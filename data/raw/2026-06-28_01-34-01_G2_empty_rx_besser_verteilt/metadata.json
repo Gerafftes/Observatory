@@ -1,0 +1,20 @@
+{
+  "label": "G2_empty_rx_besser_verteilt",
+  "duration_s": 60.0,
+  "interval_s": 1.0,
+  "url": "http://localhost:8080/api/v1/sensing/latest",
+  "expected_nodes": [
+    1,
+    2,
+    3,
+    4
+  ],
+  "notes": "RX-Module besser im Raum verteilt, leerer Raum, Guard 500ms hard / 200ms soft",
+  "started_local": "2026-06-28T01:34:01+02:00",
+  "started_utc": "2026-06-27T23:34:01+00:00",
+  "outputs": {
+    "raw_jsonl": "raw_sensing.jsonl",
+    "summary_csv": "summary.csv",
+    "errors_log": "errors.log"
+  }
+}
