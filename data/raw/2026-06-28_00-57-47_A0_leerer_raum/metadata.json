@@ -1,0 +1,20 @@
+{
+  "label": "A0_leerer_raum",
+  "duration_s": 60.0,
+  "interval_s": 1.0,
+  "url": "http://localhost:8080/api/v1/sensing/latest",
+  "expected_nodes": [
+    1,
+    2,
+    3,
+    4
+  ],
+  "notes": "Raum leer, 4 RX aktiv",
+  "started_local": "2026-06-28T00:57:47+02:00",
+  "started_utc": "2026-06-27T22:57:47+00:00",
+  "outputs": {
+    "raw_jsonl": "raw_sensing.jsonl",
+    "summary_csv": "summary.csv",
+    "errors_log": "errors.log"
+  }
+}
