@@ -1,4 +1,5 @@
 # WLAN-CSI-Projekt: Berichtsdokumentation
+
 [![Status](https://img.shields.io/badge/status-work%20in%20progress-orange)](#)
 [![Production Ready](https://img.shields.io/badge/production%20ready-no-red)](#)
 
@@ -19,9 +20,27 @@ Dieser Ordner ist nicht als Schritt-für-Schritt-Anleitung gedacht. Er sammelt M
 - Auswertungsgrundlagen
 - Material für Diskussion und Fazit
 
+## Hardware-Aufbau
+
+Fünf ESP32-S3-Boards bilden die Grundlage des Aufbaus: ein TX-Board sendet, vier RX-Boards (RX-1 bis RX-4) empfangen die CSI-Rohdaten.
+
+<img src="images/esp32-s3-boards.jpeg" alt="Fünf beschriftete ESP32-S3-Boards (RX-1, RX-2, RX-3, RX-4, TX) auf einer Schneidematte" width="480">
+
+## Referenzsensor: HLK-LD2450 24G mmWave
+
+Als Referenzsensor für Präsenz- und Bewegungserkennung dient ein HLK-LD2450-Modul (24 GHz mmWave-Radar) mit Antenne und Anschlusskabel.
+
+<img src="images/hlk-ld2450-mmwave-sensor.jpeg" alt="HLK-LD2450 24G mmWave-Sensor mit Antenne und Anschlusskabel" width="480">
+
+## Systemarchitektur (Skizze)
+
+Geplante Erweiterung: eine zentrale Hub-PCB, an die TX- und alle RX-Boards angebunden werden, um die Verkabelung im Zielraum zu vereinfachen.
+
+<img src="images/hub-pcb-schema.png" alt="KiCad-Schema: Hub-PCB verbindet ein TX- und vier RX-ESP32-S3-Boards" width="480">
+
 ## Ordnerstruktur
 
-```text
+```
 wifi-csi-dokumentation/
 ├── README.md
 ├── 00-status-und-annahmen.md
@@ -39,6 +58,10 @@ wifi-csi-dokumentation/
 │   └── processed/
 ├── logs/
 ├── results/
+├── images/
+│   ├── esp32-s3-boards.jpeg
+│   ├── hlk-ld2450-mmwave-sensor.jpeg
+│   └── hub-pcb-schema.png
 └── skizzen/
     └── screenshots/
 ```
@@ -52,6 +75,7 @@ wifi-csi-dokumentation/
 - Messreihen A0 bis A3, G1 und G2 liegen als Rohdaten/CSV vor
 - Screenshot-Nachweise sind unter `07-screenshot-nachweise.md` nach Zeitstempel und Inhalt einsortiert
 - Die RuView-Webvisualisierung ist aktuell nur qualitativ zu verwenden; sie springt ohne Kalibrierung/Geometrie stark
+- Geplant: eine Hub-PCB zur zentralen Anbindung aller Boards (siehe Skizze oben)
 - Softwarebasis RX/Server: [ruvnet/RuView](https://github.com/ruvnet/RuView)
 
 ## Wichtige aktuelle Befunde
