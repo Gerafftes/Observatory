@@ -1,4 +1,6 @@
 # WLAN-CSI-Projekt: Berichtsdokumentation
+[![Status](https://img.shields.io/badge/status-work%20in%20progress-orange)](#)
+[![Production Ready](https://img.shields.io/badge/production%20ready-no-red)](#)
 
 Stand: 2026-07-04
 
