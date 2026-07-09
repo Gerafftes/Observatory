@@ -29,6 +29,7 @@ wifi-csi-dokumentation/
 ├── 04-auswertung-bis-problemfrage.md
 ├── 05-erfolge-niederlagen-und-aenderungen.md
 ├── 06-ruview-anpassungen.md
+├── 07-screenshot-nachweise.md
 ├── templates/
 │   └── messblatt.md
 ├── data/
@@ -37,6 +38,7 @@ wifi-csi-dokumentation/
 ├── logs/
 ├── results/
 └── skizzen/
+    └── screenshots/
 ```
 
 ## Aktueller Versuchsstand
@@ -46,6 +48,7 @@ wifi-csi-dokumentation/
 - Aktueller WLAN-CSI-Aufbau: 1 ESP32-TX und 4 ESP32-RX
 - RX1 bis RX4 liefern Raw-CSI-Daten an den lokalen RuView-Server
 - Messreihen A0 bis A3, G1 und G2 liegen als Rohdaten/CSV vor
+- Screenshot-Nachweise sind unter `07-screenshot-nachweise.md` nach Zeitstempel und Inhalt einsortiert
 - Die RuView-Webvisualisierung ist aktuell nur qualitativ zu verwenden; sie springt ohne Kalibrierung/Geometrie stark
 - Softwarebasis RX/Server: [ruvnet/RuView](https://github.com/ruvnet/RuView)
 
