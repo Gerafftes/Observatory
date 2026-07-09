@@ -1,5 +1,6 @@
 # WLAN-CSI-Projekt: Berichtsdokumentation
 
+![ESP32](https://img.shields.io/badge/ESP32-E7352C?style=flat-square&logo=espressif&logoColor=white)
 [![Status](https://img.shields.io/badge/status-work%20in%20progress-orange)](#)
 [![Production Ready](https://img.shields.io/badge/production%20ready-no-red)](#)
 
