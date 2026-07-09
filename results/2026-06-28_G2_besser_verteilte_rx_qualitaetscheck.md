@@ -50,6 +50,8 @@ Bewertung: Der 500-ms-Guard reduziert die Fallback-Problematik deutlich, beseiti
 
 ## Webansicht / Visualisierung
 
+Zugehöriger Screenshot: [`skizzen/screenshots/2026-06-28_01-39-16_g2-jumping-heatmap-multiple-poses.png`](../skizzen/screenshots/2026-06-28_01-39-16_g2-jumping-heatmap-multiple-poses.png)
+
 Beobachtung aus Screenshot und Live-Ansicht: Die Heatmap und Pose-/Personhypothesen springen stark hin und her. Es erscheinen mehrere Pose-ähnliche Markierungen und helle Feldmaxima, obwohl die echte Personensituation einfacher ist.
 
 Einordnung:
