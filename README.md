@@ -4,7 +4,7 @@
 [![Status](https://img.shields.io/badge/status-work%20in%20progress-orange)](#)
 [![Production Ready](https://img.shields.io/badge/production%20ready-no-red)](#)
 
-Stand: 2026-07-04
+Stand: 2026-07-21
 
 ## Problemfrage
 
@@ -77,6 +77,9 @@ wifi-csi-dokumentation/
 - Screenshot-Nachweise sind unter `07-screenshot-nachweise.md` nach Zeitstempel und Inhalt einsortiert
 - Die RuView-Webvisualisierung ist aktuell nur qualitativ zu verwenden; sie springt ohne Kalibrierung/Geometrie stark
 - Geplant: eine Hub-PCB zur zentralen Anbindung aller Boards (siehe Skizze oben)
+- Der feste Raumaufbau vom 2026-07-18 ist vermessen und in RuView eingetragen; mmWave bleibt vorerst zurückgestellt
+- Der Vergleich „still sitzen“ gegen „deutliche Bewegung“ zeigte überlappende Roh-Bewegungswerte. Die aktuelle Klassifikation ist deshalb noch kein gültiges Messergebnis
+- Der Screenshot des fehlgeschlagenen Live-Tests und die technische Ursachenanalyse liegen unter `07-screenshot-nachweise.md` und `results/2026-07-18_fester-raum_live-visualisierung_diagnose.md`
 - Softwarebasis RX/Server: [ruvnet/RuView](https://github.com/ruvnet/RuView)
 
 ## Wichtige aktuelle Befunde
@@ -86,6 +89,14 @@ wifi-csi-dokumentation/
 - Leerer Raum wird aktuell teilweise fälschlich als `presence=True` klassifiziert.
 - Atem-/Herzfrequenzwerte sind ohne Referenzsensor noch nicht belastbar.
 - Für eine echte Positionsanzeige wären Geometrie, Kalibrierung und bessere Synchronisation nötig.
+- Feste Geometrie und eine leere-Raum-Kalibrierung allein haben die Trennung von Stillstand und Bewegung nicht gelöst.
+- Vor weiteren Klassifikationstests muss geprüft werden, ob jeder RX ausschließlich vergleichbare CSI-Pakete des vorgesehenen TX verarbeitet.
+
+## Screenshot des fehlgeschlagenen RuView-Livetests
+
+[![RuView-Livetest mit fehlerhafter Punktwolke und nicht belastbarer Klassifikation](skizzen/screenshots/2026-07-18_18-54-33_fixed-room-live-sensing-failure.png)](results/2026-07-18_fester-raum_live-visualisierung_diagnose.md)
+
+Der Screenshot zeigt den laufenden festen 1TX-/4RX-Aufbau. Obwohl RuView `PRESENT_STILL` mit `81 %` anzeigte, waren zwei Marker optisch fast überlagert, die Punktwolke reagierte nicht nachvollziehbar auf Bewegung und bewegte sich später auch beim stillen Sitzen. Das Bild ist daher ein Fehlernachweis und kein Beleg für eine korrekte Positionsbestimmung. Ein Klick auf das Bild öffnet die vollständige Diagnose.
 
 ## Dokumentationsregel
 

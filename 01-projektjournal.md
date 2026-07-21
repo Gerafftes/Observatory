@@ -599,6 +599,44 @@ Als nächstes sollten die realen RX-Positionen im Raum gemessen und beim Servers
 
 Der Befund zeigt eine wichtige Grenze: Stabile CSI-Datenerfassung bedeutet nicht automatisch stabile räumliche Visualisierung. Für Positionsschätzung braucht das System Geometrie, Kalibrierung und robuste Filterung.
 
+### 2026-07-18 — Fester 1TX-/4RX-Raumaufbau und Diagnose der Live-Visualisierung
+
+**Ausgangslage**
+
+Nach den G2-Tests wurden Raum, TX und alle vier RX fest vermessen. Das mmWave-Modul wurde bewusst auf eine spätere Phase verschoben. Ziel war zunächst eine nachvollziehbare visuelle Darstellung ausschließlich mit WLAN-CSI.
+
+**Durchführung / Änderung**
+
+Die Raummaße `4,02 m × 3,44 m × 2,59 m` und die fünf Gerätepositionen wurden in das RuView-Koordinatensystem übertragen. RuView wurde mit vier Node-Positionen, TX-Position und Raummaßen gestartet. Außerdem wurde eine leere-Raum-Kalibrierung durchgeführt und die Anzeige anschließend beim Sitzen und bei deutlicher Bewegung beobachtet.
+
+Zur Diagnose wurden Server- und UI-Pfade lokal instrumentiert. Das adaptive Modell, die zeitliche Merkmalsextraktion, die per-RX-/globale Klassifikation, die Feldbewegungsabbildung und die Kalibrierungszuführung wurden überprüft.
+
+**Beobachtung**
+
+Der Screenshot vom 18. Juli zeigt eine laufende ESP32-Verbindung, vier farbige Gerätemarker, eine Punktwolke und `PRESENT_STILL` mit `81 %`. Zwei Marker erscheinen fast überlagert. Die Punktwolke folgte einer realen Bewegung nicht zuverlässig und bewegte sich später auch bei still sitzender Person.
+
+Im Code wurden mehrere Fehler bestätigt: ein automatisch geladenes Modell mit nur `41,5 %` Genauigkeit, Selbstvergleich des aktuellen Frames, Übergewichtung statischer CSI-Merkmale, Verwendung der zuletzt eingetroffenen RX-Klasse als globale Klasse und eine zu niedrige Visualisierungsenergie für `present_moving`.
+
+Nach lokalen Korrekturen blieben die Rohbewegungswerte von stiller und bewegter Person stark überlappend. Damit war die Klassifikation weiterhin nicht belastbar.
+
+**Erfolg**
+
+Der feste Aufbau, die vollständige 4RX-Verbindung und die Übertragung der realen Geometrie sind nachgewiesen. Die Diagnose konnte mehrere konkrete Softwarefehler isolieren und verhindern, dass ein schwaches Modell weiter als gültige Auswertung behandelt wird.
+
+**Problem / Fehlschlag**
+
+Die aktuelle CSI-Paketfolge enthält so starke Frame-zu-Frame-Änderungen, dass sie Körperbewegung überlagert. Eine reine Nachjustierung fester Schwellen würde Stillstand und Bewegung nicht zuverlässig trennen. Die genaue Quelle dieser Paketvariation ist noch nicht bestätigt.
+
+**Konsequenz für den nächsten Schritt**
+
+Vor neuen Bewegungsversuchen wird die RX-Firmware auf Absender-MAC-, Pakettyp- und CSI-Raster-Filterung geprüft. Erst nach einem sauberen Datenstrom werden neue gelabelte Referenzmessungen und die leere-Raum-Kalibrierung wiederholt.
+
+**Relevanz für den Bericht**
+
+Der Versuch trennt technische Konnektivität von Messvalidität: Vier empfangende Nodes, reale Geometrie und eine Live-Punktwolke reichen nicht aus, wenn die verwendeten CSI-Frames zeitlich oder nach Paketquelle nicht vergleichbar sind. Der negative Befund ist deshalb ein wichtiger Teil der Methodik- und Grenzendiskussion.
+
+Ausführliche Diagnose und Bildnachweis: [results/2026-07-18_fester-raum_live-visualisierung_diagnose.md](results/2026-07-18_fester-raum_live-visualisierung_diagnose.md)
+
 ## Vorlage für neue Journaleinträge
 
 ### Datum — Kurzbeschreibung

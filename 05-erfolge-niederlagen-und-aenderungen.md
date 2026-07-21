@@ -19,6 +19,8 @@ Diese Datei sammelt bewusst auch negative Ergebnisse. Für den späteren Bericht
 | 2026-06-28 | OTA-Status ist über WLAN auf mehreren RX-Knoten erreichbar (`/ota/status`) | Firmware-Updates ohne erneutes USB-Anschließen sind grundsätzlich möglich, falls der OTA-Upload akzeptiert wird |
 | 2026-06-28 | Messreihen A0 bis A3 wurden automatisch in Dateien gespeichert | Es gibt nun Rohdaten und CSV-Zusammenfassungen für leeren Raum, stehende Person, Bewegung und ruhige Atmung |
 | 2026-06-28 | G2 mit besser verteilten RX-Modulen liefert vollständige 4RX-Daten | Beide G2-Messungen enthalten 60/60 Samples mit Nodes 1,2,3,4 und >96 % vollständige 4x64-Subcarrier-Samples |
+| 2026-07-18 | Fester Raumaufbau mit realen Raum-, TX- und 4RX-Koordinaten in RuView dargestellt | Die Geometrie ist nicht länger ein unbekannter Faktor; Konnektivität und Messvalidität können getrennt bewertet werden |
+| 2026-07-18 | Mehrere konkrete Klassifikations-, Kalibrierungs- und UI-Fehler im lokalen RuView-Code identifiziert und getestet | Die falsche Live-Anzeige kann teilweise auf nachvollziehbare Implementierungsfehler zurückgeführt werden |
 
 ## Fehlschläge / Probleme
 
@@ -39,6 +41,8 @@ Diese Datei sammelt bewusst auch negative Ergebnisse. Für den späteren Bericht
 | 2026-06-28 | Leerer Raum A0 wurde fast durchgehend als `presence=True` klassifiziert | Aktuelle RuView-Klassifikation ist für diesen Aufbau noch nicht kalibriert; Funkumgebung/Traffic erzeugt False Positives | Klassifikation nicht ungeprüft verwenden; eigene Auswertung/Schwellwerte und Wiederholungsmessungen nutzen |
 | 2026-06-28 | Vitalwerte wurden auch im leeren Raum ausgegeben | Vital-Estimator interpretiert Signal-/Rauschanteile als BPM | Atem-/Herzfrequenz nur mit Referenzsensor oder manuellem Atemzählen bewerten |
 | 2026-06-28 | Webansicht springt trotz besser verteilter RX-Module stark hin und her | RuView nimmt auch im leeren Raum `presence=True`/`estimated_persons=1` an; reale Node-Positionen sind noch nicht gesetzt | Web-Pose vorerst nicht als Messwert verwenden; `--node-positions` und Baseline/Kalibrierung testen |
+| 2026-07-18 | Punktwolke und Klassifikation bleiben auch mit fester Geometrie und Kalibrierungsversuch unzuverlässig | Mehrere Codefehler plus stark schwankende, möglicherweise nicht vergleichbare CSI-Pakete | Codefehler lokal korrigiert; vor neuen Schwellen zuerst TX-MAC, Pakettyp und CSI-Raster in der RX-Firmware prüfen |
+| 2026-07-18 | Still- und Bewegungsphase zeigen stark überlappende Roh-Bewegungsscores | Frame-zu-Frame-Variation wird offenbar von Paket-/Signalvariation dominiert | Keine weitere blinde Schwellwertanpassung; erst saubere Paketquelle und gelabelte Rohdaten sicherstellen |
 
 ## Änderungen am Aufbau
 
@@ -49,6 +53,7 @@ Diese Datei sammelt bewusst auch negative Ergebnisse. Für den späteren Bericht
 | 2026-06-27 | RX1-RX4 auf aktuelle Mac-Ziel-IP `192.168.4.5:5005` gebracht | DHCP hatte die Host-IP verändert; alte Target-IPs machten Nodes unsichtbar | Alle vier Nodes werden vom RuView-Server empfangen |
 | 2026-06-28 | Remote-Konfiguration über HTTP `/config` als Firmware-Erweiterung vorbereitet | Künftige Target-IP-/Node-ID-Änderungen sollen ohne USB-Provisioning möglich sein | Nach OTA-Deployment können ausgewählte NVS-Werte per WLAN gesetzt und per Reboot aktiviert werden |
 | 2026-06-28 | Für den nächsten Visualisierungstest wird ein größeres RuView-Guard-Intervall geplant | Standard 60 ms ist für die beobachtete WLAN-/ESP32-Zeitspreizung zu eng | Server mit `WDP_GUARD_INTERVAL_US=500000` und `WDP_SOFT_GUARD_US=200000` starten |
+| 2026-07-18 | TX und RX1-RX4 fest vermessen; mmWave für diese Phase zurückgestellt | Zuerst soll die WLAN-CSI-Auswertung ohne zusätzliche Referenzkomplexität stabilisiert werden | Reale Geometrie ist gesetzt; nächste Priorität ist Datenqualität statt weiterer Sensorfusion |
 
 ## Änderungen an Software / Parametern
 
@@ -58,7 +63,8 @@ Diese Datei sammelt bewusst auch negative Ergebnisse. Für den späteren Bericht
 | offen | Feste Host-IP fuer 3RX-Test festlegen, vorgeschlagen `192.168.4.50` | DHCP vergab `192.168.4.4` an RX3, waehrend diese Adresse als Mac-Ziel-IP erwartet wurde | Nach Umstellung muessen RX1-RX3 auf dieselbe feste Mac-IP reprovisioniert werden |
 | 2026-06-28 | Feste Host-IP auf eine freie Adresse außerhalb der beobachteten ESP-Adressen verschieben, vorgeschlagen `192.168.4.50` | `192.168.4.5` wurde von einem ESP belegt und ist daher keine sichere Host-Adresse | Reduziert künftige DHCP-/Ziel-IP-Konflikte |
 | 2026-06-28 | Guard-Intervall-Testwert festgelegt: 500 ms hard / 200 ms soft | Pragmatiker-Workaround für RuView-Visualisierung bei unsynchronisierten ESP32-Nodes | Darf nicht als Beleg für echte synchrone Fusion interpretiert werden |
-| offen | Reale RX-Positionen als `--node-positions` setzen | Die Webvisualisierung braucht die tatsächliche Geometrie der Empfänger | Erwartet stabilere und weniger willkürliche Feld-/Positionsanzeige |
+| 2026-07-18 | Reale RX-, TX- und Raumpositionen an RuView übergeben | Geometrie als Ursache der springenden Darstellung ausschließen | Marker entsprechen dem vermessenen Aufbau; Klassifikation und Wolkenbewegung bleiben dennoch nicht valide |
+| 2026-07-18 | Schwaches adaptives Modell verworfen und Bewegungs-/Konsenslogik lokal korrigiert | Modellgenauigkeit `41,5 %`, Selbstvergleich eines Frames, statische Sättigung und Last-RX-Aggregation verfälschten das Ergebnis | Nachweisbare Softwarefehler reduziert; verbleibende Still-/Bewegungsüberlappung weist auf den CSI-Datenstrom als nächsten Prüfpunkt |
 
 ## Beobachtete Grenzen
 
@@ -73,6 +79,7 @@ Diese Datei sammelt bewusst auch negative Ergebnisse. Für den späteren Bericht
 | Mehrknoten-Synchronisation | Bei 4RX meldet RuView `Timestamp spread ... exceeds guard interval` und fällt auf per-node Fallback zurück | Für echte Positionsfusion reicht reiner Mehrknotenempfang nicht; zeitliche Synchronität ist ein zusätzlicher limitierender Faktor |
 | Server-Guard-Intervall | Ein größeres Guard-Intervall kann Fallback-Meldungen reduzieren, akzeptiert aber stärker zeitversetzte Frames | Nützlich für Visualisierung, aber methodisch schwächer für präzise Positions-/Atemanalyse |
 | Visualisierung/Pose | Die Webansicht zeigt springende Pose-/Personhypothesen; leerer Raum wird teils als Person interpretiert | Die Visualisierung ist aktuell nur qualitativ und nicht als exakte Positionsmessung nutzbar |
+| Klassifikation im festen Aufbau | Still sitzende und deutlich bewegte Person erzeugen stark überlappende Frame-zu-Frame-Scores; die globale Klasse widerspricht der Beobachtung | Vor Aussagen zu Bewegung müssen Paketquelle, Raster und gelabelte Referenzdaten kontrolliert werden |
 | Abstand | offen | |
 | Bewegung während Atemmessung | offen | |
 | mehrere Personen | offen | |

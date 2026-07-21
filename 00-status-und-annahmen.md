@@ -2,24 +2,25 @@
 
 ## Ziel der aktuellen Phase
 
-Der erste Versuch soll nicht direkt eine fertige Ortung liefern. Ziel ist:
+Die aktuelle Phase soll aus dem stabilen 1TX-/4RX-Datenempfang eine belastbare Live-Auswertung entwickeln. Ziel ist:
 
 - CSI-Daten von mehreren ESP32-RX-Nodes empfangen
-- Bewegung im CSI-Signal sichtbar machen
-- ruhige Atmung experimentell testen
-- mmWave als Referenz parallel mitlaufen lassen
+- leeren Raum, still sitzende Person und Bewegung reproduzierbar unterscheiden
+- eine ruhende Person stabil und eine Positionsänderung nachvollziehbar darstellen
+- erst nach sauberem CSI-Datenstrom ruhige Atmung experimentell testen
+- mmWave erst in einer späteren Phase als Referenz ergänzen
 
 ## Hardware aktuell
 
 | Gerät | Rolle im ersten Test | Status |
 |---|---|---|
 | ESP32 #1 | kontrollierter WLAN-Sender / TX | vorhanden |
-| ESP32 #2 | RuView CSI-Empfänger RX1 | vorhanden |
-| ESP32 #3 | RuView CSI-Empfänger RX2 | vorhanden |
-| ESP32 #4 | RuView CSI-Empfänger RX3 | provisioniert als `node_id=3`; seriell stabil bis `CSI streaming active`, Live-Empfang im Server noch offen |
-| ESP32 #5 | RuView CSI-Empfänger RX4 | kommt später |
-| mmWave-Modul | Referenz für Presence/Atmung/Distanz | vorhanden |
-| Laptop/PC | Server, Logging, Dashboard | vorhanden; fuer 3RX-Test braucht der Mac eine stabile IP im `csi-test`-Netz |
+| ESP32 #2 | RuView CSI-Empfänger RX1 | online, liefert CSI |
+| ESP32 #3 | RuView CSI-Empfänger RX2 | online, liefert CSI |
+| ESP32 #4 | RuView CSI-Empfänger RX3 | online, liefert CSI |
+| ESP32 #5 | RuView CSI-Empfänger RX4 | online, liefert CSI |
+| mmWave-Modul | spätere Referenz für Presence/Atmung/Distanz | vorhanden, aktuell bewusst nicht verwendet |
+| Laptop/PC | Server, Logging, Dashboard | gleichzeitig per Kabel/Hotspot und mit dem CSI-Netz verbunden; 4RX-Live-Empfang nachgewiesen |
 
 ## Annahmen
 
@@ -29,6 +30,36 @@ Der erste Versuch soll nicht direkt eine fertige Ortung liefern. Ziel ist:
 - Für den TX wird eine kleine separate SoftAP-/Sender-Firmware verwendet.
 - Für RX1-RX3 wird RuView `firmware/esp32-csi-node` verwendet.
 - Das mmWave-Modul wird zuerst separat als Referenz betrachtet, nicht als Teil des WLAN-CSI-Systems.
+
+## Fester Raumaufbau vom 2026-07-18
+
+Raummaße:
+
+- Länge: `4,02 m`
+- Breite: `3,44 m`
+- Höhe: `2,59 m`
+
+Gemessene Positionen in der ursprünglichen Notation `(Breite, Länge, Höhe)`:
+
+| Gerät | Breite | Länge | Höhe |
+|---|---:|---:|---:|
+| TX | 3,05 m | 2,51 m | 1,19 m |
+| RX1 | 3,16 m | 4,02 m | 0,50 m |
+| RX2 | 2,47 m | 0,00 m | 0,87 m |
+| RX3 | 1,33 m | 4,02 m | 0,74 m |
+| RX4 | 0,98 m | 0,00 m | 0,87 m |
+
+Für RuView wurden die Koordinaten in `(x=Länge, y=Höhe, z=Breite)` überführt und entsprechend der gewählten Ansicht gespiegelt:
+
+| Gerät | RuView-Koordinate `[x, y, z]` |
+|---|---|
+| RX1 | `[0.00, 0.50, 0.28]` |
+| RX2 | `[4.02, 0.87, 0.97]` |
+| RX3 | `[0.00, 0.74, 2.11]` |
+| RX4 | `[4.02, 0.87, 2.46]` |
+| TX | `[1.51, 1.19, 0.39]` |
+
+Diese Werte sind untereinander konsistent: `x = 4,02 m - Länge` und `z = 3,44 m - Breite`.
 
 ## RuView-Rolle
 
@@ -44,9 +75,8 @@ RuView wird im ersten Test nicht als fertige wissenschaftliche Auswertung übern
 
 ## Noch offen
 
-- Stabile Ziel-IP des Mac im `csi-test`-Netz festlegen, vorgeschlagen `192.168.4.50`
-- RX1-RX3 danach einheitlich auf die feste Mac-IP als `target_ip` provisionieren
-- Exakte Board-Ports am Laptop/PC dauerhaft notieren, da macOS Ports nach Reconnect neu enumerieren koennen
-- MAC-Adresse des TX-ESP32
+- Prüfen, ob die CSI-Callback-Pipeline jedes RX ausschließlich auf den vorgesehenen TX und einen einheitlichen Paket-/CSI-Typ begrenzt
+- Wechselnde Subcarrier-Raster und Paketquellen vor der Merkmalsextraktion ausschließen
+- Danach neue gelabelte Referenzmessungen für leeren Raum, stilles Sitzen und Bewegung aufnehmen
+- Erst anschließend leere-Raum-Kalibrierung und Visualisierung erneut prüfen
 - Genaues mmWave-Modul und dessen Schnittstelle: USB oder UART
-- Ob RuView direkt aus Release-Binaries geflasht wird oder lokal mit ESP-IDF gebaut wird
