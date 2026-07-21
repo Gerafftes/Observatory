@@ -11,6 +11,7 @@ Hier werden einzelne Messläufe dokumentiert. Ziel ist nicht perfekte Formulieru
 | A2 | offen | 1 TX, 3 RX, mmWave | Bewegung | offen | geplant |
 | A3 | offen | 1 TX, 3 RX, mmWave | ruhige Atmung | offen | geplant |
 | A4 | offen | 1 TX, 3 RX, mmWave | Zonen links/Mitte/rechts | offen | geplant |
+| G3 | 2026-07-18 | 1 TX, 4 RX, feste Geometrie, ohne mmWave | leer kalibriert, danach still sitzen und bewegen | Roh-Bewegungswerte überlappen; Live-Klasse und Wolke nicht valide | fehlgeschlagen, diagnostisch wertvoll |
 
 ## Detailprotokolle
 
@@ -166,3 +167,40 @@ Prüfen, ob RX1, RX2 und RX3 unterschiedliche Signaturen je Zone liefern.
 **Zwischenergebnis**
 
 -
+
+### Mess-ID: G3 — Fester Raumaufbau und Live-Visualisierung
+
+**Situation**
+
+Ein TX und vier RX waren fest im vermessenen Raum aufgebaut. Nach einer leeren-Raum-Kalibrierung saß eine Person still und bewegte anschließend Arme und Oberkörper deutlich. Das mmWave-Modul war nicht beteiligt.
+
+**Ziel**
+
+Prüfen, ob die RuView-Punktwolke in Ruhe stabil bleibt, bei Bewegung reagiert und die globale Klasse zwischen `present_still` und `present_moving` korrekt wechselt.
+
+**Beobachtungen**
+
+- Alle vier RX waren in der Live-API aktiv.
+- Der Screenshot zeigt `PRESENT_STILL` mit `81 %`, gleichzeitig aber eine nicht validierte, diffuse räumliche Wolke und zwei optisch fast überlagerte Marker.
+- Beim stillen Sitzen meldete die globale API in einer Stichprobe fünfmal `present_still` und einmal fälschlich `present_moving`.
+- Die vier per-RX-Klassen meldeten zeitweise alle `present_moving` mit ungefähr `40 %`, obwohl die Person still saß.
+- Nach mehreren lokalen Fehlerkorrekturen blieben die Rohscores stark überlappend:
+  - still: je nach RX ungefähr `0,048` bis `0,894`
+  - deutliche Bewegung: je nach RX ungefähr `0,059` bis `0,851`
+
+**Probleme**
+
+- Die globale Klassifikation war ursprünglich vom zuletzt eingetroffenen RX abhängig.
+- Ein adaptives Modell mit nur `41,5 %` Trainingsgenauigkeit überschrieb die heuristische Klasse.
+- Der Bewegungsalgorithmus verglich den aktuellen Frame zunächst mit sich selbst und nutzte zusätzlich statische, in diesem Aufbau saturierte Merkmale.
+- Selbst nach Behebung dieser Fehler war im bisherigen Frame-zu-Frame-Score keine robuste Trennung zwischen still und bewegt sichtbar.
+- Die leere-Raum-Kalibrierung ging durch notwendige Server-Neustarts verloren und muss nach Bereinigung des Datenstroms wiederholt werden.
+
+**Zwischenergebnis**
+
+G3 ist kein erfolgreicher Ortungsnachweis. Der Test belegt jedoch, dass die nächste Priorität vor UI-Tuning und neuer Kalibrierung bei der Vergleichbarkeit der CSI-Pakete liegt. Ein Absender-/Paket-/Rasterfilter in der RX-Pipeline muss zuerst geprüft werden.
+
+**Nachweis**
+
+- [Screenshot](skizzen/screenshots/2026-07-18_18-54-33_fixed-room-live-sensing-failure.png)
+- [Ausführliche Diagnose](results/2026-07-18_fester-raum_live-visualisierung_diagnose.md)
