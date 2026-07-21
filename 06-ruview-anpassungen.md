@@ -78,3 +78,31 @@ Einordnung:
 - Ohne Node-Positionen: Bewegung/Signalreaktion kann trotzdem untersucht werden.
 - Mit Node-Positionen: bessere Voraussetzung für Heatmap/Positionsanzeige.
 - Die Webansicht wird aktuell nicht als exakter Messwert verwendet.
+
+## Lokale Diagnose- und Klassifikationsänderungen vom 2026-07-18
+
+Die folgenden Änderungen liegen im separaten lokalen RuView-Arbeitsbaum. Sie sind hier dokumentiert, aber nicht Bestandteil dieses Dokumentations-Repositories:
+
+- Raummaße und TX-Position zusätzlich zu den RX-Positionen an die UI übertragen
+- TX/RX-Marker beschriftet und räumlich nach den gemessenen Koordinaten dargestellt
+- Service-Worker-Cache aktualisiert, damit geänderte UI-Dateien tatsächlich geladen werden
+- Wolkenziel mit `0,45 m` Deadzone, `0,25 m` Zielstabilität und `1,5 s` Bestätigungszeit stabilisiert
+- Kalibrierungsfeed für die Zustände `Uncalibrated` und `Collecting` aktiviert
+- 128-/192-Werte für das 56-dimensionale Einzel-Link-Kalibrierungsmodell normalisiert
+- adaptives Klassifikationsmodell unter `70 %` Trainingsgenauigkeit abgelehnt; vorhandenes Modell hatte nur rund `41,5 %`
+- zeitlichen Bewegungsvergleich auf den tatsächlich vorherigen Frame korrigiert
+- statische CSI-Merkmale aus dem unmittelbaren Bewegungsscore entfernt bzw. zur Signalleistung normalisiert
+- globale Klasse als Konsens der aktiven RX statt aus dem zuletzt eingetroffenen Paket gebildet
+- Feldenergie für `present_moving` von einem Defaultwert `0,05` auf `0,55` korrigiert; `present_still` liegt bei `0,30`
+- diagnostische per-RX-Werte für Rohscore, geglätteten Score und Ruhe-Baseline ergänzt
+
+Validierung:
+
+- sieben neue Klassifikations-/Bewegungs-Unit-Tests bestanden
+- Release-Build des Sensing-Servers erfolgreich
+- vorhandenes 41,5-%-Modell wurde beim Serverstart nachweislich verworfen
+- Live-Vergleich still/bewegt zeigte trotzdem starke Überlappung der Rohwerte
+
+Einordnung:
+
+Die lokalen Änderungen beheben nachweisbare Implementierungsfehler, liefern aber noch keinen belastbaren Klassifikator. Insbesondere die UI-Deadzone darf nicht als verbesserte Messgenauigkeit interpretiert werden. Der nächste technische Prüfpunkt liegt in der RX-seitigen Auswahl vergleichbarer Pakete des kontrollierten TX.

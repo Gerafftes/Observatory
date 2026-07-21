@@ -1,6 +1,6 @@
 # WLAN-CSI-Projekt: Berichtsdokumentation
 
-Stand: 2026-07-04
+Stand: 2026-07-21
 
 ## Problemfrage
 
@@ -50,6 +50,9 @@ wifi-csi-dokumentation/
 - Messreihen A0 bis A3, G1 und G2 liegen als Rohdaten/CSV vor
 - Screenshot-Nachweise sind unter `07-screenshot-nachweise.md` nach Zeitstempel und Inhalt einsortiert
 - Die RuView-Webvisualisierung ist aktuell nur qualitativ zu verwenden; sie springt ohne Kalibrierung/Geometrie stark
+- Der feste Raumaufbau vom 2026-07-18 ist vermessen und in RuView eingetragen; mmWave bleibt vorerst zurückgestellt
+- Der Vergleich „still sitzen“ gegen „deutliche Bewegung“ zeigte überlappende Roh-Bewegungswerte. Die aktuelle Klassifikation ist deshalb noch kein gültiges Messergebnis
+- Der Screenshot des fehlgeschlagenen Live-Tests und die technische Ursachenanalyse liegen unter `07-screenshot-nachweise.md` und `results/2026-07-18_fester-raum_live-visualisierung_diagnose.md`
 - Softwarebasis RX/Server: [ruvnet/RuView](https://github.com/ruvnet/RuView)
 
 ## Wichtige aktuelle Befunde
@@ -59,6 +62,8 @@ wifi-csi-dokumentation/
 - Leerer Raum wird aktuell teilweise fälschlich als `presence=True` klassifiziert.
 - Atem-/Herzfrequenzwerte sind ohne Referenzsensor noch nicht belastbar.
 - Für eine echte Positionsanzeige wären Geometrie, Kalibrierung und bessere Synchronisation nötig.
+- Feste Geometrie und eine leere-Raum-Kalibrierung allein haben die Trennung von Stillstand und Bewegung nicht gelöst.
+- Vor weiteren Klassifikationstests muss geprüft werden, ob jeder RX ausschließlich vergleichbare CSI-Pakete des vorgesehenen TX verarbeitet.
 
 ## Dokumentationsregel
 
