@@ -80,3 +80,23 @@ RuView wird im ersten Test nicht als fertige wissenschaftliche Auswertung übern
 - Danach neue gelabelte Referenzmessungen für leeren Raum, stilles Sitzen und Bewegung aufnehmen
 - Erst anschließend leere-Raum-Kalibrierung und Visualisierung erneut prüfen
 - Genaues mmWave-Modul und dessen Schnittstelle: USB oder UART
+
+## Aktueller Stand nach dem D5-Livetest vom 2026-07-26
+
+- Der TX-MAC-Filter ist inzwischen auf RX1 bis RX4 aktiv.
+- D4 reduziert die zuvor dominierenden groben Bewegungs-Fehlalarme, löst aber die Still-Präsenz-Klassifikation nicht.
+- D5 ergänzt per-RX-Leerraumreferenzen, 10-Sekunden-Fenster und ein absolutes Zwei-RX-Quorum.
+- Das D5-Offline-Replay war auf zwei historischen Laufpaaren positiv.
+- Eine neue reale D5-Leerraumkalibrierung wurde erfolgreich aktiv; alle vier RX hatten anschließend Referenz und aktuelle Evidenz.
+- Der anschließende reale Still-Livetest wurde nicht bestanden: 350 von 350 Samples blieben global `ABSENT`.
+- Im ersten Abschnitt reagierte zeitweise nur RX4, im zweiten durchgehend nur RX3. Zwei gleichzeitig ausreichend lange zustimmende RX traten nicht auf.
+- D5 ist deshalb weiterhin experimentell und nicht als Standard aktiviert.
+
+Der nächste belastbare Entscheidungsschritt ist eine zusammengehörige blinde Testserie unter derselben Kalibrierung:
+
+1. leerer Raum,
+2. still sitzende Person an der bisherigen Position,
+3. mindestens eine weitere Still-Position,
+4. erst danach eine Änderung der Fusion oder Schwellen.
+
+Ausführliche Auswertung: [results/2026-07-26_D5_realer-still-livetest.md](results/2026-07-26_D5_realer-still-livetest.md)

@@ -637,6 +637,261 @@ Der Versuch trennt technische Konnektivität von Messvalidität: Vier empfangend
 
 Ausführliche Diagnose und Bildnachweis: [results/2026-07-18_fester-raum_live-visualisierung_diagnose.md](results/2026-07-18_fester-raum_live-visualisierung_diagnose.md)
 
+### 2026-07-26 — D4-Bewegungsmetrik und kontaminierter E0-Versuch
+
+**Ausgangslage**
+
+Nach der Diagnose vom 18. Juli wurden alle vier RX auf den kontrollierten TX mit der MAC-Adresse `AE:27:6E:A8:D2:64` gefiltert. Vor weiteren Personenversuchen sollte zuerst geprüft werden, ob der leere Raum mit dem bereinigten Paketstrom und der D4-Bewegungsmetrik ruhig bleibt.
+
+**Durchführung / Änderung**
+
+Die Bewegung wird nun aus RMS-normalisierten zeitlichen Frame-Unterschieden und einer ebenfalls normalisierten zeitlichen Varianz berechnet. Anschließend wurde ein geplanter 60-Sekunden-Leerraumlauf mit RX1 bis RX4 aufgezeichnet. Nach Abschluss wurde gemeldet, dass der Raum währenddessen zweimal kurz betreten worden war.
+
+**Beobachtung**
+
+Alle vier RX waren in allen 237 Samples vorhanden. Global traten weder `ACTIVE` noch `PRESENT_MOVING` auf. `ABSENT` wurde 129-mal und `PRESENT_STILL` 108-mal ausgegeben. RX1 blieb vollständig `ABSENT`; RX2, RX3 und RX4 meldeten zeitweise `PRESENT_STILL`. RX3 meldete lokal in sieben Samples `PRESENT_MOVING`, erreichte damit aber nicht das globale Bewegungsquorum. Wegen der zwei nicht zeitlich markierten Raumzutritte können diese Anteile nicht als reine Leerraumwerte interpretiert werden.
+
+**Erfolg**
+
+Gegenüber dem vorherigen Lauf verschwanden die globalen groben Bewegungsalarme. Das ist ein positives Indiz für D4, aber wegen der vermischten Raumzustände noch kein gültiger Leerraumnachweis.
+
+**Problem / Fehlschlag**
+
+Der Versuch ist als Leerraum-Baseline ungültig, weil der Raum zweimal kurz betreten wurde. Die 45,6 % `PRESENT_STILL` dürfen deshalb nicht als Leerraum-Fehlerrate verwendet werden. Unabhängig davon bleibt die Aggregationsregel auffällig: Für Bewegung ist ein Quorum nötig, für Still-Präsenz genügt schon ein einzelner RX.
+
+**Konsequenz für den nächsten Schritt**
+
+Als nächstes wird unter unverändertem Aufbau zuerst ein vollständig ununterbrochener 60-Sekunden-Leerraumlauf wiederholt. Danach folgt der kontrollierte Lauf mit still sitzender Person.
+
+**Relevanz für den Bericht**
+
+Der Lauf zeigt, dass die Korrektur einer Signalmetrik grobe Fehlbewegung beseitigen kann, ohne automatisch eine zuverlässige Anwesenheitserkennung zu liefern. Einzel-RX-Klassifikation und globale Aggregation müssen getrennt bewertet werden.
+
+Ausführliche Auswertung: [results/2026-07-26_D4-E0_leerraum.md](results/2026-07-26_D4-E0_leerraum.md)
+
+### 2026-07-26 — Gültige E0b-Wiederholung im leeren Raum
+
+**Ausgangslage**
+
+Der erste E0-Versuch war durch zwei kurze Raumzutritte kontaminiert. Deshalb wurde er nicht als Leerraum-Baseline verwendet und unter unverändertem Aufbau vollständig wiederholt.
+
+**Durchführung / Änderung**
+
+Nach zehn Sekunden Vorlauf blieb der Raum während der gesamten 60-Sekunden-Aufnahme leer. Das Messende wurde für die außerhalb wartende Versuchsperson über Home Assistant durch zweimaliges Blinken der Küchen-Fackel signalisiert.
+
+**Beobachtung**
+
+Alle vier RX waren in allen 237 Samples vorhanden. Trotzdem wurde global 218-mal `PRESENT_STILL` und nur 19-mal `ABSENT` ausgegeben. RX1 blieb vollständig `ABSENT`. RX2 meldete in 12,2 %, RX3 in 39,7 % und RX4 in 84,4 % der Samples Präsenz. Global traten kein `PRESENT_MOVING` und kein `ACTIVE` auf.
+
+**Erfolg**
+
+Die Datenerfassung und das externe Abschlusssignal funktionierten zuverlässig. D4 verhindert weiterhin die zuvor dominierenden groben Bewegungsalarme.
+
+**Problem / Fehlschlag**
+
+E0b ist mit 92,0 % globaler Still-Präsenz im leeren Raum nicht bestanden. RX4 allein erzeugt in 45,6 % aller Samples die einzige Präsenzmeldung. Da für die globale Klasse `PRESENT_STILL` ein einzelner RX genügt, wird lokales Rauschen direkt als globale Anwesenheit ausgegeben.
+
+**Konsequenz für den nächsten Schritt**
+
+Vor einer Änderung von Schwelle oder Quorum wird ein gleich langer Positivlauf mit still sitzender Person aufgenommen. Danach werden die per-RX-Verteilungen von E0b und dem Positivlauf direkt verglichen.
+
+**Relevanz für den Bericht**
+
+Der Lauf trennt erfolgreich reduzierte Bewegungs-Fehlalarme von weiterhin unzuverlässiger Anwesenheitserkennung. Er zeigt außerdem, dass eine globale ODER-Verknüpfung mehrerer Empfänger die False-Positive-Rate stark erhöhen kann.
+
+Ausführliche Auswertung: [results/2026-07-26_D4-E0b_sauberer-leerraum.md](results/2026-07-26_D4-E0b_sauberer-leerraum.md)
+
+### 2026-07-26 — E0c A/B-Test mit mittigem Mac
+
+**Ausgangslage**
+
+E0b zeigte 0,0 % lokale Fehlpräsenz bei RX1, 12,2 % bei RX2, 39,7 % bei RX3 und insgesamt 84,8 % bei RX4. Es wurde vermutet, dass die Nähe des Macs zu RX4 dessen Messwerte beeinflusst.
+
+**Durchführung / Änderung**
+
+Der Mac wurde relativ mittig aufgestellt. Danach wurde unter ansonsten unverändertem Aufbau erneut 60 Sekunden lang der vollständig leere Raum gemessen. Das Messende wurde durch einmaliges kurzes Leuchten der Home-Assistant-Küchen-Fackel signalisiert.
+
+**Beobachtung**
+
+RX4 fiel von 84,8 % Fehlpräsenz auf 0,0 %. Sein Raw-Mittel sank von 0,121 auf 0,027 und der geglättete Mittelwert von 0,062 auf 0,001. Gleichzeitig verbesserte sich sein RSSI von −57,0 auf −52,0 dBm. RX1 blieb bei 0,0 %. RX2 und RX3 veränderten sich mit 13,1 % beziehungsweise 40,5 % Fehlpräsenz praktisch nicht. Global sank die Fehlpräsenz von 92,0 % auf 46,8 %.
+
+**Erfolg**
+
+Der A/B-Test isoliert für RX4 einen starken Einfluss des Mac-Standorts. Durch das Umstellen wurde dessen Fehlpräsenz vollständig beseitigt.
+
+**Problem / Fehlschlag**
+
+Der Test unterscheidet noch nicht zwischen Funkstörung und einer Änderung des Multipfadfeldes durch Metallgehäuse und Kabel. Außerdem bleiben die Fehlmeldungen von RX2 und RX3 bestehen.
+
+**Konsequenz für den nächsten Schritt**
+
+Der Mac bleibt mittig. E0c wird als aktuelle Leerraum-Referenz verwendet. Als nächstes folgt am selben Aufbau ein Positivlauf mit still sitzender Person, bevor Schwellen oder Quorum verändert werden.
+
+**Relevanz für den Bericht**
+
+Der Befund zeigt, dass nicht nur Personen, sondern auch Positionen aktiver Rechner und leitender Gegenstände das CSI-Muster einzelner Links stark verändern können. Eine stabile Versuchsanordnung muss deshalb auch den Auswerterechner und seine Kabel räumlich festlegen.
+
+Ausführliche Auswertung: [results/2026-07-26_E0b-E0c_mac-position-ab-test.md](results/2026-07-26_E0b-E0c_mac-position-ab-test.md)
+
+### 2026-07-26 — E1: still sitzende Person bei mittigem Mac
+
+**Ausgangslage**
+
+E0c wurde nach Beseitigung der RX4-Störung als aktuelle Leerraum-Referenz festgelegt. Vor einer Änderung der Klassifikationslogik musste geprüft werden, ob eine still sitzende Person unter identischem Aufbau eine trennbare Score-Verteilung erzeugt.
+
+**Durchführung / Änderung**
+
+Eine Person saß 60 Sekunden lang möglichst still ungefähr mittig im Raum. Der Mac und alle übrigen Komponenten blieben gegenüber E0c unverändert.
+
+**Beobachtung**
+
+Global stieg der Präsenzanteil von 46,8 % im Leerraum auf 79,7 % bei stiller Person. RX1 blieb vollständig `ABSENT`; RX2 sank sogar von 13,1 % auf 8,0 %. RX3 stieg von 40,5 % auf 72,2 %, RX4 von 0,0 % auf 38,8 %.
+
+Der geglättete RX4-Mittelwert stieg von 0,001 auf 0,036. Seine deskriptive AUC betrug 0,982. Der Effekt blieb in den letzten 20 Sekunden mit einem Mittelwert von 0,039 bestehen und war daher nicht nur eine Folge des Hinsetzens.
+
+**Erfolg**
+
+RX4 trennt den getesteten Leerraum und die still sitzende Person deutlich. Bei einer vorläufigen geglätteten Schwelle von 0,01 lagen 3,0 % der Leerraum- und 83,5 % der Still-Samples darüber.
+
+**Problem / Fehlschlag**
+
+Die Links reagieren sehr unterschiedlich. Eine gemeinsame Schwelle und gleich gewichtete ODER-Fusion sind ungeeignet. Die aus einem Laufpaar abgeleitete 0,01-Schwelle ist außerdem noch nicht unabhängig validiert.
+
+**Konsequenz für den nächsten Schritt**
+
+Die künftige Präsenzlogik sollte per-RX-Leerraumreferenzen und eine Fusion der individuellen Abweichungen verwenden. Vor der endgültigen Übernahme eines Schwellwerts wird ein neues Leerraum-/Still-Paar unter unverändertem Aufbau aufgenommen.
+
+**Relevanz für den Bericht**
+
+Der Versuch zeigt, dass stille Anwesenheit grundsätzlich in einem einzelnen geeigneten CSI-Link sichtbar sein kann, während andere Links am selben Aufbau keine oder widersprüchliche Reaktion zeigen. Sensorgeometrie und link-spezifische Kalibrierung sind deshalb zentral.
+
+Ausführliche Auswertung: [results/2026-07-26_E0c-E1_still-person-separation.md](results/2026-07-26_E0c-E1_still-person-separation.md)
+
+### 2026-07-26 — E0d/E1b widerlegt feste RX4-Schwelle
+
+**Ausgangslage**
+
+Im ersten E0c/E1-Paar trennte RX4 Leerraum und still sitzende Person deutlich. Eine geglättete Schwelle von 0,01 sollte deshalb mit einem unabhängigen Laufpaar bestätigt werden.
+
+**Durchführung / Änderung**
+
+Ohne Hardware-, Mac- oder Softwareänderung wurden erneut 60 Sekunden leerer Raum und anschließend 60 Sekunden still sitzende Person aufgenommen.
+
+**Beobachtung**
+
+RX4 blieb sowohl im Leerraum als auch bei sitzender Person vollständig `ABSENT`; kein Sample überschritt 0,01. RX2 war dagegen bereits im Leerraum in 83,5 % der Samples präsent. RX3 stieg von 22,4 % Präsenz im Leerraum auf 78,1 % bei sitzender Person. Sein geglätteter Mittelwert stieg von 0,027 auf 0,055.
+
+**Erfolg**
+
+Die unabhängige Prüfung verhinderte die Übernahme einer überangepassten RX4-Schwelle. RX3 zeigte als einziger Link in beiden Laufpaaren einen konsistenten Mittelwertanstieg bei stiller Person.
+
+**Problem / Fehlschlag**
+
+Die Empfindlichkeit einzelner Links ist nicht stabil genug für eine fest an einen RX gebundene Sample-Schwelle. Die globale ODER-Fusion wurde im E0d-Leerraum durch RX2 erneut stark falsch ausgelöst.
+
+**Konsequenz für den nächsten Schritt**
+
+Die neue Logik muss per-RX-Leerraumreferenzen, längere Zeitfenster und eine Zuverlässigkeitsbewertung der Links kombinieren. Eine feste RX4-Schwelle wird nicht implementiert.
+
+**Relevanz für den Bericht**
+
+Der Versuch zeigt die Bedeutung unabhängiger Wiederholungen: Eine sehr gute Trennung in einem Laufpaar kann durch kleine Änderungen der Körperposition oder des Multipfadfeldes verschwinden. Reproduzierbarkeit ist daher wichtiger als ein einzelner hoher Kennwert.
+
+Ausführliche Auswertung: [results/2026-07-26_E0d-E1b_unabhaengige-bestaetigung.md](results/2026-07-26_E0d-E1b_unabhaengige-bestaetigung.md)
+
+### 2026-07-26 — D5-Offline-Replay und experimentelle Präsenzkalibrierung
+
+**Ausgangslage**
+
+Die feste RX4-Schwelle war im zweiten Laufpaar widerlegt. Gleichzeitig erzeugte RX2 im E0d-Leerraum eine stabile lokale Fehlpräsenz. Eine neue Regel durfte deshalb weder an einen bestimmten RX noch an eine globale ODER-Verknüpfung gebunden sein.
+
+**Durchführung / Änderung**
+
+Ein reproduzierbarer Offline-Replayer wurde erstellt. D5 lernt pro RX ausschließlich aus sechs vollständigen 10-Sekunden-Leerraumblöcken Median und MAD. Im Live-Pfad werden 10-Sekunden-Mittel relativ zu dieser Referenz bewertet. Mindestens zwei RX müssen zwei Sekunden lang zustimmen. Die Regel wurde zuerst E0c-only → E0d/E1b und danach in umgekehrter Richtung geprüft.
+
+Im lokalen RuView-Server wurde D5 als explizit zu aktivierender Prototyp ergänzt. Die getrennten Endpunkte `/api/v1/classification/calibration/start|stop|status` beeinflussen die vorhandene SVD-FieldModel-Kalibrierung nicht. D4 bleibt für deutliche Bewegung zuständig.
+
+**Funktionsweise von D5**
+
+1. Während einer 60-Sekunden-Leerraumkalibrierung entstehen pro RX sechs getrennte 10-Sekunden-Mittelwerte des `smoothed_motion_score`.
+2. Aus diesen Leerraumwerten werden pro RX Median, MAD und die robuste Skala `max(1,4826 × MAD; 0,005)` berechnet. Personendaten werden nicht zum Anpassen der Referenz verwendet.
+3. Im Livebetrieb bildet jeder RX einen kausalen Mittelwert über die letzten zehn Sekunden. Seine Abweichung von der eigenen Leerraumreferenz wird als z-Wert berechnet.
+4. Ein RX stimmt für Anwesenheit, wenn `z > 1`.
+5. `PRESENT_STILL` erfordert mindestens zwei RX-Stimmen, die zwei Sekunden lang bestehen. Unter drei nutzbaren RX wird kein reduziertes Ein-RX-Quorum verwendet.
+6. D4 bleibt für deutliche Bewegung (`PRESENT_MOVING` und `ACTIVE`) zuständig. D5 übernimmt nach erfolgreicher Kalibrierung nur die schwierigere Trennung zwischen `ABSENT` und `PRESENT_STILL`.
+
+Für D5 zählen ausschließlich CSI-Frames, die den Subcarrier-Rasterfilter passiert haben und tatsächlich in die D5-Berechnung gelangt sind. Jeder verwendete RX muss mindestens 5 Hz akzeptierte D5-Daten liefern. Eine Unterbrechung von mindestens einer Sekunde verwirft das gesamte Livefenster; danach müssen erneut vollständige zehn Sekunden gesammelt werden. Evidenzverlust, Nodeverlust oder ein Subcarrier-Rasterwechsel dürfen keine zuvor erkannte Still-Präsenz festhalten.
+
+Der Server stellt dafür folgende getrennte Schnittstellen bereit:
+
+```text
+POST /api/v1/classification/calibration/start
+POST /api/v1/classification/calibration/stop
+GET  /api/v1/classification/calibration/status
+```
+
+Der Status enthält pro RX die Referenz, das aktuelle 10-Sekunden-Mittel, den z-Wert, die Stimme sowie Frische und Datenrate der tatsächlich akzeptierten D5-Samples. Ohne abgeschlossene D5-Kalibrierung bleibt die bisherige D4-Logik aktiv (`legacy_d4`).
+
+**Beobachtung**
+
+Die primäre Prüfung erreichte 0,0 % Leerraum-Fehlpräsenz, 88,8 % Still-Recall und 94,4 % Balanced Accuracy. Die umgekehrte Prüfung erreichte 0,0 %, 89,8 % und 94,9 %. Ein strengerer `z > 3`-Kandidat fiel auf 15,5 % mittleren Recall. Ein überwachter Selektor erzeugte 20,8 % mittlere Leerraum-Fehlpräsenz.
+
+**Erfolg**
+
+Erstmals trennt eine vorab definierte, nur auf Leerraumdaten kalibrierte Regel beide vorhandenen Laufpaare ohne globale Leerraum-Fehlpräsenz. Der Pfadwechsel zwischen RX3/RX4 und RX2/RX3 wird durch das absolute Zwei-RX-Quorum abgefangen. Replay- und Live-Berechnung verwenden dieselben vollständigen Kalibrierblöcke.
+
+Vor dem Livetest wurden die Runtime-Sicherungen in zwei unabhängigen Code-Audits geprüft. Veraltete RX-Stimmen, Evidenzverlust, Nodeverlust, eine zu niedrige akzeptierte Datenrate und Unterbrechungen des 10-Sekunden-Fensters fallen nun geschlossen auf keine bestätigte Still-Präsenz zurück. 709 Rust-Tests, 7 Python-Tests, der Release-Build und der isolierte API-Lebenszyklustest bestanden. Der finale Audit gab den kontrollierten Livetest frei.
+
+**Problem / Fehlschlag**
+
+Die Datengrundlage umfasst nur zwei Laufpaare aus derselben Sitzung und nur eine Sitzposition. Das Ergebnis ist daher noch kein Produktionsnachweis. Ein einzelner echter Funkpfad könnte vom Zwei-RX-Quorum übersehen werden; zwei gemeinsam driftende RX könnten weiterhin falsche Präsenz erzeugen.
+
+D5 löst außerdem keine räumliche Ortung. Die Heatmap und die sichtbare Punktwolke werden durch diese Änderung nicht automatisch zur gemessenen Personenposition. D5 verbessert ausschließlich die Raumklassifikation `ABSENT` gegenüber `PRESENT_STILL`.
+
+**Konsequenz für den nächsten Schritt**
+
+Die D5-Parameter bleiben eingefroren. Nach dem finalen Server-Build folgt eine neue 60-Sekunden-Leerraumkalibrierung, danach je ein blinder Leerraum- und Still-Lauf sowie mindestens eine weitere Sitzposition. Erst diese neuen Daten entscheiden über eine Standardaktivierung.
+
+Der finale Release wurde mit denselben Ports, Raummaßen und TX-/RX-Positionen neu gestartet. Alle vier RX lieferten anschließend wieder aktuelle Daten. D5 ist noch nicht real kalibriert; der Server arbeitet bis zum ersten erfolgreichen Kalibrierlauf weiterhin im Zustand `legacy_d4`.
+
+**Relevanz für den Bericht**
+
+D5 zeigt methodisch, wie aus negativen Wiederholungen eine überprüfbare Regel entsteht: nicht den besten Einzelsensor auswählen, sondern link-spezifische Referenzen, robuste Statistik, Zeitfenster und ein vorab festgelegtes Quorum verwenden. Gleichzeitig bleibt die kleine Stichprobe ausdrücklich als Grenze dokumentiert.
+
+Ausführliche Auswertung: [results/2026-07-26_D5_offline-replay-und-experimentelle-praesenzkalibrierung.md](results/2026-07-26_D5_offline-replay-und-experimentelle-praesenzkalibrierung.md)
+
+### 2026-07-26 — Reale D5-Kalibrierung und fehlgeschlagener Still-Livetest
+
+**Ausgangslage**
+
+Der D5-Offline-Replay hatte die vorhandenen historischen Laufpaare mit 0,0 % Leerraum-Fehlpräsenz und 89,3 % mittlerem Still-Recall getrennt. Mit eingefrorenen Parametern sollte deshalb die erste neue reale Aufnahme nach einer echten Leerraumkalibrierung folgen.
+
+**Durchführung / Änderung**
+
+Die reale D5-Kalibrierung wurde erfolgreich aktiv. Alle vier RX besaßen danach eine gültige Referenz und aktuelle Evidenz. Anschließend saß eine Person zunächst 59,7 Sekunden und danach weitere 29,9 Sekunden still. Beide Aufnahmen enthielten durchgehend RX1 bis RX4 und keine Logger-Fehler.
+
+**Beobachtung**
+
+Global wurden alle 350 Samples als `ABSENT` ausgegeben. Im ersten Lauf stimmte RX4 in 87 von 236 Samples für Präsenz; alle anderen RX blieben ohne Stimme. In der Fortsetzung stimmte RX3 in allen 114 Samples, RX2 aber nur einmal und RX1/RX4 gar nicht. Das benötigte Zwei-RX-Quorum kam deshalb nie zustande.
+
+**Erfolg**
+
+Die reale Kalibrierung, die per-RX-Diagnose und die Sicherheitsregel arbeiteten technisch nachvollziehbar. Eine einzelne RX-Stimme wurde nicht fälschlich als globale Präsenz übernommen.
+
+**Problem / Fehlschlag**
+
+Der Positivtest wurde mit 0,0 % Still-Recall vollständig verfehlt. Das positive Offline-Replay generalisierte nicht auf die neue Aufnahme. Der informative Link wechselte zudem von RX4 im ersten Abschnitt zu RX3 in der Fortsetzung.
+
+**Konsequenz für den nächsten Schritt**
+
+D5 wird nicht als Standard aktiviert. Das Quorum wird nicht isoliert anhand dieses Fehlschlags gelockert, weil die früheren Leerraumläufe die Gefahr hoher False Positives belegen. Benötigt wird eine zusammengehörige blinde Serie aus Leerraum und mehreren Still-Positionen unter derselben Kalibrierung.
+
+**Relevanz für den Bericht**
+
+Der Test zeigt, dass robuste Fusion zwei Fehler gleichzeitig vermeiden muss: einzelne driftende RX dürfen keinen Leerraumalarm erzeugen, wechselnde einzeln informative Links dürfen aber auch nicht zu vollständigen False Negatives führen. Offline-Erfolg auf wenigen Laufpaaren ersetzt keinen neuen Livetest.
+
+Ausführliche Auswertung: [results/2026-07-26_D5_realer-still-livetest.md](results/2026-07-26_D5_realer-still-livetest.md)
+
 ## Vorlage für neue Journaleinträge
 
 ### Datum — Kurzbeschreibung
