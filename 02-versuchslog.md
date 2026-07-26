@@ -204,3 +204,35 @@ G3 ist kein erfolgreicher Ortungsnachweis. Der Test belegt jedoch, dass die näc
 
 - [Screenshot](skizzen/screenshots/2026-07-18_18-54-33_fixed-room-live-sensing-failure.png)
 - [Ausführliche Diagnose](results/2026-07-18_fester-raum_live-visualisierung_diagnose.md)
+
+### Mess-ID: D5-Live — Reale Leerraumkalibrierung und still sitzende Person
+
+**Situation**
+
+Nach erfolgreicher realer D5-Leerraumkalibrierung saß eine Person zunächst 59,7 Sekunden und anschließend weitere 29,9 Sekunden still. Mac, TX, RX und Serverparameter blieben unverändert.
+
+**Ziel**
+
+Prüfen, ob die im Offline-Replay erfolgreiche D5-Regel mit per-RX-Referenzen und Zwei-RX-Quorum eine neue reale still sitzende Person erkennt.
+
+**Beobachtungen**
+
+- Beide Aufnahmen enthielten durchgehend RX1 bis RX4; die Logger meldeten keine Fehler.
+- Alle vier RX hatten eine gültige D5-Referenz und aktuelle Evidenz.
+- Global wurden alle 350 Samples als `ABSENT` ausgegeben.
+- Im ersten Abschnitt stimmte RX4 in 87 von 236 Samples für Präsenz; kein anderer RX stimmte zu.
+- Im zweiten Abschnitt stimmte RX3 in allen 114 Samples; RX2 stimmte nur einmal zu.
+
+**Probleme**
+
+- Das geforderte Zwei-RX-Quorum kam nie zustande.
+- Der informative Funkpfad wechselte zwischen den beiden direkt aufeinanderfolgenden Abschnitten.
+- Für dieselbe neue Kalibrierung fehlt noch ein separat aufgezeichneter blinder Leerraumlauf.
+
+**Zwischenergebnis**
+
+Der reale D5-Positivtest ist mit 0,0 % Still-Recall nicht bestanden. D5 bleibt deaktiviert. Vor einer Änderung an Quorum oder Schwelle ist eine gepaarte blinde Serie aus Leerraum und mehreren Still-Positionen nötig.
+
+**Nachweis**
+
+- [Ausführliche Auswertung](results/2026-07-26_D5_realer-still-livetest.md)
