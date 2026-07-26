@@ -29,6 +29,8 @@ Das Messprotokoll stellt sicher, dass die Daten später wirklich zur Problemfrag
 | A4-M | 60 s | Person steht Mitte | manuelles Label |
 | A4-R | 60 s | Person steht rechts | manuelles Label |
 | G1 | 60 s | Guard-Intervall-Test mit 4RX, Person bewegt sich langsam | Serverlog: weniger/keine `Multistatic fusion failed` |
+| D5 E1 | 59,7 s | Person sitzt nach realer D5-Leerraumkalibrierung still | manuelles Label; 4RX vollständig |
+| D5 E1 Persistenz | 29,9 s | dieselbe Person sitzt weiter still | manuelles Label; 4RX vollständig |
 
 ## Dateinamen
 
@@ -112,3 +114,21 @@ Am Ende des ersten Testtags sollten mindestens diese Daten existieren:
 - Person bewegt sich
 - ruhige Atmung
 - eine kurze Notiz, welche RX-Nodes funktioniert haben
+
+## D5-Livetest vom 2026-07-26
+
+| Lauf | Rohdaten | Ergebnis |
+|---|---|---|
+| D5 E1 | `data/raw/2026-07-26_23-28-03_D5_E1_still_sitzend/` | 236 von 236 Samples global `ABSENT` |
+| D5 E1 Persistenz | `data/raw/2026-07-26_23-30-21_D5_E1_still_persistenz/` | 114 von 114 Samples global `ABSENT` |
+
+Qualitätsprüfung:
+
+- RX1 bis RX4 in jedem Sample vorhanden
+- keine Einträge in den beiden `errors.log`-Dateien
+- D5-Referenz und aktuelle Evidenz für alle vier RX vorhanden
+- reale Person manuell als still sitzend gelabelt
+
+Bewertung:
+
+Der Positivtest ist nicht bestanden. Für eine vollständige Aussage zur realen D5-Leistung fehlt unter derselben Kalibrierung noch der separat aufgezeichnete blinde Leerraumlauf.

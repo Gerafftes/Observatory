@@ -21,6 +21,7 @@ Diese Datei sammelt bewusst auch negative Ergebnisse. Für den späteren Bericht
 | 2026-06-28 | G2 mit besser verteilten RX-Modulen liefert vollständige 4RX-Daten | Beide G2-Messungen enthalten 60/60 Samples mit Nodes 1,2,3,4 und >96 % vollständige 4x64-Subcarrier-Samples |
 | 2026-07-18 | Fester Raumaufbau mit realen Raum-, TX- und 4RX-Koordinaten in RuView dargestellt | Die Geometrie ist nicht länger ein unbekannter Faktor; Konnektivität und Messvalidität können getrennt bewertet werden |
 | 2026-07-18 | Mehrere konkrete Klassifikations-, Kalibrierungs- und UI-Fehler im lokalen RuView-Code identifiziert und getestet | Die falsche Live-Anzeige kann teilweise auf nachvollziehbare Implementierungsfehler zurückgeführt werden |
+| 2026-07-26 | Reale D5-Leerraumkalibrierung mit gültiger Referenz und aktueller Evidenz für RX1 bis RX4 abgeschlossen | Der experimentelle Pfad funktioniert technisch im Livebetrieb und kann mit neuen Daten geprüft werden |
 
 ## Fehlschläge / Probleme
 
@@ -43,6 +44,7 @@ Diese Datei sammelt bewusst auch negative Ergebnisse. Für den späteren Bericht
 | 2026-06-28 | Webansicht springt trotz besser verteilter RX-Module stark hin und her | RuView nimmt auch im leeren Raum `presence=True`/`estimated_persons=1` an; reale Node-Positionen sind noch nicht gesetzt | Web-Pose vorerst nicht als Messwert verwenden; `--node-positions` und Baseline/Kalibrierung testen |
 | 2026-07-18 | Punktwolke und Klassifikation bleiben auch mit fester Geometrie und Kalibrierungsversuch unzuverlässig | Mehrere Codefehler plus stark schwankende, möglicherweise nicht vergleichbare CSI-Pakete | Codefehler lokal korrigiert; vor neuen Schwellen zuerst TX-MAC, Pakettyp und CSI-Raster in der RX-Firmware prüfen |
 | 2026-07-18 | Still- und Bewegungsphase zeigen stark überlappende Roh-Bewegungsscores | Frame-zu-Frame-Variation wird offenbar von Paket-/Signalvariation dominiert | Keine weitere blinde Schwellwertanpassung; erst saubere Paketquelle und gelabelte Rohdaten sicherstellen |
+| 2026-07-26 | Erster realer D5-Still-Livetest liefert 350 von 350 Samples `ABSENT` | Erst reagierte nur RX4, danach nur RX3; das feste Zwei-RX-Quorum wurde nie erfüllt | D5 nicht als Standard aktivieren; gepaarte blinde Leerraum-/Still-Serie aufnehmen, bevor Fusion oder Schwelle geändert wird |
 
 ## Änderungen am Aufbau
 
@@ -65,6 +67,7 @@ Diese Datei sammelt bewusst auch negative Ergebnisse. Für den späteren Bericht
 | 2026-06-28 | Guard-Intervall-Testwert festgelegt: 500 ms hard / 200 ms soft | Pragmatiker-Workaround für RuView-Visualisierung bei unsynchronisierten ESP32-Nodes | Darf nicht als Beleg für echte synchrone Fusion interpretiert werden |
 | 2026-07-18 | Reale RX-, TX- und Raumpositionen an RuView übergeben | Geometrie als Ursache der springenden Darstellung ausschließen | Marker entsprechen dem vermessenen Aufbau; Klassifikation und Wolkenbewegung bleiben dennoch nicht valide |
 | 2026-07-18 | Schwaches adaptives Modell verworfen und Bewegungs-/Konsenslogik lokal korrigiert | Modellgenauigkeit `41,5 %`, Selbstvergleich eines Frames, statische Sättigung und Last-RX-Aggregation verfälschten das Ergebnis | Nachweisbare Softwarefehler reduziert; verbleibende Still-/Bewegungsüberlappung weist auf den CSI-Datenstrom als nächsten Prüfpunkt |
+| 2026-07-26 | D5 als separat kalibrierte Präsenzschicht mit per-RX-Referenz, 10-Sekunden-Fenster und Zwei-RX-Quorum integriert | Die frühere globale ODER-Regel erzeugte hohe Leerraum-Fehlpräsenz | Offline-Replay positiv, erster realer Still-Livetest jedoch mit 0,0 % Recall; Status bleibt experimentell |
 
 ## Beobachtete Grenzen
 
@@ -80,6 +83,7 @@ Diese Datei sammelt bewusst auch negative Ergebnisse. Für den späteren Bericht
 | Server-Guard-Intervall | Ein größeres Guard-Intervall kann Fallback-Meldungen reduzieren, akzeptiert aber stärker zeitversetzte Frames | Nützlich für Visualisierung, aber methodisch schwächer für präzise Positions-/Atemanalyse |
 | Visualisierung/Pose | Die Webansicht zeigt springende Pose-/Personhypothesen; leerer Raum wird teils als Person interpretiert | Die Visualisierung ist aktuell nur qualitativ und nicht als exakte Positionsmessung nutzbar |
 | Klassifikation im festen Aufbau | Still sitzende und deutlich bewegte Person erzeugen stark überlappende Frame-zu-Frame-Scores; die globale Klasse widerspricht der Beobachtung | Vor Aussagen zu Bewegung müssen Paketquelle, Raster und gelabelte Referenzdaten kontrolliert werden |
+| Mehrlink-Fusion | Einzelne informative Links wechseln zwischen direkt aufeinanderfolgenden Still-Aufnahmen; ein Zwei-RX-Quorum übersah die reale Person vollständig | Mehr RX allein garantieren keine robuste Erkennung; die Fusion muss Drift und wechselnde Linkempfindlichkeit gleichzeitig behandeln |
 | Abstand | offen | |
 | Bewegung während Atemmessung | offen | |
 | mehrere Personen | offen | |

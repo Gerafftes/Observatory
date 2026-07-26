@@ -41,6 +41,17 @@ Interpretation:
 
 Der Aufbau reagiert auf das Funksignal, aber die aktuelle Klassifikation ist bei schwachem Link um etwa -80 dBm nicht belastbar. Für die Problemfrage ist das ein wichtiger physikalisch-praktischer Grenzbefund: Ein einzelner Link kann zwar Änderungen zeigen, liefert aber ohne gute Geometrie/Kalibrierung viele Fehlalarme.
 
+Aktueller Mehrlink-Befund vom 2026-07-26:
+
+- D4 beseitigte die zuvor dominierenden globalen Bewegungs-Fehlalarme, ließ aber hohe Still-Präsenz-Fehlalarme im Leerraum bestehen.
+- Eine per-RX kalibrierte D5-Regel mit Zwei-RX-Quorum erreichte im Offline-Replay zweier historischer Laufpaare 89,3 % mittleren Still-Recall.
+- Im ersten neuen realen Still-Livetest nach erfolgreicher Leerraumkalibrierung wurden dagegen 350 von 350 Samples als `ABSENT` ausgegeben.
+- Zunächst reagierte nur RX4 zeitweise, anschließend nur RX3 dauerhaft. Das Zwei-RX-Quorum wurde nie erfüllt.
+
+Einordnung:
+
+Mehrere Empfänger erhöhen nicht automatisch die Zuverlässigkeit. Eine ODER-Fusion lässt einzelne driftende Links zu häufig auslösen; ein starres Zwei-RX-Quorum kann umgekehrt reale Anwesenheit vollständig übersehen, wenn nur ein Link gleichzeitig informativ ist. Die zentrale offene Aufgabe ist daher eine Fusion, die wechselnde Linkempfindlichkeit berücksichtigt, ohne Leerraumdrift wieder als Person zu interpretieren.
+
 ## Auswertungsteil 2: Atmung
 
 Fragestellung:
