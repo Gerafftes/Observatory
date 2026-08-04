@@ -1,8 +1,7 @@
-# WLAN-CSI-Projekt: Berichtsdokumentation
+# WLAN-CSI-Projekt: Berichtsdokumentation [![Hack Club Stardance](https://img.shields.io/badge/Hack%20Club-Stardance-ec3750?style=flat-square&logo=hackclub&logoColor=white)](https://stardance.hackclub.com/projects/25673)
 
-![ESP32](https://img.shields.io/badge/ESP32-E7352C?style=flat-square&logo=espressif&logoColor=white)
+[![ESP32](https://img.shields.io/badge/ESP32-E7352C?style=flat-square&logo=espressif&logoColor=white)](https://www.espressif.com/en/products/socs/esp32)
 [![Status](https://img.shields.io/badge/status-work%20in%20progress-orange)](#)
-[![Production Ready](https://img.shields.io/badge/production%20ready-no-red)](#)
 
 Stand: 2026-07-21
 
