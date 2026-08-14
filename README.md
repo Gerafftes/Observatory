@@ -23,7 +23,7 @@ Referenz verwendet.
 > motionless, if you change the signal… we’ll find *you*.
 
 *Nach dem Intro der Serie
-[*Person of Interest*](https://warnertv.de/serie/sendungen/person-of-interest).*
+[*Person of Interest*](https://en.wikipedia.org/wiki/Person_of_Interest_(TV_series)).*
 
 *Die fünf ESP32-S3-Boards des Aufbaus: ein Sender und vier
 CSI-Empfänger.*
