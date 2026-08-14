@@ -82,6 +82,32 @@ Projektanpassungen sind unter
 - Einen HLK-LD2450 als Kalibrierungs- und Referenzsensor verwenden, ohne seine
   Werte in den späteren WLAN-CSI-Prädiktor einzuspeisen.
 
+## Benutzeroberfläche
+
+### Dashboard im Offline-Fallback
+
+Das Dashboard zeigt Systemstatus, Datenquelle und Laufzeitmetriken. Diese
+Aufnahme dokumentiert den korrekt sichtbaren Offline-Fallback; sie ist kein
+Nachweis eines verbundenen Sensorsystems.
+
+<img src="images/ui/observatory-dashboard-offline.webp" alt="Observatory-Dashboard mit nicht erreichbarem Server und sichtbarem Offline-Fallback" width="900">
+
+### Sensing in der Client-Simulation
+
+Die Sensing-Ansicht trennt die diagnostische Link-Heatmap von einer echten
+Personposition. Die dargestellten Werte stammen ausdrücklich aus der
+Client-Simulation und sind keine reale Messung.
+
+<img src="images/ui/observatory-sensing-client-simulation.webp" alt="Observatory-Sensing-Ansicht im klar gekennzeichneten Offline- und Client-Simulationsmodus" width="900">
+
+### mmWave-Kalibrierungsassistent
+
+Der Assistent führt durch Verbindung, Ausrichtung, Abdeckung, Zonen, Training,
+Blindtest und Ergebnis. Der Screenshot zeigt den geprüften Fehlerzustand
+`Server nicht erreichbar` mit HTTP 502, nicht eine verbundene Radaraufnahme.
+
+<img src="images/ui/mmwave-calibration-server-unreachable.png" alt="Siebenstufiger mmWave-Kalibrierungsassistent mit nicht erreichbarem Server und HTTP-502-Status" width="900">
+
 ## Aktueller Validierungsstand
 
 **Stand: 14. August 2026**
