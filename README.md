@@ -156,11 +156,13 @@ Board bindet den HLK-LD2450 später als unabhängigen Referenzsensor an.
 
 <img src="images/hlk-ld2450-mmwave-sensor.jpeg" alt="HLK-LD2450 24G mmWave-Referenzsensor" width="460">
 
-Die [Gerber- und Bohrdaten von PCB-01](hardware/pcb-01/) liegen mit SHA-256 und
-Fertigungshinweis im Repository. Die geplante Hub-PCB soll die Verkabelung des
-Zielaufbaus vereinfachen:
+PCB-01 verbindet den ESP32-C3 mit dem mmWave-Referenzpfad. Die folgende
+Fertigungsvorschau zeigt den verwendeten Platinenstand:
 
-<img src="images/hub-pcb-schema.png" alt="KiCad-Skizze der geplanten Hub-PCB für TX und vier RX-Boards" width="620">
+<img src="images/pcb-01-preview.webp" alt="Fertigungsvorschau von PCB-01 mit ESP32-C3-Footprint, C1, C2 und Anschluss U2" width="460">
+
+Die [Gerber- und Bohrdaten von PCB-01](hardware/pcb-01/) liegen mit SHA-256 und
+Fertigungshinweis im Repository.
 
 ## Dokumentation
 
