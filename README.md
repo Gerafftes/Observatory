@@ -1,4 +1,6 @@
 # Observatory
+[**Deutsch**](README.md) · [English](README.en.md)
+
 [![Hack Club Stardance](https://img.shields.io/badge/Hack%20Club-Stardance-ec3750?style=flat-square&logo=hackclub&logoColor=white)](https://stardance.hackclub.com/projects/25673)
 [![ESP32](https://img.shields.io/badge/ESP32-E7352C?style=flat-square&logo=espressif&logoColor=white)](https://www.espressif.com/en/products/socs/esp32)
 [![Status](https://img.shields.io/badge/status-experimental-orange)](#aktueller-validierungsstand)
@@ -39,7 +41,6 @@ den festen lokalen Raumaufbau mit TX, RX1 bis RX4 und dem Referenzsensor. Der
 [aktuelle technische Wiedereinstieg](08-aktueller-arbeitsstand-d6-und-position.md)
 zeigt, was bereits real geprüft wurde und welches Hardware-Gate als Nächstes
 folgt.
-
 
 ## Forschungsfrage
 
