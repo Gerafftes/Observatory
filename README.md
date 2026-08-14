@@ -1,54 +1,150 @@
-# WLAN-CSI-Projekt: Berichtsdokumentation [![Hack Club Stardance](https://img.shields.io/badge/Hack%20Club-Stardance-ec3750?style=flat-square&logo=hackclub&logoColor=white)](https://stardance.hackclub.com/projects/25673)
+# WLAN-CSI-Projekt [![Hack Club Stardance](https://img.shields.io/badge/Hack%20Club-Stardance-ec3750?style=flat-square&logo=hackclub&logoColor=white)](https://stardance.hackclub.com/projects/25673)
 
 [![ESP32](https://img.shields.io/badge/ESP32-E7352C?style=flat-square&logo=espressif&logoColor=white)](https://www.espressif.com/en/products/socs/esp32)
 [![Status](https://img.shields.io/badge/status-work%20in%20progress-orange)](#)
 
-Stand: 2026-07-21
+> **You are being sensed.**
+>
+> This room has a secret system, a machine that watches the Wi-Fi every second
+> it is running. I know because I built it.
+>
+> I designed the machine to detect movement, but it sees every disturbance.
+> Reflections caused by ordinary people—people like you. Signals the old
+> algorithms considered “irrelevant.”
+>
+> They couldn’t understand them, so I decided I would. But I needed a partner,
+> another sensor with the precision to reveal the truth.
+>
+> Bound by physics, we work without cameras. You’ll never see us. But moving or
+> motionless, if you change the signal… we’ll find *you*.
 
-Letzte Ergänzung: 2026-07-27
+*Frei nach dem Intro der Serie
+[*Person of Interest*](https://warnertv.de/serie/sendungen/person-of-interest).*
 
-## Problemfrage
+Berichtsdokumentation eines experimentellen WLAN-CSI-Systems mit einem
+ESP32-S3-Sender, vier ESP32-S3-Empfängern und einem HLK-LD2450 als späterer
+Referenzsensor.
 
-Wie zuverlässig kann ein ESP32-basiertes WLAN-CSI-System Bewegungen und Atemrhythmen im Raum erfassen, und welche physikalischen Grenzen ergeben sich dabei?
+**Stand: 14. August 2026**
 
-## Zweck dieses Ordners
+## Forschungsfrage
 
-Dieser Ordner ist nicht als Schritt-für-Schritt-Anleitung gedacht. Er sammelt Material für den späteren Bericht:
+Wie zuverlässig kann ein ESP32-basiertes WLAN-CSI-System Bewegungen und
+Atemrhythmen im Raum erfassen, und welche physikalischen Grenzen ergeben sich
+dabei?
 
-- Ziele und Annahmen
-- Versuchsprotokolle
-- Erfolge, Fehlschläge und Änderungen
-- Messbeobachtungen
-- Auswertungsgrundlagen
-- Material für Diskussion und Fazit
+## Aktueller Stand
 
-## Veröffentlichungsstand
+| Bereich | Status | Einordnung |
+|---|---|---|
+| 1 TX / 4 RX | Transport nachgewiesen | Alle vier RX liefern gebundene Raw-CSI-Daten im gemeinsamen Raster. |
+| D4 Bewegung | Experimentell | Grobe Bewegungsalarme wurden reduziert, Still-Präsenz bleibt unzuverlässig. |
+| D5 Still-Präsenz | Livetest nicht bestanden | Trotz aktiver Kalibrierung blieben 350 von 350 Samples bei anwesender stiller Person `ABSENT`. |
+| D6 Position | Software vorbereitet | Neun feste Punkte, aufbaugebundene Aufnahmen und Blindtests sind implementiert; ein realer, blind bestandener Positionsindex fehlt. |
+| mmWave-Referenz | Teilweise in Betrieb | ESP32-C3, CSI-WLAN und Statusdienst sind nachgewiesen. Der LD2450-Datenpfad wartet auf die vollständige Verbindung mit PCB-01. |
+| Gesamtsystem | Nicht validiert | Es gibt noch keinen gemeinsamen realen PASS für Classification, Position und mmWave-Referenz. |
 
-Mit der Ergänzung vom 2026-07-27 werden zunächst die fortgeschriebene Dokumentation und die Ergebnisberichte veröffentlicht. Die neuen Rohmessdaten, der D5-Replayer mit seinen Tests sowie die zugehörigen lokalen RuView-/D5-Implementierungsänderungen bleiben vorerst lokal und werden zu einem späteren Zeitpunkt separat veröffentlicht.
+Der verbindliche technische Wiedereinstieg mit den neuesten Hardwareprüfungen
+steht in
+[`08-aktueller-arbeitsstand-d6-und-position.md`](08-aktueller-arbeitsstand-d6-und-position.md).
 
-Die Ergebnisberichte dokumentieren die verwendeten lokalen Datenpfade bereits vollständig. Solange die Rohdaten noch nicht veröffentlicht sind, dienen diese Pfade als Nachweis der lokalen Ablage und nicht als direkt auf GitHub verfügbare Dateien.
+## Systemaufbau
 
-## Hardware-Aufbau
+Fünf ESP32-S3-Boards bilden das WLAN-CSI-System: Ein TX-Board sendet, RX1 bis
+RX4 empfangen CSI-Rohdaten. Ein separates ESP32-C3-Board bindet später den
+HLK-LD2450 als unabhängige Referenz an.
 
-Fünf ESP32-S3-Boards bilden die Grundlage des Aufbaus: ein TX-Board sendet, vier RX-Boards (RX-1 bis RX-4) empfangen die CSI-Rohdaten.
-
-<img src="images/esp32-s3-boards.jpeg" alt="Fünf beschriftete ESP32-S3-Boards (RX-1, RX-2, RX-3, RX-4, TX) auf einer Schneidematte" width="480">
-
-## Referenzsensor: HLK-LD2450 24G mmWave
-
-Als Referenzsensor für Präsenz- und Bewegungserkennung dient ein HLK-LD2450-Modul (24 GHz mmWave-Radar) mit Antenne und Anschlusskabel.
+<img src="images/esp32-s3-boards.jpeg" alt="Fünf beschriftete ESP32-S3-Boards für TX und RX1 bis RX4" width="480">
 
 <img src="images/hlk-ld2450-mmwave-sensor.jpeg" alt="HLK-LD2450 24G mmWave-Sensor mit Antenne und Anschlusskabel" width="480">
 
-## Systemarchitektur (Skizze)
+Eine geplante Hub-PCB soll die Verkabelung des Zielaufbaus vereinfachen.
 
-Geplante Erweiterung: eine zentrale Hub-PCB, an die TX- und alle RX-Boards angebunden werden, um die Verkabelung im Zielraum zu vereinfachen.
+<img src="images/hub-pcb-schema.png" alt="KiCad-Skizze einer Hub-PCB für TX und vier RX-Boards" width="480">
 
-<img src="images/hub-pcb-schema.png" alt="KiCad-Schema: Hub-PCB verbindet ein TX- und vier RX-ESP32-S3-Boards" width="480">
+Die Gerber- und Bohrdaten der mmWave-Platine PCB-01 sind unter
+[`hardware/pcb-01/`](hardware/pcb-01/) mit Prüfsumme und Fertigungshinweis
+abgelegt.
 
-## Ordnerstruktur
+## Messansatz
 
+Die Entwicklung ist bewusst in getrennte Stufen gegliedert:
+
+1. **Raw-CSI und Transport:** Paketquelle, RX-Identität, Raster, Datenrate und
+   Verluste werden geprüft.
+2. **Classification:** Bewegung, Still-Präsenz und Leerraum werden getrennt
+   bewertet. Fehlende Evidenz darf keine Anwesenheit behaupten.
+3. **D6-Position:** Das System klassifiziert ausschließlich neun vermessene
+   Bodenpunkte, `unknown` oder `ambiguous`. Eine scheinpräzise kontinuierliche
+   Heatmap gilt nicht als Positionsmessung.
+4. **mmWave-Referenz:** Der Radarwert darf für Kalibrierung und zurückgehaltene
+   Wahrheit verwendet werden, aber nicht als Eingabe des späteren
+   WLAN-CSI-Prädiktors.
+5. **Blinde Prüfung:** Training, Vorhersage und Wahrheit bleiben durch getrennte
+   Dateien und Hashbindungen voneinander isoliert.
+
+Der D6-Ablauf bleibt fail-closed:
+
+```text
+physischer Aufbau
+→ Setup-Siegel
+→ 25-s-Preflight
+→ 65-s-Leerraumkalibrierung
+→ P01–P09-Training
+→ Positionsindex
+→ Blindtests
+→ gemeinsame Qualitätsgates
+→ Live-Anzeige
 ```
+
+## Bisherige belastbare Ergebnisse
+
+- Eine technische Discovery am 9. August lieferte `2.612` Frames von RX1 bis
+  RX4 bei `0` Drops. Das belegt Transport, Bindung und Rasterstabilität, nicht
+  die Erkennungs- oder Positionsgüte.
+- Ein historisch versiegelter D6-Preflight bestand mit `2.545` Frames und
+  `0` Drops. Nach einem Sidecar-Fix bestand das neu versiegelte Setup erneut
+  mit `2.701` Frames und `0` Drops.
+- Die anschließende 65-Sekunden-Leerraumkalibrierung schrieb `6.102` Frames bei
+  `0` Drops und bestand die strikte Offline-Inspektion.
+- Der erste reale D5-Still-Livetest erreichte `0 %` Still-Recall. D5 bleibt
+  deshalb deaktiviert und experimentell.
+- Die D6- und mmWave-Softwaretests belegen die Softwarekette, aber keine reale
+  RF-, Radar-, Classification- oder Positionsleistung.
+
+Die D6-Siegel vom 9. August gehören zu ihrem damaligen Serverartefakt und
+physischen Aufbau. Durch die spätere Ergänzung von ESP32-C3, PCB und
+mmWave-Hardware ist der aktuelle Aufbau verändert und noch nicht als Setup v2
+versiegelt.
+
+## Dokumentation lesen
+
+| Datei | Inhalt |
+|---|---|
+| [`00-status-und-annahmen.md`](00-status-und-annahmen.md) | Aufbau, Annahmen, Koordinaten und offene Punkte |
+| [`01-projektjournal.md`](01-projektjournal.md) | Chronologischer Entwicklungsverlauf |
+| [`02-versuchslog.md`](02-versuchslog.md) | Durchgeführte Versuche |
+| [`03-messprotokoll.md`](03-messprotokoll.md) | Messabläufe und Qualitätsregeln |
+| [`04-auswertung-bis-problemfrage.md`](04-auswertung-bis-problemfrage.md) | Auswertung entlang der Forschungsfrage |
+| [`05-erfolge-niederlagen-und-aenderungen.md`](05-erfolge-niederlagen-und-aenderungen.md) | Erfolge, Fehlschläge und Kursänderungen |
+| [`06-ruview-anpassungen.md`](06-ruview-anpassungen.md) | Lokale Änderungen an RuView |
+| [`07-screenshot-nachweise.md`](07-screenshot-nachweise.md) | Visuelle Nachweise und Fehlerbilder |
+| [`08-aktueller-arbeitsstand-d6-und-position.md`](08-aktueller-arbeitsstand-d6-und-position.md) | Verbindlicher aktueller D6-/mmWave-Wiedereinstieg |
+| [`hardware/pcb-01/`](hardware/pcb-01/) | Gerber- und Bohrdaten der mmWave-Platine PCB-01 |
+| [`results/`](results/) | Ausführliche Ergebnisberichte |
+| [`templates/messblatt.md`](templates/messblatt.md) | Vorlage für neue Messungen |
+
+Wichtige Ergebnisberichte:
+
+- [D5: Offline-Replay und experimentelle Präsenzkalibrierung](results/2026-07-26_D5_offline-replay-und-experimentelle-praesenzkalibrierung.md)
+- [D5: realer Still-Livetest](results/2026-07-26_D5_realer-still-livetest.md)
+- [D6: Setupaufnahme und TX-Firmwareidentität](results/2026-08-09_D6_setupaufnahme-und-TX-firmwareidentitaet.md)
+- [D6: Setup-Siegel und Preflight](results/2026-08-09_D6_setup-siegel-und-preflight.md)
+- [D6: Sidecar-Fix, Neusiegelung und Leerraumkalibrierung](results/2026-08-09_D6_sidecar-fix-neusiegelung-und-preflight.md)
+
+## Repository-Struktur
+
+```text
 wifi-csi-dokumentation/
 ├── README.md
 ├── 00-status-und-annahmen.md
@@ -59,140 +155,32 @@ wifi-csi-dokumentation/
 ├── 05-erfolge-niederlagen-und-aenderungen.md
 ├── 06-ruview-anpassungen.md
 ├── 07-screenshot-nachweise.md
-├── templates/
-│   └── messblatt.md
+├── 08-aktueller-arbeitsstand-d6-und-position.md
 ├── data/
-│   ├── raw/
-│   └── processed/
+├── hardware/
+│   └── pcb-01/
+├── images/
 ├── logs/
 ├── results/
-├── images/
-│   ├── esp32-s3-boards.jpeg
-│   ├── hlk-ld2450-mmwave-sensor.jpeg
-│   └── hub-pcb-schema.png
-└── skizzen/
-    └── screenshots/
+├── skizzen/
+└── templates/
 ```
 
-## Aktueller Versuchsstand
+## Veröffentlichungs- und Dokumentationsregeln
 
-- Vorhanden: 5 ESP32-S3-Boards
-- Vorhanden: 1 mmWave-Modul als Referenzsensor
-- Aktueller WLAN-CSI-Aufbau: 1 ESP32-TX und 4 ESP32-RX
-- RX1 bis RX4 liefern Raw-CSI-Daten an den lokalen RuView-Server
-- Messreihen A0 bis A3, G1 und G2 liegen als Rohdaten/CSV vor
-- Screenshot-Nachweise sind unter `07-screenshot-nachweise.md` nach Zeitstempel und Inhalt einsortiert
-- Die RuView-Webvisualisierung ist aktuell nur qualitativ zu verwenden; sie springt ohne Kalibrierung/Geometrie stark
-- Geplant: eine Hub-PCB zur zentralen Anbindung aller Boards (siehe Skizze oben)
-- Der feste Raumaufbau vom 2026-07-18 ist vermessen und in RuView eingetragen; mmWave bleibt vorerst zurückgestellt
-- Der Vergleich „still sitzen“ gegen „deutliche Bewegung“ zeigte überlappende Roh-Bewegungswerte. Die aktuelle Klassifikation ist deshalb noch kein gültiges Messergebnis
-- Der Screenshot des fehlgeschlagenen Live-Tests und die technische Ursachenanalyse liegen unter `07-screenshot-nachweise.md` und `results/2026-07-18_fester-raum_live-visualisierung_diagnose.md`
-- Der erste geplante D4-Leerraumtest mit TX-MAC-Filter liegt unter `results/2026-07-26_D4-E0_leerraum.md`, wurde aber nachträglich als Mischlauf markiert, weil der Raum währenddessen zweimal kurz betreten wurde
-- Die gültige Wiederholung E0b liegt unter `results/2026-07-26_D4-E0b_sauberer-leerraum.md`: Der leere Raum wurde in 92,0 % der Samples fälschlich als `PRESENT_STILL` ausgegeben
-- Der Mac-Positions-A/B-Test E0c liegt unter `results/2026-07-26_E0b-E0c_mac-position-ab-test.md`: Nach mittigem Aufstellen fiel RX4 von 84,8 % auf 0,0 % Fehlpräsenz
-- Der Vergleich E0c/E1 liegt unter `results/2026-07-26_E0c-E1_still-person-separation.md`: RX4 trennt den aktuellen Leerraum und eine still sitzende Person deutlich
-- Die unabhängige Wiederholung E0d/E1b liegt unter `results/2026-07-26_E0d-E1b_unabhaengige-bestaetigung.md`: Die RX4-Trennung wiederholte sich nicht; RX3 stieg dagegen in beiden Paaren
-- Der D5-Offline-Replay liegt unter `results/2026-07-26_D5_offline-replay-und-experimentelle-praesenzkalibrierung.md`: per-RX-Leerraumreferenz und 2-RX-Quorum erreichen über beide vertauschten Laufpaare 0,0 % Fehlpräsenz und 89,3 % mittleren Still-Recall
-- Der experimentelle D5-Serverpfad ist technisch für den kontrollierten Livetest freigegeben: 709 Rust-Tests, 7 Replayer-Tests, Release-Build und isolierter API-Lebenszyklus bestanden; eine erfolgreiche reale D5-Kalibrierung steht noch aus
-- Nachtrag zum realen D5-Livetest: Die Kalibrierung wurde erfolgreich aktiv, aber die still sitzende Person wurde in 350 von 350 Samples als `ABSENT` ausgegeben. Die vollständige Auswertung liegt unter `results/2026-07-26_D5_realer-still-livetest.md`
-- Softwarebasis RX/Server: [ruvnet/RuView](https://github.com/ruvnet/RuView)
+- Dieses Repository ist eine Berichtsdokumentation, keine
+  Schritt-für-Schritt-Anleitung.
+- Softwaretests, erfolgreiche Übertragung und erfolgreiche Flashvorgänge
+  werden nicht als reale Sensor- oder Messvalidierung ausgegeben.
+- Rohdaten werden nur veröffentlicht, wenn Umfang, Datenschutz und
+  Reproduzierbarkeit geprüft sind. Lokale Pfade in älteren Berichten sind kein
+  Hinweis darauf, dass die zugehörigen Dateien bereits auf GitHub liegen.
+- Fehlversuche bleiben dokumentiert, weil sie für die physikalischen und
+  technischen Grenzen des Systems relevant sind.
+- Geheimnisse, WLAN-Zugangsdaten und private Gerätekennungen gehören nicht in
+  die öffentliche Dokumentation.
 
-## Was D5 konkret macht
-
-D5 ist eine experimentelle zusätzliche Klassifikationsstufe. Sie soll ausschließlich unterscheiden, ob der Raum leer ist (`ABSENT`) oder ob eine weitgehend stillstehende Person anwesend ist (`PRESENT_STILL`). D5 erzeugt keine echte Raumortung und korrigiert die Heatmap beziehungsweise Punktwolke nicht automatisch.
-
-### 1. Leerraumreferenz
-
-Während einer 60-Sekunden-Kalibrierung werden für jeden RX sechs getrennte 10-Sekunden-Mittelwerte des `smoothed_motion_score` gebildet. Daraus berechnet D5 pro RX:
-
-- den typischen Leerraumwert als Median
-- die Streuung über MAD
-- die robuste Skala `max(1,4826 × MAD; 0,005)`
-
-Für diese Referenz werden ausschließlich Leerraumdaten und keine Personendaten verwendet.
-
-### 2. Laufende Entscheidung
-
-Nach erfolgreicher Kalibrierung betrachtet jeder RX immer die letzten zehn Sekunden. Der Mittelwert dieses Fensters wird mit der individuellen Leerraumreferenz verglichen. Ein RX stimmt für Anwesenheit, wenn seine Abweichung `z > 1` erreicht.
-
-Ein einzelner auffälliger RX reicht nicht mehr aus. `PRESENT_STILL` wird nur ausgegeben, wenn:
-
-- mindestens zwei RX gleichzeitig für Anwesenheit stimmen
-- die Zustimmung zwei Sekunden bestehen bleibt
-- mindestens drei RX gültige und aktuelle D5-Daten liefern
-
-### 3. Sicherheitsregeln
-
-- Es zählen nur CSI-Frames, die tatsächlich vom D5-Pfad akzeptiert wurden.
-- Jeder nutzbare RX muss mindestens 5 Hz akzeptierte D5-Daten liefern.
-- Eine Unterbrechung ab einer Sekunde verwirft das vollständige Livefenster.
-- Nach einer Unterbrechung müssen erneut volle zehn Sekunden gesammelt werden.
-- Evidenz- oder Nodeverlust löscht eine zuvor gesetzte Still-Präsenz.
-- Ein Wechsel des Subcarrier-Rasters löscht die Referenz des betroffenen RX.
-- Während der Kalibrierung kann D5 keine Still-Präsenz behaupten.
-
-### 4. Zusammenspiel mit D4
-
-D4 bleibt für deutliche Bewegung zuständig:
-
-- `PRESENT_MOVING`
-- `ACTIVE`
-
-D5 übernimmt nach erfolgreicher Kalibrierung nur die schwierigere Entscheidung zwischen `ABSENT` und `PRESENT_STILL`. Vor der ersten erfolgreichen D5-Kalibrierung läuft weiterhin die bisherige D4-Logik; der Server meldet dann `legacy_d4`.
-
-### 5. Bedienung und Diagnose
-
-```text
-POST /api/v1/classification/calibration/start
-POST /api/v1/classification/calibration/stop
-GET  /api/v1/classification/calibration/status
-```
-
-Der Status-Endpunkt zeigt pro RX unter anderem Referenz, aktuelles 10-Sekunden-Mittel, z-Wert, Stimme, akzeptierte Datenrate, Frische und Verwendbarkeit.
-
-Der Offline-Replay der bestehenden Laufpaare erreichte 0,0 % Leerraum-Fehlpräsenz, 89,3 % mittleren Still-Recall und 94,7 % Balanced Accuracy. Das ist wegen nur zwei Laufpaaren, einer Sitzung und einer Sitzposition noch kein Produktionsnachweis. Vor einer Standardaktivierung folgen eine neue reale Leerraumkalibrierung, ein blinder Leerraumlauf, ein blinder Still-Lauf und mindestens eine weitere Sitzposition.
-
-Ausführliche Auswertung: [D5: Offline-Replay und experimentelle Präsenzkalibrierung](results/2026-07-26_D5_offline-replay-und-experimentelle-praesenzkalibrierung.md)
-
-### 6. Ergebnis des ersten realen D5-Livetests
-
-Nach dem Offline-Replay wurde D5 real im leeren Raum kalibriert. Die vier RX-Referenzen und die laufende Evidenz waren im anschließenden Positivtest verfügbar. Trotzdem blieb die globale Ausgabe während 350 Samples beziehungsweise rund 89,7 Sekunden vollständig `ABSENT`.
-
-Im ersten Abschnitt stimmte zeitweise nur RX4 für Präsenz. Im zweiten Abschnitt stimmte RX3 durchgehend, aber kein zweiter RX ausreichend lange. Die Zwei-RX-Regel verhinderte dadurch zwar Einzel-RX-Auslösungen, übersah aber die tatsächlich anwesende Person vollständig.
-
-Dieser Livetest ist nicht bestanden. D5 bleibt experimentell und wird nicht als Standard aktiviert. Als nächster Entscheidungstest wird eine zusammengehörige blinde Serie aus Leerraum und mehreren Still-Positionen unter derselben Kalibrierung benötigt.
-
-Ausführliche Auswertung: [D5: realer Still-Livetest nach Leerraumkalibrierung](results/2026-07-26_D5_realer-still-livetest.md)
-
-## Wichtige aktuelle Befunde
-
-- Die 4RX-Datenerfassung funktioniert stabil genug für erste Auswertungen.
-- Ein Guard-Intervall von 500 ms reduziert Fusion-Fallbacks deutlich, ist aber nur ein Visualisierungs-Workaround.
-- Leerer Raum wird aktuell teilweise fälschlich als `presence=True` klassifiziert.
-- Atem-/Herzfrequenzwerte sind ohne Referenzsensor noch nicht belastbar.
-- Für eine echte Positionsanzeige wären Geometrie, Kalibrierung und bessere Synchronisation nötig.
-- Feste Geometrie und eine leere-Raum-Kalibrierung allein haben die Trennung von Stillstand und Bewegung nicht gelöst.
-- Vor weiteren Klassifikationstests muss geprüft werden, ob jeder RX ausschließlich vergleichbare CSI-Pakete des vorgesehenen TX verarbeitet.
-- Alle vier RX filtern inzwischen auf die MAC-Adresse des kontrollierten TX.
-- E0b bestätigt: D4 beseitigt die globalen groben Bewegungsalarme, aber noch nicht die Still-Präsenz-Fehlalarme.
-- RX4 meldete im leeren Raum in 84,4 % der Samples lokale Präsenz; durch die globale ODER-Logik führte das zusammen mit RX2/RX3 zu 92,0 % globaler Fehlpräsenz.
-- Das mittige Aufstellen des Macs beseitigte die RX4-Fehlpräsenz und senkte die globale Fehlpräsenz auf 46,8 %. RX2 und RX3 blieben nahezu unverändert.
-- Der Mac-Standort und seine Kabel sind damit Teil des festzuhaltenden Versuchsaufbaus.
-- Die starke RX4-Reaktion des ersten Still-Laufs war nicht reproduzierbar; eine feste RX4-Schwelle von 0,01 wird deshalb verworfen.
-- RX3 zeigte in beiden unabhängigen Paaren einen höheren Minutenmittelwert bei stiller Person als im jeweils vorherigen Leerraum.
-- D5 setzt diese Richtung als experimentellen Prototyp um: per-RX-Leerraumreferenzen, 10-Sekunden-Fenster, zwei absolute RX-Stimmen und separate Aktivierungskalibrierung.
-- Das positive D5-Replay ist wegen nur zwei Laufpaaren, einer Sitzung und einer Sitzposition noch kein Produktionsnachweis. Die nächsten Läufe müssen mit eingefrorenen Parametern blind geprüft werden.
-- Der erste reale D5-Positivtest erreichte 0,0 % Still-Recall: Erst reagierte nur RX4, danach nur RX3. Das Zwei-RX-Quorum wurde nie erfüllt.
-- D5 bleibt deshalb deaktiviert. Eine Lockerung des Quorums ist ohne zugehörigen neuen Leerraumlauf nicht vertretbar.
-
-## Screenshot des fehlgeschlagenen RuView-Livetests
-
-[![RuView-Livetest mit fehlerhafter Punktwolke und nicht belastbarer Klassifikation](skizzen/screenshots/2026-07-18_18-54-33_fixed-room-live-sensing-failure.png)](results/2026-07-18_fester-raum_live-visualisierung_diagnose.md)
-
-Der Screenshot zeigt den laufenden festen 1TX-/4RX-Aufbau. Obwohl RuView `PRESENT_STILL` mit `81 %` anzeigte, waren zwei Marker optisch fast überlagert, die Punktwolke reagierte nicht nachvollziehbar auf Bewegung und bewegte sich später auch beim stillen Sitzen. Das Bild ist daher ein Fehlernachweis und kein Beleg für eine korrekte Positionsbestimmung. Ein Klick auf das Bild öffnet die vollständige Diagnose.
-
-## Dokumentationsregel
-
-Jede relevante Beobachtung wird dokumentiert, auch wenn sie negativ ist. Gerade Fehlversuche sind wichtig, weil sie später die physikalischen und technischen Grenzen erklären.
-
-Konkrete Arbeitsanleitungen gehören nicht in diesen Ordner, sondern werden separat im Chat oder in Arbeitsnotizen geführt.
+Die verwendete Softwarebasis für RX-Firmware und Sensing-Server ist
+[ruvnet/RuView](https://github.com/ruvnet/RuView). RuView bleibt ein separates
+Repository und wird hier nur in seiner für das Projekt verwendeten Rolle
+dokumentiert.
