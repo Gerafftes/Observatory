@@ -7,23 +7,6 @@
 Ein experimentelles 1TX-/4RX-WLAN-CSI-System, das Präsenz, Bewegung und neun
 feste Raumpositionen ohne Kamera untersucht und mmWave nur als unabhängige
 Referenz verwendet.
-
-<img src="images/esp32-s3-boards.jpeg" alt="Die fünf beschrifteten ESP32-S3-Boards des Observatory-Aufbaus: RX1 bis RX4 und TX" width="620">
-
-*Die fünf ESP32-S3-Boards des Aufbaus: ein Sender und vier
-CSI-Empfänger.*
-
-
-## Projekt ansehen
-
-**[Observatory auf Stardance ansehen](https://stardance.hackclub.com/projects/25673)**
-
-Eine öffentliche Live-Demo gibt es derzeit nicht: Die echte Messung benötigt
-den festen lokalen Raumaufbau mit TX, RX1 bis RX4 und dem Referenzsensor. Der
-[aktuelle technische Wiedereinstieg](08-aktueller-arbeitsstand-d6-und-position.md)
-zeigt, was bereits real geprüft wurde und welches Hardware-Gate als Nächstes
-folgt.
-
 > **You are being sensed.**
 >
 > This room has a secret system, a machine that watches the Wi-Fi every second
@@ -41,6 +24,22 @@ folgt.
 
 *Nach dem Intro der Serie
 [*Person of Interest*](https://warnertv.de/serie/sendungen/person-of-interest).*
+
+*Die fünf ESP32-S3-Boards des Aufbaus: ein Sender und vier
+CSI-Empfänger.*
+<img src="images/esp32-s3-boards.jpeg" alt="Die fünf beschrifteten ESP32-S3-Boards des Observatory-Aufbaus: RX1 bis RX4 und TX" width="420">
+
+
+## Projekt ansehen
+
+**[Observatory auf Stardance ansehen](https://stardance.hackclub.com/projects/25673)**
+
+Eine öffentliche Live-Demo gibt es derzeit nicht: Die echte Messung benötigt
+den festen lokalen Raumaufbau mit TX, RX1 bis RX4 und dem Referenzsensor. Der
+[aktuelle technische Wiedereinstieg](08-aktueller-arbeitsstand-d6-und-position.md)
+zeigt, was bereits real geprüft wurde und welches Hardware-Gate als Nächstes
+folgt.
+
 
 ## Forschungsfrage
 
