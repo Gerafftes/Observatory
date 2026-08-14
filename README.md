@@ -10,7 +10,7 @@ Referenz verwendet.
 
 <img src="images/esp32-s3-boards.jpeg" alt="Die fünf beschrifteten ESP32-S3-Boards des Observatory-Aufbaus: RX1 bis RX4 und TX" width="620">
 
-*Die fünf realen ESP32-S3-Boards des Aufbaus: ein Sender und vier
+*Die fünf ESP32-S3-Boards des Aufbaus: ein Sender und vier
 CSI-Empfänger.*
 
 
