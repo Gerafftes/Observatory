@@ -4,6 +4,7 @@
 [![Hack Club Stardance](https://img.shields.io/badge/Hack%20Club-Stardance-ec3750?style=flat-square&logo=hackclub&logoColor=white)](https://stardance.hackclub.com/projects/25673)
 [![ESP32](https://img.shields.io/badge/ESP32-E7352C?style=flat-square&logo=espressif&logoColor=white)](https://www.espressif.com/en/products/socs/esp32)
 [![Status](https://img.shields.io/badge/status-experimental-orange)](#aktueller-validierungsstand)
+[![License: PolyForm Noncommercial 1.0.0](https://img.shields.io/badge/License-PolyForm%20Noncommercial%201.0.0-blue.svg)](LICENSE.md)
 
 
 Ein experimentelles 1TX-/4RX-WLAN-CSI-System, das Präsenz, Bewegung und neun
@@ -205,6 +206,13 @@ Fertigungshinweis im Repository.
 | [`08-aktueller-arbeitsstand-d6-und-position.md`](08-aktueller-arbeitsstand-d6-und-position.md) | Verbindlicher D6-/mmWave-Wiedereinstieg |
 | [`results/`](results/) | Ausführliche Ergebnisberichte |
 | [`templates/messblatt.md`](templates/messblatt.md) | Vorlage für neue Messungen |
+
+## Lizenz
+
+Dieses Projekt steht unter der
+[PolyForm Noncommercial License 1.0.0](LICENSE.md). Nutzung, Änderung und
+Weitergabe sind nur im Rahmen der dort definierten nichtkommerziellen Zwecke
+erlaubt.
 
 ## Credits
 

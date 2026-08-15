@@ -4,6 +4,7 @@
 [![Hack Club Stardance](https://img.shields.io/badge/Hack%20Club-Stardance-ec3750?style=flat-square&logo=hackclub&logoColor=white)](https://stardance.hackclub.com/projects/25673)
 [![ESP32](https://img.shields.io/badge/ESP32-E7352C?style=flat-square&logo=espressif&logoColor=white)](https://www.espressif.com/en/products/socs/esp32)
 [![Status](https://img.shields.io/badge/status-experimental-orange)](#current-validation-status)
+[![License: PolyForm Noncommercial 1.0.0](https://img.shields.io/badge/License-PolyForm%20Noncommercial%201.0.0-blue.svg)](LICENSE.md)
 
 
 An experimental 1TX/4RX WiFi CSI system investigating presence, movement, and
@@ -207,6 +208,13 @@ German.
 | [`08-aktueller-arbeitsstand-d6-und-position.md`](08-aktueller-arbeitsstand-d6-und-position.md) | Authoritative D6/mmWave handoff |
 | [`results/`](results/) | Detailed result reports |
 | [`templates/messblatt.md`](templates/messblatt.md) | Measurement-sheet template |
+
+## License
+
+This project is licensed under the
+[PolyForm Noncommercial License 1.0.0](LICENSE.md). Use, modification, and
+distribution are permitted only for the noncommercial purposes defined in
+the license.
 
 ## Credits
 
