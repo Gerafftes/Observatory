@@ -191,6 +191,12 @@ Fertigungsvorschau zeigt den verwendeten Platinenstand:
 Die [Gerber- und Bohrdaten von PCB-01](hardware/pcb-01/) liegen mit SHA-256 und
 Fertigungshinweis im Repository.
 
+Als Gehäuse für die ESP32-S3-Boards ist das externe MakerWorld-Modell
+[*ESP32 S3 Wroom Case*](https://makerworld.com/de/models/1456361-esp32-s3-wroom-case#profileId-1517915)
+vorgesehen. Wegen seiner MakerWorld Standard Digital File License wird die
+STL nicht erneut im Repository bereitgestellt. Weitere Hinweise stehen unter
+[`hardware/esp32-s3-case/`](hardware/esp32-s3-case/).
+
 ## Dokumentation
 
 | Datei | Inhalt |
@@ -220,6 +226,10 @@ erlaubt.
   für RX-Firmware und Sensing-Server bereit.
 - [Espressif](https://www.espressif.com/en/products/socs/esp32) entwickelt die
   verwendeten ESP32-Plattformen.
+- Das ESP32-S3-WROOM-Gehäuse wurde von MakerWorld-Nutzer
+  [`aiekick`](https://makerworld.com/de/models/1456361-esp32-s3-wroom-case#profileId-1517915)
+  erstellt und wird unter der MakerWorld Standard Digital File License
+  angeboten.
 - Der filmische Prolog ist vom Intro der Serie
   [*Person of Interest*](https://warnertv.de/serie/sendungen/person-of-interest)
   inspiriert.
