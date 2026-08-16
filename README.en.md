@@ -190,6 +190,13 @@ manufacturing preview shows the board revision used by the project:
 The [PCB-01 Gerber and drill files](hardware/pcb-01/) are available in this
 repository with a SHA-256 checksum and manufacturing note.
 
+The external MakerWorld model
+[*ESP32 S3 Wroom Case*](https://makerworld.com/de/models/1456361-esp32-s3-wroom-case#profileId-1517915)
+is intended as an enclosure for the ESP32-S3 boards. Its MakerWorld Standard
+Digital File License does not permit redistributing the STL through this
+repository. See [`hardware/esp32-s3-case/`](hardware/esp32-s3-case/) for the
+source and usage note.
+
 ## Documentation
 
 The detailed project documentation linked below is currently written in
@@ -222,6 +229,9 @@ the license.
   for the RX firmware and sensing server.
 - [Espressif](https://www.espressif.com/en/products/socs/esp32) develops the
   ESP32 platforms used by this project.
+- The ESP32-S3-WROOM enclosure was created by MakerWorld user
+  [`aiekick`](https://makerworld.com/de/models/1456361-esp32-s3-wroom-case#profileId-1517915)
+  and is offered under the MakerWorld Standard Digital File License.
 - The cinematic prologue is inspired by the opening monologue of the TV series
   [*Person of Interest*](https://warnertv.de/serie/sendungen/person-of-interest).
 
