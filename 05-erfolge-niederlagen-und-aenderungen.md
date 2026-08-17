@@ -7,7 +7,7 @@ Diese Datei sammelt bewusst auch negative Ergebnisse. Für den späteren Bericht
 | Datum | Erfolg | Bedeutung für die Arbeit |
 |---|---|---|
 | 2026-06-26 | TX-Firmware erfolgreich auf ESP32-S3 geflasht; Hash-Verifikation erfolgreich | Der kontrollierte Sender für Versuch A ist grundsätzlich vorbereitet |
-| 2026-06-26 | TX-SoftAP startet mit anderem USB-Kabel erfolgreich; AP IP `192.168.4.1`, AP MAC `AE:27:6E:A8:D2:64` | Der kontrollierte Sender für Versuch A ist betriebsbereit |
+| 2026-06-26 | TX-SoftAP startet mit anderem USB-Kabel erfolgreich; AP IP `CSI_AP_IP`, AP MAC `TX_MAC_REDACTED` | Der kontrollierte Sender für Versuch A ist betriebsbereit |
 | 2026-06-26 | Lokale RuView-`.venv` mit `esptool 5.3.0` und `esp-idf-nvs-partition-gen 0.2.0` eingerichtet | RX-Firmware kann geflasht und NVS-Provisioning vorbereitet werden |
 | 2026-06-26 | RuView-Sensing-Server erfolgreich mit Cargo gebaut | Der PC/Mac kann nun als CSI-Empfangs- und Auswertungsserver für RX1 dienen |
 | 2026-06-26 | Erster gültiger ESP32-CSI-Frame im RuView-Server erkannt: `node=1`, `subs=64`, `seq=0` | RX1 sendet nicht nur UDP-Pakete, sondern mindestens ein Paket wurde korrekt als CSI-Frame geparst |
@@ -27,7 +27,7 @@ Diese Datei sammelt bewusst auch negative Ergebnisse. Für den späteren Bericht
 
 | Datum | Problem | Vermutete Ursache | Reaktion |
 |---|---|---|---|
-| 2026-06-26 | SoftAP-Funktion nach Flash noch nicht geprüft | Flash-Log bestätigt nur das Schreiben der Firmware, nicht den laufenden Betrieb | Seriellen Monitor öffnen, AP-IP und AP-MAC prüfen, Laptop mit `csi-test` verbinden |
+| 2026-06-26 | SoftAP-Funktion nach Flash noch nicht geprüft | Flash-Log bestätigt nur das Schreiben der Firmware, nicht den laufenden Betrieb | Seriellen Monitor öffnen, AP-IP und AP-MAC prüfen, Laptop mit `CSI_SSID` verbinden |
 | 2026-06-26 | TX-ESP32 startet mit `E BOD: Brownout detector was triggered` neu | Versorgungsspannung bricht beim Boot/WiFi-Start ein | Besseres USB-Kabel, aktiver USB-Hub oder externes 5V-Netzteil verwenden; danach SoftAP erneut prüfen |
 | 2026-06-26 | Brownout bleibt trotz `WiFi.setTxPower(WIFI_POWER_11dBm)` bestehen | Stromversorgung weiterhin instabil oder Brownout entsteht vor/nicht nur durch TX-Power | Minimal-Sketch ohne WiFi testen; SoftAP-Start verzögern; aktiven Hub/externes Netzteil verwenden |
 | 2026-06-26 | Brownout trat mit ursprünglichem USB-Kabel beim WiFi-Start auf, verschwand mit anderem Kabel | USB-Kabel verursachte Spannungsabfall bei WiFi-Stromspitze | Stabiles Kabel als Pflicht für weitere Messungen festhalten |
@@ -36,9 +36,9 @@ Diese Datei sammelt bewusst auch negative Ergebnisse. Für den späteren Bericht
 | 2026-06-26 | `cargo` nicht gefunden | Rust-Toolchain noch nicht installiert oder nicht im PATH | Rust via `rustup` installieren und Server erneut bauen |
 | 2026-06-26 | RuView-Build findet `vendor/rufield/crates/rufield-core/Cargo.toml` nicht | Git-Submodule waren noch nicht initialisiert | `git submodule update --init --recursive` ausführen und Build erneut starten |
 | 2026-06-27 | RX3 startete zuerst immer wieder mit `Brownout detector was triggered` beim WiFi-/PHY-Start neu | USB-Stromversorgung/Kabel reichte fuer die WiFi-Stromspitze nicht aus | Versorgung/Kabel geaendert; danach seriell `brownout_count=0` beobachtet |
-| 2026-06-27 | Trotz korrekt laufendem RX3 ist der 3RX-Live-Test noch nicht nachgewiesen | Der Mac war im normalen WLAN (`192.168.178.123`), waehrend RX3 selbst `192.168.4.4` bekam und auf `target_ip=192.168.4.4` sendete | Fuer den Live-Test feste Mac-IP im `csi-test`-Netz setzen und alle RX auf diese Ziel-IP provisionieren |
+| 2026-06-27 | Trotz korrekt laufendem RX3 ist der 3RX-Live-Test noch nicht nachgewiesen | Der Mac war im normalen WLAN (`HOME_LAN_IP`), waehrend RX3 selbst `RX3_IP` bekam und auf `target_ip=RX3_IP` sendete | Fuer den Live-Test feste Mac-IP im `CSI_SSID`-Netz setzen und alle RX auf diese Ziel-IP provisionieren |
 | 2026-06-27 | `Multistatic fusion failed`, obwohl alle vier Nodes Raw-CSI senden | Zeitspreizung der Frame-Ankunft liegt über dem Guard-Intervall; Nodes sind noch nicht hinreichend synchronisiert | Für erste Visualisierung den Fallback akzeptieren; für spätere Positionsmessung Timing/Traffic/TDM verbessern |
-| 2026-06-28 | `192.168.4.5` ist als Mac-Ziel-IP ungeeignet | Diese Adresse wurde aktuell von einem ESP32-Knoten belegt | Feste Mac-Ziel-IP außerhalb der bisherigen DHCP-Vergabe wählen, z. B. `192.168.4.50` |
+| 2026-06-28 | `RX4_IP` ist als Mac-Ziel-IP ungeeignet | Diese Adresse wurde aktuell von einem ESP32-Knoten belegt | Feste Mac-Ziel-IP außerhalb der bisherigen DHCP-Vergabe wählen, z. B. `CSI_HOST_IP` |
 | 2026-06-28 | Leerer Raum A0 wurde fast durchgehend als `presence=True` klassifiziert | Aktuelle RuView-Klassifikation ist für diesen Aufbau noch nicht kalibriert; Funkumgebung/Traffic erzeugt False Positives | Klassifikation nicht ungeprüft verwenden; eigene Auswertung/Schwellwerte und Wiederholungsmessungen nutzen |
 | 2026-06-28 | Vitalwerte wurden auch im leeren Raum ausgegeben | Vital-Estimator interpretiert Signal-/Rauschanteile als BPM | Atem-/Herzfrequenz nur mit Referenzsensor oder manuellem Atemzählen bewerten |
 | 2026-06-28 | Webansicht springt trotz besser verteilter RX-Module stark hin und her | RuView nimmt auch im leeren Raum `presence=True`/`estimated_persons=1` an; reale Node-Positionen sind noch nicht gesetzt | Web-Pose vorerst nicht als Messwert verwenden; `--node-positions` und Baseline/Kalibrierung testen |
@@ -51,8 +51,8 @@ Diese Datei sammelt bewusst auch negative Ergebnisse. Für den späteren Bericht
 | Datum | Änderung | Grund | Auswirkung |
 |---|---|---|---|
 | 2026-06-26 | Rust/Cargo installiert und RuView-Submodule geladen | Lokaler RuView-Sensing-Server benötigt Rust-Abhängigkeiten und Vendor-Code | Server-Build ist erfolgreich; nächster Schritt ist Live-Empfang auf UDP-Port `5005` |
-| 2026-06-27 | RX3-Stromversorgung/Kabel nach Brownout-Befund angepasst | WiFi-/PHY-Start loeste vorher Brownout aus | RX3 bootet stabil, verbindet sich mit `csi-test` und initialisiert CSI |
-| 2026-06-27 | RX1-RX4 auf aktuelle Mac-Ziel-IP `192.168.4.5:5005` gebracht | DHCP hatte die Host-IP verändert; alte Target-IPs machten Nodes unsichtbar | Alle vier Nodes werden vom RuView-Server empfangen |
+| 2026-06-27 | RX3-Stromversorgung/Kabel nach Brownout-Befund angepasst | WiFi-/PHY-Start loeste vorher Brownout aus | RX3 bootet stabil, verbindet sich mit `CSI_SSID` und initialisiert CSI |
+| 2026-06-27 | RX1-RX4 auf aktuelle Mac-Ziel-IP `RX4_IP:5005` gebracht | DHCP hatte die Host-IP verändert; alte Target-IPs machten Nodes unsichtbar | Alle vier Nodes werden vom RuView-Server empfangen |
 | 2026-06-28 | Remote-Konfiguration über HTTP `/config` als Firmware-Erweiterung vorbereitet | Künftige Target-IP-/Node-ID-Änderungen sollen ohne USB-Provisioning möglich sein | Nach OTA-Deployment können ausgewählte NVS-Werte per WLAN gesetzt und per Reboot aktiviert werden |
 | 2026-06-28 | Für den nächsten Visualisierungstest wird ein größeres RuView-Guard-Intervall geplant | Standard 60 ms ist für die beobachtete WLAN-/ESP32-Zeitspreizung zu eng | Server mit `WDP_GUARD_INTERVAL_US=500000` und `WDP_SOFT_GUARD_US=200000` starten |
 | 2026-07-18 | TX und RX1-RX4 fest vermessen; mmWave für diese Phase zurückgestellt | Zuerst soll die WLAN-CSI-Auswertung ohne zusätzliche Referenzkomplexität stabilisiert werden | Reale Geometrie ist gesetzt; nächste Priorität ist Datenqualität statt weiterer Sensorfusion |
@@ -61,9 +61,9 @@ Diese Datei sammelt bewusst auch negative Ergebnisse. Für den späteren Bericht
 
 | Datum | Änderung | Grund | Auswirkung |
 |---|---|---|---|
-| 2026-06-27 | RX3 per NVS mit `--reset`, `node_id=3`, `edge_tier=0`, `channel=6`, `target_ip=192.168.4.4`, `target_port=5005` provisioniert | Alte Provisioning-Reste ausschliessen und dritten RX eindeutig konfigurieren | RX3 liest die erwarteten NVS-Werte und startet als CSI-RX3 |
-| offen | Feste Host-IP fuer 3RX-Test festlegen, vorgeschlagen `192.168.4.50` | DHCP vergab `192.168.4.4` an RX3, waehrend diese Adresse als Mac-Ziel-IP erwartet wurde | Nach Umstellung muessen RX1-RX3 auf dieselbe feste Mac-IP reprovisioniert werden |
-| 2026-06-28 | Feste Host-IP auf eine freie Adresse außerhalb der beobachteten ESP-Adressen verschieben, vorgeschlagen `192.168.4.50` | `192.168.4.5` wurde von einem ESP belegt und ist daher keine sichere Host-Adresse | Reduziert künftige DHCP-/Ziel-IP-Konflikte |
+| 2026-06-27 | RX3 per NVS mit `--reset`, `node_id=3`, `edge_tier=0`, `channel=6`, `target_ip=RX3_IP`, `target_port=5005` provisioniert | Alte Provisioning-Reste ausschliessen und dritten RX eindeutig konfigurieren | RX3 liest die erwarteten NVS-Werte und startet als CSI-RX3 |
+| offen | Feste Host-IP fuer 3RX-Test festlegen, vorgeschlagen `CSI_HOST_IP` | DHCP vergab `RX3_IP` an RX3, waehrend diese Adresse als Mac-Ziel-IP erwartet wurde | Nach Umstellung muessen RX1-RX3 auf dieselbe feste Mac-IP reprovisioniert werden |
+| 2026-06-28 | Feste Host-IP auf eine freie Adresse außerhalb der beobachteten ESP-Adressen verschieben, vorgeschlagen `CSI_HOST_IP` | `RX4_IP` wurde von einem ESP belegt und ist daher keine sichere Host-Adresse | Reduziert künftige DHCP-/Ziel-IP-Konflikte |
 | 2026-06-28 | Guard-Intervall-Testwert festgelegt: 500 ms hard / 200 ms soft | Pragmatiker-Workaround für RuView-Visualisierung bei unsynchronisierten ESP32-Nodes | Darf nicht als Beleg für echte synchrone Fusion interpretiert werden |
 | 2026-07-18 | Reale RX-, TX- und Raumpositionen an RuView übergeben | Geometrie als Ursache der springenden Darstellung ausschließen | Marker entsprechen dem vermessenen Aufbau; Klassifikation und Wolkenbewegung bleiben dennoch nicht valide |
 | 2026-07-18 | Schwaches adaptives Modell verworfen und Bewegungs-/Konsenslogik lokal korrigiert | Modellgenauigkeit `41,5 %`, Selbstvergleich eines Frames, statische Sättigung und Last-RX-Aggregation verfälschten das Ergebnis | Nachweisbare Softwarefehler reduziert; verbleibende Still-/Bewegungsüberlappung weist auf den CSI-Datenstrom als nächsten Prüfpunkt |
@@ -78,7 +78,7 @@ Diese Datei sammelt bewusst auch negative Ergebnisse. Für den späteren Bericht
 | Vitalzeichen | API liefert aktuell noch `breathing_rate_bpm: null` und `heart_rate_bpm: null` | Atem-/Herzfrequenz ist noch kein belastbares Ergebnis; zunächst nur Signalreaktion und Bewegung prüfen |
 | Paketformat | Kontinuierliche UDP-Pakete sind 60 Byte lang und beginnen mit `0xC5110006` (`feature_state`), nicht `0xC5110001` (`raw CSI`) | Für die Methodik muss getrennt werden zwischen vorverarbeiteten Features und echten Roh-CSI-Daten |
 | MAC-Filter | Filter auf die TX/AP-MAC reduzierte den Raw-CSI-Strom stark; ohne Filter kommen fortlaufende Frames | Für frühe Tests ist kein MAC-Filter robuster; Filter erst später gezielt testen |
-| Host-IP / DHCP | RX3 bekam im `csi-test`-Netz selbst `192.168.4.4`, obwohl diese Adresse als Mac-Ziel-IP provisioniert war | Fuer Mehrknotenmessungen braucht der Server-Host eine stabile Zieladresse; DHCP-Zufall kann RX-Daten unsichtbar machen |
+| Host-IP / DHCP | RX3 bekam im `CSI_SSID`-Netz selbst `RX3_IP`, obwohl diese Adresse als Mac-Ziel-IP provisioniert war | Fuer Mehrknotenmessungen braucht der Server-Host eine stabile Zieladresse; DHCP-Zufall kann RX-Daten unsichtbar machen |
 | Mehrknoten-Synchronisation | Bei 4RX meldet RuView `Timestamp spread ... exceeds guard interval` und fällt auf per-node Fallback zurück | Für echte Positionsfusion reicht reiner Mehrknotenempfang nicht; zeitliche Synchronität ist ein zusätzlicher limitierender Faktor |
 | Server-Guard-Intervall | Ein größeres Guard-Intervall kann Fallback-Meldungen reduzieren, akzeptiert aber stärker zeitversetzte Frames | Nützlich für Visualisierung, aber methodisch schwächer für präzise Positions-/Atemanalyse |
 | Visualisierung/Pose | Die Webansicht zeigt springende Pose-/Personhypothesen; leerer Raum wird teils als Person interpretiert | Die Visualisierung ist aktuell nur qualitativ und nicht als exakte Positionsmessung nutzbar |

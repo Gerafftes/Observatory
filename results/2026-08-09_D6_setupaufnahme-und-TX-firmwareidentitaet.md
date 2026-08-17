@@ -33,7 +33,7 @@ Weitere festgelegte Zustände:
 
 - Tür: geschlossen
 - CSI-WLAN: verbunden
-- IP-Adresse des Macs im CSI-WLAN: `192.168.4.50/24`
+- IP-Adresse des Macs im CSI-WLAN: `CSI_HOST_IP/24`
 - Möbel und normale statische Gegenstände: bleiben für Preflight,
   Leerraumkalibrierung und alle späteren Aufnahmen unverändert im Raum
 

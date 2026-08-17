@@ -8,7 +8,7 @@ Der RuView-Quellcode selbst bleibt ein separates Upstream-Repository. Dieses BLL
 
 Motivation:
 
-- Die RX-Knoten mussten mehrfach neu provisioniert werden, weil sich die Mac-IP im `csi-test`-Netz geändert hatte.
+- Die RX-Knoten mussten mehrfach neu provisioniert werden, weil sich die Mac-IP im `CSI_SSID`-Netz geändert hatte.
 - OTA-Status war über WLAN erreichbar, der OTA-Upload war aber ohne PSK gesperrt (`403 Forbidden`).
 - Ziel war, spätere Änderungen wie `target_ip`, `node_id`, `edge_tier` oder `csi_channel` ohne USB per WLAN setzen zu können.
 
@@ -17,7 +17,7 @@ Vorbereitete lokale Änderung:
 - `config_server.c`
 - `config_server.h`
 - Registrierung in `main.c` auf dem bestehenden HTTP-/OTA-Server
-- Beispiel-Endpoint: `POST /config?target_ip=192.168.4.50&reboot=1`
+- Beispiel-Endpoint: `POST /config?target_ip=CSI_HOST_IP&reboot=1`
 
 Status:
 
@@ -243,3 +243,179 @@ Die technische Fail-closed-Regel arbeitete wie vorgesehen, weil eine einzelne RX
 D5 bleibt experimentell und wird nicht als Standard aktiviert. Das Quorum wird ohne neuen zugehörigen Leerraumlauf nicht gelockert, da eine Ein-RX-Regel die bereits gemessenen Leerraum-Fehlalarme wieder zulassen könnte.
 
 Ausführliche Auswertung: [results/2026-07-26_D5_realer-still-livetest.md](results/2026-07-26_D5_realer-still-livetest.md)
+
+## D6 und diskrete Positionspipeline vom 2026-07-29
+
+Nach dem nicht generalisierenden D5-Livetest wurde die nächste Änderung nicht
+als weitere einzelne Schwellenkorrektur aufgebaut. Die lokale RuView-Arbeit
+trennt jetzt drei Ebenen:
+
+1. verlustfreie, aufbaugebundene Rohdatenerfassung
+2. D6-Präsenzmerkmale relativ zu einer robusten Leerraumreferenz
+3. eine davon getrennte Positionsklassifikation für neun feste Punkte
+
+### D6-Fingerprint
+
+D6 vergleicht nicht nur einen skalaren Bewegungswert. Für jeden RX und jedes
+gültige CSI-Raster wird die gain-normalisierte Subcarrier-Form mit einer
+Leerraumreferenz verglichen. Die Referenz enthält außerdem eine stabile
+Bin-Maske, damit verrauschte Subcarrier nicht als künstliche Nullevidenz in die
+Positionsmerkmale gelangen.
+
+Wichtig gegenüber D5:
+
+- signierte Residuen bleiben erhalten
+- positive und negative Abweichungen können Veränderung tragen
+- RSSI- und CSI-RMS-Abweichung werden getrennt erfasst
+- ein Rasterwechsel kann nicht stillschweigend dieselbe Referenz
+  weiterverwenden
+
+D6 ersetzt damit die einseitige Regel `z > 1` durch reichhaltigere
+CSI-Formmerkmale. Eine erfolgreiche reale Presence-Classification ist dadurch
+noch nicht bewiesen.
+
+### Verlustfreie Aufnahmen
+
+Der Server kann validierte ESP32-UDP-Frames verlustfrei als Raw-CSI-JSONL
+speichern. Erfasst werden unter anderem:
+
+- RX-ID und Zeitstempel
+- Frequenz, Antennen- und Subcarrierzahl
+- Sequenz, RSSI, Noise Floor, PPDU-Typ und Layout-Flags
+- jedes signierte I/Q-Paar in ursprünglicher Reihenfolge
+
+Zu jeder Aufnahme entsteht ein Sidecar. Für die Positionspipeline muss es eine
+Setup-ID und einen Setup-Hash, die feste Geometrie und den Serverstand binden.
+Raw- und Sidecar-Schema lehnen unbekannte Felder ab. Positionsaufnahmen werden
+verworfen, wenn sie ein eingebettetes Label oder eine Ground Truth enthalten.
+
+### Neun feste Punkte statt kontinuierlicher Scheinpräzision
+
+Die Ortung verwendet P01 bis P09 aus
+[`00-status-und-annahmen.md`](00-status-und-annahmen.md). Pro Drei-Sekunden-
+Fenster entstehen 28 Merkmale je RX. Erforderlich sind:
+
+- RX1 bis RX4
+- mindestens 5 Hz
+- mindestens 15 Frames je RX und Fenster
+- höchstens eine Sekunde Lücke
+- ausreichende gemeinsame zeitliche Abdeckung
+- identisches, erwartetes Subcarrier-Raster
+
+Sechs unabhängige Fünf-Sekunden-Blöcke je Punkt bilden robuste
+Median-Prototypen. Die vier RX werden gleich gewichtet. Neben P01 bis P09 sind
+ausdrücklich `unknown` für außerhalb der bekannten Verteilung und `ambiguous`
+für nicht ausreichend getrennte Kandidaten vorgesehen.
+
+Eine Position wird nicht zwischen Punkten interpoliert. Der Ansatz soll zuerst
+beweisen, ob der feste Aufbau grobe Raumbereiche reproduzierbar unterscheiden
+kann.
+
+### Getrennte Offlinebefehle
+
+```text
+--position-inspect <empty-calibration|position>
+--position-build-index <TRAINING_MANIFEST>
+--position-predict <POSITION_INDEX>
+--position-evaluate <PREDICTIONS>
+```
+
+Der Workflow ist absichtlich blind:
+
+1. `inspect` prüft Aufnahme und Sidecar und erzeugt manifestfähige Hashes.
+2. `build-index` darf Trainingspfade und Punktlabels lesen.
+3. `predict` akzeptiert ausschließlich Index und ungelabelte Blindaufnahmen.
+4. `evaluate` liest erst danach die separat gespeicherte Wahrheit.
+
+Rohdatei-, Sidecar- und Signalabschnitt-Hashes verhindern, dass
+Trainingsaufnahmen versehentlich im Blindtest wiederverwendet werden. Die
+Ausgabe wird atomisch in eine neue Datei geschrieben; vorhandene Artefakte
+werden nicht überschrieben.
+
+### Sicherheitsverhalten der Sensing-Ansicht
+
+Die bestehende Heatmap bleibt eine Diagnoseansicht und ist kein Nachweis einer
+gemessenen Personposition. Bei ESP32-Daten darf die UI keine Person aus einer
+künstlichen Feldspitze ableiten. Ohne gültige Position, ohne Präsenz oder bei
+veralteten Daten werden Personposition und Pose geschlossen entfernt. Die
+TX-/RX-Marker bleiben sichtbar, weil sie den fest vermessenen Aufbau zeigen.
+
+### Prüfstatus
+
+Implementiert:
+
+- D6-Referenz und signierte Projektion
+- Raw-Recorder und Replay
+- Positionsfenster und Qualitätsgates
+- robuster 9-Punkt-Klassifikator
+- Inspection, Indexbau, blinde Vorhersage und getrennte Auswertung
+- Leakage- und No-Clobber-Sicherungen
+- kanonische, gehashte Setupbindung für Geometrie, Geräte- und Funkstand
+- fail-closed Live-Positionskern mit D6-Gate, 4-aus-5-Konsens und
+  Raw-CSI-Veraltungsgrenze
+- ehrliche Sensing-Darstellung ohne künstliche Position bei fehlender Evidenz
+
+Automatisiert bestanden:
+
+- dateibasierter End-to-End-Test mit 65 Sekunden Leerraum, neun Trainings- und
+  neun getrennten Blindaufnahmen
+- vollständiger Weg `inspect → build-index → predict → evaluate`
+- synthetisches Ergebnis `9/9` korrekt, Coverage und Accuracy `1,0`,
+  Median-/p95-Fehler `0,0 m`
+- vollständiger Rust-Testlauf mit `852` bestandenen, `0` fehlgeschlagenen und
+  `2` absichtlich ignorierten Tests
+- Sensing-UI-Test, JavaScript-Syntax, Debug-Build, echte CLI-Prüfung,
+  gezieltes Rustfmt der bearbeiteten Module und `git diff --check`
+
+Noch offen:
+
+- endgültigen Mac-Standort und vollständiges Setup-Manifest einfrieren
+- reale Leerraum-, P01-bis-P09-Trainings- und Blindaufnahmen
+- vorab festgelegte Gütegrenzen mit Blinddaten prüfen
+- erst danach den bestandenen realen Index in den bereits vorbereiteten
+  Live-Serverpfad laden
+
+Der aktuelle ausgeschaltete Hardwarezustand ist für diese Offlinephase
+beabsichtigt. Er ist kein Hindernis für Code- und Schemavalidierung, erlaubt
+aber selbstverständlich noch keine Aussage über die reale Ortungsleistung.
+Ohne realen Index meldet der Livepfad absichtlich `uncalibrated` und zeigt
+keine Personenposition.
+
+Fortlaufender Wiedereinstieg:
+[`08-aktueller-arbeitsstand-d6-und-position.md`](08-aktueller-arbeitsstand-d6-und-position.md)
+
+### Abschlussaudit der Live-Ausgaben
+
+Ein späterer Audit zeigte, dass die Sensing-Ansicht zwar bereits nur den
+diskreten Positionszustand verwendete, andere RuView-Ausgaben aber noch alte
+Grobdaten als scheinbare Person weiterreichen konnten. Deshalb gelten jetzt
+einheitlich folgende Verträge:
+
+- Bei aktivem Positions-Setup ist Classification bis zur fertigen
+  D6-Leerraumreferenz `uncalibrated` oder `calibrating`, niemals D4-Präsenz.
+- Ein Positionsmodell muss exakt P01 bis P09 enthalten.
+- ESP32-`persons[]` darf nur bei bestätigter Präsenz und einem gültigen
+  diskreten P01-bis-P09-Ergebnis entstehen.
+- Der ESP32-Marker enthält keine prozeduralen Pose-Keypoints; Heatmap und
+  Groblokalisierung bleiben reine Diagnosewerte.
+- `GET /health/ready.position_setup` zeigt das aktive versiegelte Setup auch
+  dann, wenn noch kein realer Index geladen ist.
+
+Observatory zeigt den Transportzustand nicht mehr pauschal als `LIVE`.
+`CONNECTING`, `LIVE ESP32`, `SIMULATED` und `STALE` werden getrennt. Ein
+ESP32-Frame verfällt nach drei Sekunden lokaler Browserzeit. Im Hardwaremodus
+werden nur validierte Raum-, TX- und exakt RX1-bis-RX4-Koordinaten dargestellt.
+Die frühere feste Demo-Geometrie, animierte Standardfigur und Szenarioprops
+bleiben der ausdrücklich beschrifteten Simulation vorbehalten. Reale Hardware
+erzeugt höchstens einen neutralen statischen P01-bis-P09-Marker.
+
+Für den späteren Hardwareübergang wurde außerdem
+`scripts/capture_position_run.py` ergänzt. Der Runner verwendet ausschließlich
+neutrale Aufnahme-IDs und prüft Setup, frische RX1 bis RX4, Mindestdatenrate,
+verlorene Frames sowie den abgeschlossenen setupgebundenen Sidecar. Der
+allgemeine Training-Tab ersetzt dieses Blindprotokoll nicht.
+
+Die TX-Filteridentität
+`sha256-ruview-tx-filter-mac-v1` ist nun eindeutig als SHA-256 über exakt die
+sechs binären NVS-Bytes definiert. Provisioning und Server prüfen denselben
+Testvektor; die rohe MAC muss nicht im Bericht erscheinen.
