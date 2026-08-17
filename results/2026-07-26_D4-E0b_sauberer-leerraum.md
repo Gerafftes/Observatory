@@ -10,7 +10,7 @@ Geprüft werden ausschließlich die per-RX- und globale Klassifikation mit D4 un
 
 ## Aufbau und Daten
 
-- 1 kontrollierter TX, Absender-MAC `AE:27:6E:A8:D2:64`
+- 1 kontrollierter TX, Absender-MAC `TX_MAC_REDACTED`
 - RX1 bis RX4 mit aktivem TX-MAC-Filter
 - fester Raumaufbau und korrigierte Gerätegeometrie
 - 10 Sekunden Vorlauf, danach 60 Sekunden leerer Raum

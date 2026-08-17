@@ -54,7 +54,7 @@ Noch nicht geprüft ist, ob das SoftAP-WLAN sichtbar ist und ob die AP-MAC-Adres
 
 **Konsequenz für den nächsten Schritt**
 
-Seriellen Monitor öffnen, TX-Startausgabe prüfen, AP-MAC notieren und Laptop mit dem `csi-test`-WLAN verbinden.
+Seriellen Monitor öffnen, TX-Startausgabe prüfen, AP-MAC notieren und Laptop mit dem `CSI_SSID`-WLAN verbinden.
 
 **Relevanz für den Bericht**
 
@@ -130,8 +130,8 @@ Zuerst wurde ein Minimal-Sketch ohne WiFi getestet. Dieser lief stabil. Danach w
 
 Der Minimal-Sketch gab wiederholt `alive` aus. Der SoftAP-Start funktionierte mit anderem Kabel:
 
-- AP IP: `192.168.4.1`
-- AP MAC: `AE:27:6E:A8:D2:64`
+- AP IP: `CSI_AP_IP`
+- AP MAC: `TX_MAC_REDACTED`
 
 **Erfolg**
 
@@ -276,7 +276,7 @@ Der RuView-Sensing-Server wurde mit `RUST_LOG=debug` gestartet, um akzeptierte E
 
 **Beobachtung**
 
-Der Server meldete `ESP32 frame from 192.168.4.3:54714: node=1, subs=64, seq=0`.
+Der Server meldete `ESP32 frame from RX2_IP:54714: node=1, subs=64, seq=0`.
 
 **Erfolg**
 
@@ -332,7 +332,7 @@ Der API-`tick` blieb nach wenigen gültigen CSI-Frames stehen, obwohl der RX-Kno
 
 **Durchführung / Änderung**
 
-Mit `sudo ping -i 0.1 192.168.4.3` wurde aktiver Datenverkehr erzeugt. Anschließend wurden UDP-Pakete auf Port `5005` per `tcpdump -X` betrachtet.
+Mit `sudo ping -i 0.1 RX2_IP` wurde aktiver Datenverkehr erzeugt. Anschließend wurden UDP-Pakete auf Port `5005` per `tcpdump -X` betrachtet.
 
 **Beobachtung**
 
@@ -362,7 +362,7 @@ Der RX-Knoten sendete kontinuierlich Feature-State-Pakete, aber nur sporadisch R
 
 **Durchführung / Änderung**
 
-RX1 wurde ohne `--filter-mac` neu provisioniert. Danach wurde durch Ping-Verkehr zu `192.168.4.3` zusätzlicher WLAN-Datenverkehr erzeugt.
+RX1 wurde ohne `--filter-mac` neu provisioniert. Danach wurde durch Ping-Verkehr zu `RX2_IP` zusätzlicher WLAN-Datenverkehr erzeugt.
 
 **Beobachtung**
 
@@ -388,14 +388,14 @@ Der Aufbau zeigt eine wichtige praktische Grenze: Eine zu starke Filterung verbe
 
 **Ausgangslage**
 
-Nach dem 2RX-Lauf fehlte im RuView-Server weiterhin ein dritter Knoten. Der Server hatte nur Frames von `node=1` (`192.168.4.2`) und `node=2` (`192.168.4.5`) gesehen. Der Mac war im Testnetz zuvor `192.168.4.4`; im normalen Internet-WLAN hatte er dagegen `192.168.178.123`.
+Nach dem 2RX-Lauf fehlte im RuView-Server weiterhin ein dritter Knoten. Der Server hatte nur Frames von `node=1` (`RX1_IP`) und `node=2` (`RX4_IP`) gesehen. Der Mac war im Testnetz zuvor `RX3_IP`; im normalen Internet-WLAN hatte er dagegen `HOME_LAN_IP`.
 
 **Durchführung / Änderung**
 
 RX3 wurde ueber USB erneut provisioniert. Der Port enumerierte zuerst als `/dev/cu.usbmodem5C4C0893221` und spaeter als `/dev/cu.usbmodem101`. Die NVS-Konfiguration wurde mit `--reset` neu geschrieben:
 
-- SSID: `csi-test`
-- Target: `192.168.4.4:5005`
+- SSID: `CSI_SSID`
+- Target: `RX3_IP:5005`
 - Node ID: `3`
 - Edge Tier: `0`
 - Channel: `6`
@@ -404,7 +404,7 @@ Anschliessend wurde der serielle Bootlog geprueft.
 
 **Beobachtung**
 
-Die NVS-Werte wurden korrekt geladen: `node_id=3`, `edge_tier=0`, `csi_channel=6`, `target_ip=192.168.4.4`, `target_port=5005`. Beim ersten Check trat beim WiFi-/PHY-Start ein Brownout auf. Nach Wechsel bzw. Stabilisierung der Stromversorgung bootete RX3 ohne Brownout, verband sich mit `csi-test`, initialisierte CSI und meldete `CSI streaming active -> 192.168.4.4:5005`.
+Die NVS-Werte wurden korrekt geladen: `node_id=3`, `edge_tier=0`, `csi_channel=6`, `target_ip=RX3_IP`, `target_port=5005`. Beim ersten Check trat beim WiFi-/PHY-Start ein Brownout auf. Nach Wechsel bzw. Stabilisierung der Stromversorgung bootete RX3 ohne Brownout, verband sich mit `CSI_SSID`, initialisierte CSI und meldete `CSI streaming active -> RX3_IP:5005`.
 
 **Erfolg**
 
@@ -412,11 +412,11 @@ RX3 ist firmwareseitig und NVS-seitig korrekt als `node_id=3` eingerichtet. Der 
 
 **Problem / Fehlschlag**
 
-Der 3RX-Live-Test im RuView-Server ist noch nicht nachgewiesen. Solange der Mac im normalen WLAN bleibt, besitzt er nicht die Zieladresse `192.168.4.4`. Beim seriellen Check bekam RX3 selbst die IP `192.168.4.4`; dadurch wuerde RX3 seine UDP-Pakete an sich selbst statt an den Mac senden.
+Der 3RX-Live-Test im RuView-Server ist noch nicht nachgewiesen. Solange der Mac im normalen WLAN bleibt, besitzt er nicht die Zieladresse `RX3_IP`. Beim seriellen Check bekam RX3 selbst die IP `RX3_IP`; dadurch wuerde RX3 seine UDP-Pakete an sich selbst statt an den Mac senden.
 
 **Konsequenz für den nächsten Schritt**
 
-Fuer den 3RX-Test muss der Mac wieder in das `csi-test`-Netz und eine stabile Ziel-IP bekommen. Robuster als DHCP ist eine feste Mac-IP im Testnetz, z. B. `192.168.4.50`, und danach erneutes Provisionieren von RX1, RX2 und RX3 auf `target_ip=192.168.4.50`. Erst danach ist `/api/v1/nodes` mit `total=3` bzw. Server-Logs mit `node=1`, `node=2` und `node=3` der eigentliche 3RX-Nachweis.
+Fuer den 3RX-Test muss der Mac wieder in das `CSI_SSID`-Netz und eine stabile Ziel-IP bekommen. Robuster als DHCP ist eine feste Mac-IP im Testnetz, z. B. `CSI_HOST_IP`, und danach erneutes Provisionieren von RX1, RX2 und RX3 auf `target_ip=CSI_HOST_IP`. Erst danach ist `/api/v1/nodes` mit `total=3` bzw. Server-Logs mit `node=1`, `node=2` und `node=3` der eigentliche 3RX-Nachweis.
 
 **Relevanz für den Bericht**
 
@@ -426,20 +426,20 @@ Der Befund trennt drei Ursachen sauber: Provisionierung ist korrekt, Stromversor
 
 **Ausgangslage**
 
-Der vierte ESP32-S3 ist angekommen und wurde als RX4 eingerichtet. Im `csi-test`-Netz hatte der Mac die IP `192.168.4.5`.
+Der vierte ESP32-S3 ist angekommen und wurde als RX4 eingerichtet. Im `CSI_SSID`-Netz hatte der Mac die IP `RX4_IP`.
 
 **Durchführung / Änderung**
 
-RX1 bis RX4 wurden auf die aktuelle Mac-Zieladresse `192.168.4.5:5005` provisioniert bzw. erneut provisioniert. Anschließend wurde für alle sichtbaren RX-IP-Adressen Ping-Verkehr erzeugt.
+RX1 bis RX4 wurden auf die aktuelle Mac-Zieladresse `RX4_IP:5005` provisioniert bzw. erneut provisioniert. Anschließend wurde für alle sichtbaren RX-IP-Adressen Ping-Verkehr erzeugt.
 
 **Beobachtung**
 
 Der RuView-Server empfing Raw-CSI-Frames von vier Nodes:
 
-- `node=1` von `192.168.4.2`
-- `node=2` von `192.168.4.3`
-- `node=3` von `192.168.4.4`
-- `node=4` von `192.168.4.6`
+- `node=1` von `RX1_IP`
+- `node=2` von `RX2_IP`
+- `node=3` von `RX3_IP`
+- `node=4` von `RX_DHCP_IP`
 
 Alle gemeldeten Frames hatten `subs=64`.
 
@@ -463,15 +463,15 @@ Dies ist der erste erfolgreiche 4RX-Meilenstein. Gleichzeitig zeigt er eine zent
 
 **Ausgangslage**
 
-Nach dem 4RX-Aufbau wurde erneut geprüft, welche Geräte im `csi-test`-Netz erreichbar sind. Der Mac bekam per DHCP wechselnde Adressen; gleichzeitig waren ESPs auf `192.168.4.2` bis `192.168.4.5` erreichbar.
+Nach dem 4RX-Aufbau wurde erneut geprüft, welche Geräte im `CSI_SSID`-Netz erreichbar sind. Der Mac bekam per DHCP wechselnde Adressen; gleichzeitig waren ESPs auf `RX1_IP` bis `RX4_IP` erreichbar.
 
 **Durchführung / Änderung**
 
-Die OTA-Status-Endpunkte der RX-Knoten wurden über WLAN geprüft. `192.168.4.2`, `.3`, `.4` und `.5` antworteten auf `GET /ota/status`.
+Die OTA-Status-Endpunkte der RX-Knoten wurden über WLAN geprüft. `RX1_IP`, `.3`, `.4` und `.5` antworteten auf `GET /ota/status`.
 
 **Beobachtung**
 
-`192.168.4.5` ist aktuell ein ESP32-Knoten und darf deshalb nicht als feste Mac-Ziel-IP verwendet werden. Andernfalls senden RX-Knoten ihre UDP-/CSI-Daten an einen anderen ESP statt an den RuView-Server.
+`RX4_IP` ist aktuell ein ESP32-Knoten und darf deshalb nicht als feste Mac-Ziel-IP verwendet werden. Andernfalls senden RX-Knoten ihre UDP-/CSI-Daten an einen anderen ESP statt an den RuView-Server.
 
 **Erfolg**
 
@@ -483,7 +483,7 @@ Die bisherige Strategie „Mac-Ziel-IP = aktuelle DHCP-IP“ ist bei mehreren ES
 
 **Konsequenz für den nächsten Schritt**
 
-Als stabile Host-Adresse sollte eine freie Adresse außerhalb der bisherigen DHCP-Vergabe genutzt werden, z. B. `192.168.4.50`. Zusätzlich wird eine Firmware-Erweiterung vorbereitet, damit ausgewählte NVS-Werte künftig per HTTP `/config` über WLAN geändert werden können.
+Als stabile Host-Adresse sollte eine freie Adresse außerhalb der bisherigen DHCP-Vergabe genutzt werden, z. B. `CSI_HOST_IP`. Zusätzlich wird eine Firmware-Erweiterung vorbereitet, damit ausgewählte NVS-Werte künftig per HTTP `/config` über WLAN geändert werden können.
 
 **Relevanz für den Bericht**
 
@@ -641,7 +641,7 @@ Ausführliche Diagnose und Bildnachweis: [results/2026-07-18_fester-raum_live-vi
 
 **Ausgangslage**
 
-Nach der Diagnose vom 18. Juli wurden alle vier RX auf den kontrollierten TX mit der MAC-Adresse `AE:27:6E:A8:D2:64` gefiltert. Vor weiteren Personenversuchen sollte zuerst geprüft werden, ob der leere Raum mit dem bereinigten Paketstrom und der D4-Bewegungsmetrik ruhig bleibt.
+Nach der Diagnose vom 18. Juli wurden alle vier RX auf den kontrollierten TX mit der MAC-Adresse `TX_MAC_REDACTED` gefiltert. Vor weiteren Personenversuchen sollte zuerst geprüft werden, ob der leere Raum mit dem bereinigten Paketstrom und der D4-Bewegungsmetrik ruhig bleibt.
 
 **Durchführung / Änderung**
 
@@ -893,6 +893,695 @@ Der Test zeigt, dass robuste Fusion zwei Fehler gleichzeitig vermeiden muss: ein
 Ausführliche Auswertung: [results/2026-07-26_D5_realer-still-livetest.md](results/2026-07-26_D5_realer-still-livetest.md)
 
 ## Vorlage für neue Journaleinträge
+
+### 2026-07-29 — D6-/Positionspipeline und kontextfeste Dokumentation
+
+**Ausgangslage**
+
+Die bisherige Heatmap war kein belastbarer Positionsnachweis. Gleichzeitig
+generalisierte D5 im realen Still-Livetest nicht und erreichte 0,0 %
+Still-Recall.
+
+**Durchführung / Änderung**
+
+Die laufende Arbeit trennt jetzt Präsenz und Position. Für die Ortung wird ein
+diskretes Fingerprint-Modell mit neun festen Bodenpunkten vorbereitet. Raw-CSI,
+Sidecars, Setupbindung, Hash-Provenienz, Blindvorhersage und getrennte
+Auswertung wurden als Offlinepipeline umgesetzt. Ein eigener
+Arbeitsstand-/Wiedereinstiegsnachweis hält Implementiertes, Geprüftes und
+Offenes getrennt fest.
+
+**Beobachtung**
+
+Die ESP32 sind aktuell ausgeschaltet und der Mac ist nicht im CSI-WLAN. Das
+behindert die derzeitigen Offlineprüfungen nicht. Eine reale Aussage zur
+Positionsgenauigkeit ist noch nicht möglich, weil die P01-bis-P09-Aufnahmen
+noch fehlen.
+
+**Erfolg**
+
+Die neue Pipeline kann bei unzureichender Evidenz `unknown` oder `ambiguous`
+liefern und muss keine scheinpräzise Position erzeugen. Trainings- und
+Blinddaten sind durch getrennte Artefakte und Hashprüfungen voneinander
+abgegrenzt.
+
+**Automatisierte Prüfung**
+
+Ein echter dateibasierter Test erzeugte eine 65-Sekunden-Leerraumaufnahme,
+neun 35-Sekunden-Trainingsaufnahmen und neun davon getrennte
+35-Sekunden-Blindaufnahmen mit vier RX, 5 Hz und 64 CSI-Bins. Der vollständige
+Weg `inspect → build-index → predict → evaluate` ordnete alle neun
+synthetischen Blindpositionen korrekt zu. Coverage und Accuracy betrugen 1,0,
+Median- und p95-Fehler 0,0 m.
+
+Danach bestand der vollständige Rust-Testlauf mit 852 bestandenen, 0
+fehlgeschlagenen und 2 absichtlich ignorierten Tests. Auch
+Sensing-UI-Lokalisierungstest, JavaScript-Syntaxprüfungen, Debug-Build,
+tatsächliche CLI-Hilfe und Fehlerfälle, gezieltes Rustfmt der bearbeiteten
+Module sowie `git diff --check` bestanden.
+
+**Problem / Fehlschlag**
+
+Die synthetischen Daten beweisen nur die technische Softwarekette. Der
+Livepfad ist zwar implementiert, wurde aber noch nicht mit einem real
+gemessenen und blind validierten Index betrieben. Die realen Messreihen stehen
+noch aus. Der Stand ist deshalb noch kein validiertes Ortungssystem.
+
+**Konsequenz für den nächsten Schritt**
+
+Der Offlineweg ist bestanden. Als Nächstes wird der endgültige Aufbau
+einschließlich Mac und Kabeln kanonisch eingefroren. Erst dann folgen
+Leerraum-, Trainings- und Blindaufnahmen.
+
+**Relevanz für den Bericht**
+
+Die Arbeit dokumentiert den methodischen Unterschied zwischen einer optisch
+plausiblen Heatmap und einer anhand unabhängiger Blinddaten überprüften
+Positionsklassifikation.
+
+Ausführlicher, fortlaufender Stand:
+[`08-aktueller-arbeitsstand-d6-und-position.md`](08-aktueller-arbeitsstand-d6-und-position.md)
+
+### 2026-07-29 — Abschlussaudit vor dem Hardwareübergang
+
+**Ausgangslage**
+
+Die Softwarekette war offline integriert, die reale Messserie aber noch nicht
+gestartet. Vor dem Aufbau-Freeze sollte geprüft werden, ob andere RuView-
+Ansichten oder alte Fallbacks trotzdem scheinbar reale Personen,
+Klassifikationen oder Positionen ausgeben können.
+
+**Durchführung / Änderung**
+
+Der Serververtrag wurde an vier Stellen verschärft: Classification ist bei
+aktivem Positions-Setup bis zur D6-Readiness fail-closed; Trainingsmanifest und
+Index verlangen exakt P01 bis P09; ESP32-Personen entstehen nur noch als
+neutraler Marker aus bestätigter Präsenz plus gültigem diskretem
+`position_estimate`; die TX-Filteridentität ist als Hash über exakt sechs
+binäre NVS-Bytes definiert. `GET /health/ready` zeigt die aktive Setup-
+Identität jetzt auch ohne Positionsindex.
+
+Observatory unterscheidet nun sichtbar zwischen `CONNECTING`, `LIVE ESP32`,
+`SIMULATED` und `STALE`. Nur ein frischer expliziter ESP32-Frame erhält den
+Live-Status. Der Hardwaremodus verwendet die validierte Raum-/TX-/RX-Geometrie
+und einen neutralen Positionsmarker; die animierte Demofigur bleibt
+ausschließlich Simulation.
+
+Zusätzlich wurde ein kontrollierter Aufnahme-Runner angelegt. Er startet keine
+Messung ohne aktive Setupbindung, frische ESP32-Quelle und exakt RX1 bis RX4.
+Nach dem Stopp prüft er Mindestdatenrate, Drops, Vollständigkeit und die
+Setupbindung des Sidecars.
+
+**Beobachtung**
+
+Die ESP32 blieben ausgeschaltet und der Mac blieb außerhalb des CSI-WLANs.
+Lokale Provisioning-Zustände liefern nur Kandidaten; eine ältere doppelte
+RX3-Datei ohne TX-Filter zeigt, warum die Boards später live geprüft werden
+müssen.
+
+**Erfolg**
+
+Gezielte Tests bestätigten die neuen Classification-, Punkt-ID-, ESP32-
+Personen-, TX-Filter- und Recorderverträge. Der Capture-Runner bestand seine
+eigenen Fail-closed-Tests. Observatory-Quellen-, Geometrie-, Positions-,
+Frische- und HUD-Zustände bestanden ihre separaten JavaScript-
+Regressionstests.
+
+**Problem / Fehlschlag**
+
+Die tatsächlichen RX-/TX-Firmwarestände, das Live-Raster und die endgültige
+Mac-/Kabel-/Raumrevision können ohne eingeschaltete Hardware noch nicht
+belegt werden. Eine reale Positionsgüte ist weiterhin vollständig offen.
+
+**Konsequenz für den nächsten Schritt**
+
+Zuerst wird der Mac an seinen endgültigen Betriebsort gestellt. Danach werden
+TX und RX1 bis RX4 eingeschaltet, die Live-Konfiguration geprüft und ein
+25-Sekunden-Preflight ohne Positionslabel durchgeführt. Erst nach bestandenem
+Preflight wird das Setup versiegelt und die 65-Sekunden-Leerraumaufnahme
+gestartet.
+
+**Relevanz für den Bericht**
+
+Der Audit verhindert, dass eine funktionierende WebSocket-Verbindung, eine
+alte Groblokalisierung oder ein lokaler Provisioning-Zustand als reale
+Messleistung beziehungsweise Gerätewahrheit interpretiert wird.
+
+Ausführlicher Stand:
+[`08-aktueller-arbeitsstand-d6-und-position.md`](08-aktueller-arbeitsstand-d6-und-position.md)
+
+### 2026-07-29 — Offline-Vorbereitung der Liveintegration
+
+**Ausgangslage**
+
+Die ESP32 sind ausgeschaltet und der Mac ist nicht mit dem CSI-WLAN verbunden.
+Die reale Messserie kann deshalb noch nicht beginnen; die Software kann aber
+reproduzierbar für diesen Übergang vorbereitet werden.
+
+**Durchführung / Änderung**
+
+Drei getrennte Arbeitspakete wurden umgesetzt: eine kanonische und gehashte
+Setupbindung, ein Live-Positionskern auf Basis derselben Fenster und Merkmale
+wie die Offlinepipeline sowie eine fail-closed Sensing-Darstellung. Der
+fortlaufende Arbeitsstand beschreibt für jedes Paket die erlaubten Ausgaben
+und die noch ausstehenden realen Nachweise.
+
+**Beobachtung**
+
+Dieser Schritt benötigt keine Livepakete. Die ausgeschaltete Hardware darf
+deshalb weder als Fehler noch als erfolgreicher Livetest interpretiert werden.
+
+**Erfolg**
+
+Die drei Teile sind jeweils separat implementiert und geprüft. Die Setupbindung
+bestand neben Unit-Tests und Build auch echte CLI-, HTTP- und
+UDP-Smoke-Tests; ein absichtlicher 63-statt-64-Bin-Frame schrieb null Frames
+und erzeugte einen unvollständigen Sidecar. Der Livekern bestand nach den
+Review-Korrekturen `11/11` eigene Tests sowie alle Capture-/Paritäts- und
+Positions-Tests. Der UI-Test bestätigte, dass Fehlerzustände, alte Grobdaten
+und ein Verbindungsabbruch die Persondarstellung löschen. Der Wiedereinstieg ist
+damit auch nach Abschluss der Integration eindeutig.
+
+**Problem / Fehlschlag**
+
+Die drei Arbeitspakete wurden inzwischen vollständig im Server zusammengeführt
+und erneut gesamtgetestet. Es existiert weiterhin kein real gemessener
+Positionsindex; deshalb bleibt die neue Livefunktion ohne echte Koordinaten.
+
+Ein unabhängiger Cross-Review fand vor der Integration außerdem zwei
+fail-closed Lücken: Zustandswechsel löschten den Raw-Frame-Puffer noch nicht,
+und `_simulated: true` konnte im Browser eine zugleich als ESP32 bezeichnete
+Quelle als Demo behandeln. Die Browserprüfung akzeptierte zudem noch zu
+tolerante Koordinaten.
+
+**Korrektur des Cross-Reviews**
+
+Der Livekern behandelt jetzt jeden fail-closed Übergang als neue Datenepoche
+und sammelt danach drei Sekunden ausschließlich neue Frames. `9/9` Live- und
+`105/105` Positions-Tests bestanden. Die UI verwendet nur noch eine explizite
+Simulations-Source-Allowlist, prüft P01 bis P09 und exakt drei numerische
+Koordinaten innerhalb des Raums. Ihr Regressionstest deckt zusätzlich
+Disconnect und parallele Init-/Dispose-Abläufe ab.
+
+Während der Integration wurde außerdem verhindert, dass weiterlaufende
+Edge-Vitals eine alte Position festhalten, obwohl kein Raw-CSI mehr ankommt.
+Nach einer Sekunde ohne akzeptiertes Raw-CSI wird jetzt `stale` ohne
+Koordinaten ausgegeben; Edge-Vitals erzeugt selbst keine Position.
+
+**Gesamtprüfung**
+
+Die Serverintegration ist abgeschlossen. Der vollständige Rust-Testlauf
+bestand mit 852 bestandenen, 0 fehlgeschlagenen und 2 absichtlich ignorierten
+Tests. Server-Build, reale CLI-Hilfe und Fehlerfälle, UI-Regressionstest,
+JavaScript-Syntax, `git diff --check` sowie gezieltes Rustfmt der bearbeiteten
+Module bestanden ebenfalls. Ein workspaceweiter Formatcheck bleibt wegen
+bereits vorhandener Abweichungen in nicht betroffenen Workspace-/Vendor-Dateien
+kein sinnvoller Abschlussnachweis.
+
+**Konsequenz für den nächsten Schritt**
+
+Für den Hardwareübergang fehlen nun die normale Mac-Betriebsposition, die
+bestätigten Firmware-/Funk-/Rasterangaben und das daraus versiegelte
+Setup-Artefakt. Der normale Mac-, Kabel- und Möbelaufbau wird in der
+Leerraumreferenz mitgemessen; leer bedeutet nur ohne Person. Erst danach
+folgen reale Leerraum-, Trainings- und Blindaufnahmen.
+
+**Relevanz für den Bericht**
+
+Die Trennung verhindert, dass ein synthetischer Softwaretest oder eine
+funktionierende UI versehentlich als reale Ortungsleistung dargestellt wird.
+
+### 2026-08-01 — Offline-Abschluss Software und Vorbereitung
+
+**Ausgangslage**
+
+Vor neuen Leerraum- und Positionsaufnahmen musste die Messkette sicherstellen,
+dass ausschließlich Raw-CSI des kontrollierten TX und des versiegelten
+1TX-/4RX-Aufbaus in Auswertung und Aufzeichnung gelangt. Gleichzeitig durfte
+die Vorbereitung keine reale Erkennungsleistung behaupten, solange die ESP32
+ausgeschaltet sind.
+
+**Durchführung / Änderung**
+
+Der RX-Firmwarevertrag wurde um einen strikt definierten 40-Byte-
+Laufzeitnachweis ergänzt. Gemeinsamer Parser, Server, Recorder,
+Offlinewerkzeuge und Capture-Runner prüfen Filterstatus, tatsächlich passende
+Framequelle, Identitätsgültigkeit und Übereinstimmung mit dem versiegelten
+Setup. Ein fehlender, beschädigter, widersprechender oder veralteter Nachweis
+wird fail-closed vor Liveness, Classification, D4/D5/D6, Position und Recorder
+abgewiesen. Öffentliche Statusausgaben enthalten nur Zustandsflags und Alter,
+nicht die rohe TX-MAC oder ihren Hash.
+
+Provisionierung und Zustandsdateien wurden zusätzlich gegen die Ausgabe von
+MAC- und OTA-Geheimnissen abgesichert. Historische Raw-v1-Aufnahmen bleiben
+lesbar; neue setupgebundene Positionsartefakte verlangen den vollständigen
+Nachweis.
+
+**Automatisierte Prüfung**
+
+Bestätigt wurden die gezielten Firmware-Host-, Provisionierungs-, Parser-,
+Server-, Positions-, Runner-, Sanitizer- und UI-Regressionsprüfungen. Der
+synthetische dateibasierte Positionsweg ordnete weiterhin `9/9` Blindpunkte
+korrekt zu. Die vollständige aktuelle Rust-Matrix bestand mit `1.118`
+bestandenen, `0` fehlgeschlagenen und `3` bewusst ignorierten Tests: Server
+`885/2`, Hardware `177/1`, CLI `33/0` und Pointcloud `23/0`, jeweils in der
+Notation bestanden/ignoriert. Zusätzlich bestanden Provisionierung `27/27`,
+Capture-Runner `8/8`, ADR-Hosttests `21/21`, Vitals-Hosttests `22/22`, die drei
+UI-Vertragstests sowie der Source-Binding-Vertrag. Die `8/8` vorhandenen
+mmWave-Prädikatstests sind grün, bedeuten aber keine Aktivierung oder Integration
+des weiterhin zurückgestellten mmWave-Moduls. Die Summen vom 2026-07-29 bleiben
+historische Momentaufnahmen.
+
+Ein anschließender unabhängiger Audit schloss vier Vorbereitungslücken: Im
+versiegelten Modus werden Edge-Vitals vor jeder Zustandsänderung ignoriert,
+Null-Frame-Aufnahmen enden als unvollständig, Discovery verlangt intern eine
+frische identische 0x07-TX-Bindung aller vier RX und meldet dennoch ausdrücklich
+nur Inventur statt Mess-PASS, und ein NVS-Rewrite bricht bei unbekanntem
+OTA-Schlüsselzustand vor dem Flashen ab. Die physische Zuordnung der beschrifteten
+RX zu ihren Koordinaten bleibt ein manueller Aufbaucheck; eine selbst gemeldete
+RX-ID kann eine räumliche Vertauschung nicht erkennen.
+
+**Nachtrag: echter Target-Build**
+
+ESP-IDF v5.4 wurde lokal und vom Projekt getrennt unter `.toolchains/`
+installiert. Die aktuelle Firmware 0.7.0 kompilierte für ESP32-S3 mit 8-MB-
+Layout (`1.129.872` Byte, `46 %` App-Partitionsreserve), ESP32-S3 mit 4-MB-
+Layout (`913.920` Byte, `52 %` Reserve) und den CI-Forschungstarget ESP32-C6
+(`1.054.736` Byte, `45 %` Reserve). Die beiden für den realen Aufbau relevanten
+S3-Varianten wurden unter
+`artifacts/ruview-firmware-0.7.0-2026-08-01/` mit Flashargumenten und
+SHA-256-Prüfsummen gesichert. Die historischen `release_bins` 0.6.7 dürfen für
+die neuen Messungen nicht verwendet werden, weil ihnen der TX-Binding-Nachweis
+fehlt.
+
+Der 8-MB-S3-Build lag `3.472` Byte über dem bisherigen CI-Grenzwert von
+`1.100 KiB`, passte aber mit fast der Hälfte Reserve in die vorgesehene 2-MiB-
+App-Partition. Der CI-Schutzwert wurde deshalb auf `1.120 KiB` aktualisiert;
+die Firmware-Dokumentation nennt nun konsistent ESP-IDF v5.4, den aktuellen
+Größenstand und die 2-MiB-Partition.
+
+**Grenze / noch kein Nachweis**
+
+Target-Kompilierung ist damit nachgewiesen. Flash-Größenerkennung, Flashen und
+Boottest benötigen ein tatsächlich angeschlossenes, beschriftetes Board und
+bleiben das erste physische Gate. Ebenfalls offen sind reale Classification-
+Güte, P01-bis-P09-Fingerprints und die unabhängige Blindvalidierung.
+
+**Konsequenz für den nächsten Schritt**
+
+Der Mac wird an seiner normalen Betriebsposition betrieben. Mac, Kabel, Möbel,
+Türstellung und andere statische Raumteile bleiben während Kalibrierung,
+Training und Blindtest unverändert und werden als Leerraumhintergrund
+mitgemessen; „leer“ bedeutet ausschließlich „ohne Person“. Nach Flash-
+Größenerkennung, Flash, Boot- und Live-Konfigurationsprüfung folgen Discovery, versiegelter Preflight
+und erst danach die D6-Leerraumaufnahme.
+
+Ausführlicher Stand:
+[`08-aktueller-arbeitsstand-d6-und-position.md`](08-aktueller-arbeitsstand-d6-und-position.md)
+
+### 2026-08-01 — RX1 Flash- und Bootprüfung
+
+**Getestet**
+
+Das beschriftete RX1 wurde allein per USB verbunden. `esptool 5.3.0` erkannte
+einen ESP32-S3 Revision 0.2 mit 16 MB physischem Flash und 8 MB PSRAM. Vor dem
+Flashen wurde keine Löschung ausgeführt.
+
+**Durchführung / Ergebnis**
+
+RX1 erhielt die verifizierte Firmware 0.7.0 mit dem geprüften 8-MB-Layout; die
+obere Hälfte des 16-MB-Flashs bleibt bewusst ungenutzt. Bootloader,
+Partitionstabelle, OTA-Auswahl und App wurden geschrieben und jeweils per Hash
+verifiziert. Der NVS-Bereich ab `0x9000` wurde nicht überschrieben.
+
+Der Bootlog bestätigte Node-ID 1, Kanal 6, Edge-Tier 0, aktiven TX-MAC-Filter,
+Zielserver `CSI_HOST_IP:5005` und den korrekten Headless-Pfad des Boards. Das
+Image meldet Projekt `esp32-csi-node`, Version 0.7.0 und ESP-IDF v5.4. WLAN und
+CSI konnten noch nicht geprüft werden, weil nur RX1 eingeschaltet und der
+CSI-AP beziehungsweise TX nicht aktiv war.
+
+**Offener Sicherheitszustand**
+
+Der OTA-HTTP-Endpunkt läuft fail-closed, weil auf RX1 noch kein Security-
+Namespace mit OTA-Schlüssel eingerichtet ist. Das betrifft nicht den separaten
+lokalen Konfigurationsendpunkt für Ziel-IP-Änderungen, muss aber vor einem
+späteren OTA-Firmwareupdate bewusst provisioniert werden. Es wurde kein
+Schlüsselwert protokolliert.
+
+**Nächster Schritt**
+
+RX2, RX3, RX4 und TX werden einzeln zunächst mit `flash-id` inventarisiert und
+erst danach mit der zu ihrer Flash-Größe passenden S3-Variante geflasht. Nach
+allen Bootprüfungen folgen gemeinsames Einschalten, CSI-WLAN, Provisionierung,
+Discovery und versiegelter Preflight.
+
+### 2026-08-01 — RX2 Flash- und Bootprüfung
+
+RX2 wurde als ESP32-S3 Revision 0.2 mit 16 MB Flash und 8 MB PSRAM erkannt.
+Wie RX1 erhielt es ohne NVS-Löschung die verifizierte Firmware 0.7.0 mit dem
+8-MB-Layout; alle geschriebenen Bereiche bestanden die Hashprüfung. Der
+Bootlog bestätigte Node-ID 2, Kanal 6, Edge-Tier 0, aktiven TX-MAC-Filter,
+Headless-Betrieb und Zielserver `CSI_HOST_IP:5005`. WLAN/CSI blieb bei
+ausgeschaltetem TX beziehungsweise CSI-AP erwartbar inaktiv. Auch RX2 betreibt
+OTA ohne Security-Namespace fail-closed; es wurde kein Schlüsselwert
+protokolliert.
+
+Nächster Board-Schritt: RX3 allein per USB anschließen, `flash-id`, passende
+Variante flashen und Bootkonfiguration prüfen.
+
+### 2026-08-01 — RX3 Flash- und Bootprüfung
+
+RX3 wurde als ESP32-S3 Revision 0.2 mit 16 MB Flash und 8 MB PSRAM erkannt.
+Das verifizierte 8-MB-Image der Firmware 0.7.0 wurde ohne NVS-Löschung
+geschrieben; alle Bereiche bestanden die Hashprüfung. Der Bootlog bestätigte
+Node-ID 3, Kanal 6, Edge-Tier 0, aktiven TX-MAC-Filter, Headless-Betrieb und
+Zielserver `CSI_HOST_IP:5005`. Der WLAN-Ausfall war bei inaktivem TX/CSI-AP
+erwartbar. OTA bleibt ohne Security-Namespace fail-closed.
+
+Nächster Board-Schritt: RX4 allein per USB anschließen, inventarisieren,
+flashen und bootprüfen.
+
+### 2026-08-01 — RX4 Flash- und Bootprüfung
+
+RX4 wurde als ESP32-S3 Revision 0.2 mit 16 MB Flash und 8 MB PSRAM erkannt.
+Das verifizierte 8-MB-Image der Firmware 0.7.0 wurde ohne NVS-Löschung
+geschrieben und vollständig per Hash geprüft. Der Bootlog bestätigte Node-ID 4,
+Kanal 6, Edge-Tier 0, aktiven TX-MAC-Filter, Headless-Betrieb und Zielserver
+`CSI_HOST_IP:5005`. Der WLAN-Ausfall war ohne aktiven TX/CSI-AP erwartbar.
+OTA bleibt ohne Security-Namespace fail-closed.
+
+Damit haben RX1 bis RX4 den Einzelboard-Flash- und Boottest bestanden. Vor
+einem Flash des TX wird getrennt geprüft, ob er dieselbe CSI-Node-Firmware oder
+eine eigene Sender-/AP-Firmware benötigt; eine RX-Firmware wird nicht ohne
+diesen Nachweis auf den TX geschrieben.
+
+### 2026-08-01 — TX-Firmwaregrenze auditiert
+
+Der TX verwendet weiterhin die separate Arduino-SoftAP-Firmware und darf nicht
+mit `esp32-csi-node` 0.7.0 überschrieben werden. Der erhaltene lokale Build ist
+für ESP32-S3, 4-MB-Layout, DIO/80 MHz erstellt und sendet auf Kanal 6 ungefähr
+50 kleine UDP-Broadcasts pro Sekunde. Die neue TX-Quellbindung verlangt keine
+Senderänderung: Jeder RX filtert gegen die AP-Identität und ergänzt den
+Laufzeitnachweis selbst.
+
+Der TX wird deshalb zunächst ausschließlich inventarisiert und gebootet.
+Geprüft werden stabiler Start ohne Brownout-Schleife, erfolgreicher SoftAP,
+Kanal 6, DHCP/Gateway und Broadcast-Rate. Rohe AP-MAC und WLAN-Zugangsdaten
+werden nicht protokolliert. Falls ein Reflash überhaupt nötig wird, wird davor
+der vollständige aktuelle TX-Flash privat gesichert und ausschließlich der
+erhaltene Senderbuild verwendet.
+
+### 2026-08-01 — TX zerstörungsfrei inventarisiert und gebootet
+
+Der TX wurde ohne BOOT-Taste und ohne Schreibzugriff per USB geprüft. `flash_id`
+bestätigte einen ESP32-S3 Revision 0.2 mit 16 MB Flash und 8 MB PSRAM. Danach
+wurde der normale Start seriell beobachtet. Die vorhandene Senderfirmware
+bootete erfolgreich, startete den SoftAP auf `CSI_AP_IP` und blieb in einer
+zusätzlichen Beobachtungsphase ohne Brownout- oder Reset-Schleife stabil.
+
+Es wurde nichts geflasht oder konfiguriert. Die rohe AP-MAC wurde nur lokal
+gesehen und weder hier noch in anderen Projektunterlagen gespeichert. Kanal,
+DHCP/Gateway, Broadcast-Rate und die nicht-identifizierende Bindungskonsistenz
+werden als Nächstes mit eingeschaltetem Gesamtaufbau geprüft.
+
+### 2026-08-01 — TX-Netzpfad und feste Serveradresse geprüft
+
+Der Mac verband sich bei weiterhin ausgeschalteten RX1 bis RX4 allein mit dem
+TX-SoftAP. DHCP vergab `RX1_IP`; das Gateway `CSI_AP_IP` antwortete in
+beiden Pingserien ohne Paketverlust. Ein unprivilegierter UDP-Empfänger zählte
+im stabileren 10-Sekunden-Lauf 457 Pakete beziehungsweise `45,5 Hz`; alle
+Pakete waren exakt 32 Byte groß. Die Ankünfte waren gebündelt, lagen insgesamt
+aber nahe am 50-Hz-Soll und deutlich über dem späteren 5-Hz-Mindestgate je RX.
+
+Da RX1 bis RX4 weiterhin fest an `CSI_HOST_IP:5005` senden, wurde ausschließlich
+das CSI-WLAN-Interface des Macs von der DHCP-Adresse auf `CSI_HOST_IP/24` mit
+Gateway `CSI_AP_IP` gesetzt und erfolgreich erneut geprüft. Hotspot und Kabel
+blieben unberührt. Der Kanal ließ sich über die macOS-API nicht auslesen; Kanal
+6 ist im Senderbuild festgelegt und wird im gemeinsamen RX-Lauf nochmals als
+Laufzeiteigenschaft geprüft.
+
+### 2026-08-01 — Letzte Softwarelücken vor dem realen Setup geschlossen
+
+Ein unabhängiger Audit zeigte, dass die guarded Leerraumaufnahme D5/D6 noch
+nicht selbst startete und beendete, Classification keine getrennte blinde
+Truth-Auswertung besaß und der Positionsreport noch nicht jedes eingefrorene
+PASS-Gate maschinenlesbar erzwang. Deshalb wurde noch keine reale P01-Aufnahme
+begonnen.
+
+`capture_position_run.py --kind empty` orchestriert nun Kalibrierungsstart,
+verlustfreie 65-Sekunden-Aufnahme, sicheren Abschluss und die Prüfung gültiger
+D5-/D6-Referenzen sowie frischer operationaler Evidenz für exakt RX1 bis RX4.
+Classification erzeugt zuerst ein ungelabeltes Replay-Artefakt; ein separater,
+an exakte Report-, Raw-, Sidecar-, Signal- und Setup-Hashes gebundener
+Truth-Evaluator erzwingt danach 3 Leerraum- und 18 belegte Blindläufe. Eine
+private `0600`-Truth-Vorlage wird aus dem Vorhersageartefakt erzeugt. Der
+Positionsreport erzwingt nun alle Coverage-, Accuracy-, Wiederholungs-,
+Abstentions- und Fehlergrenzen. Ein abschließender Gesamtbericht gibt nur PASS,
+wenn Classification und Position für dasselbe versiegelte Setup bestehen.
+
+Der vollständige Server-Binärtest bestand `394/394`, Runner und
+Truth-Generator `18/18`; die öffentlichen Setup-/Trainingsvorlagen bestanden
+die echten Rust-Schematests. Es wurde kein Commit, Branch, Push oder PR erzeugt.
+Die vier aktuellen privaten RX-Provisionierungszustände und die alte, weiterhin
+nicht verwendete Zustandsdatei wurden ohne Inhaltsänderung von `0644` auf
+`0600` beschränkt.
+
+### 2026-08-01 — Finalen Release-Server eingefroren
+
+Nach Abschluss aller Softwareänderungen wurde der Server mit
+`cargo +stable build --release -p wifi-densepose-sensing-server --bin sensing-server`
+neu gebaut. Die exakt geprüfte Binärdatei wurde ohne Überschreiben unter
+`artifacts/live-position-2026-08-01/sensing-server` archiviert, auf Modus
+`0500` gesetzt und bytegleich mit dem Build-Ausgang verglichen.
+
+Die Datei ist `5.954.240` Byte groß. Ihr SHA-256 lautet
+`e5cb6302404aa35872071f1ac20e73c26db60281ce826fe9bf365b2b3d5c3823`;
+die lokale `SHA256SUMS.txt`-Prüfung bestand. Ein CLI-Smoke-Test am archivierten
+Artifact bestätigte Classification-Auswertung, Position-Auswertung,
+Setup-Erzeugung und kombinierten Gesamtverdict. Ab jetzt wird für die reale
+Serie kein Servercode mehr geändert. Ein notwendiger Fix würde bewusst ein
+neues Artifact, Setup und eine neue Serie auslösen.
+
+### 2026-08-09 — Gemeinsamer Liveempfang und Gridfehler gefunden
+
+Der Mac stand an seiner normalen Betriebsposition, TX und RX1 bis RX4 waren
+eingeschaltet und das CSI-WLAN verbunden. Da DHCP zunächst `RX_DHCP_IP`
+vergeben hatte, wurde das WLAN-Interface erneut auf die von allen RX erwartete
+Empfangsadresse `CSI_HOST_IP/24` mit Gateway `CSI_AP_IP` gesetzt. Der TX war
+ohne Paketverlust erreichbar; alle vier RX erschienen anschließend frisch im
+Server.
+
+Die öffentliche Binding-Anzeige wechselte jedoch zwischen bestätigt und nicht
+bestätigt. Eine getrennte 10-Sekunden-UDP-Inventur zeigte für RX1 bis RX4
+ausschließlich vollständige, gültig gebundene CSI-Pakete und keine
+Legacy-Pakete. Jeder RX lieferte überwiegend 64-Subcarrier-Frames sowie einen
+kleineren Anteil gültiger 128-Subcarrier-Frames. Der Fehler lag im Server: Ein
+vom aktiven Raster abweichendes, aber korrekt gebundenes Paket löschte die
+frische TX-Bestätigung, vergiftete eine laufende Aufnahme und setzte den
+Live-Positionstracker zurück. Deshalb wurde die geplante Discovery nicht mit
+dem Build vom 2026-08-01 gestartet.
+
+### 2026-08-09 — Binding und Raster getrennt, neuer Release eingefroren
+
+Der Server validiert nun zuerst die vollständige TX-/RX-Identität und behandelt
+anschließend die Rasterauswahl getrennt. Gültige Off-Grid-Frames halten den
+Binding-Nachweis frisch, werden pro RX gezählt und vor D5/D6, Recorder und
+Live-Position herausgefiltert. Fehlende, unvollständige, fehlerhafte oder zum
+versiegelten Setup unpassende Bindings bleiben harte Fehler. Beim versiegelten
+Setup werden Quellidentität und erwartetes Raster ebenfalls getrennt geprüft.
+
+Die vollständige Server-Binärtestsuite bestand `397/397`; zusätzlich bestanden
+die fokussierten Grid-Tests `7/7`, die Setup-Tests `14/14`, Format- und
+Diffprüfung. Der neue Release liegt mit Modus `0500` unter
+`artifacts/live-position-2026-08-09/sensing-server`, ist `5.954.240` Byte groß
+und besitzt SHA-256
+`91feb860f89f094ba16ea9d749e3a1e5378de1a25ceedd08cebeb67f2cd3484b`.
+Der Build vom 2026-08-01 ist damit für reale Messungen abgelöst. Nächstes Gate
+ist die unversiegelte 25-Sekunden-Discovery mit dem neuen Build.
+
+### 2026-08-09 — Korrigierte 25-Sekunden-Discovery bestanden
+
+Der neue Release wurde unversiegelt mit der dokumentierten Raum-, TX- und
+RX-Geometrie gestartet. Über sechs aufeinanderfolgende API-Abfragen blieb die
+gemeinsame TX-Bindung von RX1 bis RX4 durchgehend bestätigt, während die neuen
+Off-Grid-Zähler erwartungsgemäß anstiegen. Damit war live nachgewiesen, dass
+die gültigen 128-Subcarrier-Ausreißer den Binding-Status nicht mehr löschen.
+
+Die anschließende Discovery `discovery-neutral-20260809-01` lief vollständig
+über 25 Sekunden. Sie endete mit `2.612` Frames, `0` Drops, Status `completed`,
+`incomplete=false` und ohne Integritätsfehler. Alle vier RX wurden mit demselben
+stabilen Raster inventarisiert: `2437 MHz`, eine Antenne, `64` Subcarrier,
+PPDU-Typ `0`, Layout-Flags `0`. Die per-RX-Framezahlen waren RX1 `623`, RX2
+`626`, RX3 `645` und RX4 `718`; alle Dauer- und Mindest-Ratengates bestanden.
+
+Diese Discovery ist ein Transport-, Binding- und Raster-Nachweis, noch kein
+Mess-PASS für Classification oder Position. Vor der Leerraumkalibrierung wird
+nun das vollständige reale Setup versiegelt. Noch benötigt werden die genaue
+normale Mac-Position und die exakte Identität der tatsächlich laufenden
+TX-Senderfirmware; danach folgt der versiegelte Preflight.
+
+### 2026-08-09 — Mac-Position, Türzustand und TX-App exakt erfasst
+
+Als Bezugspunkt für den Mac wurde die Mitte des Unterteils festgelegt. Der Mac
+steht auf gleicher Höhe wie RX4 und 4 cm von RX4 entfernt auf der von RX2
+wegführenden Linie. In der ursprünglichen Notation
+`(Breite, Länge, Höhe)` ist seine Position damit
+`(0,94 m, 0,00 m, 0,87 m)`; für RuView ergibt sich
+`[4.02, 0.87, 2.50]`. Die Tür ist geschlossen und bleibt für Preflight,
+Kalibrierung und Aufnahmen in diesem Zustand. Das CSI-WLAN ist verbunden und
+der Mac verwendet wie vorgesehen `CSI_HOST_IP/24`.
+
+Dieser Mac-Standort ist nicht der historische Aufbau „Mac mittig“ vom
+2026-07-26. Frühere Leerraumreferenzen sind deshalb nicht auf die neue Serie
+übertragbar. Mac, normale Gegenstände, Möbel und Kabel werden in der neuen
+65-Sekunden-Leerraumkalibrierung als statischer Hintergrund mitgemessen.
+
+Der TX wurde zuerst mit `flash_id` ohne BOOT-Taste und ohne Schreibzugriff als
+ESP32-S3 Revision 0.2 mit 16 MB Flash und 8 MB PSRAM bestätigt. Weil
+`flash_id` keine exakte Firmwareidentität liefert, wurde vor dem Versiegeln ein
+zweiter ausschließlich lesender USB-Lauf durchgeführt. Ein 16-MB-Vollreadback
+bei 460800 Baud brach bei ungefähr 7 % wegen serieller Paketstörung ab; die
+unvollständige Temp-Datei wurde gelöscht und der TX blieb unverändert.
+
+Bei 115200 Baud wurden danach Partitionstabelle und OTA-Auswahl gelesen. Der
+TX bootet aus `app0` bei `0x10000`. Nur diese aktive 1280-KiB-App-Partition
+wurde bei 230400 Baud vollständig ausgelesen; NVS und WLAN-Zugangsdaten waren
+nicht Teil dieses App-Readbacks. Das gültige Image meldet Projekt
+`arduino-lib-builder`, App-Version `43a8f6d`, Kompilierzeit
+`2026-06-02 11:17:54` und ESP-IDF `v5.5.4`. Der SHA-256 des vollständigen
+aktiven Partitions-Readbacks lautet
+`a66a11ad8e299a962572c2bc8a9e4067599a8460c44ae0efb1deae07277994e5`.
+Der eingebettete Image-Validierungshash
+`586d81820c929ed236f9ea0c6bf389ff00b3cc0e69b60f21478f53a05cdeb285`
+war gültig.
+
+Die vier aktuellen privaten RX-Zustände für Node-ID 1 bis 4 verwenden Kanal 6
+und denselben gesetzten TX-Filter. Dessen SHA-256 nach
+`sha256-ruview-tx-filter-mac-v1` lautet, ohne die rohe Adresse in diesem neuen
+Eintrag zu wiederholen,
+`60c998af0f5f845bd2afaac558a7da831a3a34ec07544de0efc6d1e747fad86c`.
+Eine alte doppelte RX3-Datei ohne Filter bleibt ausgeschlossen. Rohe MAC,
+WLAN-Zugangsdaten und OTA-Schlüssel wurden in diesem neuen Eintrag nicht
+wiederholt.
+
+Nach der Prüfung wurden der unvollständige Vollreadback, Partitionstabelle,
+OTA-Daten und aktive App-Kopie aus `/private/tmp` gelöscht. Es wurde nichts
+geflasht, provisioniert oder konfiguriert. Der TX ist am Ende dieses
+Zwischenstands noch für den Readback per USB angeschlossen; das Setup ist
+daher bewusst noch nicht versiegelt und der Preflight wurde nicht gestartet.
+Als Nächstes wird das USB-Datenkabel entfernt, der TX wieder ausschließlich
+mit Strom versorgt und erst dann das endgültige Setup erzeugt.
+
+Ausführlicher Nachweis:
+[results/2026-08-09_D6_setupaufnahme-und-TX-firmwareidentitaet.md](results/2026-08-09_D6_setupaufnahme-und-TX-firmwareidentitaet.md)
+
+### 2026-08-09 — Setup versiegelt und 25-Sekunden-Preflight bestanden
+
+Der TX wurde nach dem Readback wieder ausschließlich mit Strom versorgt. Mac,
+TX, RX1 bis RX4, Möbel, Kabel und die geschlossene Tür blieben danach
+unverändert. Aus den dokumentierten realen Angaben wurde die private
+Setup-Spezifikation erstellt und mit dem freigegebenen Serverbuild vom
+2026-08-09 versiegelt.
+
+Das resultierende Setup besitzt die ID `setup-0a49d75f122f9dc9` und den
+SHA-256
+`0a49d75f122f9dc9757aed7e175bb444056e7fdde6889bd8965288d1b9008a4e`.
+Spezifikation und Siegel liegen mit Modus `0600` unter
+`private/d6-20260809/`. Das Siegel bindet unter anderem die exakte Geometrie,
+Mac-/Kabel-/Möbel-/Türrevisionen, Kanal und Raster, TX- und RX-Firmwarehashes,
+den gemeinsamen TX-Filterhash sowie den Server-SHA-256
+`91feb860f89f094ba16ea9d749e3a1e5378de1a25ceedd08cebeb67f2cd3484b`.
+
+Ein erster Serverstart validierte das Siegel, konnte in der lokalen
+Anwendungs-Sandbox aber UDP und WebSocket nicht binden und endete vor jeder
+Aufnahme. Mit den erforderlichen lokalen Portrechten startete derselbe
+unveränderte Release danach erfolgreich. `/health/ready` meldete Quelle
+`esp32`, Status `ready` und das richtige aktive Setup. Exakt RX1 bis RX4 waren
+aktiv; alle fünf Laufzeit-Bindingflags waren bei jedem RX wahr, das Binding-
+Alter lag vor dem Lauf zwischen 15 und 36 ms.
+
+Der neutrale Lauf `preflight-neutral-20260809-01` endete nach 25 Sekunden mit
+2.545 Frames, 0 Drops, `completed`, `incomplete=false`, keinem
+Integritätsfehler und passender Setup-ID samt Setup-Hash. RX1 lieferte 604,
+RX2 647, RX3 684 und RX4 610 Frames. Alle vier RX verwendeten 2437 MHz, eine
+Antenne, 64 Subcarrier, PPDU-Typ 0 und Layout-Flags 0. Die Rohdatei besitzt
+SHA-256
+`0bd38597fc59083d1a61a2e752202a7784bacc878ff449ceb7d8a278cfce31a3`,
+die Metadatei
+`5488fd47ded95bafc786cace4b88acb81c1e09289dc455a95c8c7d129df2280b`.
+
+Damit ist der vorab definierte versiegelte Transport-, Binding-, Raster- und
+Recorder-Preflight bestanden. Er ist noch kein Classification- oder
+Positions-PASS. Zusätzlich blieb der allgemeine Engine-Trust wegen
+wiederholter RX-Zeitstempelspreizung über dem 60-ms-Guardintervall auf
+`Restricted` und unterdrückte Live-Roh-Ausgaben. Das entwertet den bestandenen
+Raw-Recorder-Preflight nicht, muss aber vor der abschließenden Live-Anzeige
+erneut geprüft werden.
+
+Nächstes Gate ist die 65-Sekunden-Leerraumkalibrierung ohne Person. Sie startet
+erst nach ausdrücklicher Bestätigung, dass der Raum während der vollständigen
+Dauer leer bleibt.
+
+Ausführlicher Nachweis:
+[results/2026-08-09_D6_setup-siegel-und-preflight.md](results/2026-08-09_D6_setup-siegel-und-preflight.md)
+
+### 2026-08-09 — Offline-Sidecar-Fix und neu versiegelter Preflight
+
+Die erste 65-Sekunden-Leerraumaufnahme war live vollständig und verlustfrei,
+wurde aber vom anschließenden strikten Positionsinspektor wegen der legitimen
+Recorderfelder `max_duration_seconds` und `rx_summaries` abgelehnt. Vor P01
+wurde deshalb angehalten. Die Aufnahme wurde nicht verändert.
+
+Der Inspektor wurde minimal typisiert erweitert und prüft die
+RX-Zusammenfassungen nun exakt gegen die Rohframes. Die zwei Regressionstests
+und die vollständige Server-Binärtestsuite bestanden mit 398 von 398 Tests.
+Wegen der geänderten ausführbaren Datei wurden ein separates Releaseartefakt
+und ein neues Setup-Siegel erzeugt. Der physische Aufbau blieb unverändert.
+
+Das neue Setup `setup-2beda4496ccfb547` bestand den erneuten versiegelten
+Preflight `preflight-neutral-20260809-02` über 25 Sekunden mit 2.701 Frames,
+0 Drops, vollständiger RX1-bis-RX4-Abdeckung und passender Setupidentität. Vor
+P01 muss nun unter diesem neuen Siegel eine neue bestätigte
+65-Sekunden-Leerraumkalibrierung erfolgen.
+
+Ausführlicher Nachweis:
+[results/2026-08-09_D6_sidecar-fix-neusiegelung-und-preflight.md](results/2026-08-09_D6_sidecar-fix-neusiegelung-und-preflight.md)
+
+### 2026-08-09 — Neue Leerraumkalibrierung bestanden
+
+Nach erneuter ausdrücklicher Leerraumbestätigung wurde unter dem neuen Siegel
+`empty-neutral-20260809-02` über 65 Sekunden aufgenommen. Der Runner schrieb
+6.102 Frames bei 0 Drops. Alle vier RX deckten die volle Dauer mit demselben
+64-Subcarrier-Raster ab. Die mit dem eingefrorenen Release ausgeführte strikte
+Offline-Inspektion bestand und band Raw-, Meta- und Signalhash eindeutig an
+`setup-2beda4496ccfb547`.
+
+Der Server war anschließend mit vier frischen D5-/D6-Referenzen operational.
+Bei der Abschlussabfrage stimmte kein RX für Präsenz. RX3 hatte während der
+Kalibrierung 55 bewegungsverdächtige Frames verworfen, erreichte aber dennoch
+eine vollständige Referenz aus sechs Blöcken. Dieser Befund bleibt unverändert
+dokumentiert. Als Nächstes darf die echte Trainingsserie an P01 beginnen.
+
+### 2026-08-09 — Lokale Mess-UI verbunden
+
+Die statische UI auf Port 3000 verwendete die Dockerportzuordnung 3000/3001
+und konnte den versiegelten Server auf 8080/8765 deshalb nicht erreichen. Ein
+lokaler Same-Origin-Proxy wurde auf Port 3002 gestartet, ohne den kalibrierten
+Server neu zu starten. Die UI meldete danach API, Hardware und Streaming als
+gesund sowie im Sensing-Tab reale ESP32-Hardware, vier aktive RX und eine
+bestehende Verbindung. Die Positionsanzeige bleibt bis zum fertigen Index
+absichtlich `UNCALIBRATED`.
+
+### 2026-08-09 — Sensing-Raumansicht ausgerichtet
+
+Die verbundene Sensing-UI zeigte TX und RX spiegelverkehrt, obwohl die
+versiegelten Messkoordinaten korrekt waren. Ein erster Versuch mit einer
+180°-Kameradrehung wurde als unzureichend verworfen, da eine Rotation keine
+Spiegelung korrigiert. Die endgültige UI-Korrektur spiegelt nur die dargestellte
+X-Koordinate (`x_display = Raumlänge - x`) für TX, RX, Positionskörper und
+Signalfeld. Die live verbundene Ansicht zeigte danach RX2/RX4 links und
+RX1/RX3 rechts. Kameraazimut, Setup, Kalibrierung und Messdaten blieben
+unverändert.
 
 ### Datum — Kurzbeschreibung
 

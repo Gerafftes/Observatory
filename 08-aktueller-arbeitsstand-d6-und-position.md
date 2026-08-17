@@ -623,7 +623,7 @@ RX1 hat dieses Gate inzwischen bestanden. Das Board meldete ESP32-S3 Revision
 0.2, 16 MB physischen Flash und 8 MB PSRAM. Es wurde absichtlich mit dem
 verifizierten 8-MB-Layout geflasht; Schreibvorgang und Hashprüfung waren
 erfolgreich. Der Bootlog bestätigte Node-ID 1, Kanal 6, Edge-Tier 0, aktiven
-TX-Filter und Zielserver `192.168.4.50:5005`. RX2 bestand anschließend
+TX-Filter und Zielserver `CSI_HOST_IP:5005`. RX2 bestand anschließend
 dasselbe Gate mit Node-ID 2; RX3 ebenso mit Node-ID 3. Beide meldeten dieselbe
 Funk-/Filterkonfiguration. RX4 bestand es anschließend mit Node-ID 4. Die
 fehlende WLAN-Verbindung war bei ausgeschaltetem TX beziehungsweise CSI-AP
@@ -636,7 +636,7 @@ bleibt unverändert; `esp32-csi-node` 0.7.0 ist ausschließlich die RX-Firmware.
 Die neue Quellbindung benötigt keine Senderänderung, weil Filterung und
 Laufzeitnachweis auf RX1 bis RX4 stattfinden. TX-Inventur und serieller Boot
 sind inzwischen ebenfalls bestanden: ESP32-S3,
-16 MB Flash, 8 MB PSRAM, stabiler Start und SoftAP auf `192.168.4.1` ohne
+16 MB Flash, 8 MB PSRAM, stabiler Start und SoftAP auf `CSI_AP_IP` ohne
 Brownout- oder Reset-Schleife. DHCP/Gateway und 32-Byte-Broadcastempfang sind
 mit dem verbundenen Mac ebenfalls bestanden; `45,5 Hz` wurden im stabileren
 10-Sekunden-Fenster gemessen. Die gemeinsame Discovery muss Kanal 6 und die
@@ -895,7 +895,7 @@ kaschiert. Dann werden die Fehler nach Punkt, RX und Merkmal ausgewertet.
 - 32-Byte-UDP-Broadcasts im stabileren 10-Sekunden-Fenster mit `45,5 Hz`
   empfangen
 - CSI-WLAN-Interface anschließend auf die in RX1 bis RX4 gespeicherte
-  Serveradresse `192.168.4.50/24` gesetzt
+  Serveradresse `CSI_HOST_IP/24` gesetzt
 - TX weiterhin unverändert und nicht geflasht
 - Kanal 6 im Senderbuild fest; Laufzeitbestätigung folgt im gemeinsamen
   RX-Discovery-Lauf
@@ -932,13 +932,13 @@ kaschiert. Dann werden die Fehler nach Punkt, RX und Merkmal ausgewertet.
   CLI-Optionen erneut geprüft
 - nächster Schritt erfordert wieder Hardware und CSI-WLAN: Mac an normale
   Betriebsposition, TX und RX1 bis RX4 einschalten, CSI-Interface mit
-  `192.168.4.50`, dann unversiegelte 25-Sekunden-Discovery
+  `CSI_HOST_IP`, dann unversiegelte 25-Sekunden-Discovery
 
 ### 2026-08-09 — Gemeinsamer 1TX-/4RX-Lauf und korrigierter Serverbuild
 
 - Mac an normaler Betriebsposition, TX und RX1 bis RX4 gemeinsam live geprüft
-- nach DHCP-Adresse `192.168.4.6` das CSI-Interface wieder auf die dauerhaft von
-  allen RX erwartete Adresse `192.168.4.50/24` gesetzt
+- nach DHCP-Adresse `RX_DHCP_IP` das CSI-Interface wieder auf die dauerhaft von
+  allen RX erwartete Adresse `CSI_HOST_IP/24` gesetzt
 - alle vier RX frisch empfangen; 10-Sekunden-Inventur enthielt ausschließlich
   vollständige `0x07`-Bindings, keine Legacy-CSI-Pakete
 - pro RX dominantes 64-Subcarrier-Raster und kleinere Zahl gültiger
@@ -987,7 +987,7 @@ kaschiert. Dann werden die Fehler nach Punkt, RX und Merkmal ausgewertet.
 - räumliche Beschreibung: gleiche Höhe wie RX4, 4 cm von RX4 entfernt auf der
   von RX2 wegführenden Linie
 - Türzustand für die vollständige Serie: geschlossen
-- CSI-WLAN verbunden; Mac weiterhin auf `192.168.4.50/24`
+- CSI-WLAN verbunden; Mac weiterhin auf `CSI_HOST_IP/24`
 - jetzige Mac-Position unterscheidet sich vom historischen Aufbau „Mac
   mittig“; neue Leerraumreferenz zwingend, alte Kalibrierung nicht übertragbar
 - TX per `flash_id` als ESP32-S3 Revision 0.2 mit 16 MB Flash und 8 MB PSRAM
@@ -1128,10 +1128,10 @@ Detailnachweis:
   `f72af68fb505f6355851941baf7c656d29aea05face8e09ed1aaec105a9ab086`
 - keinerlei Flash-, OTA- oder Konfigurationsschreibzugriff durchgeführt
 - Nutzer bestätigte angeschlossenen HLK-LD2450 und laufenden TX
-- Mac war bei der Prüfung im Heimnetz auf `192.168.178.121`, nicht im
-  CSI-Subnetz `192.168.4.0/24`
-- `csi-test` ist als bevorzugtes WLAN gespeichert; der explizite
-  Verbindungsversuch meldete jedoch `Could not find network csi-test`
+- Mac war bei der Prüfung im Heimnetz auf `HOME_LAN_IP`, nicht im
+  CSI-Subnetz `CSI_SUBNET`
+- `CSI_SSID` ist als bevorzugtes WLAN gespeichert; der explizite
+  Verbindungsversuch meldete jedoch `Could not find network CSI_SSID`
 - ESP initialisiert den WLAN-STA-Modus, erhält aber keine IP; deshalb werden
   HTTP-/UDP-Transport und die nachgelagerte UART-Radarschleife noch nicht
   gestartet
@@ -1139,35 +1139,35 @@ Detailnachweis:
   live nachgewiesen
 - durch die neu hinzugekommene mmWave-Hardware und Verkabelung ist der
   endgültige Aufbau noch nicht als Setup v2 versiegelt
-- nächstes Gate: TX-SoftAP `csi-test` wieder sichtbar machen, Mac und ESP ins
+- nächstes Gate: TX-SoftAP `CSI_SSID` wieder sichtbar machen, Mac und ESP ins
   CSI-Netz bringen und danach WLAN, UART-Radar und UDP getrennt verifizieren
 
 ### 2026-08-14 — mmWave-Knoten im CSI-Netz erreichbar
 
-- Nutzer verband den Mac mit dem wieder sichtbaren TX-SoftAP `csi-test`
-- TX unter `192.168.4.1`, ESP32-C3 unter `192.168.4.2` und Mac zunächst per
-  DHCP unter `192.168.4.3` im selben `/24`-Netz nachgewiesen
+- Nutzer verband den Mac mit dem wieder sichtbaren TX-SoftAP `CSI_SSID`
+- TX unter `CSI_AP_IP`, ESP32-C3 unter `RX1_IP` und Mac zunächst per
+  DHCP unter `RX2_IP` im selben `/24`-Netz nachgewiesen
 - ESP verband sich auf Kanal 6 per WPA2-PSK mit dem TX; gemeldeter RSSI beim
   Start `-78 dBm`
 - ESP erhielt seine IP und startete den HTTP-Status-/Modus-/OTA-Dienst auf
   Port `8032`
 - read-only Statusabfrage erfolgreich: Knoten `MMWAVE1`, Sensor
   `HLK-LD2450`, Modus `calibration`, UART RX GPIO20, TX GPIO21 bei 256000 Baud
-- laufende Firmware sendet Radarframes fest an `192.168.4.50:5010`; diese
+- laufende Firmware sendet Radarframes fest an `CSI_HOST_IP:5010`; diese
   reservierte Adresse war im Netz bei der Vorprüfung unbeantwortet
-- Versuch, `192.168.4.50` als Alias zu setzen, scheiterte ausschließlich an
+- Versuch, `CSI_HOST_IP` als Alias zu setzen, scheiterte ausschließlich an
   den macOS-Administratorrechten; es wurde keine Netzwerkkonfiguration
   verändert
 - nächstes Gate: Administrator setzt die dokumentierte Mac-Adresse
-  `192.168.4.50`; danach echtes LD2450-UDP-Paket empfangen und validieren
+  `CSI_HOST_IP`; danach echtes LD2450-UDP-Paket empfangen und validieren
 
 ### 2026-08-14 — CSI-Zieladresse aktiv, noch keine LD2450-Frames
 
-- Mac-Adresse `192.168.4.50/24` zusätzlich zu DHCP-Adresse `192.168.4.3`
+- Mac-Adresse `CSI_HOST_IP/24` zusätzlich zu DHCP-Adresse `RX2_IP`
   erfolgreich auf `en0` bestätigt
-- ESP-Ziel `192.168.4.50:5010` und Statusdienst weiterhin erreichbar
+- ESP-Ziel `CSI_HOST_IP:5010` und Statusdienst weiterhin erreichbar
 - erster UDP-Empfangsversuch mit `nc` über 15 Sekunden ohne Paket
-- unabhängiger, direkt an `192.168.4.50:5010` gebundener Socket-Empfänger mit
+- unabhängiger, direkt an `CSI_HOST_IP:5010` gebundener Socket-Empfänger mit
   10-Sekunden-Timeout ebenfalls ohne Paket
 - Netzadressierung und Listenerfehler damit als primäre Ursache weitgehend
   ausgeschlossen

@@ -6,6 +6,7 @@ __pycache__/
 *.pyc
 .venv/
 
-# Keep raw measurement exports intentionally versioned for this BLL repo.
-# If later measurements become too large, move them to an external archive
-# and replace them with checksums plus summary CSVs.
+# Raw measurement exports and local server logs can contain sensitive
+# presence, physiology, and network data. Keep them outside the published repo.
+data/raw/
+logs/

@@ -72,7 +72,7 @@ Ziel: Prüfen, ob ein größeres RuView-Guard-Intervall die Mehrknoten-Visualisi
 Server-Start für G1:
 
 ```zsh
-mkdir -p /Users/Johann/Development/BLL/wifi-csi-dokumentation/logs
+mkdir -p PROJECT_DIR/logs
 
 WDP_GUARD_INTERVAL_US=500000 \
 WDP_SOFT_GUARD_US=200000 \
@@ -82,7 +82,7 @@ RUST_LOG=debug ./target/release/sensing-server \
   --http-port 8080 \
   --ws-port 8765 \
   --bind-addr 0.0.0.0 \
-  2>&1 | tee /Users/Johann/Development/BLL/wifi-csi-dokumentation/logs/G1_guard500ms_server.log
+  2>&1 | tee PROJECT_DIR/logs/G1_guard500ms_server.log
 ```
 
 Erfolgskriterium:
@@ -132,3 +132,87 @@ Qualitätsprüfung:
 Bewertung:
 
 Der Positivtest ist nicht bestanden. Für eine vollständige Aussage zur realen D5-Leistung fehlt unter derselben Kalibrierung noch der separat aufgezeichnete blinde Leerraumlauf.
+
+## Geplanter D6-/9-Punkt-Blindtest
+
+Status am 2026-08-09: noch nicht als Messserie durchgeführt. Die korrigierte
+unversiegelte 25-Sekunden-Discovery mit RX1 bis RX4 ist bestanden. Mac-Position,
+geschlossene Tür, CSI-Hostadresse, dominantes 64-Subcarrier-Raster, RX-Firmware,
+Serverartefakt, aktive TX-App und gemeinsamer TX-Filterhash sind erfasst. Der
+Mac-Bezugspunkt liegt bei `(Breite, Länge, Höhe) =
+(0,94 m, 0,00 m, 0,87 m)` beziehungsweise RuView
+`[4.02, 0.87, 2.50]`; damit steht er auf gleicher Höhe wie RX4 und 4 cm von RX4
+entfernt auf der von RX2 wegführenden Linie.
+
+Der TX wurde nach dem zerstörungsfreien Firmware-Readback wieder ausschließlich
+mit Strom versorgt. Nach einer streng fail-closed behandelten
+Sidecar-Inkompatibilität wurde der korrigierte Server separat eingefroren und
+das unveränderte physische Setup neu als `setup-2beda4496ccfb547` versiegelt.
+Der neue versiegelte Preflight `preflight-neutral-20260809-02` bestand über 25
+Sekunden mit 2.701 Frames, 0 Drops, exakt RX1 bis RX4, stabilem 64-Subcarrier-
+Raster und passender Setupidentität. Die Leerraumaufnahme misst anschließend
+diesen realen Aufbau einschließlich Mac, Möbeln, Kabeln und normalen
+Gegenständen mit — ausgeschlossen ist nur eine Person. Frühere Aufnahmen mit
+„Mac mittig“ sind nicht als Kalibrierung für diesen Aufbau verwendbar.
+Nachweise:
+[TX-Firmwareidentität](results/2026-08-09_D6_setupaufnahme-und-TX-firmwareidentitaet.md)
+und
+[Neusiegelung/Preflight](results/2026-08-09_D6_sidecar-fix-neusiegelung-und-preflight.md).
+
+Die neue Leerraumkalibrierung `empty-neutral-20260809-02` ist inzwischen unter
+dem neuen Siegel bestanden: 65 Sekunden, 6.102 Frames, 0 Drops, vollständige
+RX1-bis-RX4-Abdeckung und erfolgreiche strikte Offline-Inspektion. Damit ist
+das nächste zulässige Gate die reale Trainingsaufnahme an P01.
+
+Die folgenden Regeln sind vorab festgelegt und werden nicht nach Sichtung der
+Blindvorhersagen gelockert.
+
+### Aufnahmeumfang
+
+| Teil | Anzahl | Mindestdauer je Lauf | Inhalt |
+|---|---:|---:|---|
+| Versiegelter Setup-Preflight | 1 | 25 s | Raum ohne Person und ohne Bewegung |
+| D6-Leerraumkalibrierung | 1 | 65 s | Raum leer |
+| Positionstraining | 9 | 35 s | je P01 bis P09 |
+| Leerraumprüfung | 3 | 35 s | Raum leer |
+| Positions-Blindtest | 18 | 35 s | zwei zufällige Durchgänge über P01 bis P09 |
+
+Die ersten fünf Sekunden jedes Positions-/Prüflaufs dienen ausschließlich dem
+Einpendeln. Alle Blindaufnahmen erhalten neutrale IDs. Punktlabel und Wahrheit
+werden separat gespeichert und erst nach der Vorhersage zusammengeführt.
+
+### Vorherige Qualitätsprüfung
+
+- identische Setup-ID und identischer Setup-Hash
+- RX1 bis RX4 vollständig
+- gültige Datenrate, Zeitabdeckung, Lücken und Subcarrier-Raster
+- kein Label und keine Ground Truth in Raw-Datei oder Sidecar
+- keine identischen Roh-, Sidecar- oder Signal-Hashes zwischen Kalibrierung,
+  Training und Blindtest
+
+Strukturell ungültige Läufe werden vor der Vorhersage mit neuer neutraler ID
+wiederholt und mit Abbruchgrund protokolliert. Nach Öffnen der Truth-Datei
+werden keine Läufe ersetzt.
+
+### Bestehensgrenzen
+
+Classification:
+
+- Leerraum-Fehlpräsenz aggregiert höchstens 5 %
+- kein einzelner Leerraumlauf über 10 %
+- bestätigte Präsenz in mindestens 16 von 18 belegten Blindläufen
+- belegter Recall aggregiert mindestens 80 %
+- kein Punkt in beiden Wiederholungen vollständig übersehen
+
+Position:
+
+- Coverage mindestens 16 von 18
+- mindestens 15 von 18 Läufen exakt richtig
+- Accuracy der entschiedenen Läufe mindestens 90 %
+- je Punkt mindestens eine Wiederholung korrekt
+- höchstens zwei Abstentionsausgaben
+- Median-Bodenfehler 0,0 m
+- p95 und jeder falsche entschiedene Punkt höchstens 1,30 m vom Sollpunkt
+
+Nur wenn Classification und Position beide bestehen, darf der Positionsindex
+im Live-Sensing aktiviert werden.
