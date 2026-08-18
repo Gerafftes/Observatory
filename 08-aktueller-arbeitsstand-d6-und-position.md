@@ -937,7 +937,7 @@ kaschiert. Dann werden die Fehler nach Punkt, RX und Merkmal ausgewertet.
 ### 2026-08-09 — Gemeinsamer 1TX-/4RX-Lauf und korrigierter Serverbuild
 
 - Mac an normaler Betriebsposition, TX und RX1 bis RX4 gemeinsam live geprüft
-- nach DHCP-Adresse `RX_DHCP_IP` das CSI-Interface wieder auf die dauerhaft von
+- nach DHCP-Adresse `CSI_NODE_IP_6` das CSI-Interface wieder auf die dauerhaft von
   allen RX erwartete Adresse `CSI_HOST_IP/24` gesetzt
 - alle vier RX frisch empfangen; 10-Sekunden-Inventur enthielt ausschließlich
   vollständige `0x07`-Bindings, keine Legacy-CSI-Pakete
@@ -1145,8 +1145,8 @@ Detailnachweis:
 ### 2026-08-14 — mmWave-Knoten im CSI-Netz erreichbar
 
 - Nutzer verband den Mac mit dem wieder sichtbaren TX-SoftAP `CSI_SSID`
-- TX unter `CSI_AP_IP`, ESP32-C3 unter `RX1_IP` und Mac zunächst per
-  DHCP unter `RX2_IP` im selben `/24`-Netz nachgewiesen
+- TX unter `CSI_AP_IP`, ESP32-C3 unter `CSI_NODE_IP_2` und Mac zunächst per
+  DHCP unter `CSI_NODE_IP_3` im selben `/24`-Netz nachgewiesen
 - ESP verband sich auf Kanal 6 per WPA2-PSK mit dem TX; gemeldeter RSSI beim
   Start `-78 dBm`
 - ESP erhielt seine IP und startete den HTTP-Status-/Modus-/OTA-Dienst auf
@@ -1163,7 +1163,7 @@ Detailnachweis:
 
 ### 2026-08-14 — CSI-Zieladresse aktiv, noch keine LD2450-Frames
 
-- Mac-Adresse `CSI_HOST_IP/24` zusätzlich zu DHCP-Adresse `RX2_IP`
+- Mac-Adresse `CSI_HOST_IP/24` zusätzlich zu DHCP-Adresse `CSI_NODE_IP_3`
   erfolgreich auf `en0` bestätigt
 - ESP-Ziel `CSI_HOST_IP:5010` und Statusdienst weiterhin erreichbar
 - erster UDP-Empfangsversuch mit `nc` über 15 Sekunden ohne Paket

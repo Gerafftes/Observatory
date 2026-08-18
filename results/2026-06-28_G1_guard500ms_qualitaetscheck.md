@@ -85,10 +85,10 @@ Node-Verteilung im Ausschnitt:
 
 | Node | IP | Frames |
 |---:|---|---:|
-| 1 | `RX1_IP` | 12 |
-| 2 | `RX3_IP` | 12 |
-| 3 | `RX_OTHER_IP` | 13 |
-| 4 | `RX2_IP` | 10 |
+| 1 | `CSI_NODE_IP_2` | 12 |
+| 2 | `CSI_NODE_IP_4` | 12 |
+| 3 | `CSI_NODE_IP_9` | 13 |
+| 4 | `CSI_NODE_IP_3` | 10 |
 
 Bewertung: Im gelieferten Logausschnitt traten keine Fusion-Fallback-Meldungen auf. Das spricht dafür, dass das größere Guard-Intervall von 500 ms den Visualisierungs-/Fusion-Workaround verbessert hat. Einschränkung: Der geprüfte Ausschnitt umfasst nur einen kurzen Zeitraum; für eine belastbare Rate müsste der vollständige Serverlog über die gesamte G1-Messdauer gespeichert werden.
 
