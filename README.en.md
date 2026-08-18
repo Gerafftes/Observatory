@@ -11,6 +11,17 @@ An experimental 1TX/4RX WiFi CSI system investigating presence, movement, and
 nine fixed room positions without cameras, while using mmWave only as an
 independent reference.
 
+<img src="images/esp32-s3-boards.jpeg" alt="The five labeled ESP32-S3 boards in the Observatory setup: RX1 through RX4 and TX" width="420">
+
+## View the project
+
+**[View Observatory on Stardance](https://stardance.hackclub.com/projects/25673)**
+
+There is currently no public live demo: real measurements require the fixed
+local room setup with TX, RX1 through RX4, and the reference sensor. The
+[current technical handoff](08-aktueller-arbeitsstand-d6-und-position.md)
+documents what has been verified and which hardware gate comes next.
+
 > **You are being sensed.**
 >
 > This room has a secret system, a machine that watches the Wi-Fi every second
@@ -29,26 +40,6 @@ independent reference.
 *Inspired by the opening monologue of the TV series
 [*Person of Interest*](https://warnertv.de/serie/sendungen/person-of-interest).*
 
-*The five ESP32-S3 boards in the setup: one transmitter and four CSI
-receivers.*
-
-<img src="images/esp32-s3-boards.jpeg" alt="The five labeled ESP32-S3 boards in the Observatory setup: RX1 through RX4 and TX" width="420">
-
-
-## View the project
-
-**[View Observatory on Stardance](https://stardance.hackclub.com/projects/25673)**
-
-There is currently no public live demo: real measurements require the fixed
-local room setup with TX, RX1 through RX4, and the reference sensor. The
-[current technical handoff](08-aktueller-arbeitsstand-d6-und-position.md)
-documents what has been verified and which hardware gate comes next.
-
-## Research question
-
-How reliably can an ESP32-based WiFi CSI system detect movement and breathing
-patterns in a room, and which physical limitations affect the results?
-
 ## Quick start
 
 This repository contains the project report and requires no build step:
@@ -58,7 +49,11 @@ git clone https://github.com/Gerafftes/Observatory.git
 cd Observatory
 ```
 
-These are the three most important entry points:
+For a first reproducible check, open the technical handoff and follow its
+setup and preflight gates. This documentation repository has no local runtime
+to install.
+
+The three most important entry points are:
 
 1. [Current D6/mmWave status](08-aktueller-arbeitsstand-d6-und-position.md)
 2. [Result reports](results/)
@@ -83,23 +78,40 @@ are documented in
 - Use an HLK-LD2450 as a calibration and reference sensor without feeding its
   values into the later WiFi CSI predictor.
 
+## Local checks (optional)
+
+This documentation repository has no local runtime to install. The included
+offline evaluation test can be run with Python 3:
+
+```bash
+python3 -m unittest scripts/tests/test_evaluate_d5_replay.py
+```
+
+The check processes no new sensor signals and does not prove live hardware
+quality.
+
+## Research question
+
+How reliably can an ESP32-based WiFi CSI system detect movement and breathing
+patterns in a room, and which physical limitations affect the results?
+
+## Current validation status
+
+**As of August 14, 2026**
+
+| Area | Status | What this status proves |
+|---|---|---|
+| 1 TX / 4 RX | Transport verified | All four receivers delivered source-bound Raw CSI using the same subcarrier grid. |
+| D4 movement | Experimental | Coarse movement false alarms were reduced; still-presence detection remains unreliable. |
+| D5 still presence | Live test failed | With a motionless person present, 350 out of 350 samples remained `ABSENT`. |
+| D6 position | Software prepared | Captures, nine positions, and blind tests are implemented; a real index passing blind evaluation is still missing. |
+| mmWave reference | Partially operational | ESP32-C3, CSI WiFi, and the status service are verified; the real LD2450 data path has not yet been fully validated. |
+| Overall system | Not validated | There is no joint real-world PASS for classification, position, and mmWave. |
+
+Software tests, a successful flash operation, or lossless transport are
+explicitly not treated as proof of real sensor or positioning accuracy.
+
 ## User interface
-
-### Dashboard in offline fallback
-
-The dashboard displays system status, data source, and runtime metrics. This
-screenshot documents the clearly visible offline fallback; it does not prove
-that a sensor system was connected.
-
-<img src="images/ui/observatory-dashboard-offline.webp" alt="Observatory dashboard showing an unreachable server and the visible offline fallback" width="900">
-
-### Sensing in client simulation
-
-The sensing view separates the diagnostic link heatmap from an actual person
-position. The displayed values explicitly come from the client simulation and
-are not a real measurement.
-
-<img src="images/ui/observatory-sensing-client-simulation.webp" alt="Observatory sensing view in its clearly labeled offline and client-simulation mode" width="900">
 
 ### mmWave calibration assistant
 
@@ -145,22 +157,6 @@ from a simulated run with no sensors connected.
    confusion matrix, and quality gates, then write the report. Without
    hardware it remains explicitly **SOFTWARE-ONLY / UNVALIDATED** and proves
    no real measurement quality.
-
-## Current validation status
-
-**As of August 14, 2026**
-
-| Area | Status | What this status proves |
-|---|---|---|
-| 1 TX / 4 RX | Transport verified | All four receivers delivered source-bound Raw CSI using the same subcarrier grid. |
-| D4 movement | Experimental | Coarse movement false alarms were reduced; still-presence detection remains unreliable. |
-| D5 still presence | Live test failed | With a motionless person present, 350 out of 350 samples remained `ABSENT`. |
-| D6 position | Software prepared | Captures, nine positions, and blind tests are implemented; a real index passing blind evaluation is still missing. |
-| mmWave reference | Partially operational | ESP32-C3, CSI WiFi, and the status service are verified; the real LD2450 data path has not yet been fully validated. |
-| Overall system | Not validated | There is no joint real-world PASS for classification, position, and mmWave. |
-
-Software tests, a successful flash operation, or lossless transport are
-explicitly not treated as proof of real sensor or positioning accuracy.
 
 ## How it works
 
