@@ -10,6 +10,19 @@
 Ein experimentelles 1TX-/4RX-WLAN-CSI-System, das Präsenz, Bewegung und neun
 feste Raumpositionen ohne Kamera untersucht und mmWave nur als unabhängige
 Referenz verwendet.
+
+<img src="images/esp32-s3-boards.jpeg" alt="Die fünf beschrifteten ESP32-S3-Boards des Observatory-Aufbaus: RX1 bis RX4 und TX" width="420">
+
+## Projekt ansehen
+
+**[Observatory auf Stardance ansehen](https://stardance.hackclub.com/projects/25673)**
+
+Eine öffentliche Live-Demo gibt es derzeit nicht: Die echte Messung benötigt
+den festen lokalen Raumaufbau mit TX, RX1 bis RX4 und dem Referenzsensor. Der
+[aktuelle technische Wiedereinstieg](08-aktueller-arbeitsstand-d6-und-position.md)
+zeigt, was bereits real geprüft wurde und welches Hardware-Gate als Nächstes
+folgt.
+
 > **You are being sensed.**
 >
 > This room has a secret system, a machine that watches the Wi-Fi every second
@@ -28,27 +41,6 @@ Referenz verwendet.
 *Nach dem Intro der Serie
 [*Person of Interest*](https://en.wikipedia.org/wiki/Person_of_Interest_(TV_series)).*
 
-*Die fünf ESP32-S3-Boards des Aufbaus: ein Sender und vier
-CSI-Empfänger.*
-<img src="images/esp32-s3-boards.jpeg" alt="Die fünf beschrifteten ESP32-S3-Boards des Observatory-Aufbaus: RX1 bis RX4 und TX" width="420">
-
-
-## Projekt ansehen
-
-**[Observatory auf Stardance ansehen](https://stardance.hackclub.com/projects/25673)**
-
-Eine öffentliche Live-Demo gibt es derzeit nicht: Die echte Messung benötigt
-den festen lokalen Raumaufbau mit TX, RX1 bis RX4 und dem Referenzsensor. Der
-[aktuelle technische Wiedereinstieg](08-aktueller-arbeitsstand-d6-und-position.md)
-zeigt, was bereits real geprüft wurde und welches Hardware-Gate als Nächstes
-folgt.
-
-## Forschungsfrage
-
-Wie zuverlässig kann ein ESP32-basiertes WLAN-CSI-System Bewegungen und
-Atemrhythmen im Raum erfassen, und welche physikalischen Grenzen ergeben sich
-dabei?
-
 ## Schnelleinstieg
 
 Dieses Repository enthält die Berichtsdokumentation und benötigt keinen Build:
@@ -58,7 +50,11 @@ git clone https://github.com/Gerafftes/Observatory.git
 cd Observatory
 ```
 
-Danach sind diese drei Einstiegspunkte am wichtigsten:
+Für einen ersten reproduzierbaren Check öffnest du den technischen
+Wiedereinstieg und arbeitest die Setup-/Preflight-Gates durch. Dafür brauchst
+du keine lokale Runtime in diesem Dokumentations-Repository.
+
+Die drei wichtigsten Einstiegspunkte sind:
 
 1. [Aktueller D6-/mmWave-Arbeitsstand](08-aktueller-arbeitsstand-d6-und-position.md)
 2. [Ergebnisberichte](results/)
@@ -83,23 +79,42 @@ Projektanpassungen sind unter
 - Einen HLK-LD2450 als Kalibrierungs- und Referenzsensor verwenden, ohne seine
   Werte in den späteren WLAN-CSI-Prädiktor einzuspeisen.
 
+## Lokale Checks (optional)
+
+Dieses Dokumentations-Repository braucht keine lokale Runtime. Der vorhandene
+Offline-Auswertetest lässt sich mit Python 3 ausführen:
+
+```bash
+python3 -m unittest scripts/tests/test_evaluate_d5_replay.py
+```
+
+Der Check verarbeitet keine neuen Sensorsignale und beweist keine Live-
+Hardwarequalität.
+
+## Forschungsfrage
+
+Wie zuverlässig kann ein ESP32-basiertes WLAN-CSI-System Bewegungen und
+Atemrhythmen im Raum erfassen, und welche physikalischen Grenzen ergeben sich
+dabei?
+
+## Aktueller Validierungsstand
+
+**Stand: 14. August 2026**
+
+| Bereich | Status | Was dieser Status belegt |
+|---|---|---|
+| 1 TX / 4 RX | Transport nachgewiesen | Alle vier RX lieferten gebundene Raw-CSI-Daten im gemeinsamen Raster. |
+| D4 Bewegung | Experimentell | Grobe Bewegungsalarme wurden reduziert; Still-Präsenz bleibt unzuverlässig. |
+| D5 Still-Präsenz | Livetest nicht bestanden | Bei anwesender stiller Person blieben 350 von 350 Samples `ABSENT`. |
+| D6 Position | Software vorbereitet | Aufnahmen, neun Punkte und Blindtests sind implementiert; ein realer blind bestandener Index fehlt. |
+| mmWave-Referenz | Teilweise in Betrieb | ESP32-C3, CSI-WLAN und Statusdienst sind nachgewiesen; der reale LD2450-Datenpfad ist noch nicht vollständig validiert. |
+| Gesamtsystem | Nicht validiert | Es gibt noch keinen gemeinsamen realen PASS für Classification, Position und mmWave. |
+
+Softwaretests, ein erfolgreicher Flashvorgang oder eine verlustfreie
+Übertragung gelten hier ausdrücklich nicht als Nachweis realer Sensor- oder
+Positionsgenauigkeit.
+
 ## Benutzeroberfläche
-
-### Dashboard im Offline-Fallback
-
-Das Dashboard zeigt Systemstatus, Datenquelle und Laufzeitmetriken. Diese
-Aufnahme dokumentiert den korrekt sichtbaren Offline-Fallback; sie ist kein
-Nachweis eines verbundenen Sensorsystems.
-
-<img src="images/ui/observatory-dashboard-offline.webp" alt="Observatory-Dashboard mit nicht erreichbarem Server und sichtbarem Offline-Fallback" width="900">
-
-### Sensing in der Client-Simulation
-
-Die Sensing-Ansicht trennt die diagnostische Link-Heatmap von einer echten
-Personposition. Die dargestellten Werte stammen ausdrücklich aus der
-Client-Simulation und sind keine reale Messung.
-
-<img src="images/ui/observatory-sensing-client-simulation.webp" alt="Observatory-Sensing-Ansicht im klar gekennzeichneten Offline- und Client-Simulationsmodus" width="900">
 
 ### mmWave-Kalibrierungsassistent
 
@@ -144,23 +159,6 @@ simulierten Lauf ohne angeschlossene Sensoren.
    Confusion Matrix und Qualitätsgates auswerten und anschließend den Report
    schreiben. Ohne Hardware bleibt er ausdrücklich
    **SOFTWARE-ONLY / UNVALIDATED** und beweist keine echte Messqualität.
-
-## Aktueller Validierungsstand
-
-**Stand: 14. August 2026**
-
-| Bereich | Status | Was dieser Status belegt |
-|---|---|---|
-| 1 TX / 4 RX | Transport nachgewiesen | Alle vier RX lieferten gebundene Raw-CSI-Daten im gemeinsamen Raster. |
-| D4 Bewegung | Experimentell | Grobe Bewegungsalarme wurden reduziert; Still-Präsenz bleibt unzuverlässig. |
-| D5 Still-Präsenz | Livetest nicht bestanden | Bei anwesender stiller Person blieben 350 von 350 Samples `ABSENT`. |
-| D6 Position | Software vorbereitet | Aufnahmen, neun Punkte und Blindtests sind implementiert; ein realer blind bestandener Index fehlt. |
-| mmWave-Referenz | Teilweise in Betrieb | ESP32-C3, CSI-WLAN und Statusdienst sind nachgewiesen; der reale LD2450-Datenpfad ist noch nicht vollständig validiert. |
-| Gesamtsystem | Nicht validiert | Es gibt noch keinen gemeinsamen realen PASS für Classification, Position und mmWave. |
-
-Softwaretests, ein erfolgreicher Flashvorgang oder eine verlustfreie
-Übertragung gelten hier ausdrücklich nicht als Nachweis realer Sensor- oder
-Positionsgenauigkeit.
 
 ## Wie es funktioniert
 
