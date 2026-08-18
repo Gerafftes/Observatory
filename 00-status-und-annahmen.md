@@ -194,7 +194,7 @@ ausgeschaltet waren, war der WLAN-Verbindungsfehler erwartbar und noch kein
 Live-CSI-Test. Der TX wurde anschließend ohne Schreibzugriff als ESP32-S3 mit
 16 MB Flash und 8 MB PSRAM inventarisiert. Seine unveränderte Senderfirmware
 bootete stabil, startete den SoftAP auf `CSI_AP_IP` und zeigte weder Brownout
-noch Reset-Schleife. Der Mac erhielt per DHCP zunächst `RX1_IP`; Gateway
+noch Reset-Schleife. Der Mac erhielt per DHCP zunächst `CSI_NODE_IP_2`; Gateway
 und Broadcastempfang wurden damit bestätigt. Anschließend wurde das
 CSI-Interface passend zu RX1 bis RX4 wieder auf `CSI_HOST_IP` gesetzt. In
 einem 10-Sekunden-Lauf kamen 32-Byte-Pakete mit `45,5 Hz` an. Der gemeinsame
