@@ -14,3 +14,29 @@ __pycache__/
 # privacy and reproducibility review.
 data/raw/
 logs/
+
+# RuView runtime and hardware-local state. These paths are intentionally not
+# part of the Observatory source/documentation publication.
+CLAUDE.local.md
+.swarm/
+.claude/
+.claude-flow/
+/.claude-plugin/
+.mcp.json
+CLAUDE.md
+**/CLAUDE.md
+data/recordings/
+**/data/recordings/
+firmware/**/build/
+firmware/**/managed_components/
+firmware/**/dependencies.lock
+firmware/**/sdkconfig
+firmware/**/sdkconfig.old
+firmware/**/sdkconfig.defaults.bak
+v2/target/
+v2/data/*.sqlite3
+v2/data/*.sqlite3-*
+
+# Provisioning exports can contain WiFi credentials.
+**/nvs_*.bin
+**/nvs_*.csv

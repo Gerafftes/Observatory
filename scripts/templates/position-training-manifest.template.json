@@ -1,0 +1,137 @@
+{
+  "schema_version": 1,
+  "kind": "ruview.position-training-manifest",
+  "setup_id": "__SETUP_ID__",
+  "setup_sha256": "__SETUP_SHA256__",
+  "geometry": {
+    "room_dimensions_m": "__ROOM_DIMENSIONS_M__",
+    "tx_position_m": "__TX_POSITION_M__",
+    "rx_positions_m": "__RX_POSITIONS_M__"
+  },
+  "calibration": {
+    "path": "__CALIBRATION_RAW_PATH__",
+    "recording_id": "__CALIBRATION_RECORDING_ID__",
+    "raw_sha256": "__CALIBRATION_RAW_SHA256__",
+    "metadata_sha256": "__CALIBRATION_METADATA_SHA256__",
+    "signal_sha256": "__CALIBRATION_SIGNAL_SHA256__"
+  },
+  "points": [
+    {
+      "id": "P01",
+      "coordinates_m": "__P01_COORDINATES_M__",
+      "captures": [
+        {
+          "path": "__P01_CAPTURE_RAW_PATH__",
+          "recording_id": "__P01_CAPTURE_RECORDING_ID__",
+          "raw_sha256": "__P01_CAPTURE_RAW_SHA256__",
+          "metadata_sha256": "__P01_CAPTURE_METADATA_SHA256__",
+          "signal_sha256": "__P01_CAPTURE_SIGNAL_SHA256__"
+        }
+      ]
+    },
+    {
+      "id": "P02",
+      "coordinates_m": "__P02_COORDINATES_M__",
+      "captures": [
+        {
+          "path": "__P02_CAPTURE_RAW_PATH__",
+          "recording_id": "__P02_CAPTURE_RECORDING_ID__",
+          "raw_sha256": "__P02_CAPTURE_RAW_SHA256__",
+          "metadata_sha256": "__P02_CAPTURE_METADATA_SHA256__",
+          "signal_sha256": "__P02_CAPTURE_SIGNAL_SHA256__"
+        }
+      ]
+    },
+    {
+      "id": "P03",
+      "coordinates_m": "__P03_COORDINATES_M__",
+      "captures": [
+        {
+          "path": "__P03_CAPTURE_RAW_PATH__",
+          "recording_id": "__P03_CAPTURE_RECORDING_ID__",
+          "raw_sha256": "__P03_CAPTURE_RAW_SHA256__",
+          "metadata_sha256": "__P03_CAPTURE_METADATA_SHA256__",
+          "signal_sha256": "__P03_CAPTURE_SIGNAL_SHA256__"
+        }
+      ]
+    },
+    {
+      "id": "P04",
+      "coordinates_m": "__P04_COORDINATES_M__",
+      "captures": [
+        {
+          "path": "__P04_CAPTURE_RAW_PATH__",
+          "recording_id": "__P04_CAPTURE_RECORDING_ID__",
+          "raw_sha256": "__P04_CAPTURE_RAW_SHA256__",
+          "metadata_sha256": "__P04_CAPTURE_METADATA_SHA256__",
+          "signal_sha256": "__P04_CAPTURE_SIGNAL_SHA256__"
+        }
+      ]
+    },
+    {
+      "id": "P05",
+      "coordinates_m": "__P05_COORDINATES_M__",
+      "captures": [
+        {
+          "path": "__P05_CAPTURE_RAW_PATH__",
+          "recording_id": "__P05_CAPTURE_RECORDING_ID__",
+          "raw_sha256": "__P05_CAPTURE_RAW_SHA256__",
+          "metadata_sha256": "__P05_CAPTURE_METADATA_SHA256__",
+          "signal_sha256": "__P05_CAPTURE_SIGNAL_SHA256__"
+        }
+      ]
+    },
+    {
+      "id": "P06",
+      "coordinates_m": "__P06_COORDINATES_M__",
+      "captures": [
+        {
+          "path": "__P06_CAPTURE_RAW_PATH__",
+          "recording_id": "__P06_CAPTURE_RECORDING_ID__",
+          "raw_sha256": "__P06_CAPTURE_RAW_SHA256__",
+          "metadata_sha256": "__P06_CAPTURE_METADATA_SHA256__",
+          "signal_sha256": "__P06_CAPTURE_SIGNAL_SHA256__"
+        }
+      ]
+    },
+    {
+      "id": "P07",
+      "coordinates_m": "__P07_COORDINATES_M__",
+      "captures": [
+        {
+          "path": "__P07_CAPTURE_RAW_PATH__",
+          "recording_id": "__P07_CAPTURE_RECORDING_ID__",
+          "raw_sha256": "__P07_CAPTURE_RAW_SHA256__",
+          "metadata_sha256": "__P07_CAPTURE_METADATA_SHA256__",
+          "signal_sha256": "__P07_CAPTURE_SIGNAL_SHA256__"
+        }
+      ]
+    },
+    {
+      "id": "P08",
+      "coordinates_m": "__P08_COORDINATES_M__",
+      "captures": [
+        {
+          "path": "__P08_CAPTURE_RAW_PATH__",
+          "recording_id": "__P08_CAPTURE_RECORDING_ID__",
+          "raw_sha256": "__P08_CAPTURE_RAW_SHA256__",
+          "metadata_sha256": "__P08_CAPTURE_METADATA_SHA256__",
+          "signal_sha256": "__P08_CAPTURE_SIGNAL_SHA256__"
+        }
+      ]
+    },
+    {
+      "id": "P09",
+      "coordinates_m": "__P09_COORDINATES_M__",
+      "captures": [
+        {
+          "path": "__P09_CAPTURE_RAW_PATH__",
+          "recording_id": "__P09_CAPTURE_RECORDING_ID__",
+          "raw_sha256": "__P09_CAPTURE_RAW_SHA256__",
+          "metadata_sha256": "__P09_CAPTURE_METADATA_SHA256__",
+          "signal_sha256": "__P09_CAPTURE_SIGNAL_SHA256__"
+        }
+      ]
+    }
+  ]
+}
