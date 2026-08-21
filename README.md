@@ -6,13 +6,6 @@
 [![Status](https://img.shields.io/badge/status-experimental-orange)](#aktueller-validierungsstand)
 [![License: PolyForm Noncommercial 1.0.0](https://img.shields.io/badge/License-PolyForm%20Noncommercial%201.0.0-blue.svg)](LICENSE.md)
 
-
-Ein experimentelles 1TX-/4RX-WLAN-CSI-System, das Präsenz, Bewegung und neun
-feste Raumpositionen ohne Kamera untersucht und mmWave nur als unabhängige
-Referenz verwendet.
-
-<img src="images/esp32-s3-boards.jpeg" alt="Die fünf beschrifteten ESP32-S3-Boards des Observatory-Aufbaus: RX1 bis RX4 und TX" width="420">
-
 ## Projekt ansehen
 
 **[Observatory auf Stardance ansehen](https://stardance.hackclub.com/projects/25673)**
@@ -40,6 +33,13 @@ folgt.
 
 *Nach dem Intro der Serie
 [*Person of Interest*](https://en.wikipedia.org/wiki/Person_of_Interest_(TV_series)).*
+
+Ein experimentelles 1TX-/4RX-WLAN-CSI-System, das Präsenz, Bewegung und neun
+feste Raumpositionen ohne Kamera untersucht und mmWave nur als unabhängige
+Referenz verwendet.
+
+<img src="images/esp32-s3-boards.jpeg" alt="Die fünf beschrifteten ESP32-S3-Boards des Observatory-Aufbaus: RX1 bis RX4 und TX" width="420">
+
 
 ## Schnelleinstieg
 
