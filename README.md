@@ -202,6 +202,31 @@ physischer Aufbau
 - Durch die spätere Ergänzung von ESP32-C3, PCB und mmWave-Hardware ist der
   aktuelle physische Aufbau verändert und noch nicht als Setup v2 versiegelt.
 
+### D4/D5/D6-Ergebnisdiagramme
+
+Der [technische D4/D5/D6-Ergebnisbericht](results/2026-08-23_D4-D5-D6_technischer-ergebnisbericht.md)
+ist mit der [Laufübersicht über 25 Aufnahmen](results/2026-08-23_D4-D5-D6_laufuebersicht.csv),
+der [D4-RX-Diagnostik](results/2026-08-23_D4_RX_diagnostik.csv) und dem
+[Diagrammvertrag inklusive QA](results/2026-08-23_D4-D5-D6_chart-map.md)
+verknüpft. Die vier geprüften Diagramme sind hier direkt sichtbar:
+
+<table>
+<tr>
+<td><a href="results/2026-08-23_D4-D5-D6_figures/01_globaler_vergleich.png"><img src="results/2026-08-23_D4-D5-D6_figures/01_globaler_vergleich.png" alt="Globaler Vergleich von D4 und D5-abs für Leerraum-Fehlpräsenz und Still-Recall" width="480"></a></td>
+<td><a href="results/2026-08-23_D4-D5-D6_figures/02_D4_RX_leerraum_heatmap.png"><img src="results/2026-08-23_D4-D5-D6_figures/02_D4_RX_leerraum_heatmap.png" alt="D4-Leerraumstimmen als RX-Heatmap" width="480"></a></td>
+</tr>
+<tr>
+<td><a href="results/2026-08-23_D4-D5-D6_figures/03_D5_live_RX_linkwechsel.png"><img src="results/2026-08-23_D4-D5-D6_figures/03_D5_live_RX_linkwechsel.png" alt="D5-Livetest mit RX-Linkwechseln" width="480"></a></td>
+<td><a href="results/2026-08-23_D4-D5-D6_figures/04_D6_RX_frameraten.png"><img src="results/2026-08-23_D4-D5-D6_figures/04_D6_RX_frameraten.png" alt="D6-RX-Frameraten über fünf Aufnahmen" width="480"></a></td>
+</tr>
+</table>
+
+D5-abs senkt die globale Leerraum-Fehlpräsenz von D4s `75,2 %` auf `0 %`,
+senkt aber zugleich den Still-Recall von `88,4 %` auf `0 %` und ist deshalb
+insgesamt **nicht bestanden**. D6 ist technisch vollständig und
+setupgebunden; daraus folgt keine Aussage über Erkennungs- oder
+Positionsgenauigkeit.
+
 Wichtige Nachweise:
 
 - [D5: Offline-Replay und experimentelle Präsenzkalibrierung](results/2026-07-26_D5_offline-replay-und-experimentelle-praesenzkalibrierung.md)

@@ -1,0 +1,15 @@
+# DEVLOG #15 — D4/D5/D6 evidence package
+
+I consolidated every archived D4/D5/D6 recording into one reproducible technical report and a 25-run CSV inventory. I kept historical A/G captures separate because their sample rate and guard settings do not support a direct percentage comparison.
+
+![D4/D5 global comparison](RuView/results/2026-08-23_D4-D5-D6_figures/01_globaler_vergleich.png)
+
+The result is clear: pooled D4 retained 88.4% still recall but produced 75.2% empty-room false presence. Historical D5 replay looked strong at 0.0% false presence and 89.3% recall, but the real D5 live run and D5-abs still-person run both collapsed to 0% recall. D5-abs therefore reduced false presence only by making still presence unusable.
+
+I also audited all five D6 raw CSI files against their sidecars. Every file is complete, has zero recorder drops, includes RX1–RX4, and uses one 2.437 GHz / 1-antenna / 64-subcarrier grid. The current `empty-neutral-02` capture is a valid same-setup baseline candidate; the older setup and discovery capture remain separate.
+
+This is technical evidence, not an accuracy claim. No phase yet has independent mmWave ground truth, blind position validation, or a proven live localization path.
+
+Full report: `RuView/results/2026-08-23_D4-D5-D6_technischer-ergebnisbericht.md`
+
+Next I need to validate read-only mmWave UART frames, UDP transport, coordinate transforms, and CSI/mmWave synchronization before collecting calibration data.
