@@ -212,12 +212,12 @@ verknüpft. Die vier geprüften Diagramme sind hier direkt sichtbar:
 
 <table>
 <tr>
-<td><a href="results/2026-08-23_D4-D5-D6_figures/01_globaler_vergleich.png"><img src="results/2026-08-23_D4-D5-D6_figures/01_globaler_vergleich.png" alt="Globaler Vergleich von D4 und D5-abs für Leerraum-Fehlpräsenz und Still-Recall" width="480"></a></td>
-<td><a href="results/2026-08-23_D4-D5-D6_figures/02_D4_RX_leerraum_heatmap.png"><img src="results/2026-08-23_D4-D5-D6_figures/02_D4_RX_leerraum_heatmap.png" alt="D4-Leerraumstimmen als RX-Heatmap" width="480"></a></td>
+<td><a href="results/2026-08-23_D4-D5-D6_figures/01_globaler_vergleich.png"><img src="results/2026-08-23_D4-D5-D6_figures/01_globaler_vergleich.png" alt="Globaler Vergleich von D4 und D5-abs für Leerraum-Fehlpräsenz und Still-Recall" width="480"></a><br><strong>Globaler Vergleich</strong><br>D5-abs entfernt die Leerraum-Fehlpräsenz, verliert dabei aber den Still-Recall. Deshalb ist die Variante insgesamt nicht bestanden.</td>
+<td><a href="results/2026-08-23_D4-D5-D6_figures/02_D4_RX_leerraum_heatmap.png"><img src="results/2026-08-23_D4-D5-D6_figures/02_D4_RX_leerraum_heatmap.png" alt="D4-Leerraumstimmen als RX-Heatmap" width="480"></a><br><strong>D4-RX-Leerraum-Heatmap</strong><br>Die Fehlpräsenz entsteht lokal und wechselt zwischen den RX-Pfaden. Ein einzelner stabiler Verursacher ist nicht erkennbar.</td>
 </tr>
 <tr>
-<td><a href="results/2026-08-23_D4-D5-D6_figures/03_D5_live_RX_linkwechsel.png"><img src="results/2026-08-23_D4-D5-D6_figures/03_D5_live_RX_linkwechsel.png" alt="D5-Livetest mit RX-Linkwechseln" width="480"></a></td>
-<td><a href="results/2026-08-23_D4-D5-D6_figures/04_D6_RX_frameraten.png"><img src="results/2026-08-23_D4-D5-D6_figures/04_D6_RX_frameraten.png" alt="D6-RX-Frameraten über fünf Aufnahmen" width="480"></a></td>
+<td><a href="results/2026-08-23_D4-D5-D6_figures/03_D5_live_RX_linkwechsel.png"><img src="results/2026-08-23_D4-D5-D6_figures/03_D5_live_RX_linkwechsel.png" alt="D5-Livetest mit RX-Linkwechseln" width="480"></a><br><strong>D5-Live-Linkwechsel</strong><br>Die Präsenzstimmen wechseln zwischen RX3 und RX4. Das Zwei-RX-Quorum bleibt dadurch aus, und die stille Person wird nicht erkannt.</td>
+<td><a href="results/2026-08-23_D4-D5-D6_figures/04_D6_RX_frameraten.png"><img src="results/2026-08-23_D4-D5-D6_figures/04_D6_RX_frameraten.png" alt="D6-RX-Frameraten über fünf Aufnahmen" width="480"></a><br><strong>D6-RX-Frameraten</strong><br>Alle vier RX sind in den fünf technischen Aufnahmen vertreten. Das belegt Erfassung und Transport, aber keine Positionsgenauigkeit.</td>
 </tr>
 </table>
 
