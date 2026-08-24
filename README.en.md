@@ -228,7 +228,7 @@ The revised [PCB-02 with KiCad sources, validation reports, and ordering archive
 restores the SMD capacitors, uses standard pin-header pads for the ESP32-C3,
 and keeps the PCB-01 outer dimensions and mounting-hole positions.
 
-<a href="hardware/pcb-02/"><img src="hardware/pcb-02/preview/PCB-02-top.png" alt="PCB-02 manufacturing preview with ESP32-C3 pads, SMD capacitors, and LD2450 connector" width="460"></a>
+<a href="hardware/pcb-02/"><img src="hardware/pcb-02/preview/PCB-02-reference.png" alt="PCB-02 preview with PCB-02 and @gerafftes labels, ESP32-C3 pads, SMD capacitors, and LD2450 connector" width="460"></a>
 
 The external MakerWorld model
 [*ESP32 S3 Wroom Case*](https://makerworld.com/de/models/1456361-esp32-s3-wroom-case#profileId-1517915)
