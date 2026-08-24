@@ -1,0 +1,104 @@
+[Unit]
+Description=ruvector mmWave bridge — 60 GHz radar UART → cluster embed RPC (ADR-063, ADR-167 §8)
+Documentation=https://github.com/ruvnet/ruvector
+# Bridge depends on the cluster's worker fleet being reachable. We
+# weakly prefer Tailscale up since most prod deploys point --workers
+# at tailnet IPs; the bridge itself doesn't *require* tailscaled to
+# run, so use Wants= (soft) rather than Requires= (hard).
+Wants=network-online.target tailscaled.service
+After=network-online.target tailscaled.service
+# Iter 205 — bound the restart-on-failure loop. Mirrors the worker's
+# StartLimitBurst hardening: parks the unit in `failed` state after
+# 5 failed starts in 60 s instead of cycling forever (e.g., a missing
+# UART device, malformed worker manifest).
+StartLimitBurst=5
+StartLimitIntervalSec=60
+
+[Service]
+Type=simple
+# Dedicated unprivileged system user analogous to the iter-106
+# ruvector-worker pattern. Created by install-mmwave-bridge.sh.
+User=ruvector-bridge
+Group=ruvector-bridge
+DynamicUser=no
+
+# State + runtime dirs are systemd-managed (0750 owned by User/Group).
+# /var/lib/ruvector-bridge holds nothing today but is reserved for
+# future iter-B mTLS cert provisioning (the bridge needs a CA-signed
+# client cert to authenticate against §1b mTLS clusters).
+StateDirectory=ruvector-bridge
+StateDirectoryMode=0750
+RuntimeDirectory=ruvector-bridge
+RuntimeDirectoryMode=0750
+WorkingDirectory=/var/lib/ruvector-bridge
+
+# Default config lands at /etc/ruvector-mmwave-bridge.env. install.sh
+# drops the .example template; operators copy the relevant variables.
+EnvironmentFile=-/etc/ruvector-mmwave-bridge.env
+
+# Bridge invocation. The env file is expected to provide:
+#   RUVECTOR_BRIDGE_DEVICE       (/dev/ttyUSB0 or /dev/ttyACM0)
+#   RUVECTOR_BRIDGE_WORKERS      (csv of host:port endpoints)
+#   RUVECTOR_BRIDGE_FINGERPRINT  (hex fp of the cluster's HEF)
+# Plus optional --baud / --dim / --quiet pass-throughs via
+# RUVECTOR_BRIDGE_EXTRA_ARGS for one-off operator tweaks.
+ExecStart=/usr/local/bin/ruvector-mmwave-bridge \
+    --device ${RUVECTOR_BRIDGE_DEVICE} \
+    --workers ${RUVECTOR_BRIDGE_WORKERS} \
+    --fingerprint ${RUVECTOR_BRIDGE_FINGERPRINT} \
+    $RUVECTOR_BRIDGE_EXTRA_ARGS
+
+# A bridge that hits a recoverable hiccup (radar unplugged briefly,
+# cluster restarted) should retry; only stop if systemctl says so.
+Restart=on-failure
+RestartSec=3
+
+# Resource bounds — bridge is lightweight (~5 MB RSS in practice)
+# but cap so a runaway loop can't eat the box.
+LimitNOFILE=4096
+MemoryMax=128M
+
+# Hardening — same shape as the iter-106 worker.service, minus the
+# Hailo-specific DeviceAllow. The bridge needs read access to the
+# radar's serial node; install-mmwave-bridge.sh provisions a udev rule
+# that grants the ruvector-bridge group rw on /dev/ttyUSB* + /dev/ttyACM*.
+NoNewPrivileges=yes
+CapabilityBoundingSet=
+AmbientCapabilities=
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=no
+ProtectControlGroups=yes
+ProtectKernelModules=yes
+ProtectKernelTunables=yes
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+SystemCallFilter=~@privileged @resources @mount @swap @reboot
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+ProtectClock=yes
+ProtectHostname=yes
+ProtectKernelLogs=yes
+ProtectProc=invisible
+
+# DevicePolicy=closed + explicit DeviceAllow for the typical radar
+# tty nodes. Operators with non-standard nodes (CH341/CP210x clones)
+# extend via systemctl edit.
+DevicePolicy=closed
+DeviceAllow=/dev/ttyUSB0 rw
+DeviceAllow=/dev/ttyUSB1 rw
+DeviceAllow=/dev/ttyUSB2 rw
+DeviceAllow=/dev/ttyUSB3 rw
+DeviceAllow=/dev/ttyACM0 rw
+DeviceAllow=/dev/ttyACM1 rw
+
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

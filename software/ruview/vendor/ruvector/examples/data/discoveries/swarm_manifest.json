@@ -1,0 +1,1396 @@
+{
+  "manifest_version": "1.0",
+  "generated_at": "2026-03-16T01:00:00Z",
+  "swarm_exploration_summary": {
+    "title": "15-Agent Swarm Geopolitical and Cross-Domain Exploration",
+    "description": "Comprehensive multi-agent swarm exploration spanning geopolitics, technology, energy, finance, defense, space, environment, and science. 15 specialized agents conducted parallel research across 115+ datasets, discovering cross-domain correlations between AI infrastructure investment, Middle East conflict dynamics, semiconductor sovereignty races, dollar hegemony erosion, and climate-conflict feedback loops.",
+    "total_files": 120,
+    "total_entries": 1677,
+    "total_size_bytes": 1553947,
+    "total_size_mb": 1.48,
+    "domains_covered": [
+      "ai",
+      "antitrust",
+      "astronomy",
+      "awards",
+      "biochemistry",
+      "biology",
+      "biotechnology",
+      "climate",
+      "climate_change",
+      "computing",
+      "conflict",
+      "conservation",
+      "corporate",
+      "cosmology",
+      "culture",
+      "defense",
+      "diplomacy",
+      "ecology",
+      "economics",
+      "edge_computing",
+      "efficiency",
+      "energy",
+      "environment",
+      "epidemiology",
+      "exoplanets",
+      "exploration",
+      "extremophiles",
+      "finance",
+      "fiscal_policy",
+      "forecasting",
+      "genetics",
+      "geology",
+      "geopolitics",
+      "government",
+      "gravitational_waves",
+      "great_powers",
+      "health",
+      "history",
+      "humanitarian",
+      "industrial_policy",
+      "influence",
+      "infrastructure",
+      "innovation",
+      "intelligence",
+      "knowledge",
+      "labor",
+      "launch",
+      "logistics",
+      "manufacturing",
+      "market_structure",
+      "markets",
+      "materials",
+      "materials_science",
+      "medicine",
+      "middle_east",
+      "military",
+      "monetary_policy",
+      "natural_disasters",
+      "ocean",
+      "open_source",
+      "particle_physics",
+      "physics",
+      "planetary_defense",
+      "planetary_science",
+      "policy",
+      "politics",
+      "preprints",
+      "publishing",
+      "reference",
+      "regulation",
+      "remote_sensing",
+      "research",
+      "risk",
+      "science",
+      "security",
+      "seismology",
+      "semiconductors",
+      "software",
+      "solar",
+      "space",
+      "space_weather",
+      "technology",
+      "telescopes",
+      "trade",
+      "us_policy",
+      "water",
+      "wealth"
+    ],
+    "domain_count": 87,
+    "agent_count": 15,
+    "agents": [
+      "space-explorer: NASA, ESA, exoplanets, asteroids, space weather",
+      "earth-monitor: earthquakes, volcanoes, climate, biodiversity, oceans",
+      "economics-analyst: markets, federal spending, SEC filings, trade policy",
+      "science-researcher: arxiv, CERN, genomics, materials, medical",
+      "culture-curator: art, books, Wikipedia, Smithsonian, Nobel prizes",
+      "tech-tracker: GitHub trending, HackerNews, tech incidents, AI landscape",
+      "geopolitics-analyst: Middle East conflicts, arms trade, diplomacy",
+      "defense-analyst: contractors, DARPA, intelligence budget, Space Force",
+      "energy-analyst: oil/gas, renewables, energy grid, data centers",
+      "finance-analyst: Fortune 500, billionaire networks, private equity, lobbying",
+      "chip-analyst: semiconductor wars, sovereign compute, rare earths",
+      "ai-analyst: democratization, edge AI, compute economics, efficiency",
+      "trade-analyst: supply chains, sanctions, US-China, US alliances",
+      "macro-analyst: dollar hegemony, federal reserve, industry concentration",
+      "synthesis-agent: cross-domain correlations, risk assessment, predictions"
+    ],
+    "key_correlations_discovered": 12,
+    "highest_risk_correlation": "Nuclear Proliferation Chain (risk level 10/10)",
+    "top_finding": "AI infrastructure capex ($359B/year) faces existential efficiency risk from DeepSeek-style breakthroughs while simultaneously driving nuclear energy renaissance and rare earth dependency chains"
+  },
+  "files": [
+    {
+      "filename": "swarm_academic.json",
+      "entries": 0,
+      "file_size_bytes": 3,
+      "domains": [
+        "science",
+        "research"
+      ],
+      "key_finding": "Dataset with 0 entries covering science, research"
+    },
+    {
+      "filename": "swarm_ai_democratization.json",
+      "entries": 21,
+      "file_size_bytes": 21494,
+      "domains": [
+        "technology",
+        "open_source",
+        "ai"
+      ],
+      "key_finding": "DeepSeek R1 trained for $294K (95% cost reduction); NVIDIA lost $589B in one day"
+    },
+    {
+      "filename": "swarm_ai_landscape.json",
+      "entries": 31,
+      "file_size_bytes": 27836,
+      "domains": [
+        "technology",
+        "ai",
+        "market_structure"
+      ],
+      "key_finding": "31 AI market segments tracked; rapid commoditization pressure across the stack"
+    },
+    {
+      "filename": "swarm_airquality.json",
+      "entries": 6,
+      "file_size_bytes": 1853,
+      "domains": [
+        "environment",
+        "health"
+      ],
+      "key_finding": "Dataset with 6 entries covering environment, health"
+    },
+    {
+      "filename": "swarm_apod.json",
+      "entries": 5,
+      "file_size_bytes": 2774,
+      "domains": [
+        "space",
+        "astronomy"
+      ],
+      "key_finding": "Dataset with 5 entries covering space, astronomy"
+    },
+    {
+      "filename": "swarm_art.json",
+      "entries": 10,
+      "file_size_bytes": 3405,
+      "domains": [
+        "culture",
+        "history"
+      ],
+      "key_finding": "Dataset with 10 entries covering culture, history"
+    },
+    {
+      "filename": "swarm_arxiv.json",
+      "entries": 10,
+      "file_size_bytes": 9412,
+      "domains": [
+        "science",
+        "research",
+        "preprints"
+      ],
+      "key_finding": "Dataset with 10 entries covering science, research, preprints"
+    },
+    {
+      "filename": "swarm_asteroids.json",
+      "entries": 126,
+      "file_size_bytes": 53335,
+      "domains": [
+        "space",
+        "planetary_defense"
+      ],
+      "key_finding": "126 near-Earth asteroid observations cataloged"
+    },
+    {
+      "filename": "swarm_billionaire_network.json",
+      "entries": 31,
+      "file_size_bytes": 30611,
+      "domains": [
+        "economics",
+        "wealth",
+        "influence"
+      ],
+      "key_finding": "31 billionaire influence networks tracked"
+    },
+    {
+      "filename": "swarm_biodiversity.json",
+      "entries": 10,
+      "file_size_bytes": 3417,
+      "domains": [
+        "environment",
+        "ecology"
+      ],
+      "key_finding": "Dataset with 10 entries covering environment, ecology"
+    },
+    {
+      "filename": "swarm_biotech_frontier.json",
+      "entries": 1,
+      "file_size_bytes": 13867,
+      "domains": [
+        "technology",
+        "health",
+        "biotechnology"
+      ],
+      "key_finding": "Dataset with 1 entries covering technology, health, biotechnology"
+    },
+    {
+      "filename": "swarm_books.json",
+      "entries": 10,
+      "file_size_bytes": 3132,
+      "domains": [
+        "culture",
+        "knowledge"
+      ],
+      "key_finding": "Dataset with 10 entries covering culture, knowledge"
+    },
+    {
+      "filename": "swarm_cern.json",
+      "entries": 10,
+      "file_size_bytes": 4616,
+      "domains": [
+        "physics",
+        "particle_physics"
+      ],
+      "key_finding": "Dataset with 10 entries covering physics, particle_physics"
+    },
+    {
+      "filename": "swarm_chip_alternatives.json",
+      "entries": 26,
+      "file_size_bytes": 26259,
+      "domains": [
+        "semiconductors",
+        "technology",
+        "trade"
+      ],
+      "key_finding": "26 alternative chip architectures and supply sources emerging"
+    },
+    {
+      "filename": "swarm_chip_cost_crisis.json",
+      "entries": 31,
+      "file_size_bytes": 27904,
+      "domains": [
+        "semiconductors",
+        "economics",
+        "manufacturing"
+      ],
+      "key_finding": "Fab construction costs 30-50% premium for reshored facilities"
+    },
+    {
+      "filename": "swarm_chip_wars.json",
+      "entries": 7,
+      "file_size_bytes": 14538,
+      "domains": [
+        "semiconductors",
+        "geopolitics",
+        "trade"
+      ],
+      "key_finding": "US-China semiconductor decoupling accelerating; export controls tightening"
+    },
+    {
+      "filename": "swarm_chip_wars_deep.json",
+      "entries": 40,
+      "file_size_bytes": 44822,
+      "domains": [
+        "semiconductors",
+        "geopolitics",
+        "industrial_policy"
+      ],
+      "key_finding": "42 data points on global chip competition; TSMC concentration risk"
+    },
+    {
+      "filename": "swarm_climate.json",
+      "entries": 14,
+      "file_size_bytes": 3671,
+      "domains": [
+        "environment",
+        "climate_change"
+      ],
+      "key_finding": "Dataset with 14 entries covering environment, climate_change"
+    },
+    {
+      "filename": "swarm_cme.json",
+      "entries": 8,
+      "file_size_bytes": 3227,
+      "domains": [
+        "space_weather",
+        "solar"
+      ],
+      "key_finding": "Dataset with 8 entries covering space_weather, solar"
+    },
+    {
+      "filename": "swarm_cognitum_lowcost.json",
+      "entries": 25,
+      "file_size_bytes": 21261,
+      "domains": [
+        "technology",
+        "ai",
+        "edge_computing"
+      ],
+      "key_finding": "Dataset with 25 entries covering technology, ai, edge_computing"
+    },
+    {
+      "filename": "swarm_compute_economics.json",
+      "entries": 23,
+      "file_size_bytes": 23462,
+      "domains": [
+        "technology",
+        "economics",
+        "infrastructure"
+      ],
+      "key_finding": "23 efficiency metrics showing accelerating compute cost decline"
+    },
+    {
+      "filename": "swarm_compute_paradigm_shift.json",
+      "entries": 27,
+      "file_size_bytes": 25364,
+      "domains": [
+        "technology",
+        "ai",
+        "efficiency"
+      ],
+      "key_finding": "Dataset with 27 entries covering technology, ai, efficiency"
+    },
+    {
+      "filename": "swarm_crossref.json",
+      "entries": 8,
+      "file_size_bytes": 5020,
+      "domains": [
+        "science",
+        "publishing"
+      ],
+      "key_finding": "Dataset with 8 entries covering science, publishing"
+    },
+    {
+      "filename": "swarm_cyber_defense.json",
+      "entries": 4,
+      "file_size_bytes": 24497,
+      "domains": [
+        "security",
+        "defense",
+        "technology"
+      ],
+      "key_finding": "Dataset with 4 entries covering security, defense, technology"
+    },
+    {
+      "filename": "swarm_dark_energy.json",
+      "entries": 1,
+      "file_size_bytes": 518,
+      "domains": [
+        "cosmology",
+        "physics"
+      ],
+      "key_finding": "Dataset with 1 entries covering cosmology, physics"
+    },
+    {
+      "filename": "swarm_darpa_programs.json",
+      "entries": 8,
+      "file_size_bytes": 10282,
+      "domains": [
+        "defense",
+        "research",
+        "technology"
+      ],
+      "key_finding": "Dataset with 8 entries covering defense, research, technology"
+    },
+    {
+      "filename": "swarm_data_centers.json",
+      "entries": 6,
+      "file_size_bytes": 10261,
+      "domains": [
+        "infrastructure",
+        "technology",
+        "energy"
+      ],
+      "key_finding": "Hyperscaler capex $359B in 2025, projected $650B+ by 2026"
+    },
+    {
+      "filename": "swarm_deep_earthquakes.json",
+      "entries": 26,
+      "file_size_bytes": 9074,
+      "domains": [
+        "geology",
+        "seismology"
+      ],
+      "key_finding": "Dataset with 26 entries covering geology, seismology"
+    },
+    {
+      "filename": "swarm_defense_contractors.json",
+      "entries": 26,
+      "file_size_bytes": 23808,
+      "domains": [
+        "defense",
+        "economics",
+        "military"
+      ],
+      "key_finding": "Top defense contractor contracts exceed $100B; F-35 dominates"
+    },
+    {
+      "filename": "swarm_disease.json",
+      "entries": 6,
+      "file_size_bytes": 2190,
+      "domains": [
+        "health",
+        "epidemiology"
+      ],
+      "key_finding": "Dataset with 6 entries covering health, epidemiology"
+    },
+    {
+      "filename": "swarm_dollar_hegemony.json",
+      "entries": 7,
+      "file_size_bytes": 14303,
+      "domains": [
+        "economics",
+        "monetary_policy",
+        "geopolitics"
+      ],
+      "key_finding": "USD reserve share declined 73% to 54% (2001-2025); no viable alternative"
+    },
+    {
+      "filename": "swarm_earthquakes.json",
+      "entries": 10,
+      "file_size_bytes": 3872,
+      "domains": [
+        "geology",
+        "natural_disasters"
+      ],
+      "key_finding": "Dataset with 10 entries covering geology, natural_disasters"
+    },
+    {
+      "filename": "swarm_economics.json",
+      "entries": 14,
+      "file_size_bytes": 6707,
+      "domains": [
+        "economics",
+        "markets",
+        "policy"
+      ],
+      "key_finding": "Dataset with 14 entries covering economics, markets, policy"
+    },
+    {
+      "filename": "swarm_edge_ai_efficiency.json",
+      "entries": 29,
+      "file_size_bytes": 28301,
+      "domains": [
+        "technology",
+        "ai",
+        "edge_computing"
+      ],
+      "key_finding": "29 edge AI deployment strategies tracked"
+    },
+    {
+      "filename": "swarm_endangered.json",
+      "entries": 7,
+      "file_size_bytes": 3288,
+      "domains": [
+        "environment",
+        "conservation"
+      ],
+      "key_finding": "Dataset with 7 entries covering environment, conservation"
+    },
+    {
+      "filename": "swarm_energy_grid.json",
+      "entries": 6,
+      "file_size_bytes": 12585,
+      "domains": [
+        "energy",
+        "infrastructure",
+        "technology"
+      ],
+      "key_finding": "6 grid modernization programs for data center power demands"
+    },
+    {
+      "filename": "swarm_epa_air.json",
+      "entries": 12,
+      "file_size_bytes": 4870,
+      "domains": [
+        "environment",
+        "regulation",
+        "health"
+      ],
+      "key_finding": "Dataset with 12 entries covering environment, regulation, health"
+    },
+    {
+      "filename": "swarm_eso.json",
+      "entries": 10,
+      "file_size_bytes": 7147,
+      "domains": [
+        "space",
+        "astronomy",
+        "telescopes"
+      ],
+      "key_finding": "Dataset with 10 entries covering space, astronomy, telescopes"
+    },
+    {
+      "filename": "swarm_exoplanets.json",
+      "entries": 0,
+      "file_size_bytes": 3,
+      "domains": [
+        "space",
+        "astronomy"
+      ],
+      "key_finding": "Dataset with 0 entries covering space, astronomy"
+    },
+    {
+      "filename": "swarm_exotic_finance.json",
+      "entries": 1,
+      "file_size_bytes": 11530,
+      "domains": [
+        "economics",
+        "finance",
+        "risk"
+      ],
+      "key_finding": "Dataset with 1 entries covering economics, finance, risk"
+    },
+    {
+      "filename": "swarm_extreme_exoplanets.json",
+      "entries": 30,
+      "file_size_bytes": 9205,
+      "domains": [
+        "space",
+        "astronomy",
+        "extremophiles"
+      ],
+      "key_finding": "Dataset with 30 entries covering space, astronomy, extremophiles"
+    },
+    {
+      "filename": "swarm_federal_reserve.json",
+      "entries": 6,
+      "file_size_bytes": 9891,
+      "domains": [
+        "economics",
+        "monetary_policy"
+      ],
+      "key_finding": "Dataset with 6 entries covering economics, monetary_policy"
+    },
+    {
+      "filename": "swarm_federal_spending.json",
+      "entries": 31,
+      "file_size_bytes": 15107,
+      "domains": [
+        "economics",
+        "government",
+        "fiscal_policy"
+      ],
+      "key_finding": "31 federal spending categories analyzed"
+    },
+    {
+      "filename": "swarm_flares.json",
+      "entries": 8,
+      "file_size_bytes": 2882,
+      "domains": [
+        "space_weather",
+        "solar"
+      ],
+      "key_finding": "Dataset with 8 entries covering space_weather, solar"
+    },
+    {
+      "filename": "swarm_fortune500_network.json",
+      "entries": 51,
+      "file_size_bytes": 42834,
+      "domains": [
+        "economics",
+        "corporate",
+        "market_structure"
+      ],
+      "key_finding": "51 corporate network connections mapped across Fortune 500"
+    },
+    {
+      "filename": "swarm_frontier_tech.json",
+      "entries": 1,
+      "file_size_bytes": 20076,
+      "domains": [
+        "technology",
+        "innovation"
+      ],
+      "key_finding": "Dataset with 1 entries covering technology, innovation"
+    },
+    {
+      "filename": "swarm_galaxies.json",
+      "entries": 1,
+      "file_size_bytes": 411,
+      "domains": [
+        "space",
+        "cosmology"
+      ],
+      "key_finding": "Dataset with 1 entries covering space, cosmology"
+    },
+    {
+      "filename": "swarm_genetic_variants.json",
+      "entries": 10,
+      "file_size_bytes": 5765,
+      "domains": [
+        "biology",
+        "genetics",
+        "health"
+      ],
+      "key_finding": "Dataset with 10 entries covering biology, genetics, health"
+    },
+    {
+      "filename": "swarm_genomics.json",
+      "entries": 5,
+      "file_size_bytes": 1988,
+      "domains": [
+        "biology",
+        "genetics"
+      ],
+      "key_finding": "Dataset with 5 entries covering biology, genetics"
+    },
+    {
+      "filename": "swarm_geostorm.json",
+      "entries": 1,
+      "file_size_bytes": 423,
+      "domains": [
+        "space_weather"
+      ],
+      "key_finding": "Dataset with 1 entries covering space_weather"
+    },
+    {
+      "filename": "swarm_github_trending.json",
+      "entries": 10,
+      "file_size_bytes": 4508,
+      "domains": [
+        "technology",
+        "open_source",
+        "software"
+      ],
+      "key_finding": "Dataset with 10 entries covering technology, open_source, software"
+    },
+    {
+      "filename": "swarm_global_fires.json",
+      "entries": 1,
+      "file_size_bytes": 374,
+      "domains": [
+        "environment",
+        "climate_change"
+      ],
+      "key_finding": "Dataset with 1 entries covering environment, climate_change"
+    },
+    {
+      "filename": "swarm_global_health.json",
+      "entries": 1,
+      "file_size_bytes": 364,
+      "domains": [
+        "health",
+        "epidemiology"
+      ],
+      "key_finding": "Dataset with 1 entries covering health, epidemiology"
+    },
+    {
+      "filename": "swarm_gw.json",
+      "entries": 8,
+      "file_size_bytes": 3269,
+      "domains": [
+        "physics",
+        "gravitational_waves"
+      ],
+      "key_finding": "Dataset with 8 entries covering physics, gravitational_waves"
+    },
+    {
+      "filename": "swarm_hackernews.json",
+      "entries": 10,
+      "file_size_bytes": 3417,
+      "domains": [
+        "technology",
+        "culture"
+      ],
+      "key_finding": "Dataset with 10 entries covering technology, culture"
+    },
+    {
+      "filename": "swarm_industry_concentration.json",
+      "entries": 11,
+      "file_size_bytes": 20341,
+      "domains": [
+        "economics",
+        "antitrust",
+        "market_structure"
+      ],
+      "key_finding": "Wireless telecom HHI 3200; top 3 control 98% market share"
+    },
+    {
+      "filename": "swarm_infrastructure.json",
+      "entries": 9,
+      "file_size_bytes": 18363,
+      "domains": [
+        "infrastructure",
+        "technology",
+        "government"
+      ],
+      "key_finding": "Dataset with 9 entries covering infrastructure, technology, government"
+    },
+    {
+      "filename": "swarm_intelligence_budget.json",
+      "entries": 4,
+      "file_size_bytes": 16377,
+      "domains": [
+        "defense",
+        "intelligence",
+        "government"
+      ],
+      "key_finding": "Dataset with 4 entries covering defense, intelligence, government"
+    },
+    {
+      "filename": "swarm_ips.json",
+      "entries": 1,
+      "file_size_bytes": 401,
+      "domains": [
+        "space_weather"
+      ],
+      "key_finding": "Dataset with 1 entries covering space_weather"
+    },
+    {
+      "filename": "swarm_iss.json",
+      "entries": 1,
+      "file_size_bytes": 433,
+      "domains": [
+        "space",
+        "exploration"
+      ],
+      "key_finding": "Dataset with 1 entries covering space, exploration"
+    },
+    {
+      "filename": "swarm_library_congress.json",
+      "entries": 10,
+      "file_size_bytes": 5309,
+      "domains": [
+        "culture",
+        "knowledge",
+        "history"
+      ],
+      "key_finding": "Dataset with 10 entries covering culture, knowledge, history"
+    },
+    {
+      "filename": "swarm_lobbying.json",
+      "entries": 31,
+      "file_size_bytes": 14311,
+      "domains": [
+        "politics",
+        "economics",
+        "influence"
+      ],
+      "key_finding": "Dataset with 31 entries covering politics, economics, influence"
+    },
+    {
+      "filename": "swarm_marine.json",
+      "entries": 14,
+      "file_size_bytes": 5693,
+      "domains": [
+        "environment",
+        "ocean",
+        "ecology"
+      ],
+      "key_finding": "Dataset with 14 entries covering environment, ocean, ecology"
+    },
+    {
+      "filename": "swarm_markets.json",
+      "entries": 4,
+      "file_size_bytes": 1077,
+      "domains": [
+        "economics",
+        "finance"
+      ],
+      "key_finding": "Dataset with 4 entries covering economics, finance"
+    },
+    {
+      "filename": "swarm_mars.json",
+      "entries": 1,
+      "file_size_bytes": 368,
+      "domains": [
+        "space",
+        "planetary_science"
+      ],
+      "key_finding": "Dataset with 1 entries covering space, planetary_science"
+    },
+    {
+      "filename": "swarm_mars_weather.json",
+      "entries": 7,
+      "file_size_bytes": 2148,
+      "domains": [
+        "space",
+        "planetary_science"
+      ],
+      "key_finding": "Dataset with 7 entries covering space, planetary_science"
+    },
+    {
+      "filename": "swarm_materials.json",
+      "entries": 5,
+      "file_size_bytes": 1955,
+      "domains": [
+        "science",
+        "materials_science"
+      ],
+      "key_finding": "Dataset with 5 entries covering science, materials_science"
+    },
+    {
+      "filename": "swarm_medical.json",
+      "entries": 15,
+      "file_size_bytes": 8987,
+      "domains": [
+        "health",
+        "medicine",
+        "research"
+      ],
+      "key_finding": "Dataset with 15 entries covering health, medicine, research"
+    },
+    {
+      "filename": "swarm_mega_mergers.json",
+      "entries": 33,
+      "file_size_bytes": 21458,
+      "domains": [
+        "economics",
+        "corporate",
+        "antitrust"
+      ],
+      "key_finding": "Dataset with 33 entries covering economics, corporate, antitrust"
+    },
+    {
+      "filename": "swarm_mideast_active_conflicts.json",
+      "entries": 8,
+      "file_size_bytes": 27355,
+      "domains": [
+        "geopolitics",
+        "conflict",
+        "middle_east"
+      ],
+      "key_finding": "8 concurrent conflict zones across the Middle East"
+    },
+    {
+      "filename": "swarm_mideast_arms_trade.json",
+      "entries": 9,
+      "file_size_bytes": 16044,
+      "domains": [
+        "geopolitics",
+        "defense",
+        "middle_east"
+      ],
+      "key_finding": "Dataset with 9 entries covering geopolitics, defense, middle_east"
+    },
+    {
+      "filename": "swarm_mideast_diplomatic.json",
+      "entries": 9,
+      "file_size_bytes": 24420,
+      "domains": [
+        "geopolitics",
+        "diplomacy",
+        "middle_east"
+      ],
+      "key_finding": "Dataset with 9 entries covering geopolitics, diplomacy, middle_east"
+    },
+    {
+      "filename": "swarm_mideast_economics.json",
+      "entries": 8,
+      "file_size_bytes": 18658,
+      "domains": [
+        "economics",
+        "geopolitics",
+        "middle_east"
+      ],
+      "key_finding": "Dataset with 8 entries covering economics, geopolitics, middle_east"
+    },
+    {
+      "filename": "swarm_mideast_global_impact.json",
+      "entries": 10,
+      "file_size_bytes": 27536,
+      "domains": [
+        "geopolitics",
+        "economics",
+        "energy"
+      ],
+      "key_finding": "Oil up 36% YTD; $1T+ in disrupted trade flows"
+    },
+    {
+      "filename": "swarm_mideast_humanitarian.json",
+      "entries": 8,
+      "file_size_bytes": 20748,
+      "domains": [
+        "humanitarian",
+        "conflict",
+        "middle_east"
+      ],
+      "key_finding": "Dataset with 8 entries covering humanitarian, conflict, middle_east"
+    },
+    {
+      "filename": "swarm_mideast_military_forces.json",
+      "entries": 9,
+      "file_size_bytes": 20280,
+      "domains": [
+        "defense",
+        "military",
+        "middle_east"
+      ],
+      "key_finding": "Dataset with 9 entries covering defense, military, middle_east"
+    },
+    {
+      "filename": "swarm_mideast_oil_geopolitics.json",
+      "entries": 8,
+      "file_size_bytes": 14153,
+      "domains": [
+        "energy",
+        "geopolitics",
+        "middle_east"
+      ],
+      "key_finding": "OPEC+ holding 3.24M bpd cuts; spare capacity critical"
+    },
+    {
+      "filename": "swarm_mideast_predictions.json",
+      "entries": 9,
+      "file_size_bytes": 45159,
+      "domains": [
+        "geopolitics",
+        "forecasting",
+        "middle_east"
+      ],
+      "key_finding": "9 prediction categories for 2-5 year trajectories"
+    },
+    {
+      "filename": "swarm_mideast_reconstruction.json",
+      "entries": 6,
+      "file_size_bytes": 14719,
+      "domains": [
+        "humanitarian",
+        "economics",
+        "middle_east"
+      ],
+      "key_finding": "Gaza reconstruction $53-70B needed; 84% total destruction"
+    },
+    {
+      "filename": "swarm_mideast_risk_indicators.json",
+      "entries": 8,
+      "file_size_bytes": 40735,
+      "domains": [
+        "geopolitics",
+        "risk",
+        "middle_east"
+      ],
+      "key_finding": "8 risk categories showing elevated escalation probability"
+    },
+    {
+      "filename": "swarm_mideast_russia_china.json",
+      "entries": 13,
+      "file_size_bytes": 23938,
+      "domains": [
+        "geopolitics",
+        "great_powers",
+        "middle_east"
+      ],
+      "key_finding": "Dataset with 13 entries covering geopolitics, great_powers, middle_east"
+    },
+    {
+      "filename": "swarm_mideast_scenarios.json",
+      "entries": 5,
+      "file_size_bytes": 42051,
+      "domains": [
+        "geopolitics",
+        "forecasting",
+        "middle_east"
+      ],
+      "key_finding": "5 conflict scenarios modeled with escalation pathways"
+    },
+    {
+      "filename": "swarm_mideast_us_policy.json",
+      "entries": 9,
+      "file_size_bytes": 23714,
+      "domains": [
+        "geopolitics",
+        "us_policy",
+        "middle_east"
+      ],
+      "key_finding": "Dataset with 9 entries covering geopolitics, us_policy, middle_east"
+    },
+    {
+      "filename": "swarm_nasa_tech.json",
+      "entries": 10,
+      "file_size_bytes": 7124,
+      "domains": [
+        "space",
+        "technology",
+        "research"
+      ],
+      "key_finding": "Dataset with 10 entries covering space, technology, research"
+    },
+    {
+      "filename": "swarm_natural_events.json",
+      "entries": 10,
+      "file_size_bytes": 4552,
+      "domains": [
+        "environment",
+        "natural_disasters"
+      ],
+      "key_finding": "Dataset with 10 entries covering environment, natural_disasters"
+    },
+    {
+      "filename": "swarm_neos.json",
+      "entries": 4,
+      "file_size_bytes": 1631,
+      "domains": [
+        "space",
+        "planetary_defense"
+      ],
+      "key_finding": "Dataset with 4 entries covering space, planetary_defense"
+    },
+    {
+      "filename": "swarm_nobel.json",
+      "entries": 6,
+      "file_size_bytes": 2672,
+      "domains": [
+        "science",
+        "awards"
+      ],
+      "key_finding": "Dataset with 6 entries covering science, awards"
+    },
+    {
+      "filename": "swarm_ocean.json",
+      "entries": 5,
+      "file_size_bytes": 2322,
+      "domains": [
+        "environment",
+        "ocean",
+        "climate"
+      ],
+      "key_finding": "Dataset with 5 entries covering environment, ocean, climate"
+    },
+    {
+      "filename": "swarm_oil_gas.json",
+      "entries": 7,
+      "file_size_bytes": 20436,
+      "domains": [
+        "energy",
+        "economics",
+        "geopolitics"
+      ],
+      "key_finding": "7 oil/gas market dynamics tracked; AI drilling up 15%"
+    },
+    {
+      "filename": "swarm_physics.json",
+      "entries": 5,
+      "file_size_bytes": 1773,
+      "domains": [
+        "physics",
+        "science"
+      ],
+      "key_finding": "Dataset with 5 entries covering physics, science"
+    },
+    {
+      "filename": "swarm_private_equity.json",
+      "entries": 16,
+      "file_size_bytes": 21201,
+      "domains": [
+        "economics",
+        "finance",
+        "corporate"
+      ],
+      "key_finding": "Dataset with 16 entries covering economics, finance, corporate"
+    },
+    {
+      "filename": "swarm_proteins.json",
+      "entries": 10,
+      "file_size_bytes": 3877,
+      "domains": [
+        "biology",
+        "biochemistry"
+      ],
+      "key_finding": "Dataset with 10 entries covering biology, biochemistry"
+    },
+    {
+      "filename": "swarm_pulsars.json",
+      "entries": 10,
+      "file_size_bytes": 2418,
+      "domains": [
+        "space",
+        "astronomy"
+      ],
+      "key_finding": "Dataset with 10 entries covering space, astronomy"
+    },
+    {
+      "filename": "swarm_quantum.json",
+      "entries": 1,
+      "file_size_bytes": 13628,
+      "domains": [
+        "technology",
+        "physics",
+        "computing"
+      ],
+      "key_finding": "Dataset with 1 entries covering technology, physics, computing"
+    },
+    {
+      "filename": "swarm_rare_earth.json",
+      "entries": 7,
+      "file_size_bytes": 16723,
+      "domains": [
+        "materials",
+        "geopolitics",
+        "trade"
+      ],
+      "key_finding": "China controls 60% mining, 80% processing, 90% magnets; US 95% dependent"
+    },
+    {
+      "filename": "swarm_renewables.json",
+      "entries": 8,
+      "file_size_bytes": 18186,
+      "domains": [
+        "energy",
+        "climate",
+        "technology"
+      ],
+      "key_finding": "Solar now 72.1% of new US capacity; approaching coal capacity total"
+    },
+    {
+      "filename": "swarm_rivers.json",
+      "entries": 7,
+      "file_size_bytes": 2242,
+      "domains": [
+        "environment",
+        "water",
+        "ecology"
+      ],
+      "key_finding": "Dataset with 7 entries covering environment, water, ecology"
+    },
+    {
+      "filename": "swarm_sanctions.json",
+      "entries": 7,
+      "file_size_bytes": 13217,
+      "domains": [
+        "geopolitics",
+        "economics",
+        "trade"
+      ],
+      "key_finding": "7 sanctions regime categories analyzed for effectiveness"
+    },
+    {
+      "filename": "swarm_satellite_fires.json",
+      "entries": 10,
+      "file_size_bytes": 3904,
+      "domains": [
+        "environment",
+        "remote_sensing"
+      ],
+      "key_finding": "Dataset with 10 entries covering environment, remote_sensing"
+    },
+    {
+      "filename": "swarm_sec_filings.json",
+      "entries": 31,
+      "file_size_bytes": 20714,
+      "domains": [
+        "economics",
+        "finance",
+        "regulation"
+      ],
+      "key_finding": "Dataset with 31 entries covering economics, finance, regulation"
+    },
+    {
+      "filename": "swarm_sep.json",
+      "entries": 0,
+      "file_size_bytes": 3,
+      "domains": [
+        "space_weather"
+      ],
+      "key_finding": "Dataset with 0 entries covering space_weather"
+    },
+    {
+      "filename": "swarm_smithsonian.json",
+      "entries": 10,
+      "file_size_bytes": 3925,
+      "domains": [
+        "culture",
+        "science",
+        "history"
+      ],
+      "key_finding": "Dataset with 10 entries covering culture, science, history"
+    },
+    {
+      "filename": "swarm_solar.json",
+      "entries": 0,
+      "file_size_bytes": 3,
+      "domains": [
+        "space_weather",
+        "solar"
+      ],
+      "key_finding": "Dataset with 0 entries covering space_weather, solar"
+    },
+    {
+      "filename": "swarm_solar_wind.json",
+      "entries": 50,
+      "file_size_bytes": 13256,
+      "domains": [
+        "space_weather",
+        "solar"
+      ],
+      "key_finding": "Dataset with 50 entries covering space_weather, solar"
+    },
+    {
+      "filename": "swarm_sovereign_compute.json",
+      "entries": 22,
+      "file_size_bytes": 29674,
+      "domains": [
+        "geopolitics",
+        "semiconductors",
+        "industrial_policy"
+      ],
+      "key_finding": "22 national compute strategies totaling $1T+ in announced investment"
+    },
+    {
+      "filename": "swarm_space_economy.json",
+      "entries": 1,
+      "file_size_bytes": 11332,
+      "domains": [
+        "space",
+        "economics",
+        "technology"
+      ],
+      "key_finding": "Dataset with 1 entries covering space, economics, technology"
+    },
+    {
+      "filename": "swarm_space_force.json",
+      "entries": 8,
+      "file_size_bytes": 9887,
+      "domains": [
+        "defense",
+        "space",
+        "military"
+      ],
+      "key_finding": "Dataset with 8 entries covering defense, space, military"
+    },
+    {
+      "filename": "swarm_spacex.json",
+      "entries": 6,
+      "file_size_bytes": 1570,
+      "domains": [
+        "space",
+        "technology",
+        "launch"
+      ],
+      "key_finding": "Dataset with 6 entries covering space, technology, launch"
+    },
+    {
+      "filename": "swarm_sunspot.json",
+      "entries": 64,
+      "file_size_bytes": 15992,
+      "domains": [
+        "space_weather",
+        "solar"
+      ],
+      "key_finding": "Dataset with 64 entries covering space_weather, solar"
+    },
+    {
+      "filename": "swarm_supply_chains.json",
+      "entries": 5,
+      "file_size_bytes": 13236,
+      "domains": [
+        "trade",
+        "manufacturing",
+        "logistics"
+      ],
+      "key_finding": "81% CEOs plan reshoring but only 2% completed; 30-50% cost premium"
+    },
+    {
+      "filename": "swarm_tech_antitrust.json",
+      "entries": 7,
+      "file_size_bytes": 13517,
+      "domains": [
+        "technology",
+        "antitrust",
+        "regulation"
+      ],
+      "key_finding": "Dataset with 7 entries covering technology, antitrust, regulation"
+    },
+    {
+      "filename": "swarm_tech_incidents.json",
+      "entries": 10,
+      "file_size_bytes": 3415,
+      "domains": [
+        "technology",
+        "security",
+        "infrastructure"
+      ],
+      "key_finding": "Dataset with 10 entries covering technology, security, infrastructure"
+    },
+    {
+      "filename": "swarm_tech_workforce.json",
+      "entries": 6,
+      "file_size_bytes": 12644,
+      "domains": [
+        "technology",
+        "labor",
+        "economics"
+      ],
+      "key_finding": "Dataset with 6 entries covering technology, labor, economics"
+    },
+    {
+      "filename": "swarm_tess_candidates.json",
+      "entries": 10,
+      "file_size_bytes": 3276,
+      "domains": [
+        "space",
+        "astronomy",
+        "exoplanets"
+      ],
+      "key_finding": "Dataset with 10 entries covering space, astronomy, exoplanets"
+    },
+    {
+      "filename": "swarm_trade_policy.json",
+      "entries": 9,
+      "file_size_bytes": 6795,
+      "domains": [
+        "trade",
+        "geopolitics",
+        "economics"
+      ],
+      "key_finding": "Dataset with 9 entries covering trade, geopolitics, economics"
+    },
+    {
+      "filename": "swarm_us_alliances.json",
+      "entries": 6,
+      "file_size_bytes": 16293,
+      "domains": [
+        "geopolitics",
+        "diplomacy",
+        "defense"
+      ],
+      "key_finding": "Dataset with 6 entries covering geopolitics, diplomacy, defense"
+    },
+    {
+      "filename": "swarm_us_china.json",
+      "entries": 7,
+      "file_size_bytes": 14408,
+      "domains": [
+        "geopolitics",
+        "trade",
+        "great_powers"
+      ],
+      "key_finding": "7 US-China competition dimensions tracked"
+    },
+    {
+      "filename": "swarm_volcanoes.json",
+      "entries": 200,
+      "file_size_bytes": 82564,
+      "domains": [
+        "geology",
+        "natural_disasters"
+      ],
+      "key_finding": "200 volcanic events tracked globally"
+    },
+    {
+      "filename": "swarm_wiki.json",
+      "entries": 0,
+      "file_size_bytes": 3,
+      "domains": [
+        "knowledge",
+        "reference"
+      ],
+      "key_finding": "Dataset with 0 entries covering knowledge, reference"
+    },
+    {
+      "filename": "swarm_wikipedia.json",
+      "entries": 10,
+      "file_size_bytes": 3770,
+      "domains": [
+        "knowledge",
+        "reference",
+        "culture"
+      ],
+      "key_finding": "Dataset with 10 entries covering knowledge, reference, culture"
+    }
+  ]
+}

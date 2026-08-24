@@ -1,0 +1,242 @@
+[
+  {
+    "title": "PubMed: Disparities in Thoracic Oncology Patients.",
+    "content": "Medical: Disparities in Thoracic Oncology Patients.. Journal: Cancers (Basel). PMID: 41827727.",
+    "category": "pattern",
+    "tags": [
+      "medical",
+      "pubmed",
+      "research",
+      "gap-fill"
+    ],
+    "domain": "medical-genomics",
+    "source_api": "PubMed",
+    "timestamp": "2026-03-15T21:59:51Z",
+    "confidence": 0.85,
+    "data_points": 1
+  },
+  {
+    "title": "PubMed: Research advances in nanomaterials for gastric cancer: Diagnosis and treatment.",
+    "content": "Medical: Research advances in nanomaterials for gastric cancer: Diagnosis and treatment.. Journal: Nanomedicine. PMID: 41825678.",
+    "category": "pattern",
+    "tags": [
+      "medical",
+      "pubmed",
+      "research",
+      "gap-fill"
+    ],
+    "domain": "medical-genomics",
+    "source_api": "PubMed",
+    "timestamp": "2026-03-15T21:59:51Z",
+    "confidence": 0.85,
+    "data_points": 1
+  },
+  {
+    "title": "PubMed: Advances in Targeted Therapy for Human Epidermal Growth Factor Receptor 2-Low Tumors: From Trastuzumab to Antibody-Drug Conjugates.",
+    "content": "Medical: Advances in Targeted Therapy for Human Epidermal Growth Factor Receptor 2-Low Tumors: From Trastuzumab to Antibody-Drug Conjugates.. Journal: World J Oncol. PMID: 41822315.",
+    "category": "pattern",
+    "tags": [
+      "medical",
+      "pubmed",
+      "research",
+      "gap-fill"
+    ],
+    "domain": "medical-genomics",
+    "source_api": "PubMed",
+    "timestamp": "2026-03-15T21:59:51Z",
+    "confidence": 0.85,
+    "data_points": 1
+  },
+  {
+    "title": "PubMed: Extracellular vesicles-mediated delivery of SpCas9 RNPs for therapeutic gene editing in Spinocerebellar Ataxia Type 3.",
+    "content": "Medical: Extracellular vesicles-mediated delivery of SpCas9 RNPs for therapeutic gene editing in Spinocerebellar Ataxia Type 3.. Journal: Biomaterials. PMID: 41830765.",
+    "category": "pattern",
+    "tags": [
+      "medical",
+      "pubmed",
+      "research",
+      "gap-fill"
+    ],
+    "domain": "medical-genomics",
+    "source_api": "PubMed",
+    "timestamp": "2026-03-15T21:59:51Z",
+    "confidence": 0.85,
+    "data_points": 1
+  },
+  {
+    "title": "PubMed: Advancing Gene Therapies and Novel Treatment Strategies for Infiltrative Cardiomyopathies: A Comprehensive Review of Targeted Interventions.",
+    "content": "Medical: Advancing Gene Therapies and Novel Treatment Strategies for Infiltrative Cardiomyopathies: A Comprehensive Review of Targeted Interventions.. Journal: Curr Cardiol Rev. PMID: 41830166.",
+    "category": "pattern",
+    "tags": [
+      "medical",
+      "pubmed",
+      "research",
+      "gap-fill"
+    ],
+    "domain": "medical-genomics",
+    "source_api": "PubMed",
+    "timestamp": "2026-03-15T21:59:51Z",
+    "confidence": 0.85,
+    "data_points": 1
+  },
+  {
+    "title": "PubMed: Modulation of Oncogenic NOTCH Signaling in Highly Aggressive Malignancies by Targeting the γ-Secretase Complex: A Systematic Review.",
+    "content": "Medical: Modulation of Oncogenic NOTCH Signaling in Highly Aggressive Malignancies by Targeting the γ-Secretase Complex: A Systematic Review.. Journal: Cells. PMID: 41827901.",
+    "category": "pattern",
+    "tags": [
+      "medical",
+      "pubmed",
+      "research",
+      "gap-fill"
+    ],
+    "domain": "medical-genomics",
+    "source_api": "PubMed",
+    "timestamp": "2026-03-15T21:59:51Z",
+    "confidence": 0.85,
+    "data_points": 1
+  },
+  {
+    "title": "PubMed: Alginate-Amphotericin B bifunctional conjugates have improved solubility and reduced toxicity.",
+    "content": "Medical: Alginate-Amphotericin B bifunctional conjugates have improved solubility and reduced toxicity.. Journal: Carbohydr Polym. PMID: 41832013.",
+    "category": "pattern",
+    "tags": [
+      "medical",
+      "pubmed",
+      "research",
+      "gap-fill"
+    ],
+    "domain": "medical-genomics",
+    "source_api": "PubMed",
+    "timestamp": "2026-03-15T21:59:51Z",
+    "confidence": 0.85,
+    "data_points": 1
+  },
+  {
+    "title": "PubMed: Imidazolium salt chitosan based on bacterial capture: Antimicrobial mechanisms, biosafety, and methicillin-resistant Staphylococcus aureus-infected wound healing.",
+    "content": "Medical: Imidazolium salt chitosan based on bacterial capture: Antimicrobial mechanisms, biosafety, and methicillin-resistant Staphylococcus aureus-infected wound healing.. Journal: Carbohydr Polym. PMID: 41831999.",
+    "category": "pattern",
+    "tags": [
+      "medical",
+      "pubmed",
+      "research",
+      "gap-fill"
+    ],
+    "domain": "medical-genomics",
+    "source_api": "PubMed",
+    "timestamp": "2026-03-15T21:59:51Z",
+    "confidence": 0.85,
+    "data_points": 1
+  },
+  {
+    "title": "PubMed: A novel bridged Dicarboximide derivative: A highly effective antifungal agent for managing plant pathogens.",
+    "content": "Medical: A novel bridged Dicarboximide derivative: A highly effective antifungal agent for managing plant pathogens.. Journal: Pestic Biochem Physiol. PMID: 41831908.",
+    "category": "pattern",
+    "tags": [
+      "medical",
+      "pubmed",
+      "research",
+      "gap-fill"
+    ],
+    "domain": "medical-genomics",
+    "source_api": "PubMed",
+    "timestamp": "2026-03-15T21:59:51Z",
+    "confidence": 0.85,
+    "data_points": 1
+  },
+  {
+    "title": "PubMed: The impact of insulin resistance on cognitive impairment and cerebrospinal fluid biomarkers in Alzheimer's disease.",
+    "content": "Medical: The impact of insulin resistance on cognitive impairment and cerebrospinal fluid biomarkers in Alzheimer's disease.. Journal: Neurobiol Dis. PMID: 41831578.",
+    "category": "pattern",
+    "tags": [
+      "medical",
+      "pubmed",
+      "research",
+      "gap-fill"
+    ],
+    "domain": "medical-genomics",
+    "source_api": "PubMed",
+    "timestamp": "2026-03-15T21:59:51Z",
+    "confidence": 0.85,
+    "data_points": 1
+  },
+  {
+    "title": "PubMed: Translating neurofilament light chain testing into clinical practice: a multidisciplinary implementation roadmap.",
+    "content": "Medical: Translating neurofilament light chain testing into clinical practice: a multidisciplinary implementation roadmap.. Journal: Clin Chem Lab Med. PMID: 41831326.",
+    "category": "pattern",
+    "tags": [
+      "medical",
+      "pubmed",
+      "research",
+      "gap-fill"
+    ],
+    "domain": "medical-genomics",
+    "source_api": "PubMed",
+    "timestamp": "2026-03-15T21:59:51Z",
+    "confidence": 0.85,
+    "data_points": 1
+  },
+  {
+    "title": "PubMed: Amyloid spatial extent with florbetapir-PET for early detection of preclinical Alzheimer's disease.",
+    "content": "Medical: Amyloid spatial extent with florbetapir-PET for early detection of preclinical Alzheimer's disease.. Journal: J Prev Alzheimers Dis. PMID: 41830758.",
+    "category": "pattern",
+    "tags": [
+      "medical",
+      "pubmed",
+      "research",
+      "gap-fill"
+    ],
+    "domain": "medical-genomics",
+    "source_api": "PubMed",
+    "timestamp": "2026-03-15T21:59:51Z",
+    "confidence": 0.85,
+    "data_points": 1
+  },
+  {
+    "title": "PubMed: mRNA-based COVID-19 Vaccination and Risk of Autoimmune Diseases in the Pediatric Population.",
+    "content": "Medical: mRNA-based COVID-19 Vaccination and Risk of Autoimmune Diseases in the Pediatric Population.. Journal: Ann Epidemiol. PMID: 41831745.",
+    "category": "pattern",
+    "tags": [
+      "medical",
+      "pubmed",
+      "research",
+      "gap-fill"
+    ],
+    "domain": "medical-genomics",
+    "source_api": "PubMed",
+    "timestamp": "2026-03-15T21:59:51Z",
+    "confidence": 0.85,
+    "data_points": 1
+  },
+  {
+    "title": "PubMed: Adapting covid-19 vaccination through targeted approaches: FDA-approved vaccines for the 2025-2026 season.",
+    "content": "Medical: Adapting covid-19 vaccination through targeted approaches: FDA-approved vaccines for the 2025-2026 season.. Journal: Immunol Res. PMID: 41831154.",
+    "category": "pattern",
+    "tags": [
+      "medical",
+      "pubmed",
+      "research",
+      "gap-fill"
+    ],
+    "domain": "medical-genomics",
+    "source_api": "PubMed",
+    "timestamp": "2026-03-15T21:59:51Z",
+    "confidence": 0.85,
+    "data_points": 1
+  },
+  {
+    "title": "PubMed: Strain-specific anti-RBD IgG antibody titers against the WT, XBB.1.5, JN.1, and KP.3 strains consistently correlate with neutralizing activity following SARS-CoV-2 XBB.1.5-adapted mRNA vaccination.",
+    "content": "Medical: Strain-specific anti-RBD IgG antibody titers against the WT, XBB.1.5, JN.1, and KP.3 strains consistently correlate with neutralizing activity following SARS-CoV-2 XBB.1.5-adapted mRNA vaccination.. Journal: J Infect Chemother. PMID: 41815056.",
+    "category": "pattern",
+    "tags": [
+      "medical",
+      "pubmed",
+      "research",
+      "gap-fill"
+    ],
+    "domain": "medical-genomics",
+    "source_api": "PubMed",
+    "timestamp": "2026-03-15T21:59:51Z",
+    "confidence": 0.85,
+    "data_points": 1
+  }
+]

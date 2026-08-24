@@ -1,0 +1,18 @@
+# udev rule for /dev/hailo* on Pi 5 + AI HAT+ (ADR-172 §3a iter 106).
+#
+# Grants the `ruvector-worker` system group rw access to every Hailo
+# device the kernel exposes, so the worker daemon can run as an
+# unprivileged dedicated user instead of root or operator-account.
+#
+# Verified device naming with `udevadm info -a -n /dev/hailo0` on a
+# stock Pi 5 + AI HAT+ Bookworm install: SUBSYSTEM is "hailo_chardev",
+# DRIVER is "hailort", KERNEL matches "hailo[0-9]+". Vendor:device is
+# 1e60:2864 over PCIe but matching by kernel-name is sufficient and
+# survives PCIe re-enumeration after a kernel upgrade.
+#
+# After dropping this file at /etc/udev/rules.d/, run:
+#   sudo udevadm control --reload-rules
+#   sudo udevadm trigger /dev/hailo0
+# install.sh does both for you.
+
+KERNEL=="hailo[0-9]*", SUBSYSTEM=="hailo_chardev", GROUP="ruvector-worker", MODE="0660"

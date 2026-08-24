@@ -6,6 +6,13 @@
 [![Status](https://img.shields.io/badge/status-experimental-orange)](#aktueller-validierungsstand)
 [![License: PolyForm Noncommercial 1.0.0](https://img.shields.io/badge/License-PolyForm%20Noncommercial%201.0.0-blue.svg)](LICENSE.md)
 
+
+Ein experimentelles 1TX-/4RX-WLAN-CSI-System, das Präsenz, Bewegung und neun
+feste Raumpositionen ohne Kamera untersucht und mmWave nur als unabhängige
+Referenz verwendet.
+
+<img src="images/esp32-s3-boards.jpeg" alt="Die fünf beschrifteten ESP32-S3-Boards des Observatory-Aufbaus: RX1 bis RX4 und TX" width="420">
+
 ## Projekt ansehen
 
 **[Observatory auf Stardance ansehen](https://stardance.hackclub.com/projects/25673)**
@@ -34,36 +41,42 @@ folgt.
 *Nach dem Intro der Serie
 [*Person of Interest*](https://en.wikipedia.org/wiki/Person_of_Interest_(TV_series)).*
 
-Ein experimentelles 1TX-/4RX-WLAN-CSI-System, das Präsenz, Bewegung und neun
-feste Raumpositionen ohne Kamera untersucht und mmWave nur als unabhängige
-Referenz verwendet.
-
-<img src="images/esp32-s3-boards.jpeg" alt="Die fünf beschrifteten ESP32-S3-Boards des Observatory-Aufbaus: RX1 bis RX4 und TX" width="420">
-
-
 ## Schnelleinstieg
 
-Dieses Repository enthält die Berichtsdokumentation und benötigt keinen Build:
+Dieses Repository enthält Dokumentation, Hardwaredateien und den vollständigen
+Observatory-Softwarestand:
 
 ```bash
 git clone https://github.com/Gerafftes/Observatory.git
 cd Observatory
 ```
 
-Für einen ersten reproduzierbaren Check öffnest du den technischen
-Wiedereinstieg und arbeitest die Setup-/Preflight-Gates durch. Dafür brauchst
-du keine lokale Runtime in diesem Dokumentations-Repository.
+Die Dokumentation kann direkt gelesen werden. UI und Backend liegen gemeinsam
+unter [`software/ruview/`](software/README.md). Ein Softwaretest ohne Hardware
+lässt sich so starten:
 
-Die drei wichtigsten Einstiegspunkte sind:
+```bash
+cd software/ruview/v2
+cargo run -p wifi-densepose-sensing-server --no-default-features -- \
+  --source simulate --http-port 3002 --ws-port 3001
+```
 
-1. [Aktueller D6-/mmWave-Arbeitsstand](08-aktueller-arbeitsstand-d6-und-position.md)
-2. [Ergebnisberichte](results/)
-3. [PCB-01-Fertigungsdaten](hardware/pcb-01/)
-4. [PCB-02-Fertigungsdaten und KiCad-Quellen](hardware/pcb-02/)
+Danach ist die Sensing-UI unter
+`http://127.0.0.1:3002/ui/index.html#sensing` erreichbar. Simulation bleibt
+`SOFTWARE-ONLY / UNVALIDATED` und ersetzt kein Hardware-Gate.
 
-Die verwendete RX-Firmware und der Sensing-Server stammen aus dem separaten
-Upstream-Projekt [ruvnet/RuView](https://github.com/ruvnet/RuView). Die lokalen
-Projektanpassungen sind unter
+Die wichtigsten Einstiegspunkte sind:
+
+1. [UI, Backend und Firmware](software/README.md)
+2. [Aktueller D6-/mmWave-Arbeitsstand](08-aktueller-arbeitsstand-d6-und-position.md)
+3. [Ergebnisberichte](results/)
+4. [PCB-01-Fertigungsdaten](hardware/pcb-01/)
+5. [PCB-02-Fertigungsdaten und KiCad-Quellen](hardware/pcb-02/)
+
+Die Software basiert auf [ruvnet/RuView](https://github.com/ruvnet/RuView), ist
+aber mit den Observatory-Anpassungen und den benötigten Unterprojekten direkt
+im Repository enthalten. Herkunft und festgeschriebene Quellstände stehen in
+[`software/README.md`](software/README.md); die Projektanpassungen sind unter
 [`06-ruview-anpassungen.md`](06-ruview-anpassungen.md) dokumentiert.
 
 ## Was Observatory kann
@@ -80,12 +93,15 @@ Projektanpassungen sind unter
 - Einen HLK-LD2450 als Kalibrierungs- und Referenzsensor verwenden, ohne seine
   Werte in den späteren WLAN-CSI-Prädiktor einzuspeisen.
 
-## Lokale Checks (optional)
+## Lokale Checks
 
-Dieses Dokumentations-Repository braucht keine lokale Runtime. Der vorhandene
-Offline-Auswertetest lässt sich mit Python 3 ausführen:
+Der enthaltene Softwarestand lässt sich aus dem Repository heraus prüfen:
 
 ```bash
+sh scripts/verify_observatory_source.sh
+node --test software/ruview/ui/tests/*.test.mjs
+cargo check --manifest-path software/ruview/v2/Cargo.toml \
+  -p wifi-densepose-sensing-server --no-default-features
 python3 -m unittest scripts/tests/test_evaluate_d5_replay.py
 ```
 
@@ -255,8 +271,6 @@ Die überarbeitete [PCB-02 mit KiCad-Quellen, Prüfberichten und Bestellarchiv](
 verwendet wieder SMD-Kondensatoren, Standard-Pinheader-Pads für den ESP32-C3
 und dieselben Außenmaße sowie Montagebohrungen wie PCB-01.
 
-<a href="hardware/pcb-02/"><img src="hardware/pcb-02/preview/PCB-02-reference.png" alt="PCB-02-Vorschau mit PCB-02- und @gerafftes-Beschriftung, ESP32-C3-Pads, SMD-Kondensatoren und LD2450-Anschluss" width="460"></a>
-
 Als Gehäuse für die ESP32-S3-Boards ist das externe MakerWorld-Modell
 [*ESP32 S3 Wroom Case*](https://makerworld.com/de/models/1456361-esp32-s3-wroom-case#profileId-1517915)
 vorgesehen. Wegen seiner MakerWorld Standard Digital File License wird die
@@ -276,20 +290,21 @@ STL nicht erneut im Repository bereitgestellt. Weitere Hinweise stehen unter
 | [`06-ruview-anpassungen.md`](06-ruview-anpassungen.md) | Lokale Änderungen an RuView |
 | [`07-screenshot-nachweise.md`](07-screenshot-nachweise.md) | Visuelle Nachweise und Fehlerbilder |
 | [`08-aktueller-arbeitsstand-d6-und-position.md`](08-aktueller-arbeitsstand-d6-und-position.md) | Verbindlicher D6-/mmWave-Wiedereinstieg |
+| [`software/`](software/README.md) | Vollständiger UI-, Backend- und Firmware-Quellstand mit Herkunftsnachweis |
 | [`results/`](results/) | Ausführliche Ergebnisberichte |
 | [`templates/messblatt.md`](templates/messblatt.md) | Vorlage für neue Messungen |
 
 ## Lizenz
 
-Dieses Projekt steht unter der
-[PolyForm Noncommercial License 1.0.0](LICENSE.md). Nutzung, Änderung und
-Weitergabe sind nur im Rahmen der dort definierten nichtkommerziellen Zwecke
-erlaubt.
+Die Observatory-eigenen Inhalte stehen unter der
+[PolyForm Noncommercial License 1.0.0](LICENSE.md). Der eingebettete
+RuView-Quellstand und seine vendierten Komponenten behalten ihre jeweiligen
+Lizenz- und Notice-Dateien unter [`software/ruview/`](software/ruview/).
 
 ## Credits
 
-- [ruvnet/RuView](https://github.com/ruvnet/RuView) stellt die Softwarebasis
-  für RX-Firmware und Sensing-Server bereit.
+- [ruvnet/RuView](https://github.com/ruvnet/RuView) ist die dokumentierte
+  Softwarebasis des eingebetteten UI-, Firmware- und Server-Quellstands.
 - [Espressif](https://www.espressif.com/en/products/socs/esp32) entwickelt die
   verwendeten ESP32-Plattformen.
 - Das ESP32-S3-WROOM-Gehäuse wurde von MakerWorld-Nutzer

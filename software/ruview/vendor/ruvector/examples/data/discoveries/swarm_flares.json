@@ -1,0 +1,58 @@
+[
+  {
+    "title": "Solar Flare C5.2 - AR14381",
+    "content": "Class: C5.2 | Begin: 2026-03-01T06:07Z | Peak: 2026-03-01T06:15Z | End: 2026-03-01T06:22Z | Source: N07E65 | Active Region: 14381 | Linked Events: 2026-03-01T07:24:00-CME-001 | Note: None",
+    "timestamp": "2026-03-01T06:07Z",
+    "source": "nasa_donki",
+    "confidence": 0.93
+  },
+  {
+    "title": "Solar Flare C5.9 - AR14381",
+    "content": "Class: C5.9 | Begin: 2026-03-01T07:30Z | Peak: 2026-03-01T07:49Z | End: 2026-03-01T08:03Z | Source: N10E65 | Active Region: 14381 | Linked Events: 2026-03-01T09:36:00-CME-001 | Note: None",
+    "timestamp": "2026-03-01T07:30Z",
+    "source": "nasa_donki",
+    "confidence": 0.93
+  },
+  {
+    "title": "Solar Flare C4.0 - AR14384",
+    "content": "Class: C4.0 | Begin: 2026-03-01T21:41Z | Peak: 2026-03-01T21:48Z | End: 2026-03-01T21:59Z | Source: N10E90 | Active Region: 14384 | Linked Events: 2026-03-01T22:15:00-CME-001 | Note: Occulted flare on NE limb from the newly numbered AR 14384 rotating on disk, so the location of the AR/flare is somewhat uncertain.",
+    "timestamp": "2026-03-01T21:41Z",
+    "source": "nasa_donki",
+    "confidence": 0.93
+  },
+  {
+    "title": "Solar Flare C2.0 - AR14387",
+    "content": "Class: C2.0 | Begin: 2026-03-08T15:02Z | Peak: 2026-03-08T15:07Z | End: 2026-03-08T15:12Z | Source: N08E68 | Active Region: 14387 | Linked Events: 2026-03-08T18:08:00-CME-001 | Note: None",
+    "timestamp": "2026-03-08T15:02Z",
+    "source": "nasa_donki",
+    "confidence": 0.93
+  },
+  {
+    "title": "Solar Flare C2.4 - AR14389",
+    "content": "Class: C2.4 | Begin: 2026-03-10T11:22Z | Peak: 2026-03-10T12:04Z | End: 2026-03-10T12:20Z | Source: N13E70 | Active Region: 14389 | Linked Events: 2026-03-10T12:24:00-CME-001 | Note: None",
+    "timestamp": "2026-03-10T11:22Z",
+    "source": "nasa_donki",
+    "confidence": 0.93
+  },
+  {
+    "title": "Solar Flare M1.1 - AR14384",
+    "content": "Class: M1.1 | Begin: 2026-03-13T09:40Z | Peak: 2026-03-13T09:55Z | End: 2026-03-13T10:05Z | Source: N10W70 | Active Region: 14384 | Linked Events: None | Note: None",
+    "timestamp": "2026-03-13T09:40Z",
+    "source": "nasa_donki",
+    "confidence": 0.93
+  },
+  {
+    "title": "Solar Flare C8.9 - AR14392",
+    "content": "Class: C8.9 | Begin: 2026-03-13T20:09Z | Peak: 2026-03-13T20:23Z | End: 2026-03-13T20:32Z | Source: S15E53 | Active Region: 14392 | Linked Events: 2026-03-13T20:48:00-CME-001 | Note: None",
+    "timestamp": "2026-03-13T20:09Z",
+    "source": "nasa_donki",
+    "confidence": 0.93
+  },
+  {
+    "title": "Solar Flare M1.0 - AR14392",
+    "content": "Class: M1.0 | Begin: 2026-03-15T09:21Z | Peak: 2026-03-15T09:39Z | End: 2026-03-15T09:52Z | Source: S15E35 | Active Region: 14392 | Linked Events: 2026-03-15T10:36:00-CME-001 | Note: None",
+    "timestamp": "2026-03-15T09:21Z",
+    "source": "nasa_donki",
+    "confidence": 0.93
+  }
+]

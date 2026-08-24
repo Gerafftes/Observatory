@@ -1,0 +1,402 @@
+[
+  {
+    "source_domain": "space-science",
+    "target_domain": "earth",
+    "target_title": "Equatorial Climate: 2026-03-09",
+    "target_id": "swarm_climate.json#1",
+    "ppr_score": 0.012096131106805895,
+    "confidence": 0.010886517996125306
+  },
+  {
+    "source_domain": "space-science",
+    "target_domain": "earth",
+    "target_title": "Equatorial Climate: 2026-03-08",
+    "target_id": "swarm_climate.json#0",
+    "ppr_score": 0.012079608654870021,
+    "confidence": 0.010871647789383019
+  },
+  {
+    "source_domain": "space-science",
+    "target_domain": "earth",
+    "target_title": "Equatorial Climate: 2026-03-20",
+    "target_id": "swarm_climate.json#12",
+    "ppr_score": 0.012023177796394051,
+    "confidence": 0.010820860016754646
+  },
+  {
+    "source_domain": "earth",
+    "target_domain": "research",
+    "target_title": "Martian concretion sizes predicted from two independently constrained inputs: atmospheric dust grain size and obliquity-forced wetting duration",
+    "target_id": "swarm_arxiv.json#9",
+    "ppr_score": 0.011871316790426793,
+    "confidence": 0.01092161144719265
+  },
+  {
+    "source_domain": "earth-science",
+    "target_domain": "misc",
+    "target_title": "Largest image of its kind shows hidden chemistry at the heart of the Milky Way",
+    "target_id": "swarm_eso.json#0",
+    "ppr_score": 0.011847293949549203,
+    "confidence": 0.011610348070558218
+  },
+  {
+    "source_domain": "space-science",
+    "target_domain": "earth",
+    "target_title": "M4.7 Deep Earthquake - south of the Kermadec Islands",
+    "target_id": "swarm_deep_earthquakes.json#2",
+    "ppr_score": 0.011745528983583914,
+    "confidence": 0.011510618403912235
+  },
+  {
+    "source_domain": "space-science",
+    "target_domain": "space",
+    "target_title": "Ultra-short-period planet: WASP-103 b",
+    "target_id": "swarm_extreme_exoplanets.json#22",
+    "ppr_score": 0.011731760450684671,
+    "confidence": 0.011145172428150437
+  },
+  {
+    "source_domain": "space-science",
+    "target_domain": "earth",
+    "target_title": "M4.5 Deep Earthquake - south of the Fiji Islands",
+    "target_id": "swarm_deep_earthquakes.json#23",
+    "ppr_score": 0.011731695292428557,
+    "confidence": 0.011497061386579986
+  },
+  {
+    "source_domain": "materials-physics",
+    "target_domain": "research",
+    "target_title": "Martian concretion sizes predicted from two independently constrained inputs: atmospheric dust grain size and obliquity-forced wetting duration",
+    "target_id": "swarm_arxiv.json#9",
+    "ppr_score": 0.011726547527636268,
+    "confidence": 0.010788423725425367
+  },
+  {
+    "source_domain": "space-science",
+    "target_domain": "culture",
+    "target_title": "Mammal Observation: Puma concolor",
+    "target_id": "swarm_biodiversity.json#6",
+    "ppr_score": 0.011711119111101632,
+    "confidence": 0.009954451244436387
+  },
+  {
+    "source_domain": "culture",
+    "target_domain": "space-science",
+    "target_title": "Cross-domain: Elevated solar activity coincides with dense NEO approach window",
+    "target_id": "space_discoveries.json#13",
+    "ppr_score": 0.011704205581665041,
+    "confidence": 0.009129280353698732
+  },
+  {
+    "source_domain": "space-science",
+    "target_domain": "space",
+    "target_title": "Ultra-short-period planet: WASP-19 b",
+    "target_id": "swarm_extreme_exoplanets.json#27",
+    "ppr_score": 0.011600737655591218,
+    "confidence": 0.011020700772811656
+  },
+  {
+    "source_domain": "space-science",
+    "target_domain": "earth",
+    "target_title": "M4.8 Deep Earthquake - south of the Fiji Islands",
+    "target_id": "swarm_deep_earthquakes.json#22",
+    "ppr_score": 0.011586859548077586,
+    "confidence": 0.011355122357116035
+  },
+  {
+    "source_domain": "materials-physics",
+    "target_domain": "space-science",
+    "target_title": "Active Region 14384: 12-day persistent activity spanning full solar disk transit",
+    "target_id": "space_discoveries.json#10",
+    "ppr_score": 0.01158152055358887,
+    "confidence": 0.010539183703765873
+  },
+  {
+    "source_domain": "earth-science",
+    "target_domain": "economics-finance",
+    "target_title": "Cross-Market Signal: Crypto Bear Market Coincides with Global Growth Fragmentation",
+    "target_id": "economics_discoveries.json#7",
+    "ppr_score": 0.011578286916363749,
+    "confidence": 0.009494195271418274
+  },
+  {
+    "source_domain": "misc",
+    "target_domain": "space-science",
+    "target_title": "Northern hemisphere solar activity dominance: 86% of flares from N07-N13 latitude band",
+    "target_id": "space_discoveries.json#11",
+    "ppr_score": 0.011573095001220706,
+    "confidence": 0.0098371307510376
+  },
+  {
+    "source_domain": "research",
+    "target_domain": "space-science",
+    "target_title": "Active Region 14384: 12-day persistent activity spanning full solar disk transit",
+    "target_id": "space_discoveries.json#10",
+    "ppr_score": 0.011573012252807621,
+    "confidence": 0.010531441150054935
+  },
+  {
+    "source_domain": "space",
+    "target_domain": "space-science",
+    "target_title": "Cross-domain: Elevated solar activity coincides with dense NEO approach window",
+    "target_id": "space_discoveries.json#13",
+    "ppr_score": 0.011568115317153934,
+    "confidence": 0.009023129947380068
+  },
+  {
+    "source_domain": "materials-physics",
+    "target_domain": "space-science",
+    "target_title": "ZTF J1828+2308 b: Ultra-short period brown dwarf companion completing orbit in 2.7 hours",
+    "target_id": "space_discoveries.json#1",
+    "ppr_score": 0.011568072769165043,
+    "confidence": 0.01064262694763184
+  },
+  {
+    "source_domain": "misc",
+    "target_domain": "space-science",
+    "target_title": "Active Region 14384: 12-day persistent activity spanning full solar disk transit",
+    "target_id": "space_discoveries.json#10",
+    "ppr_score": 0.011558007812500003,
+    "confidence": 0.010517787109375003
+  },
+  {
+    "source_domain": "earth",
+    "target_domain": "life-science",
+    "target_title": "Global COVID-19 Summary",
+    "target_id": "swarm_disease.json#0",
+    "ppr_score": 0.011464495255261638,
+    "confidence": 0.010088755824630242
+  },
+  {
+    "source_domain": "space-science",
+    "target_domain": "culture",
+    "target_title": "Mammal Observation: Puma concolor",
+    "target_id": "swarm_biodiversity.json#8",
+    "ppr_score": 0.0114574104437404,
+    "confidence": 0.00973879887717934
+  },
+  {
+    "source_domain": "earth",
+    "target_domain": "research",
+    "target_title": "Nobel Prize in Chemistry (2025)",
+    "target_id": "swarm_nobel.json#5",
+    "ppr_score": 0.011455813590715442,
+    "confidence": 0.010883022911179669
+  },
+  {
+    "source_domain": "materials-physics",
+    "target_domain": "earth",
+    "target_title": "M4.5 Deep Earthquake - south of the Fiji Islands",
+    "target_id": "swarm_deep_earthquakes.json#23",
+    "ppr_score": 0.011448962835937057,
+    "confidence": 0.011219983579218317
+  },
+  {
+    "source_domain": "earth-science",
+    "target_domain": "space-science",
+    "target_title": "CME burst pattern: 64 ejections in 14 days with March 7 and 13 as peak days",
+    "target_id": "space_discoveries.json#12",
+    "ppr_score": 0.011448941286168102,
+    "confidence": 0.01018955774468961
+  },
+  {
+    "source_domain": "earth-science",
+    "target_domain": "space-science",
+    "target_title": "TIC 241249530 b: Record eccentricity hot Jupiter on collision course with host star",
+    "target_id": "space_discoveries.json#0",
+    "ppr_score": 0.011447196293299202,
+    "confidence": 0.010874836478634242
+  },
+  {
+    "source_domain": "space-science",
+    "target_domain": "earth",
+    "target_title": "Equatorial Climate: 2026-03-16",
+    "target_id": "swarm_climate.json#8",
+    "ppr_score": 0.011445473099749092,
+    "confidence": 0.010300925789774183
+  },
+  {
+    "source_domain": "earth-science",
+    "target_domain": "space-science",
+    "target_title": "Active Region 14384: 12-day persistent activity spanning full solar disk transit",
+    "target_id": "space_discoveries.json#10",
+    "ppr_score": 0.011443644317626955,
+    "confidence": 0.01041371632904053
+  },
+  {
+    "source_domain": "misc",
+    "target_domain": "space-science",
+    "target_title": "CME burst pattern: 64 ejections in 14 days with March 7 and 13 as peak days",
+    "target_id": "space_discoveries.json#12",
+    "ppr_score": 0.011442152258682255,
+    "confidence": 0.010183515510227207
+  },
+  {
+    "source_domain": "technology",
+    "target_domain": "space-science",
+    "target_title": "CME burst pattern: 64 ejections in 14 days with March 7 and 13 as peak days",
+    "target_id": "space_discoveries.json#12",
+    "ppr_score": 0.01144200491333008,
+    "confidence": 0.010183384372863771
+  },
+  {
+    "source_domain": "culture",
+    "target_domain": "space-science",
+    "target_title": "HD 143811 AB b: Exoplanet with 320-year orbital period detected via imaging",
+    "target_id": "space_discoveries.json#15",
+    "ppr_score": 0.011440366031074529,
+    "confidence": 0.009838714786724094
+  },
+  {
+    "source_domain": "economics-finance",
+    "target_domain": "space-science",
+    "target_title": "CME burst pattern: 64 ejections in 14 days with March 7 and 13 as peak days",
+    "target_id": "space_discoveries.json#12",
+    "ppr_score": 0.011440240737915042,
+    "confidence": 0.010181814256744389
+  },
+  {
+    "source_domain": "culture",
+    "target_domain": "economics-finance",
+    "target_title": "Cross-Market Signal: Crypto Bear Market Coincides with Global Growth Fragmentation",
+    "target_id": "economics_discoveries.json#7",
+    "ppr_score": 0.011438706396865847,
+    "confidence": 0.009379739245429994
+  },
+  {
+    "source_domain": "earth",
+    "target_domain": "research",
+    "target_title": "Nobel Prize in Literature (2025)",
+    "target_id": "swarm_nobel.json#3",
+    "ppr_score": 0.011438685382270816,
+    "confidence": 0.010866751113157274
+  },
+  {
+    "source_domain": "earth",
+    "target_domain": "space-science",
+    "target_title": "2026 exoplanet discovery surge dominated by microlensing and radial velocity methods",
+    "target_id": "space_discoveries.json#4",
+    "ppr_score": 0.011438685382270816,
+    "confidence": 0.010066043136398318
+  },
+  {
+    "source_domain": "academic-research",
+    "target_domain": "space-science",
+    "target_title": "Cross-domain: Elevated solar activity coincides with dense NEO approach window",
+    "target_id": "space_discoveries.json#13",
+    "ppr_score": 0.011433537597656253,
+    "confidence": 0.008918159326171878
+  },
+  {
+    "source_domain": "academic-research",
+    "target_domain": "space-science",
+    "target_title": "Hazardous asteroid cluster: 8 PHAs tracked in 6-day window including kilometer-class objects",
+    "target_id": "space_discoveries.json#7",
+    "ppr_score": 0.011431877441406254,
+    "confidence": 0.010403008471679692
+  },
+  {
+    "source_domain": "technology",
+    "target_domain": "economics-finance",
+    "target_title": "Cross-Market Signal: Crypto Bear Market Coincides with Global Growth Fragmentation",
+    "target_id": "economics_discoveries.json#7",
+    "ppr_score": 0.011430217285156252,
+    "confidence": 0.009372778173828126
+  },
+  {
+    "source_domain": "economics-finance",
+    "target_domain": "misc",
+    "target_title": "Astronomers surprised by mysterious shock wave around dead star",
+    "target_id": "swarm_eso.json#2",
+    "ppr_score": 0.011430196533203128,
+    "confidence": 0.011201592602539065
+  },
+  {
+    "source_domain": "medical-genomics",
+    "target_domain": "academic-research",
+    "target_title": "Energy-Based and Feature-Matching Methods Challenge Cross-Entropy Dominance",
+    "target_id": "academic_discoveries.json#6",
+    "ppr_score": 0.011430196533203128,
+    "confidence": 0.009715667053222658
+  },
+  {
+    "source_domain": "research",
+    "target_domain": "technology",
+    "target_title": "Computational Investigation of Wave/Mode Structure and Multiplicity in Rotating Detonation Rocket Engines",
+    "target_id": "swarm_nasa_tech.json#9",
+    "ppr_score": 0.011426896972656253,
+    "confidence": 0.010284207275390629
+  },
+  {
+    "source_domain": "economics-finance",
+    "target_domain": "space-science",
+    "target_title": "Cross-domain: Elevated solar activity coincides with dense NEO approach window",
+    "target_id": "space_discoveries.json#13",
+    "ppr_score": 0.011316129052093032,
+    "confidence": 0.008826580660632565
+  },
+  {
+    "source_domain": "earth",
+    "target_domain": "research",
+    "target_title": "Nobel Prize in Economic Sciences (2025)",
+    "target_id": "swarm_nobel.json#4",
+    "ppr_score": 0.011314383793299201,
+    "confidence": 0.010748664603634241
+  },
+  {
+    "source_domain": "space-science",
+    "target_domain": "space",
+    "target_title": "Ultra-short-period planet: LTT 9779 b",
+    "target_id": "swarm_extreme_exoplanets.json#7",
+    "ppr_score": 0.01130929799537659,
+    "confidence": 0.010743833095607759
+  },
+  {
+    "source_domain": "economics-finance",
+    "target_domain": "space-science",
+    "target_title": "Northern hemisphere solar activity dominance: 86% of flares from N07-N13 latitude band",
+    "target_id": "space_discoveries.json#11",
+    "ppr_score": 0.011309277246665958,
+    "confidence": 0.009612885659666065
+  },
+  {
+    "source_domain": "materials-physics",
+    "target_domain": "earth",
+    "target_title": "M4.8 Deep Earthquake - south of the Fiji Islands",
+    "target_id": "swarm_deep_earthquakes.json#22",
+    "ppr_score": 0.011307617615740303,
+    "confidence": 0.011081465263425497
+  },
+  {
+    "source_domain": "culture",
+    "target_domain": "space-science",
+    "target_title": "Active Region 14384: 12-day persistent activity spanning full solar disk transit",
+    "target_id": "space_discoveries.json#10",
+    "ppr_score": 0.011307491012573246,
+    "confidence": 0.010289816821441655
+  },
+  {
+    "source_domain": "space-science",
+    "target_domain": "space",
+    "target_title": "Ultra-short-period planet: NGTS-10 b",
+    "target_id": "swarm_extreme_exoplanets.json#10",
+    "ppr_score": 0.011305894156265262,
+    "confidence": 0.010740599448451998
+  },
+  {
+    "source_domain": "space-science",
+    "target_domain": "earth",
+    "target_title": "M4.9 Deep Earthquake - south of the Fiji Islands",
+    "target_id": "swarm_deep_earthquakes.json#18",
+    "ppr_score": 0.011305872882270817,
+    "confidence": 0.011079755424625401
+  },
+  {
+    "source_domain": "materials-physics",
+    "target_domain": "space-science",
+    "target_title": "NEO close approach: (2024 CW2)",
+    "target_id": "live_space_discoveries.json#18",
+    "ppr_score": 0.011305872882270817,
+    "confidence": 0.009044698305816654
+  }
+]

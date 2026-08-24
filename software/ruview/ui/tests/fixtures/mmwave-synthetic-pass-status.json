@@ -1,0 +1,33 @@
+{
+  "udp_port": 15010,
+  "state": "valid",
+  "reason": "Synthetic full-path test completed.",
+  "configured": true,
+  "setup_sealed": true,
+  "node_id": "radar-synthetic-01",
+  "mode": "reference",
+  "packet_age_ms": 5,
+  "target_position_mm": [3200, 1600],
+  "packets_received": 180,
+  "packets_rejected": 0,
+  "uart_bytes_received": 5400,
+  "radar_frames_valid": 180,
+  "udp_packets_sent": 180,
+  "udp_send_failures": 0,
+  "coverage_cells": 81,
+  "zones": [
+    {"id":"P01","center_mm":[0,0],"training_blocks":6,"blind_visits":2},
+    {"id":"P02","center_mm":[800,0],"training_blocks":6,"blind_visits":2},
+    {"id":"P03","center_mm":[1600,0],"training_blocks":6,"blind_visits":2},
+    {"id":"P04","center_mm":[2400,0],"training_blocks":6,"blind_visits":2},
+    {"id":"P05","center_mm":[3200,0],"training_blocks":6,"blind_visits":2},
+    {"id":"P06","center_mm":[0,800],"training_blocks":6,"blind_visits":2},
+    {"id":"P07","center_mm":[800,800],"training_blocks":6,"blind_visits":2},
+    {"id":"P08","center_mm":[1600,800],"training_blocks":6,"blind_visits":2},
+    {"id":"P09","center_mm":[2400,800],"training_blocks":6,"blind_visits":2}
+  ],
+  "position_index_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "position_live_approved": true,
+  "blind_report_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "blind_verdict": "PASS"
+}

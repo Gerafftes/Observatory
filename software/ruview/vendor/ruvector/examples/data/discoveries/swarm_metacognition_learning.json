@@ -1,0 +1,168 @@
+{
+  "domain": "metacognition-learning",
+  "generated": "2026-03-16T14:00:00Z",
+  "entries": [
+    {
+      "title": "MAML — Model-Agnostic Meta-Learning",
+      "category": "architecture",
+      "content": "MAML (Finn et al., 2017) trains model initializations that adapt to new tasks with few gradient steps. The bi-level optimization finds parameters that, after one or few gradient updates on a new task's support set, achieve low loss on the query set. Variants include ANIL (almost no inner loop), Meta-SGD (learned learning rates), and iMAML (implicit differentiation for memory efficiency). MAML applies to classification, regression, reinforcement learning, and has inspired the modern few-shot learning paradigm.",
+      "tags": ["MAML", "meta-learning", "few-shot", "bi-level-optimization", "task-adaptation"],
+      "confidence": 0.93,
+      "novelty": 0.78,
+      "source": "research"
+    },
+    {
+      "title": "Neural Architecture Search — Automating Network Design",
+      "category": "architecture",
+      "content": "NAS automates the design of neural network architectures. Zoph and Le (2017) used RL to search over 10,000 GPU-days. DARTS (differentiable architecture search) reduces cost to single GPU-days through continuous relaxation. Weight-sharing methods (ENAS, One-Shot) amortize training across candidates. Hardware-aware NAS (MnasNet, EfficientNet) optimizes for latency on target devices. The resulting architectures often outperform human-designed ones, suggesting that architectural choices contain more information than typically assumed.",
+      "tags": ["NAS", "architecture-search", "DARTS", "AutoML", "EfficientNet"],
+      "confidence": 0.91,
+      "novelty": 0.76,
+      "source": "research"
+    },
+    {
+      "title": "Curriculum Learning — Ordering Training Data for Better Learning",
+      "category": "pattern",
+      "content": "Curriculum learning presents training examples in meaningful order — typically from easy to hard — mimicking human educational progression. Bengio et al. (2009) showed this improves both convergence speed and generalization. Self-paced learning lets the model automatically determine difficulty. Anti-curriculum (hard examples first) works for some tasks. Competence-based curricula adapt to the learner's current ability. Data mixing curricula for LLMs optimize the proportion of code/text/math during training phases.",
+      "tags": ["curriculum-learning", "self-paced", "training-order", "Bengio", "competence-based"],
+      "confidence": 0.88,
+      "novelty": 0.77,
+      "source": "research"
+    },
+    {
+      "title": "Self-Play — Learning from Self-Competition",
+      "category": "architecture",
+      "content": "Self-play trains agents by competing against copies or past versions of themselves, creating an auto-curriculum of increasing difficulty. AlphaGo Zero mastered Go from scratch through pure self-play MCTS. AlphaZero generalized to chess and shogi. OpenAI Five used self-play for Dota 2. Self-play in language models (constitutional AI, debate) provides scalable oversight. The key insight: in two-player zero-sum games, the Nash equilibrium discovered through self-play converges to optimal play without human knowledge.",
+      "tags": ["self-play", "AlphaZero", "MCTS", "auto-curriculum", "Nash-equilibrium"],
+      "confidence": 0.92,
+      "novelty": 0.75,
+      "source": "research"
+    },
+    {
+      "title": "Intrinsic Motivation in Reinforcement Learning",
+      "category": "pattern",
+      "content": "Intrinsic motivation provides internal reward signals for exploration independent of extrinsic task rewards. Count-based exploration bonuses reward visiting novel states. Prediction error surprise (ICM — Intrinsic Curiosity Module) rewards states where the forward model errs. Random Network Distillation (RND) uses prediction error on fixed random features. Information gain (empowerment, mutual information) maximizes the agent's channel capacity to the environment. These methods solve sparse-reward problems like Montezuma's Revenge.",
+      "tags": ["intrinsic-motivation", "curiosity", "ICM", "RND", "exploration-bonus"],
+      "confidence": 0.89,
+      "novelty": 0.80,
+      "source": "research"
+    },
+    {
+      "title": "Hindsight Experience Replay — Learning from Failure",
+      "category": "solution",
+      "content": "HER (Andrychowicz et al., 2017) transforms failed episodes into successful training data by retroactively replacing the desired goal with the actually achieved state. A robot arm that misses the target block learns 'how to reach the position I actually reached.' This dramatically improves sample efficiency in goal-conditioned RL with sparse rewards. Universal Value Function Approximators extend this to continuous goal spaces. HER enables learning complex robotic manipulation from scratch without reward shaping.",
+      "tags": ["hindsight-experience-replay", "goal-conditioned", "sparse-reward", "sample-efficiency", "robotic-manipulation"],
+      "confidence": 0.90,
+      "novelty": 0.79,
+      "source": "research"
+    },
+    {
+      "title": "DreamerV3 — World Model for Universal RL",
+      "category": "architecture",
+      "content": "DreamerV3 (Hafner et al., 2023) learns a world model from pixels and trains a policy entirely within the learned model's imagination. It masters diverse domains (Atari, Minecraft diamond, DMC, Crafter) with a single algorithm and hyperparameters. Key innovations: symlog predictions handle varying reward scales, discrete representations prevent posterior collapse, and free bits prevent KL vanishing. The world model uses RSSM (Recurrent State Space Model) combining deterministic and stochastic states for rich environment modeling.",
+      "tags": ["DreamerV3", "world-model", "model-based-rl", "RSSM", "imagination-training"],
+      "confidence": 0.91,
+      "novelty": 0.82,
+      "source": "research"
+    },
+    {
+      "title": "MuZero — Planning Without a Given Model",
+      "category": "architecture",
+      "content": "MuZero (Schrittwieser et al., 2020) combines the benefits of model-based planning and model-free RL by learning a dynamics model that predicts only what's relevant for planning: rewards, values, and policy. Unlike AlphaZero which uses known game rules, MuZero learns the rules implicitly. It achieves superhuman performance in Go, chess, shogi, and Atari. The learned model doesn't reconstruct observations — it captures abstract planning-relevant dynamics, demonstrating that full environment reconstruction is unnecessary.",
+      "tags": ["MuZero", "learned-model", "planning", "abstract-dynamics", "DeepMind"],
+      "confidence": 0.92,
+      "novelty": 0.80,
+      "source": "research"
+    },
+    {
+      "title": "Few-Shot Learning — Learning from Minimal Data",
+      "category": "pattern",
+      "content": "Few-shot learning aims to classify new categories from 1-5 examples. Metric learning approaches (Prototypical Networks, Matching Networks) compare query embeddings to class prototypes. Optimization-based methods (MAML, Reptile) learn fast-adapting initializations. Hallucination methods augment the few examples with generated samples. In-context learning in LLMs achieves few-shot performance through demonstration prompts without weight updates. The gap between few-shot and full-data performance continues to narrow with scale.",
+      "tags": ["few-shot-learning", "prototypical-networks", "metric-learning", "in-context-learning", "low-data"],
+      "confidence": 0.91,
+      "novelty": 0.74,
+      "source": "research"
+    },
+    {
+      "title": "Continual Learning — Avoiding Catastrophic Forgetting",
+      "category": "pattern",
+      "content": "Continual learning enables neural networks to learn sequentially without forgetting previous knowledge. EWC (Elastic Weight Consolidation) penalizes changes to weights important for past tasks using Fisher information. PackNet isolates subnetworks for each task. Progressive Neural Networks add lateral connections to frozen columns. Experience replay stores and replays past examples. Architectural methods (dynamic networks, hypernetworks) allocate new capacity for new tasks. The stability-plasticity dilemma remains fundamental.",
+      "tags": ["continual-learning", "catastrophic-forgetting", "EWC", "experience-replay", "stability-plasticity"],
+      "confidence": 0.90,
+      "novelty": 0.77,
+      "source": "research"
+    },
+    {
+      "title": "Gato — Generalist Agent Across Domains",
+      "category": "architecture",
+      "content": "DeepMind's Gato (2022) is a single transformer that plays Atari, captions images, chats, controls robots, and stacks blocks — 604 distinct tasks with one set of weights. All modalities (images, text, joint torques, button presses) are tokenized into a flat sequence. While not state-of-the-art on any individual task, Gato demonstrates that a single architecture can handle diverse domains. This challenges the assumption that specialized architectures are necessary and suggests scaling may yield truly general agents.",
+      "tags": ["Gato", "generalist-agent", "multi-task", "multi-modal", "DeepMind"],
+      "confidence": 0.88,
+      "novelty": 0.80,
+      "source": "research"
+    },
+    {
+      "title": "Active Learning — Intelligent Data Selection",
+      "category": "solution",
+      "content": "Active learning selects the most informative unlabeled examples for annotation, reducing labeling cost by 50-90%. Uncertainty sampling queries points where the model is least confident. Query-by-committee uses disagreement among an ensemble. Expected model change selects examples that would most alter the model. Batch active learning selects diverse, informative batches. Deep active learning combines representation learning with acquisition functions. CoreSet approaches select examples that cover the feature space. Applications span medical imaging, NLP, and autonomous driving.",
+      "tags": ["active-learning", "data-selection", "uncertainty-sampling", "query-strategy", "annotation-efficiency"],
+      "confidence": 0.90,
+      "novelty": 0.73,
+      "source": "research"
+    },
+    {
+      "title": "Reinforcement Learning from Human Feedback (RLHF)",
+      "category": "architecture",
+      "content": "RLHF trains language models to align with human preferences through three stages: supervised fine-tuning, reward model training from human comparisons, and PPO optimization against the reward model. InstructGPT demonstrated that RLHF dramatically improves helpfulness and safety. DPO (Direct Preference Optimization) simplifies by eliminating the separate reward model. RLAIF uses AI feedback instead of human labels. KTO (Kahneman-Tversky Optimization) needs only binary good/bad labels rather than comparisons.",
+      "tags": ["RLHF", "preference-learning", "DPO", "alignment", "reward-model"],
+      "confidence": 0.93,
+      "novelty": 0.75,
+      "source": "research"
+    },
+    {
+      "title": "Transfer Learning — Knowledge Reuse Across Domains",
+      "category": "pattern",
+      "content": "Transfer learning leverages knowledge from source tasks to improve target task performance. Pre-trained vision models (ImageNet features) transfer to medical imaging, satellite analysis, and manufacturing inspection. Language model pre-training (BERT, GPT) created the foundation model paradigm. Domain adaptation handles distribution shift between source and target. Negative transfer occurs when source knowledge hurts target performance. Multi-task learning simultaneously optimizes shared representations. Transfer learning reduces data requirements by orders of magnitude.",
+      "tags": ["transfer-learning", "domain-adaptation", "pre-training", "foundation-models", "knowledge-reuse"],
+      "confidence": 0.94,
+      "novelty": 0.70,
+      "source": "research"
+    },
+    {
+      "title": "Distillation — Compressing Knowledge Into Smaller Models",
+      "category": "solution",
+      "content": "Knowledge distillation trains a small student model to mimic a large teacher's soft predictions (Hinton et al., 2015). Dark knowledge in soft labels conveys inter-class similarities invisible in hard labels. Self-distillation improves a model by distilling from itself. Feature distillation matches intermediate representations. Online distillation trains teacher and student simultaneously. LLM distillation creates smaller, faster models retaining most capability. Distillation enables deployment on edge devices with 10-100x compression.",
+      "tags": ["knowledge-distillation", "model-compression", "soft-labels", "Hinton", "edge-deployment"],
+      "confidence": 0.92,
+      "novelty": 0.72,
+      "source": "research"
+    },
+    {
+      "title": "Neuroevolution — Evolving Neural Networks",
+      "category": "architecture",
+      "content": "Neuroevolution uses evolutionary algorithms to optimize neural network weights, architectures, or both. NEAT (NeuroEvolution of Augmenting Topologies) evolves network topology through complexification. OpenAI showed evolution strategies competitive with RL for locomotion. Quality-Diversity algorithms (MAP-Elites) maintain diverse solutions rather than single optima. Population-Based Training (PBT) evolves hyperparameters during training. Large-scale neuroevolution (Uber AI) evolved networks with millions of parameters using novelty search.",
+      "tags": ["neuroevolution", "NEAT", "evolution-strategies", "MAP-Elites", "quality-diversity"],
+      "confidence": 0.87,
+      "novelty": 0.78,
+      "source": "research"
+    },
+    {
+      "title": "Causal Inference for Machine Learning",
+      "category": "pattern",
+      "content": "Causal inference moves ML beyond correlation to understand cause-effect relationships. Pearl's do-calculus formalizes interventional reasoning. Instrumental variables and natural experiments identify causal effects from observational data. Causal forests (Athey, Imbens) estimate heterogeneous treatment effects. Causal discovery algorithms (PC, GES, NOTEARS) learn causal graphs from data. Invariant Risk Minimization uses causal structure for domain generalization. Causal ML is essential for decision-making, fairness, and robust predictions.",
+      "tags": ["causal-inference", "do-calculus", "Pearl", "causal-discovery", "treatment-effects"],
+      "confidence": 0.90,
+      "novelty": 0.79,
+      "source": "research"
+    },
+    {
+      "title": "Federated Learning — Privacy-Preserving Distributed ML",
+      "category": "architecture",
+      "content": "Federated learning trains models across decentralized data sources without centralizing raw data. FedAvg (McMahan, 2017) averages locally-trained model updates. Challenges include non-IID data distribution, communication efficiency, and Byzantine participants. Differential privacy (DP-SGD) provides formal privacy guarantees. Secure aggregation prevents the server from seeing individual updates. Personalized federated learning adapts global models to local distributions. Google Gboard and Apple Siri use federated learning for keyboard prediction and voice recognition.",
+      "tags": ["federated-learning", "privacy-preserving", "FedAvg", "differential-privacy", "decentralized-ml"],
+      "confidence": 0.91,
+      "novelty": 0.75,
+      "source": "research"
+    }
+  ]
+}

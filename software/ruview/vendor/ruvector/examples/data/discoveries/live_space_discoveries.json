@@ -1,0 +1,338 @@
+[
+  {
+    "title": "Anomalous exoplanet: KMT-2020-BLG-0202L b (2σ mass outlier)",
+    "content": "Planet KMT-2020-BLG-0202L b has mass 12.28000000 Mj (2σ from mean 2.32±4.9). Period: 0d. Ecc: 0. Teq: 0K. Method: Microlensing.",
+    "category": "anomaly",
+    "tags": [
+      "space",
+      "exoplanet",
+      "anomaly",
+      "mass-outlier",
+      "Microlensing"
+    ],
+    "domain": "space-science",
+    "source_api": "NASA Exoplanet Archive TAP",
+    "timestamp": "2026-03-15T19:25:16Z",
+    "confidence": 0.40588055059763894,
+    "data_points": 318
+  },
+  {
+    "title": "Anomalous exoplanet: HIP 54515 b (3.1σ mass outlier)",
+    "content": "Planet HIP 54515 b has mass 17.70000000 Mj (3.1σ from mean 2.32±4.9). Period: 33000.00000000000d. Ecc: 0.420000. Teq: 0K. Method: Imaging.",
+    "category": "anomaly",
+    "tags": [
+      "space",
+      "exoplanet",
+      "anomaly",
+      "mass-outlier",
+      "Imaging"
+    ],
+    "domain": "space-science",
+    "source_api": "NASA Exoplanet Archive TAP",
+    "timestamp": "2026-03-15T19:25:16Z",
+    "confidence": 0.6267910237827719,
+    "data_points": 318
+  },
+  {
+    "title": "Anomalous exoplanet: TOI-5422 b (5.2σ mass outlier)",
+    "content": "Planet TOI-5422 b has mass 28.00000000 Mj (5.2σ from mean 2.32±4.9). Period: 5.37721900000d. Ecc: 0.094000. Teq: 1369.00K. Method: Transit.",
+    "category": "anomaly",
+    "tags": [
+      "space",
+      "exoplanet",
+      "anomaly",
+      "mass-outlier",
+      "Transit"
+    ],
+    "domain": "space-science",
+    "source_api": "NASA Exoplanet Archive TAP",
+    "timestamp": "2026-03-15T19:25:16Z",
+    "confidence": 0.99,
+    "data_points": 318
+  },
+  {
+    "title": "Anomalous exoplanet: KOINTREAU-4 b (2.6σ mass outlier)",
+    "content": "Planet KOINTREAU-4 b has mass 15.30000000 Mj (2.6σ from mean 2.32±4.9). Period: 0d. Ecc: 0. Teq: 0K. Method: Imaging.",
+    "category": "anomaly",
+    "tags": [
+      "space",
+      "exoplanet",
+      "anomaly",
+      "mass-outlier",
+      "Imaging"
+    ],
+    "domain": "space-science",
+    "source_api": "NASA Exoplanet Archive TAP",
+    "timestamp": "2026-03-15T19:25:16Z",
+    "confidence": 0.5289708880550379,
+    "data_points": 318
+  },
+  {
+    "title": "Anomalous exoplanet: Gaia-5 b (3.7σ mass outlier)",
+    "content": "Planet Gaia-5 b has mass 20.87000000 Mj (3.7σ from mean 2.32±4.9). Period: 358.62000000000d. Ecc: 0.642300. Teq: 0K. Method: Astrometry.",
+    "category": "anomaly",
+    "tags": [
+      "space",
+      "exoplanet",
+      "anomaly",
+      "mass-outlier",
+      "Astrometry"
+    ],
+    "domain": "space-science",
+    "source_api": "NASA Exoplanet Archive TAP",
+    "timestamp": "2026-03-15T19:25:16Z",
+    "confidence": 0.755995119723154,
+    "data_points": 318
+  },
+  {
+    "title": "Anomalous exoplanet: ZTF J1230-2655 b (4σ mass outlier)",
+    "content": "Planet ZTF J1230-2655 b has mass 22.10000000 Mj (4σ from mean 2.32±4.9). Period: 0.23597766000d. Ecc: 0. Teq: 0K. Method: Transit.",
+    "category": "anomaly",
+    "tags": [
+      "space",
+      "exoplanet",
+      "anomaly",
+      "mass-outlier",
+      "Transit"
+    ],
+    "domain": "space-science",
+    "source_api": "NASA Exoplanet Archive TAP",
+    "timestamp": "2026-03-15T19:25:16Z",
+    "confidence": 0.806127939283618,
+    "data_points": 318
+  },
+  {
+    "title": "Anomalous exoplanet: ZTF J1828+2308 b (3.6σ mass outlier)",
+    "content": "Planet ZTF J1828+2308 b has mass 20.00000000 Mj (3.6σ from mean 2.32±4.9). Period: 0.11200670000d. Ecc: 0. Teq: 0K. Method: Transit.",
+    "category": "anomaly",
+    "tags": [
+      "space",
+      "exoplanet",
+      "anomaly",
+      "mass-outlier",
+      "Transit"
+    ],
+    "domain": "space-science",
+    "source_api": "NASA Exoplanet Archive TAP",
+    "timestamp": "2026-03-15T19:25:16Z",
+    "confidence": 0.7205353205218505,
+    "data_points": 318
+  },
+  {
+    "title": "Anomalous exoplanet: HD 87816 c (2σ mass outlier)",
+    "content": "Planet HD 87816 c has mass 12.20000000 Mj (2σ from mean 2.32±4.9). Period: 7596.00000000000d. Ecc: 0.190000. Teq: 0K. Method: Radial Velocity.",
+    "category": "anomaly",
+    "tags": [
+      "space",
+      "exoplanet",
+      "anomaly",
+      "mass-outlier",
+      "Radial Velocity"
+    ],
+    "domain": "space-science",
+    "source_api": "NASA Exoplanet Archive TAP",
+    "timestamp": "2026-03-15T19:25:16Z",
+    "confidence": 0.40261987940671445,
+    "data_points": 318
+  },
+  {
+    "title": "Anomalous exoplanet: TOI-5882 b (4σ mass outlier)",
+    "content": "Planet TOI-5882 b has mass 22.01000000 Mj (4σ from mean 2.32±4.9). Period: 7.14897200000d. Ecc: 0.033900. Teq: 1515.00K. Method: Transit.",
+    "category": "anomaly",
+    "tags": [
+      "space",
+      "exoplanet",
+      "anomaly",
+      "mass-outlier",
+      "Transit"
+    ],
+    "domain": "space-science",
+    "source_api": "NASA Exoplanet Archive TAP",
+    "timestamp": "2026-03-15T19:25:16Z",
+    "confidence": 0.8024596841938278,
+    "data_points": 318
+  },
+  {
+    "title": "Anomalous exoplanet: TOI-5882 b (4.4σ mass outlier)",
+    "content": "Planet TOI-5882 b has mass 24.29000000 Mj (4.4σ from mean 2.32±4.9). Period: 7.14897300000d. Ecc: 0.033200. Teq: 1537.00K. Method: Transit.",
+    "category": "anomaly",
+    "tags": [
+      "space",
+      "exoplanet",
+      "anomaly",
+      "mass-outlier",
+      "Transit"
+    ],
+    "domain": "space-science",
+    "source_api": "NASA Exoplanet Archive TAP",
+    "timestamp": "2026-03-15T19:25:16Z",
+    "confidence": 0.8953888131351754,
+    "data_points": 318
+  },
+  {
+    "title": "Anomalous exoplanet: TOI-201 c (2.4σ mass outlier)",
+    "content": "Planet TOI-201 c has mass 14.20000000 Mj (2.4σ from mean 2.32±4.9). Period: 2800.00000000000d. Ecc: 0.643000. Teq: 0K. Method: Transit Timing Variations.",
+    "category": "anomaly",
+    "tags": [
+      "space",
+      "exoplanet",
+      "anomaly",
+      "mass-outlier",
+      "Transit Timing Variations"
+    ],
+    "domain": "space-science",
+    "source_api": "NASA Exoplanet Archive TAP",
+    "timestamp": "2026-03-15T19:25:16Z",
+    "confidence": 0.4841366591798263,
+    "data_points": 318
+  },
+  {
+    "title": "Anomalous exoplanet: KMT-2024-BLG-0404L b (5σ mass outlier)",
+    "content": "Planet KMT-2024-BLG-0404L b has mass 27.24000000 Mj (5σ from mean 2.32±4.9). Period: 0d. Ecc: 0. Teq: 0K. Method: Microlensing.",
+    "category": "anomaly",
+    "tags": [
+      "space",
+      "exoplanet",
+      "anomaly",
+      "mass-outlier",
+      "Microlensing"
+    ],
+    "domain": "space-science",
+    "source_api": "NASA Exoplanet Archive TAP",
+    "timestamp": "2026-03-15T19:25:16Z",
+    "confidence": 0.99,
+    "data_points": 318
+  },
+  {
+    "title": "Anomalous exoplanet: BEBOP-4 AB b (4.8σ mass outlier)",
+    "content": "Planet BEBOP-4 AB b has mass 26.30000000 Mj (4.8σ from mean 2.32±4.9). Period: 1823.50000000000d. Ecc: 0.428000. Teq: 0K. Method: Radial Velocity.",
+    "category": "anomaly",
+    "tags": [
+      "space",
+      "exoplanet",
+      "anomaly",
+      "mass-outlier",
+      "Radial Velocity"
+    ],
+    "domain": "space-science",
+    "source_api": "NASA Exoplanet Archive TAP",
+    "timestamp": "2026-03-15T19:25:16Z",
+    "confidence": 0.9773131768071526,
+    "data_points": 318
+  },
+  {
+    "title": "Anomalous exoplanet: V2376 Ori b (3.6σ mass outlier)",
+    "content": "Planet V2376 Ori b has mass 20.00000000 Mj (3.6σ from mean 2.32±4.9). Period: 0d. Ecc: 0. Teq: 2100.00K. Method: Imaging.",
+    "category": "anomaly",
+    "tags": [
+      "space",
+      "exoplanet",
+      "anomaly",
+      "mass-outlier",
+      "Imaging"
+    ],
+    "domain": "space-science",
+    "source_api": "NASA Exoplanet Archive TAP",
+    "timestamp": "2026-03-15T19:25:16Z",
+    "confidence": 0.7205353205218505,
+    "data_points": 318
+  },
+  {
+    "title": "Anomalous exoplanet: HD 128717 b (3.5σ mass outlier)",
+    "content": "Planet HD 128717 b has mass 19.80000000 Mj (3.5σ from mean 2.32±4.9). Period: 3420.00000000000d. Ecc: 0.850000. Teq: 0K. Method: Astrometry.",
+    "category": "anomaly",
+    "tags": [
+      "space",
+      "exoplanet",
+      "anomaly",
+      "mass-outlier",
+      "Astrometry"
+    ],
+    "domain": "space-science",
+    "source_api": "NASA Exoplanet Archive TAP",
+    "timestamp": "2026-03-15T19:25:16Z",
+    "confidence": 0.7123836425445392,
+    "data_points": 318
+  },
+  {
+    "title": "Anomalous exoplanet: KMT-2024-BLG-1005L b (3.8σ mass outlier)",
+    "content": "Planet KMT-2024-BLG-1005L b has mass 21.00000000 Mj (3.8σ from mean 2.32±4.9). Period: 0d. Ecc: 0. Teq: 0K. Method: Microlensing.",
+    "category": "anomaly",
+    "tags": [
+      "space",
+      "exoplanet",
+      "anomaly",
+      "mass-outlier",
+      "Microlensing"
+    ],
+    "domain": "space-science",
+    "source_api": "NASA Exoplanet Archive TAP",
+    "timestamp": "2026-03-15T19:25:16Z",
+    "confidence": 0.7612937104084064,
+    "data_points": 318
+  },
+  {
+    "title": "NEO close approach: (2007 EG)",
+    "content": "Asteroid (2007 EG) passes Earth at 1712752.820333085 km (4.45 LD). Velocity: 27968.6392624107 km/h. Diameter: 73.4581486599m.",
+    "category": "anomaly",
+    "tags": [
+      "space",
+      "neo",
+      "asteroid",
+      "close-approach"
+    ],
+    "domain": "space-science",
+    "source_api": "NASA NEO API",
+    "timestamp": "2026-03-15T19:25:16Z",
+    "confidence": 0.80,
+    "data_points": 1
+  },
+  {
+    "title": "NEO close approach: (2007 RF2) [HAZARDOUS]",
+    "content": "Asteroid (2007 RF2) passes Earth at 28952325.0358558 km (75.31 LD). Velocity: 51133.9868820554 km/h. Diameter: 430.566244241m.",
+    "category": "anomaly",
+    "tags": [
+      "space",
+      "neo",
+      "asteroid",
+      "hazardous"
+    ],
+    "domain": "space-science",
+    "source_api": "NASA NEO API",
+    "timestamp": "2026-03-15T19:25:16Z",
+    "confidence": 0.95,
+    "data_points": 1
+  },
+  {
+    "title": "NEO close approach: (2024 CW2)",
+    "content": "Asteroid (2024 CW2) passes Earth at 1703646.768066611 km (4.43 LD). Velocity: 27983.2105829603 km/h. Diameter: 80.8053245222m.",
+    "category": "anomaly",
+    "tags": [
+      "space",
+      "neo",
+      "asteroid",
+      "close-approach"
+    ],
+    "domain": "space-science",
+    "source_api": "NASA NEO API",
+    "timestamp": "2026-03-15T19:25:16Z",
+    "confidence": 0.80,
+    "data_points": 1
+  },
+  {
+    "title": "NEO close approach: (2026 EC1)",
+    "content": "Asteroid (2026 EC1) passes Earth at 1540333.929902668 km (4 LD). Velocity: 44992.1941790807 km/h. Diameter: 25.0057554041m.",
+    "category": "anomaly",
+    "tags": [
+      "space",
+      "neo",
+      "asteroid",
+      "close-approach"
+    ],
+    "domain": "space-science",
+    "source_api": "NASA NEO API",
+    "timestamp": "2026-03-15T19:25:16Z",
+    "confidence": 0.80,
+    "data_points": 1
+  }
+]

@@ -1,0 +1,82 @@
+[
+  {
+    "title": "Gene: BRCA1 (BRCA1 DNA repair associated)",
+    "content": "Human gene BRCA1: BRCA1 DNA repair associated. NCBI:672.",
+    "category": "pattern",
+    "tags": [
+      "genomics",
+      "gene",
+      "ncbi",
+      "gap-fill"
+    ],
+    "domain": "medical-genomics",
+    "source_api": "NCBI Gene",
+    "timestamp": "2026-03-15T22:01:46Z",
+    "confidence": 0.90,
+    "data_points": 1
+  },
+  {
+    "title": "Gene: TP53 (tumor protein p53)",
+    "content": "Human gene TP53: tumor protein p53. NCBI:7157.",
+    "category": "pattern",
+    "tags": [
+      "genomics",
+      "gene",
+      "ncbi",
+      "gap-fill"
+    ],
+    "domain": "medical-genomics",
+    "source_api": "NCBI Gene",
+    "timestamp": "2026-03-15T22:01:46Z",
+    "confidence": 0.90,
+    "data_points": 1
+  },
+  {
+    "title": "Gene: APOE (apolipoprotein E)",
+    "content": "Human gene APOE: apolipoprotein E. NCBI:348.",
+    "category": "pattern",
+    "tags": [
+      "genomics",
+      "gene",
+      "ncbi",
+      "gap-fill"
+    ],
+    "domain": "medical-genomics",
+    "source_api": "NCBI Gene",
+    "timestamp": "2026-03-15T22:01:46Z",
+    "confidence": 0.90,
+    "data_points": 1
+  },
+  {
+    "title": "Gene: CFTR (CF transmembrane conductance regulator)",
+    "content": "Human gene CFTR: CF transmembrane conductance regulator. NCBI:1080.",
+    "category": "pattern",
+    "tags": [
+      "genomics",
+      "gene",
+      "ncbi",
+      "gap-fill"
+    ],
+    "domain": "medical-genomics",
+    "source_api": "NCBI Gene",
+    "timestamp": "2026-03-15T22:01:46Z",
+    "confidence": 0.90,
+    "data_points": 1
+  },
+  {
+    "title": "Gene: HBB (hemoglobin subunit beta)",
+    "content": "Human gene HBB: hemoglobin subunit beta. NCBI:3043.",
+    "category": "pattern",
+    "tags": [
+      "genomics",
+      "gene",
+      "ncbi",
+      "gap-fill"
+    ],
+    "domain": "medical-genomics",
+    "source_api": "NCBI Gene",
+    "timestamp": "2026-03-15T22:01:46Z",
+    "confidence": 0.90,
+    "data_points": 1
+  }
+]

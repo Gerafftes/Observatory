@@ -72,7 +72,7 @@ Ziel: Prüfen, ob ein größeres RuView-Guard-Intervall die Mehrknoten-Visualisi
 Server-Start für G1:
 
 ```zsh
-mkdir -p PROJECT_ROOT/logs
+mkdir -p logs
 
 WDP_GUARD_INTERVAL_US=500000 \
 WDP_SOFT_GUARD_US=200000 \
@@ -82,7 +82,7 @@ RUST_LOG=debug ./target/release/sensing-server \
   --http-port 8080 \
   --ws-port 8765 \
   --bind-addr 0.0.0.0 \
-  2>&1 | tee PROJECT_ROOT/logs/G1_guard500ms_server.log
+  2>&1 | tee logs/G1_guard500ms_server.log
 ```
 
 Erfolgskriterium:

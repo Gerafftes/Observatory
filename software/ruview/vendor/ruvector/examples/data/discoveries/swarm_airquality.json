@@ -1,0 +1,63 @@
+[
+  {
+    "title": "Air Quality Alert: OpenAQ API v2 Retired",
+    "content": "OpenAQ v2 API has been retired. v3 requires API key authentication. Historical worst PM2.5 cities include Lahore, Delhi, Dhaka, Beijing, and Kolkata. Real-time data unavailable without API key.",
+    "timestamp": "2026-03-15T23:43:17.406987+00:00",
+    "source": "openaq",
+    "confidence": 0.8,
+    "metadata": {
+      "api_status": "v2_retired_v3_requires_auth",
+      "note": "Static reference data"
+    }
+  },
+  {
+    "title": "Air Quality: Shanghai (\u4e0a\u6d77)",
+    "content": "AQI: 59, PM2.5: 59, PM10: 24",
+    "timestamp": "2026-03-15T23:43:18.278962+00:00",
+    "source": "waqi",
+    "confidence": 0.85,
+    "metadata": {
+      "city": "Shanghai (\u4e0a\u6d77)"
+    }
+  },
+  {
+    "title": "Air Quality: Shanghai (\u4e0a\u6d77)",
+    "content": "AQI: 59, PM2.5: 59, PM10: 24",
+    "timestamp": "2026-03-15T23:43:19.031675+00:00",
+    "source": "waqi",
+    "confidence": 0.85,
+    "metadata": {
+      "city": "Shanghai (\u4e0a\u6d77)"
+    }
+  },
+  {
+    "title": "Air Quality: Shanghai (\u4e0a\u6d77)",
+    "content": "AQI: 59, PM2.5: 59, PM10: 24",
+    "timestamp": "2026-03-15T23:43:19.817609+00:00",
+    "source": "waqi",
+    "confidence": 0.85,
+    "metadata": {
+      "city": "Shanghai (\u4e0a\u6d77)"
+    }
+  },
+  {
+    "title": "Air Quality: Shanghai (\u4e0a\u6d77)",
+    "content": "AQI: 59, PM2.5: 59, PM10: 24",
+    "timestamp": "2026-03-15T23:43:20.365869+00:00",
+    "source": "waqi",
+    "confidence": 0.85,
+    "metadata": {
+      "city": "Shanghai (\u4e0a\u6d77)"
+    }
+  },
+  {
+    "title": "Air Quality: Shanghai (\u4e0a\u6d77)",
+    "content": "AQI: 59, PM2.5: 59, PM10: 24",
+    "timestamp": "2026-03-15T23:43:21.481526+00:00",
+    "source": "waqi",
+    "confidence": 0.85,
+    "metadata": {
+      "city": "Shanghai (\u4e0a\u6d77)"
+    }
+  }
+]

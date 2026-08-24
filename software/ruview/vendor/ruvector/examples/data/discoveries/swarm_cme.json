@@ -1,0 +1,130 @@
+[
+  {
+    "title": "CME: 2026-03-08T09:48:00-CME-001",
+    "content": "CME 2026-03-08T09:48:00-CME-001. Time: 2026-03-08T09:48Z. Source: ",
+    "category": "anomaly",
+    "tags": [
+      "space",
+      "cme",
+      "solar",
+      "gap-fill"
+    ],
+    "domain": "space-science",
+    "source_api": "NASA DONKI",
+    "timestamp": "2026-03-15T21:59:51Z",
+    "confidence": 0.87,
+    "data_points": 1
+  },
+  {
+    "title": "CME: 2026-03-08T14:48:00-CME-001",
+    "content": "CME 2026-03-08T14:48:00-CME-001. Time: 2026-03-08T14:48Z. Source: N15E40",
+    "category": "anomaly",
+    "tags": [
+      "space",
+      "cme",
+      "solar",
+      "gap-fill"
+    ],
+    "domain": "space-science",
+    "source_api": "NASA DONKI",
+    "timestamp": "2026-03-15T21:59:51Z",
+    "confidence": 0.87,
+    "data_points": 1
+  },
+  {
+    "title": "CME: 2026-03-08T18:08:00-CME-001",
+    "content": "CME 2026-03-08T18:08:00-CME-001. Time: 2026-03-08T18:08Z. Source: N05E60",
+    "category": "anomaly",
+    "tags": [
+      "space",
+      "cme",
+      "solar",
+      "gap-fill"
+    ],
+    "domain": "space-science",
+    "source_api": "NASA DONKI",
+    "timestamp": "2026-03-15T21:59:51Z",
+    "confidence": 0.87,
+    "data_points": 1
+  },
+  {
+    "title": "CME: 2026-03-09T13:00:00-CME-001",
+    "content": "CME 2026-03-09T13:00:00-CME-001. Time: 2026-03-09T13:00Z. Source: ",
+    "category": "anomaly",
+    "tags": [
+      "space",
+      "cme",
+      "solar",
+      "gap-fill"
+    ],
+    "domain": "space-science",
+    "source_api": "NASA DONKI",
+    "timestamp": "2026-03-15T21:59:51Z",
+    "confidence": 0.87,
+    "data_points": 1
+  },
+  {
+    "title": "CME: 2026-03-09T20:30:00-CME-001",
+    "content": "CME 2026-03-09T20:30:00-CME-001. Time: 2026-03-09T20:30Z. Source: ",
+    "category": "anomaly",
+    "tags": [
+      "space",
+      "cme",
+      "solar",
+      "gap-fill"
+    ],
+    "domain": "space-science",
+    "source_api": "NASA DONKI",
+    "timestamp": "2026-03-15T21:59:51Z",
+    "confidence": 0.87,
+    "data_points": 1
+  },
+  {
+    "title": "CME: 2026-03-10T02:24:00-CME-001",
+    "content": "CME 2026-03-10T02:24:00-CME-001. Time: 2026-03-10T02:24Z. Source: S25E90",
+    "category": "anomaly",
+    "tags": [
+      "space",
+      "cme",
+      "solar",
+      "gap-fill"
+    ],
+    "domain": "space-science",
+    "source_api": "NASA DONKI",
+    "timestamp": "2026-03-15T21:59:51Z",
+    "confidence": 0.87,
+    "data_points": 1
+  },
+  {
+    "title": "CME: 2026-03-10T04:48:00-CME-001",
+    "content": "CME 2026-03-10T04:48:00-CME-001. Time: 2026-03-10T04:48Z. Source: N25E63",
+    "category": "anomaly",
+    "tags": [
+      "space",
+      "cme",
+      "solar",
+      "gap-fill"
+    ],
+    "domain": "space-science",
+    "source_api": "NASA DONKI",
+    "timestamp": "2026-03-15T21:59:51Z",
+    "confidence": 0.87,
+    "data_points": 1
+  },
+  {
+    "title": "CME: 2026-03-10T10:45:00-CME-001",
+    "content": "CME 2026-03-10T10:45:00-CME-001. Time: 2026-03-10T10:45Z. Source: ",
+    "category": "anomaly",
+    "tags": [
+      "space",
+      "cme",
+      "solar",
+      "gap-fill"
+    ],
+    "domain": "space-science",
+    "source_api": "NASA DONKI",
+    "timestamp": "2026-03-15T21:59:51Z",
+    "confidence": 0.87,
+    "data_points": 1
+  }
+]

@@ -1,0 +1,16 @@
+[Unit]
+Description=Run ruos-thermal snapshot every 30 seconds
+Documentation=https://github.com/ruvnet/ruvector
+
+[Timer]
+# Fire 5 s after boot, then every 30 s. Matches the default
+# node_exporter scrape interval on most Pi 5 deploys; tighter cadences
+# (5-10s) would still be cheap if a future deploy wants smoother graphs.
+OnBootSec=5s
+OnUnitActiveSec=30s
+# Persistent so a crash + restart doesn't lose the activation history.
+Persistent=true
+Unit=ruos-thermal.service
+
+[Install]
+WantedBy=timers.target

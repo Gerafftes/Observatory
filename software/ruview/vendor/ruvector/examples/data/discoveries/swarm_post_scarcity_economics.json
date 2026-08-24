@@ -1,0 +1,141 @@
+{
+  "domain": "post-scarcity-economics",
+  "generated": "2026-03-16T14:00:00Z",
+  "entries": [
+    {
+      "title": "Universal Basic Income — Global Experimental Evidence",
+      "category": "solution",
+      "content": "UBI experiments across Finland, Kenya (GiveDirectly), Stockton CA, and India's SEWA provide empirical data on unconditional cash transfers. Finnish results showed improved well-being and modest employment effects. Kenya's 12-year study shows sustained benefits. Key findings: recipients invest in education and health, entrepreneurship increases, and labor supply reduction is minimal (2-4%). Macroeconomic models suggest UBI funded by progressive taxation could reduce inequality without significant inflation.",
+      "tags": ["UBI", "universal-basic-income", "cash-transfers", "GiveDirectly", "inequality"],
+      "confidence": 0.88,
+      "novelty": 0.75,
+      "source": "research"
+    },
+    {
+      "title": "Attention Economy — Finite Human Attention as Currency",
+      "category": "pattern",
+      "content": "Herbert Simon's insight that information abundance creates attention scarcity underpins the attention economy. Platforms compete for engagement time using algorithmic feeds, notifications, and variable reward schedules. Tim Wu's 'attention merchants' framework traces commercialization of attention from newspapers to social media. Attention markets (Brave's BAT token) attempt to compensate users. The fundamental tension: optimizing for attention often conflicts with optimizing for well-being or truth.",
+      "tags": ["attention-economy", "engagement", "Herbert-Simon", "algorithmic-feeds", "attention-markets"],
+      "confidence": 0.90,
+      "novelty": 0.73,
+      "source": "research"
+    },
+    {
+      "title": "Tokenomics and DAOs — Programmable Economic Systems",
+      "category": "architecture",
+      "content": "Decentralized Autonomous Organizations encode governance rules in smart contracts, enabling trustless coordination. Token-curated registries, quadratic voting, and conviction voting provide novel governance mechanisms. Curve wars demonstrate how tokenomics create emergent power dynamics. MakerDAO maintains a decentralized stablecoin through automated monetary policy. Challenges include plutocratic voting, smart contract vulnerabilities, and regulatory uncertainty. DAOs represent experiments in post-corporate organizational design.",
+      "tags": ["DAO", "tokenomics", "smart-contracts", "quadratic-voting", "decentralized-governance"],
+      "confidence": 0.85,
+      "novelty": 0.78,
+      "source": "research"
+    },
+    {
+      "title": "AI-Driven Economic Planning — Cybernetics Redux",
+      "category": "architecture",
+      "content": "Advances in AI revive cybernetic economic planning debates. Stafford Beer's Project Cybersyn (Chile, 1971-73) used telex networks for real-time economic management. Modern proposals use deep RL for dynamic resource allocation, LLMs for preference aggregation, and digital twins for economic simulation. Walmart's supply chain AI already performs more planning computations than the Soviet Gosplan. The calculation debate (Mises vs Lange) finds new dimensions with transformer-scale optimization capabilities.",
+      "tags": ["AI-planning", "cybernetics", "Project-Cybersyn", "resource-allocation", "calculation-debate"],
+      "confidence": 0.82,
+      "novelty": 0.86,
+      "source": "research"
+    },
+    {
+      "title": "Degrowth Economics — Beyond GDP Growth Paradigm",
+      "category": "pattern",
+      "content": "Degrowth proposes deliberately shrinking material throughput in wealthy nations while improving quality of life. Jason Hickel argues that GDP growth in rich countries correlates poorly with well-being beyond ~$15,000/capita. Alternative metrics include Genuine Progress Indicator, Happy Planet Index, and Doughnut Economics (Kate Raworth). Policies include work-time reduction, maximum income ratios, commons expansion, and planned obsolescence bans. Degrowth challenges the foundational assumption of economic theory.",
+      "tags": ["degrowth", "post-growth", "doughnut-economics", "alternative-metrics", "Raworth"],
+      "confidence": 0.80,
+      "novelty": 0.82,
+      "source": "research"
+    },
+    {
+      "title": "Circular Economy — Eliminating Waste by Design",
+      "category": "solution",
+      "content": "Circular economy replaces the linear take-make-dispose model with closed-loop systems where waste becomes feedstock. Ellen MacArthur Foundation identifies three principles: eliminate waste/pollution, circulate products/materials, and regenerate nature. Industrial symbiosis (Kalundborg, Denmark) routes one factory's waste to another's input. Product-as-a-service models (Michelin tires, Philips lighting) shift incentives toward durability. Digital product passports enable material tracking for recycling optimization.",
+      "tags": ["circular-economy", "industrial-symbiosis", "product-as-service", "waste-elimination", "Ellen-MacArthur"],
+      "confidence": 0.89,
+      "novelty": 0.74,
+      "source": "research"
+    },
+    {
+      "title": "Commons-Based Peer Production — Wikipedia Model at Scale",
+      "category": "pattern",
+      "content": "Yochai Benkler's theory describes how networked individuals cooperate to produce shared resources without firms or markets. Wikipedia, Linux, and OpenStreetMap demonstrate sustained large-scale peer production. Success requires: modular tasks, low coordination costs, intrinsic motivation, and transparent contribution tracking. Extending this model to physical goods requires open-source hardware, fab labs, and community workshops. The model challenges the assumption that private property and markets are necessary for complex production.",
+      "tags": ["commons-based", "peer-production", "Benkler", "open-source", "cooperative-production"],
+      "confidence": 0.86,
+      "novelty": 0.78,
+      "source": "research"
+    },
+    {
+      "title": "Platform Cooperativism — Worker-Owned Digital Platforms",
+      "category": "solution",
+      "content": "Platform cooperativism proposes that gig economy platforms should be owned and governed by their workers and users. Stocksy (photography), Up&Go (cleaning), and Eva (ride-sharing in Montreal) demonstrate cooperative alternatives to Uber/Airbnb. Democratic governance, profit sharing, and data sovereignty distinguish co-op platforms. Technical challenges include competing with venture-capital-funded platforms on UX and scale. The International Co-operative Alliance's 7 principles provide governance templates.",
+      "tags": ["platform-cooperativism", "worker-owned", "cooperative", "gig-economy", "democratic-governance"],
+      "confidence": 0.83,
+      "novelty": 0.80,
+      "source": "research"
+    },
+    {
+      "title": "Central Bank Digital Currencies — Programmable Money",
+      "category": "architecture",
+      "content": "130+ central banks are exploring CBDCs. China's digital yuan (e-CNY) has 260 million wallets. The ECB's digital euro targets 2026 launch. CBDCs enable programmable money: expiring stimulus payments, automatic tax collection, negative interest rates, and conditional transfers. Privacy concerns drive design choices between account-based (identified) and token-based (anonymous) models. Wholesale CBDCs for interbank settlement face fewer political challenges than retail CBDCs.",
+      "tags": ["CBDC", "digital-currency", "programmable-money", "e-CNY", "digital-euro"],
+      "confidence": 0.89,
+      "novelty": 0.77,
+      "source": "research"
+    },
+    {
+      "title": "Reputation Economy — Trust as Currency",
+      "category": "pattern",
+      "content": "Reputation systems increasingly mediate economic transactions. eBay ratings, Uber scores, and credit scores function as trust currencies. Blockchain-based reputation (self-sovereign identity, verifiable credentials) enables portable trust. Challenges include Sybil attacks, reputation manipulation, and the Matthew effect (early reputation advantages compound). Cory Doctorow's 'whuffie' concept imagines reputation fully replacing money. Real implementations must balance transparency, privacy, and forgiveness for past mistakes.",
+      "tags": ["reputation-economy", "trust-systems", "verifiable-credentials", "self-sovereign-identity", "whuffie"],
+      "confidence": 0.82,
+      "novelty": 0.80,
+      "source": "research"
+    },
+    {
+      "title": "Automated Luxury Communism — Full Automation for All",
+      "category": "pattern",
+      "content": "Aaron Bastani's framework argues that automation, renewable energy, asteroid mining, and synthetic biology could create material abundance sufficient to eliminate scarcity. Unlike traditional communism, this vision relies on technological progress rather than revolution. Counterarguments: positional goods remain scarce, environmental limits constrain growth, and power concentration from AI/automation may worsen inequality. The concept connects post-work theory, techno-optimism, and socialist political economy.",
+      "tags": ["automated-luxury", "post-scarcity", "Bastani", "full-automation", "techno-optimism"],
+      "confidence": 0.75,
+      "novelty": 0.83,
+      "source": "research"
+    },
+    {
+      "title": "Resource-Based Economy — The Venus Project",
+      "category": "architecture",
+      "content": "Jacque Fresco's Venus Project proposes replacing money-based economies with scientific resource management. Central AI systems allocate resources based on carrying capacity and human needs rather than purchasing power. Circular cities integrate energy, food, and manufacturing systems. Critics argue it requires impossibly comprehensive knowledge and ignores preference diversity. The concept influences solarpunk aesthetics and post-scarcity fiction while raising fundamental questions about algorithmic governance and individual freedom.",
+      "tags": ["Venus-Project", "resource-based-economy", "Fresco", "scientific-management", "post-monetary"],
+      "confidence": 0.70,
+      "novelty": 0.82,
+      "source": "research"
+    },
+    {
+      "title": "Algorithmic Governance — Code as Law",
+      "category": "pattern",
+      "content": "Lawrence Lessig's 'code is law' thesis observes that software architecture constrains behavior more effectively than legal regulation. Smart contracts automate enforcement. Algorithmic regulation (RegTech) monitors compliance in real-time. Estonia's e-governance provides a national-scale implementation. Risks include algorithmic bias codifying discrimination, lack of democratic accountability, and the impossibility of encoding legal nuance in deterministic rules. Hybrid approaches combine algorithmic efficiency with human oversight for edge cases.",
+      "tags": ["algorithmic-governance", "code-as-law", "Lessig", "smart-contracts", "e-governance"],
+      "confidence": 0.85,
+      "novelty": 0.78,
+      "source": "research"
+    },
+    {
+      "title": "Quadratic Funding — Optimal Public Goods Provision",
+      "category": "solution",
+      "content": "Glen Weyl and Vitalik Buterin's quadratic funding mechanism optimally funds public goods by matching individual contributions according to the square root formula. Many small donations receive more matching than few large ones, amplifying broad community preferences. Gitcoin Grants has distributed $50M+ using QF for open-source software. Extensions include quadratic voting for collective decisions and MACI (Minimum Anti-Collusion Infrastructure) to prevent bribery in on-chain voting systems.",
+      "tags": ["quadratic-funding", "public-goods", "Weyl", "Buterin", "Gitcoin"],
+      "confidence": 0.87,
+      "novelty": 0.82,
+      "source": "research"
+    },
+    {
+      "title": "Post-Work Society — Automation and the End of Employment",
+      "category": "pattern",
+      "content": "As AI automates cognitive labor, post-work theorists (Srnicek, Williams, Susskind) envision societies where employment is no longer the primary source of income or meaning. Historical precedent: agriculture employed 90% of workers in 1800, now 2%. Key transitions needed: decoupling income from employment (UBI), redefining social status beyond career, expanding care/creative/community work, and ensuring automation benefits are broadly shared rather than captured by capital owners.",
+      "tags": ["post-work", "automation", "technological-unemployment", "Srnicek-Williams", "leisure-society"],
+      "confidence": 0.80,
+      "novelty": 0.79,
+      "source": "research"
+    }
+  ]
+}

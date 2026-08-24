@@ -1,0 +1,18 @@
+[
+  {
+    "title": "Geomagnetic storm: 2026-03-13T21:00:00-GST-001",
+    "content": "Storm 2026-03-13T21:00:00-GST-001. Start: 2026-03-13T21:00Z",
+    "category": "anomaly",
+    "tags": [
+      "earth",
+      "geomagnetic",
+      "storm",
+      "space-weather"
+    ],
+    "domain": "earth-science",
+    "source_api": "NASA DONKI",
+    "timestamp": "2026-03-15T21:59:51Z",
+    "confidence": 0.90,
+    "data_points": 1
+  }
+]

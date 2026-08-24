@@ -1,0 +1,157 @@
+name: ruvllm-esp32 firmware (ADR-165)
+
+# Builds the tiny-agent firmware for every ESP32 variant and attaches the
+# merged .bin assets to a GitHub release. Asset names match the URL pattern
+# already hardcoded in `examples/ruvLLM/esp32-flash/npm/web-flasher/index.html`
+# (`${FIRMWARE_BASE_URL}/ruvllm-esp32-${target}`), closing issue #409 obs 2.
+#
+# Modeled on RuView's `firmware-ci.yml` pattern: espup install → cargo +esp
+# build → espflash save-image → upload to release.
+#
+# This workflow is the implementation of ADR-165 §2.5 + §7 step 5.
+
+on:
+  push:
+    tags:
+      - 'ruvllm-esp32-v*'
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: 'Release tag to attach .bin assets to (e.g. v2.3.0)'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  host-test:
+    name: host-test smoke (G1–G3)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: build host-test
+        working-directory: examples/ruvLLM/esp32-flash
+        run: cargo build --no-default-features --features host-test --target x86_64-unknown-linux-gnu
+      - name: smoke each role
+        working-directory: examples/ruvLLM/esp32-flash
+        shell: bash
+        run: |
+          set -euo pipefail
+          BIN=target/x86_64-unknown-linux-gnu/debug/ruvllm-esp32
+          for variant in esp32 esp32s2 esp32s3 esp32c3 esp32c6; do
+            echo "=== $variant ==="
+            echo "stats" | RUVLLM_VARIANT=$variant "$BIN" | grep -E "role=" || {
+              echo "FAIL: $variant did not boot a role"
+              exit 1
+            }
+          done
+
+  firmware:
+    name: build ${{ matrix.target }}
+    needs: host-test
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Xtensa targets — use the espup-installed `esp` Rust toolchain.
+          - target: esp32
+            rust_target: xtensa-esp32-espidf
+            chip: esp32
+            toolchain: esp
+          - target: esp32s2
+            rust_target: xtensa-esp32s2-espidf
+            chip: esp32s2
+            toolchain: esp
+          - target: esp32s3
+            rust_target: xtensa-esp32s3-espidf
+            chip: esp32s3
+            toolchain: esp
+          # RISC-V targets — use upstream nightly with rust-src.
+          - target: esp32c3
+            rust_target: riscv32imc-esp-espidf
+            chip: esp32c3
+            toolchain: nightly
+          - target: esp32c6
+            rust_target: riscv32imac-esp-espidf
+            chip: esp32c6
+            toolchain: nightly
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: install rust nightly + rust-src (RISC-V)
+        if: matrix.toolchain == 'nightly'
+        run: |
+          rustup toolchain install nightly --component rust-src
+          rustup default nightly
+
+      - name: install espup + esp toolchain (Xtensa)
+        if: matrix.toolchain == 'esp'
+        run: |
+          cargo install espup --locked
+          espup install --targets ${{ matrix.target }}
+          source ~/export-esp.sh
+          echo "PATH=$PATH" >> $GITHUB_ENV
+          echo "LIBCLANG_PATH=$LIBCLANG_PATH" >> $GITHUB_ENV
+
+      - name: install ldproxy + espflash
+        run: cargo install espflash ldproxy --locked
+
+      - name: build firmware
+        working-directory: examples/ruvLLM/esp32-flash
+        env:
+          RUVLLM_VARIANT: ${{ matrix.target }}
+        run: |
+          if [ "${{ matrix.toolchain }}" = "esp" ]; then
+            source ~/export-esp.sh
+          fi
+          # Override the host's mold linker — Xtensa/RISC-V targets need the
+          # toolchain-provided gcc/ld via ldproxy.
+          unset RUSTFLAGS
+          cargo +${{ matrix.toolchain }} build \
+            --release \
+            --target ${{ matrix.rust_target }}
+
+      - name: produce merged .bin
+        working-directory: examples/ruvLLM/esp32-flash
+        run: |
+          if [ "${{ matrix.toolchain }}" = "esp" ]; then
+            source ~/export-esp.sh
+          fi
+          espflash save-image \
+            --chip ${{ matrix.chip }} \
+            --merge \
+            target/${{ matrix.rust_target }}/release/ruvllm-esp32 \
+            ruvllm-esp32-${{ matrix.target }}.bin
+
+      - name: upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ruvllm-esp32-${{ matrix.target }}
+          path: examples/ruvLLM/esp32-flash/ruvllm-esp32-${{ matrix.target }}.bin
+          if-no-files-found: error
+
+  release:
+    name: attach to release
+    needs: firmware
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch'
+    steps:
+      - name: download all firmware
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: list assets
+        run: ls -lah dist/
+
+      - name: upload to release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.inputs.release_tag || github.ref_name }}
+          files: dist/ruvllm-esp32-*.bin
+          fail_on_unmatched_files: true
+          generate_release_notes: false

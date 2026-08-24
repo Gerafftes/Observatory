@@ -1,0 +1,72 @@
+[
+  {
+    "title": "TESS Candidate TOI-1044.01",
+    "content": "Unconfirmed planet candidate TOI-1044.01 (TIC prefix: 1044). Estimated radius: None Earth radii. Transit midpoint: 2460037.194672 BJD.",
+    "timestamp": "2026-03-15T23:58:48.134904Z",
+    "source": "NASA Exoplanet Archive (TESS)",
+    "confidence": 0.75
+  },
+  {
+    "title": "TESS Candidate TOI-1035.01",
+    "content": "Unconfirmed planet candidate TOI-1035.01 (TIC prefix: 1035). Estimated radius: 30.9493217 Earth radii. Transit midpoint: 2459286.872605 BJD.",
+    "timestamp": "2026-03-15T23:58:48.134904Z",
+    "source": "NASA Exoplanet Archive (TESS)",
+    "confidence": 0.75
+  },
+  {
+    "title": "TESS Candidate TOI-1059.01",
+    "content": "Unconfirmed planet candidate TOI-1059.01 (TIC prefix: 1059). Estimated radius: 17.0216 Earth radii. Transit midpoint: 2460106.337519 BJD.",
+    "timestamp": "2026-03-15T23:58:48.134904Z",
+    "source": "NASA Exoplanet Archive (TESS)",
+    "confidence": 0.75
+  },
+  {
+    "title": "TESS Candidate TOI-1032.01",
+    "content": "Unconfirmed planet candidate TOI-1032.01 (TIC prefix: 1032). Estimated radius: 14.7738943 Earth radii. Transit midpoint: 2459283.828685 BJD.",
+    "timestamp": "2026-03-15T23:58:48.134904Z",
+    "source": "NASA Exoplanet Archive (TESS)",
+    "confidence": 0.75
+  },
+  {
+    "title": "TESS Candidate TOI-1058.01",
+    "content": "Unconfirmed planet candidate TOI-1058.01 (TIC prefix: 1058). Estimated radius: 12.8402271 Earth radii. Transit midpoint: 2458663.023129 BJD.",
+    "timestamp": "2026-03-15T23:58:48.134904Z",
+    "source": "NASA Exoplanet Archive (TESS)",
+    "confidence": 0.75
+  },
+  {
+    "title": "TESS Candidate TOI-1036.01",
+    "content": "Unconfirmed planet candidate TOI-1036.01 (TIC prefix: 1036). Estimated radius: 5.98375 Earth radii. Transit midpoint: 2460037.172273 BJD.",
+    "timestamp": "2026-03-15T23:58:48.134904Z",
+    "source": "NASA Exoplanet Archive (TESS)",
+    "confidence": 0.75
+  },
+  {
+    "title": "TESS Candidate TOI-1056.01",
+    "content": "Unconfirmed planet candidate TOI-1056.01 (TIC prefix: 1056). Estimated radius: 3.0486928 Earth radii. Transit midpoint: 2458326.062424 BJD.",
+    "timestamp": "2026-03-15T23:58:48.134904Z",
+    "source": "NASA Exoplanet Archive (TESS)",
+    "confidence": 0.75
+  },
+  {
+    "title": "TESS Candidate TOI-1057.01",
+    "content": "Unconfirmed planet candidate TOI-1057.01 (TIC prefix: 1057). Estimated radius: 2.9366826 Earth radii. Transit midpoint: 2458607.350901 BJD.",
+    "timestamp": "2026-03-15T23:58:48.134904Z",
+    "source": "NASA Exoplanet Archive (TESS)",
+    "confidence": 0.75
+  },
+  {
+    "title": "TESS Candidate TOI-1063.01",
+    "content": "Unconfirmed planet candidate TOI-1063.01 (TIC prefix: 1063). Estimated radius: 2.7272824 Earth radii. Transit midpoint: 2458629.391681 BJD.",
+    "timestamp": "2026-03-15T23:58:48.134904Z",
+    "source": "NASA Exoplanet Archive (TESS)",
+    "confidence": 0.75
+  },
+  {
+    "title": "TESS Candidate TOI-1074.01",
+    "content": "Unconfirmed planet candidate TOI-1074.01 (TIC prefix: 1074). Estimated radius: 2.4233421 Earth radii. Transit midpoint: 2458662.652685 BJD.",
+    "timestamp": "2026-03-15T23:58:48.134904Z",
+    "source": "NASA Exoplanet Archive (TESS)",
+    "confidence": 0.75
+  }
+]

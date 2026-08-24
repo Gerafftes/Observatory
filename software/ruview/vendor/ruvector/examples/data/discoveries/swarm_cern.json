@@ -1,0 +1,72 @@
+[
+  {
+    "title": "CERN Record: ATLAS Masterclasses",
+    "content": "The ATLAS Physics Masterclasses are an outreach programme of the ATLAS collaboration. It illustrates the basic principles of data analysis using actual data taken by the ATLAS detector in 2011. The linked page makes two measurements available: the W path and the Z path.\n       In both paths the user will learn about recognising and identifying particles by examining detector signatures. The W path measurement aims at understanding the structure of the proton as well as searching for the Higgs. T",
+    "timestamp": "2026-03-15T23:58:48.134904Z",
+    "source": "CERN Open Data Portal",
+    "confidence": 0.95
+  },
+  {
+    "title": "CERN Record: Higgs candidate events for use in education and outreach",
+    "content": "<p>This document contains Higgs candidate events (with an invariant mass between 120-130 GeV) that have been released by CMS for use in education and outreach: 10 gamma-gamma events, one 2e2mu event, one 4mu event and one 4e event.</p> <p>These data were selected for use in education and outreach and contain a subset of the total event information. They are not suitable for a full physics analysis.</p>",
+    "timestamp": "2026-03-15T23:58:48.134904Z",
+    "source": "CERN Open Data Portal",
+    "confidence": 0.95
+  },
+  {
+    "title": "CERN Record: Event files for CMS masterclass exercise 2014",
+    "content": "<p>This document collects event information for use in the 2014 CMS masterclass exercise. It contains previously-released data: 800 events each of W to munu and enu, 75 events each of Z to ee and mumu, 100 dimuon events between 2-100 GeV, 50 dimuon events between 2-12 GeV (i.e. J/psi and upsilon), three 4-lepton Higgs candidate events and ten di-photon Higgs candidate events.</p> <p>These data were selected for use in education and outreach, particularly for the CMS masterclass, and contain a su",
+    "timestamp": "2026-03-15T23:58:48.134904Z",
+    "source": "CERN Open Data Portal",
+    "confidence": 0.95
+  },
+  {
+    "title": "CERN Record: ATLAS WPath 2014 Masterclass dataset 1",
+    "content": "A dataset of 1000 events taken in 2011 by the ATLAS Detector, used in the Physics Masterclasses W Path",
+    "timestamp": "2026-03-15T23:58:48.134904Z",
+    "source": "CERN Open Data Portal",
+    "confidence": 0.95
+  },
+  {
+    "title": "CERN Record: ATLAS WPath 2014 Masterclass dataset 2",
+    "content": "A dataset of 1000 events taken in 2011 by the ATLAS Detector, used in the Physics Masterclasses W Path",
+    "timestamp": "2026-03-15T23:58:48.134904Z",
+    "source": "CERN Open Data Portal",
+    "confidence": 0.95
+  },
+  {
+    "title": "CERN Record: ATLAS WPath 2014 Masterclass dataset 3",
+    "content": "A dataset of 1000 events taken in 2011 by the ATLAS Detector, used in the Physics Masterclasses W Path",
+    "timestamp": "2026-03-15T23:58:48.134904Z",
+    "source": "CERN Open Data Portal",
+    "confidence": 0.95
+  },
+  {
+    "title": "CERN Record: ATLAS WPath 2014 Masterclass dataset 4",
+    "content": "A dataset of 1000 events taken in 2011 by the ATLAS Detector, used in the Physics Masterclasses W Path",
+    "timestamp": "2026-03-15T23:58:48.134904Z",
+    "source": "CERN Open Data Portal",
+    "confidence": 0.95
+  },
+  {
+    "title": "CERN Record: ATLAS WPath 2014 Masterclass dataset 5",
+    "content": "A dataset of 1000 events taken in 2011 by the ATLAS Detector, used in the Physics Masterclasses W Path",
+    "timestamp": "2026-03-15T23:58:48.134904Z",
+    "source": "CERN Open Data Portal",
+    "confidence": 0.95
+  },
+  {
+    "title": "CERN Record: ATLAS WPath 2014 Masterclass dataset 6",
+    "content": "A dataset of 1000 events taken in 2011 by the ATLAS Detector, used in the Physics Masterclasses W Path",
+    "timestamp": "2026-03-15T23:58:48.134904Z",
+    "source": "CERN Open Data Portal",
+    "confidence": 0.95
+  },
+  {
+    "title": "CERN Record: Dataset from the ATLAS Higgs Boson Machine Learning Challenge 2014",
+    "content": "<p> The dataset has been built from official ATLAS full-detector simulation, with \"Higgs to tautau\" events mixed with different backgrounds. The simulator has two parts. In the first, random proton-proton collisions are simulated based on the knowledge that we have accumulated on particle physics. It reproduces the random microscopic explosions resulting from the proton-proton collisions. In the second part, the resulting particles are tracked through a virtual model of the detector. The process",
+    "timestamp": "2026-03-15T23:58:48.134904Z",
+    "source": "CERN Open Data Portal",
+    "confidence": 0.95
+  }
+]

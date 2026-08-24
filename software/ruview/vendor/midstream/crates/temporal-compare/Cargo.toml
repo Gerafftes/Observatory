@@ -1,0 +1,30 @@
+[package]
+name = "midstreamer-temporal-compare"
+version = "0.2.1"
+edition = "2021"
+rust-version = "1.81"
+description = "Temporal sequence comparison and pattern matching"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/ruvnet/midstream"
+keywords = ["temporal", "sequence", "comparison", "pattern-matching", "midstream"]
+categories = ["algorithms", "data-structures"]
+
+[lints]
+workspace = true
+
+[lib]
+name = "midstreamer_temporal_compare"
+path = "src/lib.rs"
+
+[dependencies]
+serde = { version = "1.0", features = ["derive"] }
+thiserror = "2.0"
+dashmap = "6.1"
+lru = "0.12"
+
+[dev-dependencies]
+criterion = { version = "0.5", features = ["html_reports"] }
+# Property-based test baseline per ADR-0038. Asserts the algebraic
+# invariants that DTW / LCS / edit-distance MUST satisfy regardless
+# of input. See `tests/proptest_metrics.rs`.
+proptest = "1"

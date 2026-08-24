@@ -1,0 +1,15 @@
+{
+	"/": [],
+	"/api/analyze": [
+		"src/routes/api/analyze/+server.ts"
+	],
+	"/api/feedback": [
+		"src/routes/api/feedback/+server.ts"
+	],
+	"/api/health": [
+		"src/routes/api/health/+server.ts"
+	],
+	"/api/similar/[id]": [
+		"src/routes/api/similar/[id]/+server.ts"
+	]
+}

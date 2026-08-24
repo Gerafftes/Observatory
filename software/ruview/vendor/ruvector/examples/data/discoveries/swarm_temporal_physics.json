@@ -1,0 +1,132 @@
+{
+  "domain": "temporal-physics",
+  "generated": "2026-03-16T14:00:00Z",
+  "entries": [
+    {
+      "title": "Closed Timelike Curves — General Relativity Permits Time Travel",
+      "category": "pattern",
+      "content": "General relativity permits solutions with closed timelike curves (CTCs) where worldlines loop back to their starting point. Gödel's rotating universe (1949), Kerr black hole interiors, Tipler cylinders, and traversable wormholes all contain CTCs. Deutsch's quantum mechanical treatment using density matrices resolves grandfather paradox through self-consistent mixtures. Post-selected teleportation circuits simulate CTC effects in the lab. Whether nature actually permits CTCs remains an open question in quantum gravity.",
+      "tags": ["closed-timelike-curves", "time-travel", "Godel", "Deutsch-CTC", "general-relativity"],
+      "confidence": 0.82,
+      "novelty": 0.84,
+      "source": "research"
+    },
+    {
+      "title": "Novikov Self-Consistency Principle",
+      "category": "pattern",
+      "content": "Novikov's conjecture states that the only solutions to physics equations in the presence of CTCs are those that are globally self-consistent — paradoxes are impossible because events conspire to prevent them. A time traveler trying to kill their grandfather would fail through coincidence. Mathematical analysis of billiard balls through wormholes confirms self-consistent solutions always exist. The principle eliminates free will concerns but raises questions about the mechanism enforcing consistency.",
+      "tags": ["Novikov", "self-consistency", "grandfather-paradox", "billiard-ball", "causal-consistency"],
+      "confidence": 0.80,
+      "novelty": 0.80,
+      "source": "research"
+    },
+    {
+      "title": "Time Crystals — Perpetual Motion in Quantum Systems",
+      "category": "pattern",
+      "content": "Frank Wilczek proposed time crystals in 2012 — systems that break time-translation symmetry in their ground state, analogous to how ordinary crystals break spatial symmetry. While equilibrium time crystals were proven impossible, discrete time crystals (DTCs) exist in periodically driven quantum systems (Floquet systems). Google's Sycamore processor demonstrated a 20-qubit DTC in 2021. DTCs exhibit rigid subharmonic oscillation resistant to perturbations, suggesting new phases of matter with potential quantum memory applications.",
+      "tags": ["time-crystals", "Wilczek", "Floquet", "discrete-time-crystal", "symmetry-breaking"],
+      "confidence": 0.88,
+      "novelty": 0.87,
+      "source": "research"
+    },
+    {
+      "title": "Arrow of Time — Why Time Has Direction",
+      "category": "pattern",
+      "content": "The arrow of time emerges from the second law of thermodynamics (entropy increases) despite time-symmetric fundamental laws. Proposed explanations include the Past Hypothesis (extremely low entropy Big Bang), perspectival accounts (time's direction is observer-dependent), and gravity's tendency to create entropy through structure formation. Boltzmann's fluctuation hypothesis suggests our observable universe is a low-entropy fluctuation. The cosmological, thermodynamic, psychological, and quantum arrows of time may share a common origin.",
+      "tags": ["arrow-of-time", "entropy", "second-law", "Past-Hypothesis", "time-asymmetry"],
+      "confidence": 0.87,
+      "novelty": 0.78,
+      "source": "research"
+    },
+    {
+      "title": "Block Universe — Eternalism and the Frozen River of Time",
+      "category": "pattern",
+      "content": "The block universe theory (eternalism) holds that past, present, and future all equally exist as a 4-dimensional spacetime block. Special relativity supports this through the relativity of simultaneity — events that are simultaneous in one frame are sequential in another. The growing block theory adds events at the present but keeps the past. Presentism — only the present exists — faces challenges from relativity but aligns with our experience. These views have profound implications for free will, consciousness, and the nature of change.",
+      "tags": ["block-universe", "eternalism", "presentism", "spacetime", "philosophy-of-time"],
+      "confidence": 0.83,
+      "novelty": 0.79,
+      "source": "research"
+    },
+    {
+      "title": "Retrocausality in Quantum Mechanics",
+      "category": "pattern",
+      "content": "Retrocausal interpretations of quantum mechanics allow future measurement choices to influence past states, potentially explaining entanglement without nonlocality. The two-state vector formalism (Aharonov) evolves quantum states from both past and future boundary conditions. Delayed-choice experiments and quantum eraser experiments are naturally explained by retrocausality. Price and Wharton argue that blocking retrocausality requires fine-tuning. If real, retrocausality would radically revise our understanding of causation and time.",
+      "tags": ["retrocausality", "two-state-vector", "Aharonov", "delayed-choice", "backward-causation"],
+      "confidence": 0.75,
+      "novelty": 0.88,
+      "source": "research"
+    },
+    {
+      "title": "Wheeler-Feynman Absorber Theory — Advanced and Retarded Waves",
+      "category": "architecture",
+      "content": "Wheeler and Feynman proposed that electromagnetic radiation consists of equal parts retarded (forward-in-time) and advanced (backward-in-time) waves. The absorber response from the future cancels the advanced wave, producing the observed retarded-only radiation. This eliminates self-energy infinities and explains the arrow of radiation. Cramer's Transactional Interpretation of QM extends this to quantum mechanics: wave function collapse results from handshake between offer waves (retarded) and confirmation waves (advanced).",
+      "tags": ["absorber-theory", "Wheeler-Feynman", "advanced-waves", "Transactional-QM", "Cramer"],
+      "confidence": 0.78,
+      "novelty": 0.85,
+      "source": "research"
+    },
+    {
+      "title": "Temporal Entanglement — Correlations Across Time",
+      "category": "pattern",
+      "content": "Temporal entanglement creates quantum correlations between measurements at different times on the same system, analogous to spatial entanglement between spatially separated systems. Entanglement swapping can create correlations between particles that never coexisted. Temporal Bell inequalities test whether temporal correlations exceed classical bounds. Time-bin entanglement (photon arrival times) enables quantum communication. These experiments challenge the notion that entanglement requires spatial separation and suggest time and space play symmetric roles in quantum correlations.",
+      "tags": ["temporal-entanglement", "time-bin", "Bell-inequality", "entanglement-swapping", "temporal-correlations"],
+      "confidence": 0.82,
+      "novelty": 0.86,
+      "source": "research"
+    },
+    {
+      "title": "Many-Worlds and Branching Time",
+      "category": "pattern",
+      "content": "Everett's Many-Worlds Interpretation eliminates wave function collapse — the universe branches into parallel timelines at each quantum measurement. Decoherence explains why branches don't interfere. David Deutsch argues MWI is the only interpretation compatible with quantum computation (parallel branches perform the computation). Decision theory in MWI (Wallace) recovers the Born rule. Critics question the measure problem, ontological extravagance, and whether branching worlds are genuinely parallel or merely potential.",
+      "tags": ["many-worlds", "Everett", "branching", "decoherence", "quantum-multiverse"],
+      "confidence": 0.84,
+      "novelty": 0.77,
+      "source": "research"
+    },
+    {
+      "title": "Chronology Protection Conjecture — Nature Forbids Time Machines",
+      "category": "pattern",
+      "content": "Stephen Hawking's chronology protection conjecture states that the laws of physics prevent the creation of closed timelike curves, protecting chronological ordering. Evidence includes: vacuum fluctuation energy diverges at chronology horizons (semiclassical calculation), quantum gravity effects likely prevent CTC formation, and known CTC solutions require exotic matter violating energy conditions. Kay, Radzikowski, and Wald proved quantum field theory becomes ill-defined on CTC spacetimes. If true, chronology protection is a deep principle connecting quantum gravity and causality.",
+      "tags": ["chronology-protection", "Hawking", "time-machine", "exotic-matter", "causality"],
+      "confidence": 0.85,
+      "novelty": 0.81,
+      "source": "research"
+    },
+    {
+      "title": "Quantum Gravity and the Nature of Time",
+      "category": "pattern",
+      "content": "Time's status in quantum gravity is deeply problematic. The Wheeler-DeWitt equation has no time variable — the 'problem of time' in canonical quantum gravity. Loop quantum gravity discretizes time at the Planck scale (~5×10^-44 seconds). String theory preserves time as a background parameter. Causal set theory replaces spacetime with discrete partial orders where time emerges from causal structure. Some physicists (Barbour, Rovelli) argue time is an illusion emerging from change — 'time is what happens when nothing else does.'",
+      "tags": ["quantum-gravity", "problem-of-time", "Wheeler-DeWitt", "Planck-time", "emergent-time"],
+      "confidence": 0.82,
+      "novelty": 0.84,
+      "source": "research"
+    },
+    {
+      "title": "Causal Set Theory — Spacetime from Discrete Order",
+      "category": "architecture",
+      "content": "Causal set theory (Sorkin) proposes that spacetime is fundamentally a discrete partially ordered set of events. The causal order plus counting (number of elements between events gives volume) recovers the Lorentzian manifold in the continuum limit. Causal sets predicted a small positive cosmological constant before its observational discovery. The theory naturally incorporates both discreteness and Lorentz invariance through random sprinkling. Quantum dynamics on causal sets uses a sequential growth process — the cosmos literally grows one event at a time.",
+      "tags": ["causal-set", "Sorkin", "discrete-spacetime", "partial-order", "cosmological-constant"],
+      "confidence": 0.80,
+      "novelty": 0.86,
+      "source": "research"
+    },
+    {
+      "title": "Time Dilation — Relativistic Time Warping",
+      "category": "pattern",
+      "content": "Special relativity predicts velocity-dependent time dilation (moving clocks run slow), confirmed by muon lifetime extension and Hafele-Keating airplane experiments. General relativity adds gravitational time dilation — clocks run slower in deeper gravitational wells. GPS satellites must correct for both effects (38 microseconds/day). Extreme cases: time nearly stops at black hole horizons, and neutron star surfaces experience measurable gravitational time dilation. Time dilation is not an illusion — it produces real, measurable aging differences (twin paradox).",
+      "tags": ["time-dilation", "special-relativity", "gravitational-time", "twin-paradox", "GPS-correction"],
+      "confidence": 0.95,
+      "novelty": 0.68,
+      "source": "research"
+    },
+    {
+      "title": "Temporal Logic in Computer Science",
+      "category": "architecture",
+      "content": "Temporal logics (LTL, CTL, CTL*) formalize reasoning about time in computation. Linear Temporal Logic uses operators: always (□), eventually (◇), until (U), and next (X). Model checking verifies temporal properties of software and hardware (Turing Award 2007). Timed automata extend with real-valued clocks. Metric temporal logic adds quantitative timing constraints. Applications span safety-critical systems verification, autonomous vehicle planning, and AI agent specification. These formalisms bridge physics of time with engineered temporal systems.",
+      "tags": ["temporal-logic", "LTL", "model-checking", "timed-automata", "formal-verification"],
+      "confidence": 0.91,
+      "novelty": 0.74,
+      "source": "research"
+    }
+  ]
+}

@@ -1,0 +1,9 @@
+[
+  {
+    "title": "NASA FIRMS Global Fire Data - API Key Required",
+    "content": "The FIRMS VIIRS_SNPP_NRT endpoint requires a valid MAP_KEY. Register at https://firms.modaps.eosdis.nasa.gov/api/area/ for a free key. DEMO_KEY is no longer accepted.",
+    "timestamp": "2026-03-15T23:59:11.624931Z",
+    "source": "NASA FIRMS (VIIRS SNPP NRT)",
+    "confidence": 0.0
+  }
+]

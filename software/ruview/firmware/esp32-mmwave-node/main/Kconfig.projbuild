@@ -1,0 +1,54 @@
+menu "RuView mmWave node"
+
+config MMWAVE_WIFI_SSID
+    string "WiFi SSID"
+    default ""
+
+config MMWAVE_WIFI_PASSWORD
+    string "WiFi password"
+    default ""
+
+config MMWAVE_TARGET_HOST
+    string "UDP collector IPv4 address"
+    default "192.0.2.50"
+
+config MMWAVE_TARGET_PORT
+    int "UDP collector port"
+    range 1 65535
+    default 5010
+
+config MMWAVE_NODE_ID
+    string "Stable node ID"
+    default "MMWAVE1"
+
+config MMWAVE_OTA_PSK
+    string "OTA and mode-control bearer token"
+    default ""
+    help
+        Required for OTA uploads and mode changes. Keep this secret.
+        Empty means that all mutating HTTP endpoints fail closed.
+
+config MMWAVE_INITIAL_MODE_CALIBRATION
+    bool "Start in calibration mode on a fresh NVS partition"
+    default y
+
+config MMWAVE_RADAR_ORIGIN_X_MM
+    int "Radar origin X in room coordinates (mm)"
+    default 0
+
+config MMWAVE_RADAR_ORIGIN_Z_MM
+    int "Radar origin Z in room coordinates (mm)"
+    default 0
+
+config MMWAVE_RADAR_YAW_MDEG
+    int "Radar forward-axis yaw from room +X (millidegrees)"
+    range -360000 360000
+    default 0
+
+config MMWAVE_RADAR_INVERT_RAW_X
+    bool "Invert raw radar X before treating it as local-right"
+    default n
+    help
+        Determine this with measured left/right floor marks after mounting.
+
+endmenu

@@ -1,0 +1,30 @@
+# Base sdkconfig defaults for ruvector-mmwave-sensor (iter A bring-up).
+# Per-variant tweaks live in `sdkconfig.defaults.<target>`.
+#
+# Honest scope note: iter A's binary is dominated by the IDF C runtime
+# (FreeRTOS + log + heap + vfs + newlib) which is force-linked. There's
+# little headroom from disabling individual IDF components — the linker
+# already drops unreferenced archives. Real shrink path is a future
+# migration to bare-metal `esp-hal`; deferred.
+
+# Logging — INFO level surfaces presence/HR/BR events without flooding;
+# DEBUG bumps to per-byte parser tracing for first-attach debugging.
+CONFIG_LOG_DEFAULT_LEVEL_INFO=y
+
+# Stack — frame parser holds a 32-byte ring + a small payload buffer;
+# 16 KB is plenty.
+CONFIG_ESP_MAIN_TASK_STACK_SIZE=16384
+
+# UART driver — esp-idf-hal's UartDriver expects this enabled.
+CONFIG_UART_ISR_IN_IRAM=y
+
+# Compile IDF C with -Os to match our Cargo release profile. Real win:
+# the IDF static libs compile slightly smaller this way.
+CONFIG_COMPILER_OPTIMIZATION_SIZE=y
+
+# Quieter bootloader so first-boot logs aren't dominated by IDF chatter.
+CONFIG_BOOTLOADER_LOG_LEVEL_WARN=y
+
+# Iter B will re-enable mbedtls when the mTLS embed-RPC client lands.
+CONFIG_MBEDTLS_SSL_IN_CONTENT_LEN=4096
+CONFIG_MBEDTLS_SSL_OUT_CONTENT_LEN=2048

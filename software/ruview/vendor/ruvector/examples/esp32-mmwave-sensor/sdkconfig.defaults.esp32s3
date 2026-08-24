@@ -1,0 +1,13 @@
+# ESP32-S3 overrides for ruvector-mmwave-sensor (matches the Waveshare
+# ESP32-S3-Touch-AMOLED-1.8 board specified in ADR-SYS-0026).
+
+CONFIG_ESP32S3_DEFAULT_CPU_FREQ_240=y
+CONFIG_SPIRAM=n
+CONFIG_ESP32S3_INSTRUCTION_CACHE_32KB=y
+CONFIG_ESP32S3_DATA_CACHE_64KB=y
+
+# Console: native USB-Serial-JTAG (the board enumerates as /dev/ttyACM0
+# via the on-chip USB peripheral; UART0 has no physical pinout). Same
+# pattern as the iter-105 esp32-flash sdkconfig.
+CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG=y
+CONFIG_ESP_CONSOLE_SECONDARY_NONE=y

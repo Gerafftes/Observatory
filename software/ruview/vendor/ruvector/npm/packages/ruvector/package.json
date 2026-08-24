@@ -1,0 +1,122 @@
+{
+  "name": "ruvector",
+  "version": "0.2.28",
+  "description": "Self-learning vector database for Node.js — hybrid search, Graph RAG, FlashAttention-3, HNSW, 50+ attention mechanisms",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "bin": {
+    "ruvector": "./bin/cli.js"
+  },
+  "scripts": {
+    "build": "tsc && mkdir -p dist/core/onnx && cp -r src/core/onnx/. dist/core/onnx/",
+    "verify-dist": "node scripts/verify-dist.js",
+    "prepack": "npm run build && npm run verify-dist",
+    "prepublishOnly": "npm run build && npm run verify-dist",
+    "test": "node test/integration.js && node test/cli-commands.js && node test/sigterm-cleanup.js"
+  },
+  "keywords": [
+    "vector",
+    "database",
+    "vector-database",
+    "vector-search",
+    "similarity-search",
+    "semantic-search",
+    "embeddings",
+    "hnsw",
+    "ann",
+    "ai",
+    "machine-learning",
+    "rag",
+    "rust",
+    "wasm",
+    "native",
+    "ruv",
+    "ruvector",
+    "attention",
+    "transformer",
+    "flash-attention",
+    "hyperbolic",
+    "sona",
+    "lora",
+    "ewc",
+    "adaptive-learning",
+    "continual-learning",
+    "onnx",
+    "semantic-embeddings",
+    "minilm",
+    "brain",
+    "shared-intelligence",
+    "mcp",
+    "edge-computing",
+    "graph-rag",
+    "hnsw",
+    "hybrid-search",
+    "colbert",
+    "turboquant",
+    "mamba",
+    "pi-brain",
+    "identity",
+    "pi-key",
+    "distributed-compute"
+  ],
+  "author": "ruv.io Team <info@ruv.io> (https://ruv.io)",
+  "homepage": "https://ruv.io",
+  "bugs": {
+    "url": "https://github.com/ruvnet/ruvector/issues"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ruvnet/ruvector.git",
+    "directory": "npm/packages/ruvector"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.0",
+    "@ruvector/attention": "^0.1.3",
+    "@ruvector/core": "^0.1.25",
+    "@ruvector/gnn": "^0.1.22",
+    "@ruvector/sona": "^0.1.4",
+    "chalk": "^4.1.2",
+    "commander": "^11.1.0",
+    "js-beautify": "^1.15.4",
+    "ora": "^5.4.1"
+  },
+  "optionalDependencies": {
+    "@ruvector/rvf": "^0.1.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.5",
+    "typescript": "^5.9.3"
+  },
+  "files": [
+    "bin/",
+    "dist/",
+    "src/decompiler/",
+    "wasm/",
+    "README.md",
+    "LICENSE"
+  ],
+  "peerDependencies": {
+    "@ruvector/diskann": ">=0.1.0",
+    "@ruvector/pi-brain": ">=0.1.0",
+    "@ruvector/router": ">=0.1.0",
+    "@ruvector/ruvllm": ">=2.0.0"
+  },
+  "peerDependenciesMeta": {
+    "@ruvector/pi-brain": {
+      "optional": true
+    },
+    "@ruvector/ruvllm": {
+      "optional": true
+    },
+    "@ruvector/router": {
+      "optional": true
+    },
+    "@ruvector/diskann": {
+      "optional": true
+    }
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

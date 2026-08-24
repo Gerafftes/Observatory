@@ -1,0 +1,212 @@
+[
+  {
+    "title": "Ultra-short-period planet: ZTF J1230-2655 b",
+    "content": "Radius: 13.78704626 R_Earth, Mass: 7024.0077947 M_Earth, Orbital period: 0.2360 days, Method: Transit, Year: 2025",
+    "timestamp": "2026-03-15T23:59:11.624931Z",
+    "source": "NASA Exoplanet Archive (TAP API)",
+    "confidence": 0.95
+  },
+  {
+    "title": "Ultra-short-period planet: ZTF J1828+2308 b",
+    "content": "Radius: 11.13051784 R_Earth, Mass: 6356.56814 M_Earth, Orbital period: 0.1120 days, Method: Transit, Year: 2025",
+    "timestamp": "2026-03-15T23:59:11.624931Z",
+    "source": "NASA Exoplanet Archive (TAP API)",
+    "confidence": 0.95
+  },
+  {
+    "title": "Ultra-short-period planet: TOI-3261 b",
+    "content": "Radius: 3.82 R_Earth, Mass: 30.3 M_Earth, Orbital period: 0.8831 days, Method: Transit, Year: 2024",
+    "timestamp": "2026-03-15T23:59:11.624931Z",
+    "source": "NASA Exoplanet Archive (TAP API)",
+    "confidence": 0.95
+  },
+  {
+    "title": "Ultra-short-period planet: TOI-332 b",
+    "content": "Radius: 3.2 R_Earth, Mass: 57.2 M_Earth, Orbital period: 0.7770 days, Method: Transit, Year: 2023",
+    "timestamp": "2026-03-15T23:59:11.624931Z",
+    "source": "NASA Exoplanet Archive (TAP API)",
+    "confidence": 0.95
+  },
+  {
+    "title": "Ultra-short-period planet: TOI-1937 A b",
+    "content": "Radius: 13.97759893 R_Earth, Mass: 638.83509807 M_Earth, Orbital period: 0.9467 days, Method: Transit, Year: 2023",
+    "timestamp": "2026-03-15T23:59:11.624931Z",
+    "source": "NASA Exoplanet Archive (TAP API)",
+    "confidence": 0.95
+  },
+  {
+    "title": "Ultra-short-period planet: GJ 367 b",
+    "content": "Radius: 2.66076 R_Earth, Mass: None M_Earth, Orbital period: 0.3219 days, Method: Transit, Year: 2021",
+    "timestamp": "2026-03-15T23:59:11.624931Z",
+    "source": "NASA Exoplanet Archive (TAP API)",
+    "confidence": 0.8
+  },
+  {
+    "title": "Ultra-short-period planet: TOI-2109 b",
+    "content": "Radius: 15.098497 R_Earth, Mass: 1595.49860314 M_Earth, Orbital period: 0.6725 days, Method: Transit, Year: 2021",
+    "timestamp": "2026-03-15T23:59:11.624931Z",
+    "source": "NASA Exoplanet Archive (TAP API)",
+    "confidence": 0.95
+  },
+  {
+    "title": "Ultra-short-period planet: LTT 9779 b",
+    "content": "Radius: 4.72 R_Earth, Mass: 29.32 M_Earth, Orbital period: 0.7921 days, Method: Transit, Year: 2020",
+    "timestamp": "2026-03-15T23:59:11.624931Z",
+    "source": "NASA Exoplanet Archive (TAP API)",
+    "confidence": 0.95
+  },
+  {
+    "title": "Ultra-short-period planet: HIP 65 A b",
+    "content": "Radius: 22.75427 R_Earth, Mass: 1021.18779 M_Earth, Orbital period: 0.9810 days, Method: Transit, Year: 2020",
+    "timestamp": "2026-03-15T23:59:11.624931Z",
+    "source": "NASA Exoplanet Archive (TAP API)",
+    "confidence": 0.95
+  },
+  {
+    "title": "Ultra-short-period planet: TOI-849 b",
+    "content": "Radius: 3.64 R_Earth, Mass: 41.8 M_Earth, Orbital period: 0.7655 days, Method: Transit, Year: 2020",
+    "timestamp": "2026-03-15T23:59:11.624931Z",
+    "source": "NASA Exoplanet Archive (TAP API)",
+    "confidence": 0.95
+  },
+  {
+    "title": "Ultra-short-period planet: NGTS-10 b",
+    "content": "Radius: 13.506845 R_Earth, Mass: 687.14846 M_Earth, Orbital period: 0.7669 days, Method: Transit, Year: 2020",
+    "timestamp": "2026-03-15T23:59:11.624931Z",
+    "source": "NASA Exoplanet Archive (TAP API)",
+    "confidence": 0.95
+  },
+  {
+    "title": "Ultra-short-period planet: NGTS-6 b",
+    "content": "Radius: 14.863134 R_Earth, Mass: 425.57437 M_Earth, Orbital period: 0.8821 days, Method: Transit, Year: 2019",
+    "timestamp": "2026-03-15T23:59:11.624931Z",
+    "source": "NASA Exoplanet Archive (TAP API)",
+    "confidence": 0.95
+  },
+  {
+    "title": "Ultra-short-period planet: K2-183 b",
+    "content": "Radius: 2.59929571 R_Earth, Mass: None M_Earth, Orbital period: 0.4693 days, Method: Transit, Year: 2018",
+    "timestamp": "2026-03-15T23:59:11.624931Z",
+    "source": "NASA Exoplanet Archive (TAP API)",
+    "confidence": 0.8
+  },
+  {
+    "title": "Ultra-short-period planet: K2-266 b",
+    "content": "Radius: 3.3 R_Earth, Mass: 11.26782377 M_Earth, Orbital period: 0.6585 days, Method: Transit, Year: 2018",
+    "timestamp": "2026-03-15T23:59:11.624931Z",
+    "source": "NASA Exoplanet Archive (TAP API)",
+    "confidence": 0.95
+  },
+  {
+    "title": "Ultra-short-period planet: KELT-16 b",
+    "content": "Radius: 15.50202031 R_Earth, Mass: 861.31498297 M_Earth, Orbital period: 0.9690 days, Method: Transit, Year: 2017",
+    "timestamp": "2026-03-15T23:59:11.624931Z",
+    "source": "NASA Exoplanet Archive (TAP API)",
+    "confidence": 0.95
+  },
+  {
+    "title": "Ultra-short-period planet: K2-131 b",
+    "content": "Radius: 2.13418186 R_Earth, Mass: None M_Earth, Orbital period: 0.3693 days, Method: Transit, Year: 2017",
+    "timestamp": "2026-03-15T23:59:11.624931Z",
+    "source": "NASA Exoplanet Archive (TAP API)",
+    "confidence": 0.8
+  },
+  {
+    "title": "Ultra-short-period planet: Kepler-1039 b",
+    "content": "Radius: 3.48 R_Earth, Mass: None M_Earth, Orbital period: 0.9349 days, Method: Transit, Year: 2016",
+    "timestamp": "2026-03-15T23:59:11.624931Z",
+    "source": "NASA Exoplanet Archive (TAP API)",
+    "confidence": 0.8
+  },
+  {
+    "title": "Ultra-short-period planet: Kepler-845 b",
+    "content": "Radius: 2.1 R_Earth, Mass: None M_Earth, Orbital period: 0.9279 days, Method: Transit, Year: 2016",
+    "timestamp": "2026-03-15T23:59:11.624931Z",
+    "source": "NASA Exoplanet Archive (TAP API)",
+    "confidence": 0.8
+  },
+  {
+    "title": "Ultra-short-period planet: HATS-18 b",
+    "content": "Radius: 14.986433 R_Earth, Mass: 629.3034 M_Earth, Orbital period: 0.8378 days, Method: Transit, Year: 2016",
+    "timestamp": "2026-03-15T23:59:11.624931Z",
+    "source": "NASA Exoplanet Archive (TAP API)",
+    "confidence": 0.95
+  },
+  {
+    "title": "Ultra-short-period planet: Kepler-1520 b",
+    "content": "Radius: 5.77 R_Earth, Mass: None M_Earth, Orbital period: 0.6536 days, Method: Transit, Year: 2016",
+    "timestamp": "2026-03-15T23:59:11.624931Z",
+    "source": "NASA Exoplanet Archive (TAP API)",
+    "confidence": 0.8
+  },
+  {
+    "title": "Ultra-short-period planet: Kepler-1547 b",
+    "content": "Radius: 2.24 R_Earth, Mass: None M_Earth, Orbital period: 0.6930 days, Method: Transit, Year: 2016",
+    "timestamp": "2026-03-15T23:59:11.624931Z",
+    "source": "NASA Exoplanet Archive (TAP API)",
+    "confidence": 0.8
+  },
+  {
+    "title": "Ultra-short-period planet: K2-22 b",
+    "content": "Radius: 2.5 R_Earth, Mass: 444.962 M_Earth, Orbital period: 0.3811 days, Method: Transit, Year: 2015",
+    "timestamp": "2026-03-15T23:59:11.624931Z",
+    "source": "NASA Exoplanet Archive (TAP API)",
+    "confidence": 0.95
+  },
+  {
+    "title": "Ultra-short-period planet: WASP-103 b",
+    "content": "Radius: 17.127352 R_Earth, Mass: 462.44265 M_Earth, Orbital period: 0.9255 days, Method: Transit, Year: 2014",
+    "timestamp": "2026-03-15T23:59:11.624931Z",
+    "source": "NASA Exoplanet Archive (TAP API)",
+    "confidence": 0.95
+  },
+  {
+    "title": "Ultra-short-period planet: Kepler-32 f",
+    "content": "Radius: 2.04 R_Earth, Mass: None M_Earth, Orbital period: 0.7400 days, Method: Transit, Year: 2012",
+    "timestamp": "2026-03-15T23:59:11.624931Z",
+    "source": "NASA Exoplanet Archive (TAP API)",
+    "confidence": 0.8
+  },
+  {
+    "title": "Ultra-short-period planet: WASP-43 b",
+    "content": "Radius: 10.42 R_Earth, Mass: 572.1 M_Earth, Orbital period: 0.8000 days, Method: Transit, Year: 2011",
+    "timestamp": "2026-03-15T23:59:11.624931Z",
+    "source": "NASA Exoplanet Archive (TAP API)",
+    "confidence": 0.95
+  },
+  {
+    "title": "Ultra-short-period planet: Kepler-42 c",
+    "content": "Radius: 3.38 R_Earth, Mass: None M_Earth, Orbital period: 0.4533 days, Method: Transit, Year: 2011",
+    "timestamp": "2026-03-15T23:59:11.624931Z",
+    "source": "NASA Exoplanet Archive (TAP API)",
+    "confidence": 0.8
+  },
+  {
+    "title": "Ultra-short-period planet: Kepler-10 b",
+    "content": "Radius: 2.00462345 R_Earth, Mass: None M_Earth, Orbital period: 0.8375 days, Method: Transit, Year: 2011",
+    "timestamp": "2026-03-15T23:59:11.624931Z",
+    "source": "NASA Exoplanet Archive (TAP API)",
+    "confidence": 0.8
+  },
+  {
+    "title": "Ultra-short-period planet: WASP-19 b",
+    "content": "Radius: 15.636555 R_Earth, Mass: 354.06262 M_Earth, Orbital period: 0.7888 days, Method: Transit, Year: 2009",
+    "timestamp": "2026-03-15T23:59:11.624931Z",
+    "source": "NASA Exoplanet Archive (TAP API)",
+    "confidence": 0.95
+  },
+  {
+    "title": "Ultra-short-period planet: WASP-18 b",
+    "content": "Radius: 13.4508 R_Earth, Mass: 3635.9752 M_Earth, Orbital period: 0.9415 days, Method: Transit, Year: 2009",
+    "timestamp": "2026-03-15T23:59:11.624931Z",
+    "source": "NASA Exoplanet Archive (TAP API)",
+    "confidence": 0.95
+  },
+  {
+    "title": "Ultra-short-period planet: 55 Cnc e",
+    "content": "Radius: 2.173 R_Earth, Mass: 8.37 M_Earth, Orbital period: 0.7365 days, Method: Radial Velocity, Year: 2004",
+    "timestamp": "2026-03-15T23:59:11.624931Z",
+    "source": "NASA Exoplanet Archive (TAP API)",
+    "confidence": 0.95
+  }
+]

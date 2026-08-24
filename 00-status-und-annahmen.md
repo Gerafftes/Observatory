@@ -20,7 +20,7 @@ Die aktuelle Phase soll aus dem stabilen 1TX-/4RX-Datenempfang eine belastbare L
 | ESP32 #4 | RuView CSI-Empfänger RX3 | Firmware 0.7.0; Einzelboard-Boot, gemeinsamer Binding-Lauf und korrigierte 25-s-Discovery bestanden |
 | ESP32 #5 | RuView CSI-Empfänger RX4 | Firmware 0.7.0; Einzelboard-Boot, gemeinsamer Binding-Lauf und korrigierte 25-s-Discovery bestanden |
 | mmWave-Modul | spätere Referenz für Presence/Atmung/Distanz | vorhanden, aktuell bewusst nicht verwendet |
-| Laptop/PC | Server, Logging, Dashboard | CSI-WLAN-Adresse `CSI_HOST_IP` und gemeinsamer Empfang von RX1 bis RX4 live bestätigt; korrigierter Serverbuild vom 2026-08-09 liegt vor |
+| Laptop/PC | Server, Logging, Dashboard | CSI-WLAN-Adresse `192.168.4.50` und gemeinsamer Empfang von RX1 bis RX4 live bestätigt; korrigierter Serverbuild vom 2026-08-09 liegt vor |
 
 ## Annahmen
 
@@ -193,10 +193,10 @@ TX-Filter blieben im jeweiligen NVS erhalten. Weil TX beziehungsweise CSI-AP dab
 ausgeschaltet waren, war der WLAN-Verbindungsfehler erwartbar und noch kein
 Live-CSI-Test. Der TX wurde anschließend ohne Schreibzugriff als ESP32-S3 mit
 16 MB Flash und 8 MB PSRAM inventarisiert. Seine unveränderte Senderfirmware
-bootete stabil, startete den SoftAP auf `CSI_AP_IP` und zeigte weder Brownout
-noch Reset-Schleife. Der Mac erhielt per DHCP zunächst `CSI_NODE_IP_2`; Gateway
+bootete stabil, startete den SoftAP auf `192.168.4.1` und zeigte weder Brownout
+noch Reset-Schleife. Der Mac erhielt per DHCP zunächst `192.168.4.2`; Gateway
 und Broadcastempfang wurden damit bestätigt. Anschließend wurde das
-CSI-Interface passend zu RX1 bis RX4 wieder auf `CSI_HOST_IP` gesetzt. In
+CSI-Interface passend zu RX1 bis RX4 wieder auf `192.168.4.50` gesetzt. In
 einem 10-Sekunden-Lauf kamen 32-Byte-Pakete mit `45,5 Hz` an. Der gemeinsame
 Livebetrieb muss Kanal und per-RX-Datenqualität noch bestätigen; ein regulärer
 TX-Flash ist nicht vorgesehen.

@@ -42,28 +42,40 @@ documents what has been verified and which hardware gate comes next.
 
 ## Quick start
 
-This repository contains the project report and requires no build step:
+This repository contains the documentation, hardware files, and the complete
+Observatory software source:
 
 ```bash
 git clone https://github.com/Gerafftes/Observatory.git
 cd Observatory
 ```
 
-For a first reproducible check, open the technical handoff and follow its
-setup and preflight gates. This documentation repository has no local runtime
-to install.
+The documentation can be read directly. The UI and backend are stored together
+under [`software/ruview/`](software/README.md). A hardware-free software run can
+be started with:
 
-The three most important entry points are:
+```bash
+cd software/ruview/v2
+cargo run -p wifi-densepose-sensing-server --no-default-features -- \
+  --source simulate --http-port 3002 --ws-port 3001
+```
 
-1. [Current D6/mmWave status](08-aktueller-arbeitsstand-d6-und-position.md)
-2. [Result reports](results/)
-3. [PCB-01 manufacturing files](hardware/pcb-01/)
-4. [PCB-02 manufacturing files and KiCad sources](hardware/pcb-02/)
+Then open `http://127.0.0.1:3002/ui/index.html#sensing`. Simulation remains
+`SOFTWARE-ONLY / UNVALIDATED` and does not replace any hardware gate.
 
-The RX firmware and sensing server are based on the separate upstream project
-[ruvnet/RuView](https://github.com/ruvnet/RuView). The local project changes
-are documented in
-[`06-ruview-anpassungen.md`](06-ruview-anpassungen.md).
+The main entry points are:
+
+1. [UI, backend, and firmware](software/README.md)
+2. [Current D6/mmWave status](08-aktueller-arbeitsstand-d6-und-position.md)
+3. [Result reports](results/)
+4. [PCB-01 manufacturing files](hardware/pcb-01/)
+5. [PCB-02 manufacturing files and KiCad sources](hardware/pcb-02/)
+
+The software is based on [ruvnet/RuView](https://github.com/ruvnet/RuView), but
+the Observatory changes and required subprojects are included directly in this
+repository. Provenance and pinned source revisions are listed in
+[`software/README.md`](software/README.md); project-specific changes are
+documented in [`06-ruview-anpassungen.md`](06-ruview-anpassungen.md).
 
 ## What Observatory can do
 
@@ -79,12 +91,15 @@ are documented in
 - Use an HLK-LD2450 as a calibration and reference sensor without feeding its
   values into the later WiFi CSI predictor.
 
-## Local checks (optional)
+## Local checks
 
-This documentation repository has no local runtime to install. The included
-offline evaluation test can be run with Python 3:
+The included software can be checked directly from the repository:
 
 ```bash
+sh scripts/verify_observatory_source.sh
+node --test software/ruview/ui/tests/*.test.mjs
+cargo check --manifest-path software/ruview/v2/Cargo.toml \
+  -p wifi-densepose-sensing-server --no-default-features
 python3 -m unittest scripts/tests/test_evaluate_d5_replay.py
 ```
 
@@ -228,8 +243,6 @@ The revised [PCB-02 with KiCad sources, validation reports, and ordering archive
 restores the SMD capacitors, uses standard pin-header pads for the ESP32-C3,
 and keeps the PCB-01 outer dimensions and mounting-hole positions.
 
-<a href="hardware/pcb-02/"><img src="hardware/pcb-02/preview/PCB-02-reference.png" alt="PCB-02 preview with PCB-02 and @gerafftes labels, ESP32-C3 pads, SMD capacitors, and LD2450 connector" width="460"></a>
-
 The external MakerWorld model
 [*ESP32 S3 Wroom Case*](https://makerworld.com/de/models/1456361-esp32-s3-wroom-case#profileId-1517915)
 is intended as an enclosure for the ESP32-S3 boards. Its MakerWorld Standard
@@ -253,20 +266,21 @@ German.
 | [`06-ruview-anpassungen.md`](06-ruview-anpassungen.md) | Local changes to RuView |
 | [`07-screenshot-nachweise.md`](07-screenshot-nachweise.md) | Visual evidence and failure screenshots |
 | [`08-aktueller-arbeitsstand-d6-und-position.md`](08-aktueller-arbeitsstand-d6-und-position.md) | Authoritative D6/mmWave handoff |
+| [`software/`](software/README.md) | Complete UI, backend, and firmware source with provenance |
 | [`results/`](results/) | Detailed result reports |
 | [`templates/messblatt.md`](templates/messblatt.md) | Measurement-sheet template |
 
 ## License
 
-This project is licensed under the
-[PolyForm Noncommercial License 1.0.0](LICENSE.md). Use, modification, and
-distribution are permitted only for the noncommercial purposes defined in
-the license.
+Observatory-owned material is licensed under the
+[PolyForm Noncommercial License 1.0.0](LICENSE.md). The embedded RuView source
+and its vendored components retain their respective license and notice files
+under [`software/ruview/`](software/ruview/).
 
 ## Credits
 
-- [ruvnet/RuView](https://github.com/ruvnet/RuView) provides the software base
-  for the RX firmware and sensing server.
+- [ruvnet/RuView](https://github.com/ruvnet/RuView) is the documented software
+  base for the embedded UI, firmware, and sensing-server source.
 - [Espressif](https://www.espressif.com/en/products/socs/esp32) develops the
   ESP32 platforms used by this project.
 - The ESP32-S3-WROOM enclosure was created by MakerWorld user

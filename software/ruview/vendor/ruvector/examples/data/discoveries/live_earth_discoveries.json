@@ -1,0 +1,146 @@
+[
+  {
+    "title": "M6.3 earthquake: 85 km W of Vallenar, Chile",
+    "content": "Significant M6.3 at 85 km W of Vallenar, Chile, depth 10 km. Shallow: higher surface impact. Tsunami: 0.",
+    "category": "anomaly",
+    "tags": [
+      "earth",
+      "seismic",
+      "earthquake",
+      "shallow"
+    ],
+    "domain": "earth-science",
+    "source_api": "USGS Earthquake Hazards",
+    "timestamp": "2026-03-15T19:25:16Z",
+    "confidence": 0.63,
+    "data_points": 10
+  },
+  {
+    "title": "M5.5 earthquake: 2 km SSE of Rodotópi, Greece",
+    "content": "Significant M5.5 at 2 km SSE of Rodotópi, Greece, depth 10 km. Shallow: higher surface impact. Tsunami: 0.",
+    "category": "anomaly",
+    "tags": [
+      "earth",
+      "seismic",
+      "earthquake",
+      "shallow"
+    ],
+    "domain": "earth-science",
+    "source_api": "USGS Earthquake Hazards",
+    "timestamp": "2026-03-15T19:25:16Z",
+    "confidence": 0.55,
+    "data_points": 10
+  },
+  {
+    "title": "M6.3 earthquake: 181 km SE of Kirakira, Solomon Islands",
+    "content": "Significant M6.3 at 181 km SE of Kirakira, Solomon Islands, depth 8.682 km. Shallow: higher surface impact. Tsunami: 1.",
+    "category": "anomaly",
+    "tags": [
+      "earth",
+      "seismic",
+      "earthquake",
+      "shallow"
+    ],
+    "domain": "earth-science",
+    "source_api": "USGS Earthquake Hazards",
+    "timestamp": "2026-03-15T19:25:16Z",
+    "confidence": 0.63,
+    "data_points": 10
+  },
+  {
+    "title": "M6.4 earthquake: 224 km ESE of Attu Station, Alaska",
+    "content": "Significant M6.4 at 224 km ESE of Attu Station, Alaska, depth 10 km. Shallow: higher surface impact. Tsunami: 1.",
+    "category": "anomaly",
+    "tags": [
+      "earth",
+      "seismic",
+      "earthquake",
+      "shallow"
+    ],
+    "domain": "earth-science",
+    "source_api": "USGS Earthquake Hazards",
+    "timestamp": "2026-03-15T19:25:16Z",
+    "confidence": 0.64,
+    "data_points": 10
+  },
+  {
+    "title": "M6.3 earthquake: Fiji region",
+    "content": "Significant M6.3 at Fiji region, depth 579 km. Deep-focus: subduction zone dynamics. Tsunami: 0.",
+    "category": "anomaly",
+    "tags": [
+      "earth",
+      "seismic",
+      "earthquake",
+      "deep-focus"
+    ],
+    "domain": "earth-science",
+    "source_api": "USGS Earthquake Hazards",
+    "timestamp": "2026-03-15T19:25:16Z",
+    "confidence": 0.63,
+    "data_points": 10
+  },
+  {
+    "title": "M5 earthquake: 23 km SSE of Sātkhira, Bangladesh",
+    "content": "Significant M5 at 23 km SSE of Sātkhira, Bangladesh, depth 10 km. Shallow: higher surface impact. Tsunami: 0.",
+    "category": "anomaly",
+    "tags": [
+      "earth",
+      "seismic",
+      "earthquake",
+      "shallow"
+    ],
+    "domain": "earth-science",
+    "source_api": "USGS Earthquake Hazards",
+    "timestamp": "2026-03-15T19:25:16Z",
+    "confidence": 0.5,
+    "data_points": 10
+  },
+  {
+    "title": "M7 earthquake: 55 km NNW of Kota Belud, Malaysia",
+    "content": "Significant M7 at 55 km NNW of Kota Belud, Malaysia, depth 629 km. Deep-focus: subduction zone dynamics. Tsunami: 1.",
+    "category": "anomaly",
+    "tags": [
+      "earth",
+      "seismic",
+      "earthquake",
+      "deep-focus"
+    ],
+    "domain": "earth-science",
+    "source_api": "USGS Earthquake Hazards",
+    "timestamp": "2026-03-15T19:25:16Z",
+    "confidence": 0.7,
+    "data_points": 10
+  },
+  {
+    "title": "M6.4 earthquake: 48 km W of Port-Olry, Vanuatu",
+    "content": "Significant M6.4 at 48 km W of Port-Olry, Vanuatu, depth 43 km. Shallow: higher surface impact. Tsunami: 1.",
+    "category": "anomaly",
+    "tags": [
+      "earth",
+      "seismic",
+      "earthquake",
+      "shallow"
+    ],
+    "domain": "earth-science",
+    "source_api": "USGS Earthquake Hazards",
+    "timestamp": "2026-03-15T19:25:16Z",
+    "confidence": 0.64,
+    "data_points": 10
+  },
+  {
+    "title": "Geomagnetic storm: 2026-03-13T21:00:00-GST-001",
+    "content": "Storm 2026-03-13T21:00:00-GST-001. Start: 2026-03-13T21:00Z. Peak Kp: 6.0. Linked CMEs: 2026-03-13T07:06:00-IPS-001, 2026-03-13T08:08:00-HSS-001.",
+    "category": "anomaly",
+    "tags": [
+      "earth",
+      "geomagnetic",
+      "storm",
+      "space-weather"
+    ],
+    "domain": "earth-science",
+    "source_api": "NASA DONKI",
+    "timestamp": "2026-03-15T19:25:16Z",
+    "confidence": 0.90,
+    "data_points": 1
+  }
+]

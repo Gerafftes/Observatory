@@ -1,0 +1,51 @@
+[
+  {
+    "title": "Colorado River Flow: COLORADO RIVER AT LEES FERRY, AZ",
+    "content": "Discharge: 8350 ft3/s | Site: COLORADO RIVER AT LEES FERRY, AZ | Qualifiers: P | Variable: Streamflow, ft&#179;/s",
+    "timestamp": "2026-03-08T16:45:00.000-07:00",
+    "source": "usgs_waterservices",
+    "confidence": 0.88
+  },
+  {
+    "title": "Colorado River Flow: COLORADO RIVER AT LEES FERRY, AZ",
+    "content": "Discharge: 8380 ft3/s | Site: COLORADO RIVER AT LEES FERRY, AZ | Qualifiers: P | Variable: Streamflow, ft&#179;/s",
+    "timestamp": "2026-03-09T16:30:00.000-07:00",
+    "source": "usgs_waterservices",
+    "confidence": 0.88
+  },
+  {
+    "title": "Colorado River Flow: COLORADO RIVER AT LEES FERRY, AZ",
+    "content": "Discharge: 8380 ft3/s | Site: COLORADO RIVER AT LEES FERRY, AZ | Qualifiers: P | Variable: Streamflow, ft&#179;/s",
+    "timestamp": "2026-03-10T16:15:00.000-07:00",
+    "source": "usgs_waterservices",
+    "confidence": 0.88
+  },
+  {
+    "title": "Colorado River Flow: COLORADO RIVER AT LEES FERRY, AZ",
+    "content": "Discharge: 8450 ft3/s | Site: COLORADO RIVER AT LEES FERRY, AZ | Qualifiers: P | Variable: Streamflow, ft&#179;/s",
+    "timestamp": "2026-03-11T16:00:00.000-07:00",
+    "source": "usgs_waterservices",
+    "confidence": 0.88
+  },
+  {
+    "title": "Colorado River Flow: COLORADO RIVER AT LEES FERRY, AZ",
+    "content": "Discharge: 8420 ft3/s | Site: COLORADO RIVER AT LEES FERRY, AZ | Qualifiers: P | Variable: Streamflow, ft&#179;/s",
+    "timestamp": "2026-03-12T15:45:00.000-07:00",
+    "source": "usgs_waterservices",
+    "confidence": 0.88
+  },
+  {
+    "title": "Colorado River Flow: COLORADO RIVER AT LEES FERRY, AZ",
+    "content": "Discharge: 8420 ft3/s | Site: COLORADO RIVER AT LEES FERRY, AZ | Qualifiers: P | Variable: Streamflow, ft&#179;/s",
+    "timestamp": "2026-03-13T15:30:00.000-07:00",
+    "source": "usgs_waterservices",
+    "confidence": 0.88
+  },
+  {
+    "title": "Colorado River Flow: COLORADO RIVER AT LEES FERRY, AZ",
+    "content": "Discharge: 8380 ft3/s | Site: COLORADO RIVER AT LEES FERRY, AZ | Qualifiers: P | Variable: Streamflow, ft&#179;/s",
+    "timestamp": "2026-03-14T15:15:00.000-07:00",
+    "source": "usgs_waterservices",
+    "confidence": 0.88
+  }
+]

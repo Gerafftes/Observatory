@@ -1,0 +1,60 @@
+## Docker test runner for neural-trader-wasm
+## Validates WASM module loads and exports are correct in Node 20.
+##
+## Build:  docker build -f crates/neural-trader-wasm/Dockerfile.test -t neural-trader-wasm-test .
+## Run:    docker run --rm neural-trader-wasm-test
+
+FROM node:20-slim AS base
+
+WORKDIR /app
+
+# ---------- stage 1: build WASM from source ----------
+FROM rust:1.83-bookworm AS builder
+
+RUN curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+
+WORKDIR /src
+
+# Copy only the crates we need
+COPY crates/neural-trader-core  ./crates/neural-trader-core
+COPY crates/neural-trader-coherence ./crates/neural-trader-coherence
+COPY crates/neural-trader-replay ./crates/neural-trader-replay
+COPY crates/neural-trader-wasm  ./crates/neural-trader-wasm
+
+# Generate a minimal workspace Cargo.toml (avoids copying all 87 workspace members)
+RUN cat > Cargo.toml <<'TOML'
+[workspace]
+members = [
+    "crates/neural-trader-core",
+    "crates/neural-trader-coherence",
+    "crates/neural-trader-replay",
+    "crates/neural-trader-wasm",
+]
+resolver = "2"
+
+[workspace.dependencies]
+wasm-bindgen = "0.2"
+serde = { version = "1.0", features = ["derive"] }
+
+[profile.release]
+opt-level = 3
+lto = "fat"
+codegen-units = 1
+strip = true
+panic = "unwind"
+TOML
+
+# Build WASM
+RUN cd crates/neural-trader-wasm && \
+    CARGO_PROFILE_RELEASE_CODEGEN_UNITS=256 CARGO_PROFILE_RELEASE_LTO=off \
+    wasm-pack build --target web --scope ruvector --release
+
+# ---------- stage 2: test in Node ----------
+FROM base
+
+COPY --from=builder /src/crates/neural-trader-wasm/pkg /app/pkg
+COPY crates/neural-trader-wasm/tests/node-smoke.mjs /app/tests/node-smoke.mjs
+
+RUN echo '{"type":"module"}' > /app/package.json
+
+CMD ["node", "--experimental-vm-modules", "/app/tests/node-smoke.mjs"]

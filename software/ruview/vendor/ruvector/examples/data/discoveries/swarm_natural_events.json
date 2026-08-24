@@ -1,0 +1,162 @@
+[
+  {
+    "title": "Wildfires: Yellow Wildfire, Moore, Texas",
+    "content": "Type: Wildfires, Magnitude: 8500.0 acres, Location: [35.6423, -102.16138].",
+    "timestamp": "2026-03-10T22:40:00Z",
+    "source": "nasa_eonet",
+    "confidence": 0.9,
+    "metadata": {
+      "event_id": "EONET_18526",
+      "category": "Wildfires",
+      "status": "open",
+      "coordinates": [
+        -102.16138,
+        35.6423
+      ]
+    }
+  },
+  {
+    "title": "Wildfires: RX PCS White Oak Prescribed Fire, Scott, Arkansas",
+    "content": "Type: Wildfires, Magnitude: 2523.0 acres, Location: [34.974698, -93.885147].",
+    "timestamp": "2026-03-10T17:12:00Z",
+    "source": "nasa_eonet",
+    "confidence": 0.9,
+    "metadata": {
+      "event_id": "EONET_18531",
+      "category": "Wildfires",
+      "status": "open",
+      "coordinates": [
+        -93.885147,
+        34.974698
+      ]
+    }
+  },
+  {
+    "title": "Wildfires: Cabin Creek Wildfire, Gray, Texas",
+    "content": "Type: Wildfires, Magnitude: 7000.0 acres, Location: [35.422, -100.753]. 3 Miles SE from Lefors, TX",
+    "timestamp": "2026-03-09T17:52:00Z",
+    "source": "nasa_eonet",
+    "confidence": 0.9,
+    "metadata": {
+      "event_id": "EONET_18527",
+      "category": "Wildfires",
+      "status": "open",
+      "coordinates": [
+        -100.753,
+        35.422
+      ]
+    }
+  },
+  {
+    "title": "Wildfires: Porcupine Creek Wildfire, Campbell, Wyoming",
+    "content": "Type: Wildfires, Magnitude: 2490.23 acres, Location: [43.699, -105.647467]. 8 Miles W from Wright, WY",
+    "timestamp": "2026-03-09T15:37:00Z",
+    "source": "nasa_eonet",
+    "confidence": 0.9,
+    "metadata": {
+      "event_id": "EONET_18532",
+      "category": "Wildfires",
+      "status": "open",
+      "coordinates": [
+        -105.647467,
+        43.699
+      ]
+    }
+  },
+  {
+    "title": "Wildfires: Rock Ridge Wildfire, Chouteau, Montana",
+    "content": "Type: Wildfires, Magnitude: 700.0 acres, Location: [47.54961, -110.27752].",
+    "timestamp": "2026-03-08T19:26:00Z",
+    "source": "nasa_eonet",
+    "confidence": 0.9,
+    "metadata": {
+      "event_id": "EONET_18536",
+      "category": "Wildfires",
+      "status": "open",
+      "coordinates": [
+        -110.27752,
+        47.54961
+      ]
+    }
+  },
+  {
+    "title": "Wildfires: Eldorado Wildfire, Teton, Montana",
+    "content": "Type: Wildfires, Magnitude: 500.0 acres, Location: [47.909896, -112.26804].",
+    "timestamp": "2026-03-08T15:17:00Z",
+    "source": "nasa_eonet",
+    "confidence": 0.9,
+    "metadata": {
+      "event_id": "EONET_18540",
+      "category": "Wildfires",
+      "status": "open",
+      "coordinates": [
+        -112.26804,
+        47.909896
+      ]
+    }
+  },
+  {
+    "title": "Wildfires: South Patrol North RX Prescribed Fire, Will, Illinois",
+    "content": "Type: Wildfires, Magnitude: 609.0 acres, Location: [41.35475, -88.15605].",
+    "timestamp": "2026-03-08T11:35:00Z",
+    "source": "nasa_eonet",
+    "confidence": 0.9,
+    "metadata": {
+      "event_id": "EONET_18546",
+      "category": "Wildfires",
+      "status": "open",
+      "coordinates": [
+        -88.15605,
+        41.35475
+      ]
+    }
+  },
+  {
+    "title": "Wildfires: RX Interior Pastures 2 Prescribed Fire, Comanche, Oklahoma",
+    "content": "Type: Wildfires, Magnitude: 1209.0 acres, Location: [34.74737, -98.700088].",
+    "timestamp": "2026-03-08T08:07:00Z",
+    "source": "nasa_eonet",
+    "confidence": 0.9,
+    "metadata": {
+      "event_id": "EONET_18542",
+      "category": "Wildfires",
+      "status": "open",
+      "coordinates": [
+        -98.700088,
+        34.74737
+      ]
+    }
+  },
+  {
+    "title": "Wildfires: 440 Wildfire, Dixie, Florida",
+    "content": "Type: Wildfires, Magnitude: 750.0 acres, Location: [29.6138889, -83.2216667]. 5 Miles W from CROSS CITY, FL",
+    "timestamp": "2026-03-07T19:54:00Z",
+    "source": "nasa_eonet",
+    "confidence": 0.9,
+    "metadata": {
+      "event_id": "EONET_18544",
+      "category": "Wildfires",
+      "status": "open",
+      "coordinates": [
+        -83.2216667,
+        29.6138889
+      ]
+    }
+  },
+  {
+    "title": "Wildfires: OLD BOWLING GREEN Wildfire, Polk, Florida",
+    "content": "Type: Wildfires, Magnitude: 3297.0 acres, Location: [27.6811111, -81.8244444]. 3 Miles N from BOWLING GREEN, FL",
+    "timestamp": "2026-03-07T19:11:00Z",
+    "source": "nasa_eonet",
+    "confidence": 0.9,
+    "metadata": {
+      "event_id": "EONET_18528",
+      "category": "Wildfires",
+      "status": "open",
+      "coordinates": [
+        -81.8244444,
+        27.6811111
+      ]
+    }
+  }
+]

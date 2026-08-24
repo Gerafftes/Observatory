@@ -1,0 +1,72 @@
+[
+  {
+    "title": "Adaptable Radiometric Measurement System",
+    "content": "<p>ARMS is a low size, weight, and power (low SWaP) non-contact temperature measurement system. It addresses long-standing problems associated with reliably obtaining measurements of high temperatures on structures during high speed and reentry flight. ARMS can be adapted to provide however many measurements a given platform requires. Successes to date have earned it a FY24 Flight Opportunity.</p>",
+    "timestamp": "2026-03-15T23:58:48.134904Z",
+    "source": "NASA Techport (ID: 146891)",
+    "confidence": 0.9
+  },
+  {
+    "title": "Crosscutting Fission-Based Nuclear Capabilities",
+    "content": "<p>Existing FY25 scope that has high return on investment across multiple fission-based disciplines, with a focus on risk reduction and regulatory path finding.</p><p>NTP is an open-ended project focused on developing enabling technologies for nuclear thermal propulsion and demonstrating the robust functionality of those technologies through ground and flight testing. NTP systems have capabilities that can be directly leveraged, or readily evolved, for future NASA missions that include cis-lunar",
+    "timestamp": "2026-03-15T23:58:48.134904Z",
+    "source": "NASA Techport (ID: 183451)",
+    "confidence": 0.9
+  },
+  {
+    "title": "High Performance Materials for Space",
+    "content": "\u200bThe project looks at\u00a0lightweight,\u00a0multifunctional materials technology\u00a0tailored for use in extreme space environments. These extreme\u00a0environments include those found on orbit, on the surfaces of planetary bodies such as the Moon and Mars, in the atmospheres of planetary bodies such as Venus or the Earth and Mars, especially during (re)entry. The extreme environments relevant to space exploration and science also include those found inside spacecraft and surface systems. Examples of the extreme ",
+    "timestamp": "2026-03-15T23:58:48.134904Z",
+    "source": "NASA Techport (ID: 183422)",
+    "confidence": 0.9
+  },
+  {
+    "title": "PI - Planetary Defense",
+    "content": "<p>The traditional approach to planetary defense consists of momentum transfer between the impactor and the threat that changes the threat orbit such that it misses the Earth, which is generally known as \u201cdeflection.\u201d The PI approach is different in that we do not use momentum transfer, but rather energy transfer. We do not mitigate the threat by requiring it to miss the Earth, but rather we explore mitigating the threat by pulverizing it and then using the Earth's atmosphere as a shield. This t",
+    "timestamp": "2026-03-15T23:58:48.134904Z",
+    "source": "NASA Techport (ID: 158596)",
+    "confidence": 0.9
+  },
+  {
+    "title": "Integrated Rotating Detonation Engine System",
+    "content": "<p>A rotating detonation rocket engine improves performance over a conventional rocket engine by harnessing the increase in pressure provided by detonative combustion for thrust generation. The detonation wave propagates in an annular combustor and runs transverse to the flow direction at very high speeds, often requiring only a few inches to accomplish propellant mixing and combustion. RDRE combustors are also attractive because they can be very short, allowing for improved integration with veh",
+    "timestamp": "2026-03-15T23:58:48.134904Z",
+    "source": "NASA Techport (ID: 158559)",
+    "confidence": 0.9
+  },
+  {
+    "title": "CFMPP Modeling Portfolio",
+    "content": "<p>This portfolio contains multiple cryogenic model development activities, both CFD and Nodal, with the overall goal of developing and validating pre-predictive models against cryogenic experimental data for the following operations: Self-Pressurization, Mixing, Autogenous and GHe Pressurization, Line and Component Chill-down, Tank Chill-down, Tank Fill and Drain, Tank Venting, and Liquefaction. Results from these development activities will be infused into analyses supporting NASA mission appl",
+    "timestamp": "2026-03-15T23:58:48.134904Z",
+    "source": "NASA Techport (ID: 158415)",
+    "confidence": 0.9
+  },
+  {
+    "title": "Wall modeled large eddy simulation of high-enthalpy hypersonic flows",
+    "content": "Hypersonic entry vehicles such as capsules operate in an extreme environment where a plethora of physical phenomena must be understood and modeled to design thermal protection systems. Among these phenomena, the interaction between turbulence and chemical reactions in the gas is generally not well understood. This work will extend wall-modeled large eddy simulations (WMLES) to incorporate chemically reacting effects, enabling scale resolved simulations of chemically reacting turbulent flows. WML",
+    "timestamp": "2026-03-15T23:58:48.134904Z",
+    "source": "NASA Techport (ID: 156378)",
+    "confidence": 0.9
+  },
+  {
+    "title": "Institute for Model-Based Qualification & Certification of Additive Manufacturing",
+    "content": "<p>Carnegie Mellon University in Pittsburgh will lead Institute for Model-based Qualification & Certification of Additive Manufacturing (IMQCAM) aiming to improve computer models of 3D-printed \u2013 also called additively manufactured \u2013 metal parts and expand their utility in spaceflight applications. The institute will be co-led by Johns Hopkins University in Baltimore.</p><p>Metal parts 3D-printed are made from powdered metals, which are melted in specific ways and shaped into useful parts. Such p",
+    "timestamp": "2026-03-15T23:58:48.134904Z",
+    "source": "NASA Techport (ID: 156318)",
+    "confidence": 0.9
+  },
+  {
+    "title": "Virtual Prototyping of Multifunctional Boron-Nitrogen Nanostructures and their Composites for Extreme Space Environments",
+    "content": "<p>The recently established NASA Artemis mission reflects the growing interest of sending humans to colonize the Moon and Mars, and to explore more of our solar system. However, long-term space exploration requires technologies that can protect astronauts and space equipment from extreme space environments, such as extreme temperatures and carcinogenic radiation. While Carbon nanotubes have been investigated as space materials, boron-nitrogen nanotubes (BNNT) are just as mechanically strong, and",
+    "timestamp": "2026-03-15T23:58:48.134904Z",
+    "source": "NASA Techport (ID: 118475)",
+    "confidence": 0.9
+  },
+  {
+    "title": "Computational Investigation of Wave/Mode Structure and Multiplicity in Rotating Detonation Rocket Engines",
+    "content": "<p>Improved rocket propulsion directly translates to reduced fuel requirements and increased payloads for space flight. Rotating detonation rocket engines (RDREs) have the potential to provide significant performance gains in thrust-per-fuel ratio, design trade space, and mass savings compared to traditional rocket engines, and are attractive candidates for NASA lander, launch, and attitude-control applications. However, it is not currently known how to optimally design an RDRE injector, chamber",
+    "timestamp": "2026-03-15T23:58:48.134904Z",
+    "source": "NASA Techport (ID: 118450)",
+    "confidence": 0.9
+  }
+]

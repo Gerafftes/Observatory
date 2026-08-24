@@ -1,0 +1,3860 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RuVector CNN - Neural Image Understanding</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --background: 0 0% 3.9%;
+            --foreground: 0 0% 98%;
+            --card: 0 0% 7%;
+            --card-foreground: 0 0% 98%;
+            --popover: 0 0% 7%;
+            --popover-foreground: 0 0% 98%;
+            --primary: 262.1 83.3% 57.8%;
+            --primary-foreground: 210 20% 98%;
+            --secondary: 0 0% 14.9%;
+            --secondary-foreground: 0 0% 98%;
+            --muted: 0 0% 14.9%;
+            --muted-foreground: 0 0% 63.9%;
+            --accent: 262.1 83.3% 57.8%;
+            --accent-foreground: 210 20% 98%;
+            --destructive: 0 62.8% 30.6%;
+            --destructive-foreground: 0 0% 98%;
+            --border: 0 0% 14.9%;
+            --input: 0 0% 14.9%;
+            --ring: 262.1 83.3% 57.8%;
+            --radius: 0.75rem;
+            --success: 142 76% 36%;
+            --warning: 38 92% 50%;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: hsl(var(--background));
+            color: hsl(var(--foreground));
+            min-height: 100vh;
+            line-height: 1.6;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        .gradient-blur {
+            position: fixed;
+            top: -50%;
+            left: -50%;
+            right: -50%;
+            bottom: -50%;
+            background:
+                radial-gradient(circle at 20% 30%, hsla(262, 83%, 58%, 0.15) 0%, transparent 40%),
+                radial-gradient(circle at 80% 70%, hsla(280, 80%, 50%, 0.1) 0%, transparent 40%),
+                radial-gradient(circle at 50% 50%, hsla(220, 70%, 50%, 0.05) 0%, transparent 60%);
+            pointer-events: none;
+            z-index: 0;
+            animation: pulse-bg 8s ease-in-out infinite;
+        }
+
+        @keyframes pulse-bg {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 2rem;
+            position: relative;
+            z-index: 1;
+        }
+
+        /* Header */
+        header {
+            text-align: center;
+            margin-bottom: 3rem;
+            padding: 2rem 0;
+        }
+
+        .logo {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.75rem;
+            margin-bottom: 1rem;
+        }
+
+        .logo-icon {
+            width: 48px;
+            height: 48px;
+            background: linear-gradient(135deg, hsl(var(--primary)), hsl(280, 80%, 50%));
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            box-shadow: 0 0 30px hsla(262, 83%, 58%, 0.4);
+        }
+
+        h1 {
+            font-size: 3.5rem;
+            font-weight: 800;
+            letter-spacing: -0.025em;
+            background: linear-gradient(135deg, #fff 0%, hsl(var(--primary)) 50%, #fff 100%);
+            background-size: 200% auto;
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            animation: shine 3s linear infinite;
+        }
+
+        @keyframes shine {
+            to { background-position: 200% center; }
+        }
+
+        .tagline {
+            color: hsl(var(--muted-foreground));
+            font-size: 1.125rem;
+            margin: 0.5rem 0 1.5rem;
+            font-weight: 500;
+        }
+
+        .badge-row {
+            display: flex;
+            gap: 0.5rem;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .badge {
+            background: hsl(var(--secondary));
+            border: 1px solid hsl(var(--border));
+            padding: 0.375rem 0.875rem;
+            border-radius: 9999px;
+            font-size: 0.8rem;
+            font-weight: 500;
+            color: hsl(var(--muted-foreground));
+            transition: all 0.2s;
+        }
+
+        .badge:hover {
+            border-color: hsl(var(--primary));
+            color: hsl(var(--foreground));
+        }
+
+        .badge.primary {
+            background: hsla(262, 83%, 58%, 0.15);
+            border-color: hsl(var(--primary));
+            color: hsl(var(--primary));
+        }
+
+        /* Tabs */
+        .tabs {
+            display: flex;
+            gap: 0.25rem;
+            background: hsl(var(--secondary));
+            padding: 0.25rem;
+            border-radius: var(--radius);
+            margin-bottom: 2rem;
+            width: fit-content;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        .tab {
+            padding: 0.625rem 1.25rem;
+            border-radius: calc(var(--radius) - 4px);
+            border: none;
+            background: transparent;
+            color: hsl(var(--muted-foreground));
+            font-size: 0.875rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .tab:hover {
+            color: hsl(var(--foreground));
+        }
+
+        .tab.active {
+            background: hsl(var(--card));
+            color: hsl(var(--foreground));
+            box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+        }
+
+        /* Tab Content */
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        /* Grid */
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(380px, 1fr));
+            gap: 1.5rem;
+        }
+
+        /* Cards */
+        .card {
+            background: hsl(var(--card));
+            border: 1px solid hsl(var(--border));
+            border-radius: var(--radius);
+            overflow: hidden;
+            transition: all 0.3s ease;
+        }
+
+        .card:hover {
+            border-color: hsla(262, 83%, 58%, 0.5);
+            box-shadow: 0 0 40px hsla(262, 83%, 58%, 0.1);
+        }
+
+        .card-header {
+            padding: 1.25rem 1.5rem;
+            border-bottom: 1px solid hsl(var(--border));
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .card-icon {
+            width: 36px;
+            height: 36px;
+            background: linear-gradient(135deg, hsl(var(--primary)), hsl(280, 80%, 50%));
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1rem;
+        }
+
+        .card-title {
+            font-size: 1rem;
+            font-weight: 600;
+        }
+
+        .card-description {
+            font-size: 0.8rem;
+            color: hsl(var(--muted-foreground));
+        }
+
+        .card-body {
+            padding: 1.5rem;
+        }
+
+        /* Drop Zone */
+        .drop-zone {
+            border: 2px dashed hsl(var(--border));
+            border-radius: var(--radius);
+            padding: 3rem 2rem;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            background: hsla(var(--secondary), 0.5);
+        }
+
+        .drop-zone:hover, .drop-zone.drag-over {
+            border-color: hsl(var(--primary));
+            background: hsla(262, 83%, 58%, 0.05);
+        }
+
+        .drop-zone-icon {
+            font-size: 2.5rem;
+            margin-bottom: 0.75rem;
+            opacity: 0.7;
+        }
+
+        .drop-zone-text {
+            color: hsl(var(--foreground));
+            font-weight: 500;
+            margin-bottom: 0.25rem;
+        }
+
+        .drop-zone-hint {
+            font-size: 0.8rem;
+            color: hsl(var(--muted-foreground));
+        }
+
+        /* Buttons */
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            padding: 0.625rem 1.25rem;
+            border-radius: calc(var(--radius) - 2px);
+            font-size: 0.875rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+            border: none;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, hsl(var(--primary)), hsl(280, 80%, 50%));
+            color: white;
+            box-shadow: 0 0 20px hsla(262, 83%, 58%, 0.3);
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 0 30px hsla(262, 83%, 58%, 0.4);
+        }
+
+        .btn-secondary {
+            background: hsl(var(--secondary));
+            border: 1px solid hsl(var(--border));
+            color: hsl(var(--foreground));
+        }
+
+        .btn-secondary:hover {
+            background: hsl(var(--muted));
+            border-color: hsl(var(--muted-foreground));
+        }
+
+        .btn-ghost {
+            background: transparent;
+            color: hsl(var(--muted-foreground));
+        }
+
+        .btn-ghost:hover {
+            background: hsl(var(--secondary));
+            color: hsl(var(--foreground));
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none !important;
+        }
+
+        .btn-row {
+            display: flex;
+            gap: 0.75rem;
+            flex-wrap: wrap;
+            margin-top: 1rem;
+        }
+
+        /* Preview Grid */
+        .preview-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+            gap: 0.75rem;
+            margin-top: 1rem;
+        }
+
+        .preview-item {
+            position: relative;
+            aspect-ratio: 1;
+            border-radius: calc(var(--radius) - 2px);
+            overflow: hidden;
+            border: 2px solid transparent;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .preview-item:hover {
+            border-color: hsl(var(--primary));
+            transform: scale(1.02);
+        }
+
+        .preview-item.selected {
+            border-color: hsl(var(--success));
+            box-shadow: 0 0 15px hsla(142, 76%, 36%, 0.3);
+        }
+
+        .preview-item img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .preview-item .remove-btn {
+            position: absolute;
+            top: 4px;
+            right: 4px;
+            width: 20px;
+            height: 20px;
+            background: rgba(0, 0, 0, 0.8);
+            border: none;
+            border-radius: 50%;
+            color: white;
+            font-size: 12px;
+            cursor: pointer;
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+
+        .preview-item:hover .remove-btn {
+            opacity: 1;
+        }
+
+        /* Camera */
+        .camera-wrapper {
+            position: relative;
+            border-radius: var(--radius);
+            overflow: hidden;
+            background: hsl(var(--secondary));
+        }
+
+        #camera-video {
+            width: 100%;
+            display: block;
+            background: #000;
+        }
+
+        .camera-overlay {
+            position: absolute;
+            bottom: 1rem;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .camera-stats {
+            position: absolute;
+            top: 0.75rem;
+            left: 0.75rem;
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .stat-badge {
+            background: rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(8px);
+            padding: 0.25rem 0.625rem;
+            border-radius: 6px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+
+        .stat-badge.fps { color: hsl(var(--success)); }
+        .stat-badge.latency { color: hsl(var(--primary)); }
+
+        /* Stats Cards */
+        .stats-row {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 0.75rem;
+        }
+
+        .stat-card {
+            background: hsl(var(--secondary));
+            border-radius: calc(var(--radius) - 2px);
+            padding: 1rem;
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: hsl(var(--primary));
+        }
+
+        .stat-label {
+            font-size: 0.75rem;
+            color: hsl(var(--muted-foreground));
+            margin-top: 0.25rem;
+        }
+
+        /* Embedding Viz */
+        .embedding-viz {
+            height: 100px;
+            background: hsl(var(--secondary));
+            border-radius: calc(var(--radius) - 2px);
+            overflow: hidden;
+            position: relative;
+        }
+
+        .embedding-bars {
+            display: flex;
+            align-items: flex-end;
+            height: 100%;
+            padding: 0.5rem;
+            gap: 1px;
+        }
+
+        .embedding-bar {
+            flex: 1;
+            min-width: 2px;
+            border-radius: 2px 2px 0 0;
+            transition: height 0.15s ease;
+        }
+
+        /* Similarity Matrix */
+        .matrix-container {
+            overflow-x: auto;
+            margin-top: 1rem;
+        }
+
+        .matrix {
+            display: inline-grid;
+            gap: 3px;
+        }
+
+        .matrix-cell {
+            width: 50px;
+            height: 50px;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.7rem;
+            font-weight: 600;
+            transition: all 0.2s;
+        }
+
+        .matrix-cell.header {
+            background: hsl(var(--secondary));
+            overflow: hidden;
+        }
+
+        .matrix-cell.header img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        /* Console */
+        .console {
+            background: #0d1117;
+            border: 1px solid hsl(var(--border));
+            border-radius: calc(var(--radius) - 2px);
+            padding: 1rem;
+            font-family: 'JetBrains Mono', 'Fira Code', ui-monospace, monospace;
+            font-size: 0.8rem;
+            max-height: 180px;
+            overflow-y: auto;
+        }
+
+        .console-line {
+            margin-bottom: 0.25rem;
+            line-height: 1.4;
+        }
+
+        .console-line.success { color: hsl(var(--success)); }
+        .console-line.info { color: hsl(var(--primary)); }
+        .console-line.warning { color: hsl(var(--warning)); }
+
+        /* Use Cases */
+        .use-case-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 1rem;
+        }
+
+        .use-case {
+            background: hsl(var(--secondary));
+            border: 1px solid hsl(var(--border));
+            border-radius: var(--radius);
+            padding: 1.25rem;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .use-case:hover {
+            border-color: hsl(var(--primary));
+            transform: translateY(-2px);
+        }
+
+        .use-case-icon {
+            font-size: 2rem;
+            margin-bottom: 0.75rem;
+        }
+
+        .use-case-title {
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+        }
+
+        .use-case-desc {
+            font-size: 0.85rem;
+            color: hsl(var(--muted-foreground));
+        }
+
+        /* Sample Images */
+        .sample-row {
+            display: flex;
+            gap: 0.5rem;
+            margin-top: 1rem;
+            flex-wrap: wrap;
+        }
+
+        .sample-img {
+            width: 64px;
+            height: 64px;
+            border-radius: 8px;
+            overflow: hidden;
+            cursor: pointer;
+            border: 2px solid hsl(var(--border));
+            transition: all 0.2s;
+        }
+
+        .sample-img:hover {
+            border-color: hsl(var(--primary));
+            transform: scale(1.05);
+        }
+
+        .sample-img img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        /* Footer */
+        footer {
+            text-align: center;
+            padding: 3rem 2rem;
+            color: hsl(var(--muted-foreground));
+            font-size: 0.875rem;
+        }
+
+        footer a {
+            color: hsl(var(--primary));
+            text-decoration: none;
+            transition: opacity 0.2s;
+        }
+
+        footer a:hover {
+            opacity: 0.8;
+        }
+
+        /* Loading */
+        .loading-screen {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 4rem 2rem;
+            gap: 1.5rem;
+        }
+
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 3px solid hsl(var(--border));
+            border-top-color: hsl(var(--primary));
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Realtime Panel */
+        .realtime-panel {
+            margin-top: 1rem;
+            padding: 1rem;
+            background: hsl(var(--secondary));
+            border-radius: var(--radius);
+            border: 1px solid hsl(var(--border));
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.6; }
+        }
+
+        .realtime-active {
+            animation: pulse 1.5s ease-in-out infinite;
+        }
+
+        .hidden { display: none !important; }
+
+        @media (max-width: 768px) {
+            .grid { grid-template-columns: 1fr; }
+            h1 { font-size: 2.25rem; }
+            .container { padding: 1rem; }
+            .tabs { width: 100%; justify-content: center; }
+        }
+    </style>
+</head>
+<body>
+    <div class="gradient-blur"></div>
+
+    <div class="container">
+        <header>
+            <div class="logo">
+                <div class="logo-icon">🧠</div>
+            </div>
+            <h1>RuVector CNN</h1>
+            <p class="tagline">Neural image understanding in your browser — no backend required</p>
+            <div class="badge-row">
+                <span class="badge primary">~5ms inference</span>
+                <span class="badge">512-dim embeddings</span>
+                <span class="badge">WASM SIMD</span>
+                <span class="badge">60+ FPS real-time</span>
+                <span class="badge">17-keypoint pose</span>
+            </div>
+        </header>
+
+        <!-- Tabs -->
+        <div class="tabs">
+            <button class="tab active" data-tab="playground">Playground</button>
+            <button class="tab" data-tab="realtime">Real-time</button>
+            <button class="tab" data-tab="pose">Pose Estimation</button>
+            <button class="tab" data-tab="learning">Self-Learning</button>
+            <button class="tab" data-tab="examples">Examples</button>
+        </div>
+
+        <!-- Loading -->
+        <div id="loading-screen" class="loading-screen">
+            <div class="spinner"></div>
+            <span style="color: hsl(var(--muted-foreground));">Loading neural network...</span>
+        </div>
+
+        <!-- Main Content -->
+        <div id="main-content" class="hidden">
+
+            <!-- Playground Tab -->
+            <div class="tab-content active" data-tab="playground">
+                <div class="grid">
+                    <!-- Upload Card -->
+                    <div class="card">
+                        <div class="card-header">
+                            <div class="card-icon">📤</div>
+                            <div>
+                                <div class="card-title">Image Upload</div>
+                                <div class="card-description">Drop images to extract embeddings</div>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            <div class="drop-zone" id="drop-zone">
+                                <div class="drop-zone-icon">🖼️</div>
+                                <p class="drop-zone-text">Drop images or click to upload</p>
+                                <p class="drop-zone-hint">JPG, PNG, WebP • Multiple files supported</p>
+                            </div>
+                            <input type="file" id="file-input" multiple accept="image/*" style="display: none;">
+
+                            <p style="margin-top: 1rem; color: hsl(var(--muted-foreground)); font-size: 0.85rem;">Quick samples:</p>
+                            <div class="sample-row" id="sample-images"></div>
+
+                            <div class="preview-grid" id="preview-area"></div>
+
+                            <div class="btn-row">
+                                <button class="btn btn-primary" id="extract-btn" disabled>🧠 Extract Embeddings</button>
+                                <button class="btn btn-secondary" id="clear-btn" disabled>Clear All</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Similarity Matrix -->
+                    <div class="card">
+                        <div class="card-header">
+                            <div class="card-icon">📊</div>
+                            <div>
+                                <div class="card-title">Similarity Matrix</div>
+                                <div class="card-description">Compare image embeddings</div>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            <div class="stats-row">
+                                <div class="stat-card">
+                                    <div class="stat-value" id="stat-images">0</div>
+                                    <div class="stat-label">Images</div>
+                                </div>
+                                <div class="stat-card">
+                                    <div class="stat-value" id="stat-time">0ms</div>
+                                    <div class="stat-label">Avg Time</div>
+                                </div>
+                                <div class="stat-card">
+                                    <div class="stat-value" id="stat-dim">512</div>
+                                    <div class="stat-label">Dimensions</div>
+                                </div>
+                            </div>
+
+                            <div class="matrix-container" id="similarity-matrix">
+                                <p style="color: hsl(var(--muted-foreground)); text-align: center; padding: 2rem;">
+                                    Extract features from 2+ images to see similarity scores
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Embedding Viz -->
+                    <div class="card">
+                        <div class="card-header">
+                            <div class="card-icon">📈</div>
+                            <div>
+                                <div class="card-title">Embedding Visualization</div>
+                                <div class="card-description">512-dimensional feature vector</div>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            <p style="color: hsl(var(--muted-foreground)); font-size: 0.85rem; margin-bottom: 0.75rem;">
+                                Click an image to visualize its neural embedding
+                            </p>
+                            <div class="embedding-viz">
+                                <div class="embedding-bars" id="embedding-bars"></div>
+                            </div>
+
+                            <div class="console" id="console">
+                                <div class="console-line info">> Ready for images...</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Real-time Tab -->
+            <div class="tab-content" data-tab="realtime">
+                <div class="grid">
+                    <div class="card">
+                        <div class="card-header">
+                            <div class="card-icon">📷</div>
+                            <div>
+                                <div class="card-title">Real-time Neural Vision</div>
+                                <div class="card-description">Live CNN processing at 60+ FPS</div>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            <div class="camera-wrapper">
+                                <video id="camera-video" autoplay playsinline></video>
+                                <div class="camera-stats hidden" id="camera-stats">
+                                    <span class="stat-badge fps" id="fps-display">0 FPS</span>
+                                    <span class="stat-badge latency" id="latency-display">0ms</span>
+                                </div>
+                                <div class="camera-overlay">
+                                    <button class="btn btn-primary" id="start-camera-btn">Start Camera</button>
+                                    <button class="btn btn-secondary hidden" id="capture-btn">📸 Capture</button>
+                                    <button class="btn btn-primary hidden" id="realtime-btn">⚡ Real-time Mode</button>
+                                    <button class="btn btn-secondary hidden" id="stop-camera-btn">Stop</button>
+                                </div>
+                            </div>
+
+                            <div class="realtime-panel hidden" id="realtime-panel">
+                                <div class="stats-row" style="margin-bottom: 1rem;">
+                                    <div class="stat-card">
+                                        <div class="stat-value" id="rt-fps">0</div>
+                                        <div class="stat-label">FPS</div>
+                                    </div>
+                                    <div class="stat-card">
+                                        <div class="stat-value" id="rt-latency">0ms</div>
+                                        <div class="stat-label">Latency</div>
+                                    </div>
+                                    <div class="stat-card">
+                                        <div class="stat-value" id="rt-similarity">—</div>
+                                        <div class="stat-label">vs Reference</div>
+                                    </div>
+                                </div>
+
+                                <p style="color: hsl(var(--muted-foreground)); font-size: 0.8rem; margin-bottom: 0.5rem;">
+                                    Live embedding (updates every frame):
+                                </p>
+                                <div class="embedding-viz" style="height: 70px;">
+                                    <div class="embedding-bars" id="realtime-bars"></div>
+                                </div>
+
+                                <div class="btn-row">
+                                    <button class="btn btn-secondary" id="set-reference-btn">📌 Set Reference</button>
+                                    <button class="btn btn-ghost" id="stop-realtime-btn">⏹️ Stop</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <div class="card-header">
+                            <div class="card-icon">🎯</div>
+                            <div>
+                                <div class="card-title">How It Works</div>
+                                <div class="card-description">Real-time neural processing</div>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            <div style="color: hsl(var(--muted-foreground)); font-size: 0.9rem; line-height: 1.7;">
+                                <p><strong style="color: hsl(var(--foreground));">1. Capture</strong> — Each video frame is grabbed at native resolution</p>
+                                <p style="margin-top: 0.75rem;"><strong style="color: hsl(var(--foreground));">2. Preprocess</strong> — Center-cropped to 224×224, converted to RGB</p>
+                                <p style="margin-top: 0.75rem;"><strong style="color: hsl(var(--foreground));">3. Inference</strong> — MobileNet-V3 extracts 512-dim embedding in ~5ms</p>
+                                <p style="margin-top: 0.75rem;"><strong style="color: hsl(var(--foreground));">4. Compare</strong> — Cosine similarity vs reference image (0 to 1)</p>
+                            </div>
+                            <div style="margin-top: 1.5rem; padding: 1rem; background: hsl(var(--background)); border-radius: calc(var(--radius) - 2px); border: 1px solid hsl(var(--border));">
+                                <p style="font-size: 0.8rem; color: hsl(var(--muted-foreground));">
+                                    💡 <strong>Tip:</strong> Set a reference image, then move objects in front of the camera to see real-time similarity changes.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Pose Estimation Tab -->
+            <div class="tab-content" data-tab="pose">
+                <div class="grid">
+                    <div class="card">
+                        <div class="card-header">
+                            <div class="card-icon">🏃</div>
+                            <div>
+                                <div class="card-title">Real-time Pose Estimation</div>
+                                <div class="card-description">17 keypoints • Skeleton visualization • MoveNet</div>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            <div class="camera-wrapper" style="position: relative;">
+                                <video id="pose-video" autoplay playsinline style="width: 100%; display: block; background: #000;"></video>
+                                <canvas id="pose-canvas" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%;"></canvas>
+                                <div class="camera-stats hidden" id="pose-stats">
+                                    <span class="stat-badge fps" id="pose-fps-display">0 FPS</span>
+                                    <span class="stat-badge latency" id="pose-latency-display">0ms</span>
+                                </div>
+                                <div class="camera-overlay">
+                                    <button class="btn btn-primary" id="start-pose-btn">Start Pose Detection</button>
+                                    <button class="btn btn-secondary hidden" id="stop-pose-btn">Stop</button>
+                                </div>
+                            </div>
+
+                            <div class="realtime-panel hidden" id="pose-panel">
+                                <div class="stats-row" style="margin-bottom: 1rem;">
+                                    <div class="stat-card">
+                                        <div class="stat-value" id="pose-keypoints">0</div>
+                                        <div class="stat-label">Keypoints</div>
+                                    </div>
+                                    <div class="stat-card">
+                                        <div class="stat-value" id="pose-confidence">0%</div>
+                                        <div class="stat-label">Confidence</div>
+                                    </div>
+                                    <div class="stat-card">
+                                        <div class="stat-value" id="pose-similarity">—</div>
+                                        <div class="stat-label">vs Reference</div>
+                                    </div>
+                                </div>
+
+                                <div class="btn-row">
+                                    <button class="btn btn-secondary" id="set-pose-reference-btn">📌 Set Reference Pose</button>
+                                    <button class="btn btn-ghost" id="toggle-skeleton-btn">🦴 Toggle Skeleton</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <div class="card-header">
+                            <div class="card-icon">🎯</div>
+                            <div>
+                                <div class="card-title">Pose Keypoints</div>
+                                <div class="card-description">17 body landmarks detected</div>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            <div id="keypoint-list" style="font-size: 0.85rem; color: hsl(var(--muted-foreground)); line-height: 1.8;">
+                                <p style="margin-bottom: 1rem;">Start pose detection to see keypoints</p>
+                                <div class="keypoint-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem;">
+                                    <div><span style="color: hsl(var(--primary));">●</span> Nose</div>
+                                    <div><span style="color: hsl(var(--primary));">●</span> Left Eye</div>
+                                    <div><span style="color: hsl(var(--primary));">●</span> Right Eye</div>
+                                    <div><span style="color: hsl(var(--primary));">●</span> Left Ear</div>
+                                    <div><span style="color: hsl(var(--primary));">●</span> Right Ear</div>
+                                    <div><span style="color: hsl(var(--success));">●</span> Left Shoulder</div>
+                                    <div><span style="color: hsl(var(--success));">●</span> Right Shoulder</div>
+                                    <div><span style="color: hsl(var(--success));">●</span> Left Elbow</div>
+                                    <div><span style="color: hsl(var(--success));">●</span> Right Elbow</div>
+                                    <div><span style="color: hsl(var(--success));">●</span> Left Wrist</div>
+                                    <div><span style="color: hsl(var(--success));">●</span> Right Wrist</div>
+                                    <div><span style="color: hsl(var(--warning));">●</span> Left Hip</div>
+                                    <div><span style="color: hsl(var(--warning));">●</span> Right Hip</div>
+                                    <div><span style="color: hsl(var(--warning));">●</span> Left Knee</div>
+                                    <div><span style="color: hsl(var(--warning));">●</span> Right Knee</div>
+                                    <div><span style="color: hsl(var(--warning));">●</span> Left Ankle</div>
+                                    <div><span style="color: hsl(var(--warning));">●</span> Right Ankle</div>
+                                </div>
+                            </div>
+
+                            <div style="margin-top: 1.5rem; padding: 1rem; background: hsl(var(--background)); border-radius: calc(var(--radius) - 2px); border: 1px solid hsl(var(--border));">
+                                <p style="font-size: 0.85rem; font-weight: 600; margin-bottom: 0.5rem;">Use Cases</p>
+                                <ul style="font-size: 0.8rem; color: hsl(var(--muted-foreground)); line-height: 1.6; padding-left: 1rem;">
+                                    <li>Fitness tracking & exercise form</li>
+                                    <li>Dance/movement analysis</li>
+                                    <li>Sign language recognition</li>
+                                    <li>Sports biomechanics</li>
+                                    <li>VR/AR body tracking</li>
+                                    <li>Gesture-based UI control</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <div class="card-header">
+                            <div class="card-icon">📊</div>
+                            <div>
+                                <div class="card-title">Pose Embeddings</div>
+                                <div class="card-description">34-dim pose vector (x,y for 17 keypoints)</div>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            <p style="color: hsl(var(--muted-foreground)); font-size: 0.85rem; margin-bottom: 0.75rem;">
+                                Live pose embedding visualization
+                            </p>
+                            <div class="embedding-viz" style="height: 80px;">
+                                <div class="embedding-bars" id="pose-embedding-bars"></div>
+                            </div>
+
+                            <div class="console" id="pose-console" style="margin-top: 1rem;">
+                                <div class="console-line info">> Pose detection ready...</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Self-Learning Tab -->
+            <div class="tab-content" data-tab="learning">
+                <div class="grid">
+                    <!-- Live Classifier Training -->
+                    <div class="card">
+                        <div class="card-header">
+                            <div class="card-icon">🧠</div>
+                            <div>
+                                <div class="card-title">Live Classifier</div>
+                                <div class="card-description">Train a classifier in real-time</div>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            <p style="color: hsl(var(--muted-foreground)); font-size: 0.85rem; margin-bottom: 1rem;">
+                                1. Add labeled examples &nbsp; 2. Test on new images &nbsp; 3. Correct mistakes to improve
+                            </p>
+
+                            <div style="display: flex; gap: 0.5rem; margin-bottom: 1rem; flex-wrap: wrap;">
+                                <input type="text" id="class-name-input" placeholder="Class name (e.g., cat)"
+                                    style="flex: 1; min-width: 120px; padding: 0.5rem; background: hsl(var(--secondary)); border: 1px solid hsl(var(--border)); border-radius: 6px; color: hsl(var(--foreground)); font-size: 0.85rem;">
+                                <button class="btn btn-primary" id="add-class-btn">+ Add Class</button>
+                            </div>
+
+                            <div id="class-containers" style="display: flex; flex-wrap: wrap; gap: 0.75rem; margin-bottom: 1rem;"></div>
+
+                            <div style="border-top: 1px solid hsl(var(--border)); padding-top: 1rem; margin-top: 0.5rem;">
+                                <p style="font-size: 0.8rem; color: hsl(var(--muted-foreground)); margin-bottom: 0.5rem;">Test Classification:</p>
+                                <div class="drop-zone" id="classify-drop" style="padding: 1rem;">
+                                    <span style="font-size: 1.5rem;">🎯</span>
+                                    <span style="font-size: 0.85rem; margin-left: 0.5rem;">Drop image to classify</span>
+                                </div>
+                                <input type="file" id="classify-input" accept="image/*" style="display: none;">
+                                <div id="classify-result" style="margin-top: 0.75rem; text-align: center;"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Few-Shot Learning -->
+                    <div class="card">
+                        <div class="card-header">
+                            <div class="card-icon">🎯</div>
+                            <div>
+                                <div class="card-title">Few-Shot Learning</div>
+                                <div class="card-description">Learn from 1-5 examples per class</div>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            <p style="color: hsl(var(--muted-foreground)); font-size: 0.85rem; margin-bottom: 1rem;">
+                                Register classes with just a few examples, then classify new images instantly.
+                            </p>
+
+                            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.75rem; margin-bottom: 1rem;">
+                                <div style="text-align: center;">
+                                    <div class="drop-zone" id="fewshot-class-a" style="padding: 0.75rem; min-height: 80px;" data-class="A">
+                                        <div style="font-weight: 600; color: hsl(var(--primary));">Class A</div>
+                                        <div style="font-size: 0.7rem; color: hsl(var(--muted-foreground));">Drop images</div>
+                                    </div>
+                                    <input type="file" id="fewshot-input-a" multiple accept="image/*" style="display: none;">
+                                    <div id="fewshot-count-a" style="font-size: 0.75rem; margin-top: 0.25rem;">0 examples</div>
+                                </div>
+                                <div style="text-align: center;">
+                                    <div class="drop-zone" id="fewshot-class-b" style="padding: 0.75rem; min-height: 80px;" data-class="B">
+                                        <div style="font-weight: 600; color: hsl(var(--success));">Class B</div>
+                                        <div style="font-size: 0.7rem; color: hsl(var(--muted-foreground));">Drop images</div>
+                                    </div>
+                                    <input type="file" id="fewshot-input-b" multiple accept="image/*" style="display: none;">
+                                    <div id="fewshot-count-b" style="font-size: 0.75rem; margin-top: 0.25rem;">0 examples</div>
+                                </div>
+                                <div style="text-align: center;">
+                                    <div class="drop-zone" id="fewshot-class-c" style="padding: 0.75rem; min-height: 80px;" data-class="C">
+                                        <div style="font-weight: 600; color: hsl(var(--warning));">Class C</div>
+                                        <div style="font-size: 0.7rem; color: hsl(var(--muted-foreground));">Drop images</div>
+                                    </div>
+                                    <input type="file" id="fewshot-input-c" multiple accept="image/*" style="display: none;">
+                                    <div id="fewshot-count-c" style="font-size: 0.75rem; margin-top: 0.25rem;">0 examples</div>
+                                </div>
+                            </div>
+
+                            <div style="border-top: 1px solid hsl(var(--border)); padding-top: 1rem;">
+                                <div class="drop-zone" id="fewshot-test" style="padding: 0.75rem;">
+                                    <span>🔮 Drop to classify</span>
+                                </div>
+                                <input type="file" id="fewshot-test-input" accept="image/*" style="display: none;">
+                                <div id="fewshot-result" style="margin-top: 0.5rem; text-align: center; font-size: 0.9rem;"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Incremental Learning -->
+                    <div class="card">
+                        <div class="card-header">
+                            <div class="card-icon">📈</div>
+                            <div>
+                                <div class="card-title">Incremental Learning</div>
+                                <div class="card-description">Watch accuracy improve over time</div>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            <p style="color: hsl(var(--muted-foreground)); font-size: 0.85rem; margin-bottom: 1rem;">
+                                Add examples one by one and watch the prototype centroids evolve.
+                            </p>
+
+                            <div style="display: flex; gap: 0.5rem; margin-bottom: 1rem;">
+                                <select id="incremental-class" style="flex: 1; padding: 0.5rem; background: hsl(var(--secondary)); border: 1px solid hsl(var(--border)); border-radius: 6px; color: hsl(var(--foreground));">
+                                    <option value="positive">Positive (+)</option>
+                                    <option value="negative">Negative (-)</option>
+                                </select>
+                                <div class="drop-zone" id="incremental-add" style="padding: 0.5rem 1rem; flex: 2;">
+                                    <span style="font-size: 0.85rem;">📥 Drop to add example</span>
+                                </div>
+                                <input type="file" id="incremental-input" accept="image/*" style="display: none;">
+                            </div>
+
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
+                                <div style="background: hsl(var(--secondary)); padding: 0.75rem; border-radius: 8px; text-align: center;">
+                                    <div style="font-size: 1.5rem; font-weight: 700; color: hsl(var(--success));" id="inc-pos-count">0</div>
+                                    <div style="font-size: 0.75rem; color: hsl(var(--muted-foreground));">Positive examples</div>
+                                </div>
+                                <div style="background: hsl(var(--secondary)); padding: 0.75rem; border-radius: 8px; text-align: center;">
+                                    <div style="font-size: 1.5rem; font-weight: 700; color: hsl(var(--destructive));" id="inc-neg-count">0</div>
+                                    <div style="font-size: 0.75rem; color: hsl(var(--muted-foreground));">Negative examples</div>
+                                </div>
+                            </div>
+
+                            <div style="border-top: 1px solid hsl(var(--border)); padding-top: 1rem;">
+                                <div class="drop-zone" id="incremental-test" style="padding: 0.75rem;">
+                                    <span>⚖️ Drop to test</span>
+                                </div>
+                                <input type="file" id="incremental-test-input" accept="image/*" style="display: none;">
+                                <div id="incremental-result" style="margin-top: 0.5rem;"></div>
+                            </div>
+
+                            <button class="btn btn-ghost" id="incremental-reset" style="width: 100%; margin-top: 0.75rem;">🔄 Reset Model</button>
+                        </div>
+                    </div>
+
+                    <!-- Feedback Learning -->
+                    <div class="card">
+                        <div class="card-header">
+                            <div class="card-icon">🔄</div>
+                            <div>
+                                <div class="card-title">Feedback Learning</div>
+                                <div class="card-description">Correct mistakes to improve</div>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            <p style="color: hsl(var(--muted-foreground)); font-size: 0.85rem; margin-bottom: 1rem;">
+                                The model learns from corrections. Wrong prediction? Tell it the right answer!
+                            </p>
+
+                            <div id="feedback-history" style="max-height: 200px; overflow-y: auto; margin-bottom: 1rem;">
+                                <div style="text-align: center; color: hsl(var(--muted-foreground)); font-size: 0.85rem; padding: 1rem;">
+                                    Train the Live Classifier above, then test images here to provide feedback
+                                </div>
+                            </div>
+
+                            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0.5rem; text-align: center; font-size: 0.8rem;">
+                                <div style="background: hsl(var(--secondary)); padding: 0.5rem; border-radius: 6px;">
+                                    <div style="font-weight: 600;" id="feedback-total">0</div>
+                                    <div style="color: hsl(var(--muted-foreground));">Total</div>
+                                </div>
+                                <div style="background: hsl(var(--secondary)); padding: 0.5rem; border-radius: 6px;">
+                                    <div style="font-weight: 600; color: hsl(var(--success));" id="feedback-correct">0</div>
+                                    <div style="color: hsl(var(--muted-foreground));">Correct</div>
+                                </div>
+                                <div style="background: hsl(var(--secondary)); padding: 0.5rem; border-radius: 6px;">
+                                    <div style="font-weight: 600; color: hsl(var(--primary));" id="feedback-accuracy">—</div>
+                                    <div style="color: hsl(var(--muted-foreground));">Accuracy</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Memory Bank -->
+                    <div class="card">
+                        <div class="card-header">
+                            <div class="card-icon">💾</div>
+                            <div>
+                                <div class="card-title">Memory Bank</div>
+                                <div class="card-description">Persistent embedding storage</div>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            <p style="color: hsl(var(--muted-foreground)); font-size: 0.85rem; margin-bottom: 1rem;">
+                                View all stored embeddings and their class assignments.
+                            </p>
+
+                            <div id="memory-bank-grid" style="display: grid; grid-template-columns: repeat(6, 1fr); gap: 0.5rem; max-height: 200px; overflow-y: auto;">
+                                <div style="grid-column: span 6; text-align: center; color: hsl(var(--muted-foreground)); font-size: 0.85rem; padding: 1rem;">
+                                    No memories yet. Add examples to the classifiers above.
+                                </div>
+                            </div>
+
+                            <div style="display: flex; gap: 0.5rem; margin-top: 1rem;">
+                                <button class="btn btn-secondary" id="export-memory-btn" style="flex: 1;">📤 Export</button>
+                                <button class="btn btn-secondary" id="import-memory-btn" style="flex: 1;">📥 Import</button>
+                                <input type="file" id="import-memory-input" accept=".json" style="display: none;">
+                            </div>
+
+                            <div id="memory-stats" style="margin-top: 0.75rem; font-size: 0.8rem; color: hsl(var(--muted-foreground)); text-align: center;">
+                                0 classes • 0 embeddings • 0 KB
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Real-time Camera Training -->
+                    <div class="card">
+                        <div class="card-header">
+                            <div class="card-icon">📹</div>
+                            <div>
+                                <div class="card-title">Camera Training</div>
+                                <div class="card-description">Train using your webcam</div>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            <div class="camera-wrapper" style="position: relative; aspect-ratio: 4/3; background: hsl(var(--secondary)); margin-bottom: 1rem;">
+                                <video id="training-video" autoplay playsinline style="width: 100%; height: 100%; object-fit: cover;"></video>
+                                <div style="position: absolute; top: 0.5rem; left: 0.5rem;">
+                                    <span class="stat-badge" id="training-class-badge" style="background: hsl(var(--primary));">Ready</span>
+                                </div>
+                            </div>
+
+                            <div style="display: flex; gap: 0.5rem; margin-bottom: 1rem;">
+                                <button class="btn btn-primary" id="start-training-cam-btn">Start Camera</button>
+                                <button class="btn btn-secondary hidden" id="stop-training-cam-btn">Stop</button>
+                            </div>
+
+                            <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                                <input type="text" id="cam-class-input" placeholder="Class name"
+                                    style="flex: 1; min-width: 100px; padding: 0.5rem; background: hsl(var(--secondary)); border: 1px solid hsl(var(--border)); border-radius: 6px; color: hsl(var(--foreground)); font-size: 0.85rem;">
+                                <button class="btn btn-primary" id="capture-training-btn" disabled>📸 Capture</button>
+                                <button class="btn btn-secondary" id="auto-capture-btn" disabled>🔄 Auto (5)</button>
+                            </div>
+
+                            <div id="cam-training-log" style="margin-top: 0.75rem; font-size: 0.8rem; color: hsl(var(--muted-foreground)); max-height: 60px; overflow-y: auto;"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Examples Tab -->
+            <div class="tab-content" data-tab="examples">
+                <!-- Interactive Demos Section -->
+                <div style="margin-bottom: 2rem;">
+                    <h2 style="font-size: 1.5rem; font-weight: 700; margin-bottom: 0.5rem;">Interactive Demos</h2>
+                    <p style="color: hsl(var(--muted-foreground)); margin-bottom: 1.5rem;">Try these working demos right in your browser</p>
+
+                    <div class="grid">
+                        <!-- Image Similarity Search -->
+                        <div class="card">
+                            <div class="card-header">
+                                <div class="card-icon">🔎</div>
+                                <div>
+                                    <div class="card-title">Similarity Search</div>
+                                    <div class="card-description">Find similar images instantly</div>
+                                </div>
+                            </div>
+                            <div class="card-body">
+                                <p style="color: hsl(var(--muted-foreground)); font-size: 0.85rem; margin-bottom: 1rem;">
+                                    Click a query image, then see similarity scores for all others.
+                                </p>
+                                <div id="similarity-search-grid" style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.5rem;"></div>
+                                <div id="similarity-results" style="margin-top: 1rem; font-size: 0.85rem;"></div>
+                            </div>
+                        </div>
+
+                        <!-- Motion Detection -->
+                        <div class="card">
+                            <div class="card-header">
+                                <div class="card-icon">🎬</div>
+                                <div>
+                                    <div class="card-title">Motion Detection</div>
+                                    <div class="card-description">Detect scene changes via embeddings</div>
+                                </div>
+                            </div>
+                            <div class="card-body">
+                                <div class="camera-wrapper" style="position: relative; aspect-ratio: 4/3; background: hsl(var(--secondary));">
+                                    <video id="motion-video" autoplay playsinline style="width: 100%; height: 100%; object-fit: cover;"></video>
+                                    <div style="position: absolute; top: 0.5rem; right: 0.5rem;">
+                                        <span class="stat-badge" id="motion-badge" style="background: hsl(var(--success)); color: white;">No Motion</span>
+                                    </div>
+                                </div>
+                                <div class="btn-row">
+                                    <button class="btn btn-primary" id="start-motion-btn">Start Detection</button>
+                                    <button class="btn btn-secondary hidden" id="stop-motion-btn">Stop</button>
+                                </div>
+                                <div style="margin-top: 0.75rem;">
+                                    <div style="display: flex; justify-content: space-between; font-size: 0.8rem; color: hsl(var(--muted-foreground));">
+                                        <span>Scene Change:</span>
+                                        <span id="motion-score">0%</span>
+                                    </div>
+                                    <div style="height: 6px; background: hsl(var(--secondary)); border-radius: 3px; margin-top: 0.25rem; overflow: hidden;">
+                                        <div id="motion-bar" style="height: 100%; width: 0%; background: linear-gradient(90deg, hsl(var(--success)), hsl(var(--warning)), hsl(var(--destructive))); transition: width 0.1s;"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Embedding Comparison -->
+                        <div class="card">
+                            <div class="card-header">
+                                <div class="card-icon">⚖️</div>
+                                <div>
+                                    <div class="card-title">A/B Comparison</div>
+                                    <div class="card-description">Compare two images side-by-side</div>
+                                </div>
+                            </div>
+                            <div class="card-body">
+                                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                                    <div>
+                                        <div class="drop-zone" id="compare-drop-a" style="padding: 1.5rem; aspect-ratio: 1;">
+                                            <div style="font-size: 2rem;">A</div>
+                                            <p style="font-size: 0.75rem; color: hsl(var(--muted-foreground));">Drop image</p>
+                                        </div>
+                                        <input type="file" id="compare-input-a" accept="image/*" style="display: none;">
+                                    </div>
+                                    <div>
+                                        <div class="drop-zone" id="compare-drop-b" style="padding: 1.5rem; aspect-ratio: 1;">
+                                            <div style="font-size: 2rem;">B</div>
+                                            <p style="font-size: 0.75rem; color: hsl(var(--muted-foreground));">Drop image</p>
+                                        </div>
+                                        <input type="file" id="compare-input-b" accept="image/*" style="display: none;">
+                                    </div>
+                                </div>
+                                <div id="compare-result" style="text-align: center; margin-top: 1rem; padding: 1rem; background: hsl(var(--secondary)); border-radius: calc(var(--radius) - 2px);">
+                                    <div style="font-size: 2rem; font-weight: 700;" id="compare-score">—</div>
+                                    <div style="font-size: 0.8rem; color: hsl(var(--muted-foreground));">Similarity Score</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Batch Processor -->
+                        <div class="card">
+                            <div class="card-header">
+                                <div class="card-icon">📦</div>
+                                <div>
+                                    <div class="card-title">Batch Processor</div>
+                                    <div class="card-description">Process multiple images at once</div>
+                                </div>
+                            </div>
+                            <div class="card-body">
+                                <div class="drop-zone" id="batch-drop" style="padding: 1.5rem;">
+                                    <div style="font-size: 1.5rem;">📁</div>
+                                    <p style="font-size: 0.85rem;">Drop multiple images</p>
+                                    <p style="font-size: 0.75rem; color: hsl(var(--muted-foreground));">Process up to 20 images</p>
+                                </div>
+                                <input type="file" id="batch-input" multiple accept="image/*" style="display: none;">
+                                <div id="batch-progress" style="margin-top: 1rem; display: none;">
+                                    <div style="display: flex; justify-content: space-between; font-size: 0.8rem; margin-bottom: 0.25rem;">
+                                        <span>Processing...</span>
+                                        <span id="batch-count">0/0</span>
+                                    </div>
+                                    <div style="height: 6px; background: hsl(var(--secondary)); border-radius: 3px; overflow: hidden;">
+                                        <div id="batch-bar" style="height: 100%; width: 0%; background: hsl(var(--primary)); transition: width 0.2s;"></div>
+                                    </div>
+                                </div>
+                                <div id="batch-results" style="margin-top: 1rem; max-height: 150px; overflow-y: auto; font-size: 0.8rem;"></div>
+                            </div>
+                        </div>
+
+                        <!-- Embedding Explorer -->
+                        <div class="card">
+                            <div class="card-header">
+                                <div class="card-icon">🔬</div>
+                                <div>
+                                    <div class="card-title">Embedding Explorer</div>
+                                    <div class="card-description">Visualize feature dimensions</div>
+                                </div>
+                            </div>
+                            <div class="card-body">
+                                <p style="color: hsl(var(--muted-foreground)); font-size: 0.85rem; margin-bottom: 0.75rem;">
+                                    Upload an image to explore its 512-dim neural embedding
+                                </p>
+                                <div class="drop-zone" id="explorer-drop" style="padding: 1rem;">
+                                    <span style="font-size: 1.5rem;">🖼️</span>
+                                    <span style="font-size: 0.85rem; margin-left: 0.5rem;">Drop image to explore</span>
+                                </div>
+                                <input type="file" id="explorer-input" accept="image/*" style="display: none;">
+                                <div id="explorer-viz" style="margin-top: 1rem;">
+                                    <div style="display: flex; justify-content: space-between; font-size: 0.75rem; color: hsl(var(--muted-foreground)); margin-bottom: 0.25rem;">
+                                        <span>Dim 0</span>
+                                        <span id="explorer-hover">Hover for details</span>
+                                        <span>Dim 511</span>
+                                    </div>
+                                    <div class="embedding-viz" style="height: 60px;">
+                                        <div class="embedding-bars" id="explorer-bars"></div>
+                                    </div>
+                                </div>
+                                <div id="explorer-stats" style="margin-top: 0.75rem; display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.5rem; font-size: 0.75rem;"></div>
+                            </div>
+                        </div>
+
+                        <!-- Anomaly Detection -->
+                        <div class="card">
+                            <div class="card-header">
+                                <div class="card-icon">🚨</div>
+                                <div>
+                                    <div class="card-title">Anomaly Detection</div>
+                                    <div class="card-description">Find outlier images in a set</div>
+                                </div>
+                            </div>
+                            <div class="card-body">
+                                <p style="color: hsl(var(--muted-foreground)); font-size: 0.85rem; margin-bottom: 0.75rem;">
+                                    Upload images — outliers will be highlighted in red
+                                </p>
+                                <div class="drop-zone" id="anomaly-drop" style="padding: 1rem;">
+                                    <span style="font-size: 1.5rem;">📊</span>
+                                    <span style="font-size: 0.85rem; margin-left: 0.5rem;">Drop 4+ images</span>
+                                </div>
+                                <input type="file" id="anomaly-input" multiple accept="image/*" style="display: none;">
+                                <div id="anomaly-grid" style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.5rem; margin-top: 1rem;"></div>
+                                <div id="anomaly-result" style="margin-top: 0.75rem; font-size: 0.8rem; color: hsl(var(--muted-foreground));"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Code Examples Section -->
+                <div>
+                    <h2 style="font-size: 1.5rem; font-weight: 700; margin-bottom: 0.5rem;">Code Examples</h2>
+                    <p style="color: hsl(var(--muted-foreground)); margin-bottom: 1.5rem;">Copy-paste code snippets for common use cases</p>
+
+                    <div class="use-case-grid">
+                        <div class="use-case" onclick="loadExample('visual-search')">
+                            <div class="use-case-icon">🔍</div>
+                            <div class="use-case-title">Visual Product Search</div>
+                            <div class="use-case-desc">Upload a photo to find similar products in a catalog.</div>
+                        </div>
+                        <div class="use-case" onclick="loadExample('face-verify')">
+                            <div class="use-case-icon">👤</div>
+                            <div class="use-case-title">Face Verification</div>
+                            <div class="use-case-desc">Compare two face images to verify identity.</div>
+                        </div>
+                        <div class="use-case" onclick="loadExample('duplicate-detect')">
+                            <div class="use-case-icon">🔄</div>
+                            <div class="use-case-title">Duplicate Detection</div>
+                            <div class="use-case-desc">Find near-duplicate images in a collection.</div>
+                        </div>
+                        <div class="use-case" onclick="loadExample('style-match')">
+                            <div class="use-case-icon">🎨</div>
+                            <div class="use-case-title">Art Style Matching</div>
+                            <div class="use-case-desc">Compare artistic styles between images.</div>
+                        </div>
+                        <div class="use-case" onclick="loadExample('quality-check')">
+                            <div class="use-case-icon">✅</div>
+                            <div class="use-case-title">Quality Control</div>
+                            <div class="use-case-desc">Detect defects by embedding distance.</div>
+                        </div>
+                        <div class="use-case" onclick="loadExample('scene-cluster')">
+                            <div class="use-case-icon">🗂️</div>
+                            <div class="use-case-title">Scene Clustering</div>
+                            <div class="use-case-desc">Group photos by scene type automatically.</div>
+                        </div>
+                        <div class="use-case" onclick="loadExample('pose-tracking')">
+                            <div class="use-case-icon">🏃</div>
+                            <div class="use-case-title">Pose Tracking</div>
+                            <div class="use-case-desc">Track body pose over time for fitness.</div>
+                        </div>
+                        <div class="use-case" onclick="loadExample('gesture-control')">
+                            <div class="use-case-icon">🖐️</div>
+                            <div class="use-case-title">Gesture Control</div>
+                            <div class="use-case-desc">Detect gestures to control applications.</div>
+                        </div>
+                        <div class="use-case" onclick="loadExample('image-retrieval')">
+                            <div class="use-case-icon">🗃️</div>
+                            <div class="use-case-title">Image Retrieval</div>
+                            <div class="use-case-desc">Build a searchable image database.</div>
+                        </div>
+                        <div class="use-case" onclick="loadExample('content-moderation')">
+                            <div class="use-case-icon">🛡️</div>
+                            <div class="use-case-title">Content Moderation</div>
+                            <div class="use-case-desc">Flag similar inappropriate content.</div>
+                        </div>
+                        <div class="use-case" onclick="loadExample('recommendation')">
+                            <div class="use-case-icon">💡</div>
+                            <div class="use-case-title">Visual Recommendations</div>
+                            <div class="use-case-desc">Recommend visually similar items.</div>
+                        </div>
+                        <div class="use-case" onclick="loadExample('video-keyframes')">
+                            <div class="use-case-icon">🎥</div>
+                            <div class="use-case-title">Video Keyframes</div>
+                            <div class="use-case-desc">Extract unique frames from video.</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="example-output" style="margin-top: 2rem;"></div>
+            </div>
+
+        </div>
+
+        <footer>
+            <p>
+                Built with <a href="https://github.com/ruvnet/ruvector" target="_blank">RuVector</a> •
+                <a href="https://www.npmjs.com/package/@ruvector/cnn" target="_blank">npm</a> •
+                <a href="https://crates.io/crates/ruvector-cnn" target="_blank">crates.io</a>
+            </p>
+            <p style="margin-top: 0.5rem; opacity: 0.6;">
+                Rust + WebAssembly • SIMD Optimized • Zero Dependencies • MIT License
+            </p>
+        </footer>
+    </div>
+
+    <!-- TensorFlow.js for Pose Estimation -->
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.17.0/dist/tf.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/pose-detection@2.1.0/dist/pose-detection.min.js"></script>
+
+    <script type="module">
+        const WASM_BASE = '.';
+
+        // State
+        let embedder = null;
+        let images = [];
+        let processingTimes = [];
+        let isRealtime = false;
+        let realtimeAnimationId = null;
+        let referenceEmbedding = null;
+        let frameCount = 0;
+        let lastFpsUpdate = 0;
+        let currentFps = 0;
+        let cameraStream = null;
+
+        // DOM
+        const loadingScreen = document.getElementById('loading-screen');
+        const mainContent = document.getElementById('main-content');
+        const dropZone = document.getElementById('drop-zone');
+        const fileInput = document.getElementById('file-input');
+        const previewArea = document.getElementById('preview-area');
+        const extractBtn = document.getElementById('extract-btn');
+        const clearBtn = document.getElementById('clear-btn');
+        const consoleEl = document.getElementById('console');
+        const embeddingBars = document.getElementById('embedding-bars');
+        const similarityMatrix = document.getElementById('similarity-matrix');
+        const cameraVideo = document.getElementById('camera-video');
+        const startCameraBtn = document.getElementById('start-camera-btn');
+        const captureBtn = document.getElementById('capture-btn');
+        const stopCameraBtn = document.getElementById('stop-camera-btn');
+        const sampleImagesContainer = document.getElementById('sample-images');
+        const realtimeBtn = document.getElementById('realtime-btn');
+        const realtimePanel = document.getElementById('realtime-panel');
+        const realtimeBars = document.getElementById('realtime-bars');
+        const cameraStats = document.getElementById('camera-stats');
+        const setReferenceBtn = document.getElementById('set-reference-btn');
+        const stopRealtimeBtn = document.getElementById('stop-realtime-btn');
+
+        // Tabs
+        document.querySelectorAll('.tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+                document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+                tab.classList.add('active');
+                document.querySelector(`.tab-content[data-tab="${tab.dataset.tab}"]`).classList.add('active');
+            });
+        });
+
+        function log(message, type = 'info') {
+            const line = document.createElement('div');
+            line.className = `console-line ${type}`;
+            line.textContent = `> ${message}`;
+            consoleEl.appendChild(line);
+            consoleEl.scrollTop = consoleEl.scrollHeight;
+            if (consoleEl.children.length > 50) consoleEl.removeChild(consoleEl.firstChild);
+        }
+
+        async function initWasm() {
+            try {
+                console.log('[RuVector] Loading WASM...');
+                const module = await import(`${WASM_BASE}/ruvector_cnn_wasm.js`);
+                console.log('[RuVector] Module loaded:', Object.keys(module));
+                await module.default({ module_or_path: `${WASM_BASE}/ruvector_cnn_wasm_bg.wasm` });
+                embedder = new module.WasmCnnEmbedder();
+                console.log('[RuVector] Ready!');
+                log('Neural network loaded', 'success');
+                log(`Model: MobileNet-V3 • ${embedder.embedding_dim}-dim embeddings`);
+                loadingScreen.classList.add('hidden');
+                mainContent.classList.remove('hidden');
+                window.wasmModule = module;
+            } catch (error) {
+                console.error('[RuVector] Error:', error);
+                log(`WASM error: ${error.message}`, 'warning');
+                loadingScreen.innerHTML = `
+                    <div style="text-align: center;">
+                        <p style="margin-bottom: 1rem; color: hsl(var(--warning));">⚠️ WASM failed to load</p>
+                        <button class="btn btn-primary" onclick="startDemoMode()">Continue in Demo Mode</button>
+                    </div>
+                `;
+            }
+        }
+
+        window.startDemoMode = function() {
+            embedder = {
+                embedding_dim: 512,
+                extract: () => {
+                    const arr = new Float32Array(512);
+                    for (let i = 0; i < 512; i++) arr[i] = (Math.random() - 0.5) * 2;
+                    const norm = Math.sqrt(arr.reduce((s, v) => s + v*v, 0));
+                    for (let i = 0; i < 512; i++) arr[i] /= norm;
+                    return arr;
+                },
+                cosine_similarity: (a, b) => {
+                    let dot = 0;
+                    for (let i = 0; i < a.length; i++) dot += a[i] * b[i];
+                    return dot;
+                }
+            };
+            log('Demo mode (simulated embeddings)', 'warning');
+            loadingScreen.classList.add('hidden');
+            mainContent.classList.remove('hidden');
+        };
+
+        // Sample images
+        const samples = [
+            'https://picsum.photos/seed/product1/224/224',
+            'https://picsum.photos/seed/product2/224/224',
+            'https://picsum.photos/seed/nature1/224/224',
+            'https://picsum.photos/seed/face1/224/224',
+            'https://picsum.photos/seed/art1/224/224',
+            'https://picsum.photos/seed/city1/224/224'
+        ];
+
+        samples.forEach((url, i) => {
+            const div = document.createElement('div');
+            div.className = 'sample-img';
+            div.innerHTML = `<img src="${url}" alt="Sample" crossorigin="anonymous">`;
+            div.onclick = () => loadImageFromUrl(url);
+            sampleImagesContainer.appendChild(div);
+        });
+
+        async function loadImageFromUrl(url) {
+            try {
+                const img = new Image();
+                img.crossOrigin = 'anonymous';
+                await new Promise((resolve, reject) => {
+                    img.onload = resolve;
+                    img.onerror = reject;
+                    img.src = url;
+                });
+                addImage(img, `sample-${Date.now()}`);
+                log('Loaded sample image', 'success');
+            } catch (error) {
+                log(`Failed: ${error.message}`, 'warning');
+            }
+        }
+
+        function addImage(imgElement, id) {
+            const canvas = document.createElement('canvas');
+            canvas.width = 224;
+            canvas.height = 224;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(imgElement, 0, 0, 224, 224);
+            const imageData = ctx.getImageData(0, 0, 224, 224);
+            const rgb = new Uint8Array(224 * 224 * 3);
+            for (let i = 0, j = 0; i < imageData.data.length; i += 4, j += 3) {
+                rgb[j] = imageData.data[i];
+                rgb[j + 1] = imageData.data[i + 1];
+                rgb[j + 2] = imageData.data[i + 2];
+            }
+            images.push({ id, dataUrl: canvas.toDataURL(), rgb, embedding: null });
+            renderPreviews();
+            updateButtons();
+        }
+
+        function renderPreviews() {
+            previewArea.innerHTML = '';
+            images.forEach((img, idx) => {
+                const div = document.createElement('div');
+                div.className = 'preview-item' + (img.embedding ? ' selected' : '');
+                div.innerHTML = `<img src="${img.dataUrl}"><button class="remove-btn" onclick="event.stopPropagation();removeImage(${idx})">×</button>`;
+                div.onclick = () => img.embedding && visualizeEmbedding(img.embedding);
+                previewArea.appendChild(div);
+            });
+            document.getElementById('stat-images').textContent = images.length;
+        }
+
+        window.removeImage = function(idx) {
+            images.splice(idx, 1);
+            renderPreviews();
+            updateButtons();
+            updateSimilarityMatrix();
+        };
+
+        function updateButtons() {
+            extractBtn.disabled = images.length === 0;
+            clearBtn.disabled = images.length === 0;
+        }
+
+        async function extractFeatures() {
+            if (!embedder) return;
+            extractBtn.disabled = true;
+            extractBtn.textContent = '⏳ Processing...';
+            processingTimes = [];
+            for (const img of images) {
+                const start = performance.now();
+                try {
+                    img.embedding = embedder.extract(img.rgb, 224, 224);
+                    const elapsed = performance.now() - start;
+                    processingTimes.push(elapsed);
+                    log(`Extracted ${img.embedding.length}-dim in ${elapsed.toFixed(1)}ms`, 'success');
+                } catch (e) {
+                    log(`Error: ${e.message}`, 'warning');
+                }
+            }
+            if (processingTimes.length > 0) {
+                document.getElementById('stat-time').textContent = `${(processingTimes.reduce((a,b)=>a+b)/processingTimes.length).toFixed(1)}ms`;
+            }
+            renderPreviews();
+            updateSimilarityMatrix();
+            if (images[0]?.embedding) visualizeEmbedding(images[0].embedding);
+            extractBtn.disabled = false;
+            extractBtn.textContent = '🧠 Extract Embeddings';
+        }
+
+        function visualizeEmbedding(embedding) {
+            embeddingBars.innerHTML = '';
+            const step = Math.floor(embedding.length / 128);
+            for (let i = 0; i < 128; i++) {
+                const val = embedding[i * step];
+                const bar = document.createElement('div');
+                bar.className = 'embedding-bar';
+                const hue = val > 0 ? 262 : 340;
+                bar.style.height = `${Math.max(3, Math.abs(val) * 100)}%`;
+                bar.style.background = `hsl(${hue}, 80%, 55%)`;
+                bar.style.opacity = 0.5 + Math.abs(val) * 0.5;
+                embeddingBars.appendChild(bar);
+            }
+        }
+
+        function updateSimilarityMatrix() {
+            const valid = images.filter(i => i.embedding);
+            if (valid.length < 2) {
+                similarityMatrix.innerHTML = '<p style="color: hsl(var(--muted-foreground)); text-align: center; padding: 2rem;">Extract features from 2+ images</p>';
+                return;
+            }
+            let html = `<div class="matrix" style="grid-template-columns: repeat(${valid.length + 1}, 50px);">`;
+            html += '<div class="matrix-cell"></div>';
+            valid.forEach(img => html += `<div class="matrix-cell header"><img src="${img.dataUrl}"></div>`);
+            valid.forEach((img1, i) => {
+                html += `<div class="matrix-cell header"><img src="${img1.dataUrl}"></div>`;
+                valid.forEach((img2, j) => {
+                    const sim = embedder.cosine_similarity(img1.embedding, img2.embedding);
+                    const hue = sim * 120;
+                    html += `<div class="matrix-cell" style="background: hsl(${hue}, 60%, 35%);">${sim.toFixed(2)}</div>`;
+                });
+            });
+            html += '</div>';
+            similarityMatrix.innerHTML = html;
+        }
+
+        // Camera
+        async function startCamera() {
+            try {
+                cameraStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment', width: 640, height: 480 }});
+                cameraVideo.srcObject = cameraStream;
+                startCameraBtn.classList.add('hidden');
+                captureBtn.classList.remove('hidden');
+                realtimeBtn.classList.remove('hidden');
+                stopCameraBtn.classList.remove('hidden');
+                log('Camera started', 'success');
+            } catch (e) {
+                log(`Camera error: ${e.message}`, 'warning');
+            }
+        }
+
+        function stopCamera() {
+            stopRealtime();
+            if (cameraStream) {
+                cameraStream.getTracks().forEach(t => t.stop());
+                cameraStream = null;
+            }
+            cameraVideo.srcObject = null;
+            startCameraBtn.classList.remove('hidden');
+            captureBtn.classList.add('hidden');
+            realtimeBtn.classList.add('hidden');
+            stopCameraBtn.classList.add('hidden');
+            realtimePanel.classList.add('hidden');
+            cameraStats.classList.add('hidden');
+        }
+
+        function captureFrame() {
+            const canvas = document.createElement('canvas');
+            canvas.width = cameraVideo.videoWidth;
+            canvas.height = cameraVideo.videoHeight;
+            canvas.getContext('2d').drawImage(cameraVideo, 0, 0);
+            const img = new Image();
+            img.onload = () => { addImage(img, `cam-${Date.now()}`); log('Captured', 'success'); };
+            img.src = canvas.toDataURL();
+        }
+
+        function startRealtime() {
+            if (!embedder) return;
+            isRealtime = true;
+            frameCount = 0;
+            lastFpsUpdate = performance.now();
+            realtimeBtn.classList.add('hidden');
+            captureBtn.classList.add('hidden');
+            realtimePanel.classList.remove('hidden');
+            cameraStats.classList.remove('hidden');
+            cameraVideo.classList.add('realtime-active');
+            log('Real-time CNN started', 'success');
+            processRealtimeFrame();
+        }
+
+        function stopRealtime() {
+            isRealtime = false;
+            if (realtimeAnimationId) cancelAnimationFrame(realtimeAnimationId);
+            cameraVideo.classList.remove('realtime-active');
+            if (cameraStream) {
+                realtimeBtn.classList.remove('hidden');
+                captureBtn.classList.remove('hidden');
+            }
+            realtimePanel.classList.add('hidden');
+            cameraStats.classList.add('hidden');
+        }
+
+        function processRealtimeFrame() {
+            if (!isRealtime || !cameraStream) return;
+            const start = performance.now();
+            const canvas = document.createElement('canvas');
+            canvas.width = 224; canvas.height = 224;
+            const ctx = canvas.getContext('2d');
+            const vw = cameraVideo.videoWidth, vh = cameraVideo.videoHeight;
+            const size = Math.min(vw, vh);
+            ctx.drawImage(cameraVideo, (vw-size)/2, (vh-size)/2, size, size, 0, 0, 224, 224);
+            const imageData = ctx.getImageData(0, 0, 224, 224);
+            const rgb = new Uint8Array(224 * 224 * 3);
+            for (let i = 0, j = 0; i < imageData.data.length; i += 4, j += 3) {
+                rgb[j] = imageData.data[i];
+                rgb[j+1] = imageData.data[i+1];
+                rgb[j+2] = imageData.data[i+2];
+            }
+            const embedding = embedder.extract(rgb, 224, 224);
+            const latency = performance.now() - start;
+            frameCount++;
+            const now = performance.now();
+            if (now - lastFpsUpdate >= 1000) {
+                currentFps = Math.round(frameCount * 1000 / (now - lastFpsUpdate));
+                frameCount = 0;
+                lastFpsUpdate = now;
+            }
+            document.getElementById('rt-fps').textContent = currentFps;
+            document.getElementById('rt-latency').textContent = `${latency.toFixed(1)}ms`;
+            document.getElementById('fps-display').textContent = `${currentFps} FPS`;
+            document.getElementById('latency-display').textContent = `${latency.toFixed(1)}ms`;
+            if (referenceEmbedding) {
+                const sim = embedder.cosine_similarity(embedding, referenceEmbedding);
+                const el = document.getElementById('rt-similarity');
+                el.textContent = sim.toFixed(3);
+                el.style.color = sim > 0.8 ? 'hsl(var(--success))' : sim > 0.5 ? 'hsl(var(--warning))' : 'hsl(var(--primary))';
+            }
+            visualizeRealtimeEmbedding(embedding);
+            realtimeAnimationId = requestAnimationFrame(processRealtimeFrame);
+        }
+
+        function visualizeRealtimeEmbedding(embedding) {
+            realtimeBars.innerHTML = '';
+            const step = Math.floor(embedding.length / 64);
+            for (let i = 0; i < 64; i++) {
+                const val = embedding[i * step];
+                const bar = document.createElement('div');
+                bar.className = 'embedding-bar';
+                bar.style.height = `${Math.max(3, Math.abs(val) * 100)}%`;
+                bar.style.background = `linear-gradient(to top, hsl(262, 80%, 55%), hsl(280, 70%, 50%))`;
+                bar.style.opacity = 0.5 + Math.abs(val) * 0.5;
+                realtimeBars.appendChild(bar);
+            }
+        }
+
+        function setReferenceEmbedding() {
+            if (!embedder || !cameraStream) return;
+            const canvas = document.createElement('canvas');
+            canvas.width = 224; canvas.height = 224;
+            const ctx = canvas.getContext('2d');
+            const vw = cameraVideo.videoWidth, vh = cameraVideo.videoHeight;
+            const size = Math.min(vw, vh);
+            ctx.drawImage(cameraVideo, (vw-size)/2, (vh-size)/2, size, size, 0, 0, 224, 224);
+            const imageData = ctx.getImageData(0, 0, 224, 224);
+            const rgb = new Uint8Array(224 * 224 * 3);
+            for (let i = 0, j = 0; i < imageData.data.length; i += 4, j += 3) {
+                rgb[j] = imageData.data[i]; rgb[j+1] = imageData.data[i+1]; rgb[j+2] = imageData.data[i+2];
+            }
+            referenceEmbedding = embedder.extract(rgb, 224, 224);
+            log('Reference set — comparing live frames', 'success');
+        }
+
+        // Pose Estimation
+        let poseDetector = null;
+        let poseStream = null;
+        let isPoseRunning = false;
+        let poseAnimationId = null;
+        let referencePose = null;
+        let showSkeleton = true;
+        let poseFrameCount = 0;
+        let poseLastFpsUpdate = 0;
+        let poseCurrentFps = 0;
+
+        const poseVideo = document.getElementById('pose-video');
+        const poseCanvas = document.getElementById('pose-canvas');
+        const poseCtx = poseCanvas ? poseCanvas.getContext('2d') : null;
+        const startPoseBtn = document.getElementById('start-pose-btn');
+        const stopPoseBtn = document.getElementById('stop-pose-btn');
+        const posePanel = document.getElementById('pose-panel');
+        const poseStats = document.getElementById('pose-stats');
+        const poseConsole = document.getElementById('pose-console');
+        const poseEmbeddingBars = document.getElementById('pose-embedding-bars');
+        const setPoseReferenceBtn = document.getElementById('set-pose-reference-btn');
+        const toggleSkeletonBtn = document.getElementById('toggle-skeleton-btn');
+
+        const KEYPOINT_NAMES = [
+            'nose', 'left_eye', 'right_eye', 'left_ear', 'right_ear',
+            'left_shoulder', 'right_shoulder', 'left_elbow', 'right_elbow',
+            'left_wrist', 'right_wrist', 'left_hip', 'right_hip',
+            'left_knee', 'right_knee', 'left_ankle', 'right_ankle'
+        ];
+
+        const SKELETON_CONNECTIONS = [
+            ['left_ear', 'left_eye'], ['left_eye', 'nose'], ['nose', 'right_eye'], ['right_eye', 'right_ear'],
+            ['left_shoulder', 'right_shoulder'],
+            ['left_shoulder', 'left_elbow'], ['left_elbow', 'left_wrist'],
+            ['right_shoulder', 'right_elbow'], ['right_elbow', 'right_wrist'],
+            ['left_shoulder', 'left_hip'], ['right_shoulder', 'right_hip'],
+            ['left_hip', 'right_hip'],
+            ['left_hip', 'left_knee'], ['left_knee', 'left_ankle'],
+            ['right_hip', 'right_knee'], ['right_knee', 'right_ankle']
+        ];
+
+        function poseLog(message, type = 'info') {
+            if (!poseConsole) return;
+            const line = document.createElement('div');
+            line.className = `console-line ${type}`;
+            line.textContent = `> ${message}`;
+            poseConsole.appendChild(line);
+            poseConsole.scrollTop = poseConsole.scrollHeight;
+            if (poseConsole.children.length > 30) poseConsole.removeChild(poseConsole.firstChild);
+        }
+
+        async function initPoseDetector() {
+            try {
+                poseLog('Loading MoveNet model...');
+
+                // Force WebGL backend (more compatible than WebGPU)
+                await tf.setBackend('webgl');
+                await tf.ready();
+                poseLog(`Using TF.js backend: ${tf.getBackend()}`);
+
+                const model = poseDetection.SupportedModels.MoveNet;
+                const detectorConfig = {
+                    modelType: poseDetection.movenet.modelType.SINGLEPOSE_LIGHTNING,
+                    enableSmoothing: true
+                };
+                poseDetector = await poseDetection.createDetector(model, detectorConfig);
+                poseLog('MoveNet loaded (SinglePose Lightning)', 'success');
+                return true;
+            } catch (error) {
+                poseLog(`Failed to load MoveNet: ${error.message}`, 'warning');
+                console.error('Pose detection error:', error);
+                return false;
+            }
+        }
+
+        async function startPoseDetection() {
+            if (!poseDetector) {
+                const loaded = await initPoseDetector();
+                if (!loaded) return;
+            }
+
+            try {
+                poseStream = await navigator.mediaDevices.getUserMedia({
+                    video: { facingMode: 'user', width: 640, height: 480 }
+                });
+                poseVideo.srcObject = poseStream;
+                await new Promise(resolve => poseVideo.onloadedmetadata = resolve);
+
+                poseCanvas.width = poseVideo.videoWidth;
+                poseCanvas.height = poseVideo.videoHeight;
+
+                isPoseRunning = true;
+                poseFrameCount = 0;
+                poseLastFpsUpdate = performance.now();
+
+                startPoseBtn.classList.add('hidden');
+                stopPoseBtn.classList.remove('hidden');
+                posePanel.classList.remove('hidden');
+                poseStats.classList.remove('hidden');
+
+                poseLog('Pose detection started', 'success');
+                detectPoseFrame();
+            } catch (error) {
+                poseLog(`Camera error: ${error.message}`, 'warning');
+            }
+        }
+
+        function stopPoseDetection() {
+            isPoseRunning = false;
+            if (poseAnimationId) {
+                cancelAnimationFrame(poseAnimationId);
+                poseAnimationId = null;
+            }
+            if (poseStream) {
+                poseStream.getTracks().forEach(t => t.stop());
+                poseStream = null;
+            }
+            poseVideo.srcObject = null;
+            if (poseCtx) poseCtx.clearRect(0, 0, poseCanvas.width, poseCanvas.height);
+
+            startPoseBtn.classList.remove('hidden');
+            stopPoseBtn.classList.add('hidden');
+            posePanel.classList.add('hidden');
+            poseStats.classList.add('hidden');
+        }
+
+        async function detectPoseFrame() {
+            if (!isPoseRunning || !poseDetector || !poseStream) return;
+
+            const start = performance.now();
+
+            try {
+                const poses = await poseDetector.estimatePoses(poseVideo);
+                const latency = performance.now() - start;
+
+                poseFrameCount++;
+                const now = performance.now();
+                if (now - poseLastFpsUpdate >= 1000) {
+                    poseCurrentFps = Math.round(poseFrameCount * 1000 / (now - poseLastFpsUpdate));
+                    poseFrameCount = 0;
+                    poseLastFpsUpdate = now;
+                }
+
+                document.getElementById('pose-fps-display').textContent = `${poseCurrentFps} FPS`;
+                document.getElementById('pose-latency-display').textContent = `${latency.toFixed(0)}ms`;
+
+                if (poses.length > 0) {
+                    const pose = poses[0];
+                    const validKeypoints = pose.keypoints.filter(kp => kp.score > 0.3);
+
+                    document.getElementById('pose-keypoints').textContent = validKeypoints.length;
+                    const avgConfidence = validKeypoints.length > 0
+                        ? (validKeypoints.reduce((s, kp) => s + kp.score, 0) / validKeypoints.length * 100).toFixed(0)
+                        : 0;
+                    document.getElementById('pose-confidence').textContent = `${avgConfidence}%`;
+
+                    // Draw skeleton
+                    if (showSkeleton && poseCtx) {
+                        drawPose(pose);
+                    } else if (poseCtx) {
+                        poseCtx.clearRect(0, 0, poseCanvas.width, poseCanvas.height);
+                    }
+
+                    // Compute pose embedding and similarity
+                    const poseEmbedding = computePoseEmbedding(pose);
+                    visualizePoseEmbedding(poseEmbedding);
+
+                    if (referencePose) {
+                        const similarity = computePoseSimilarity(poseEmbedding, referencePose);
+                        const simEl = document.getElementById('pose-similarity');
+                        simEl.textContent = similarity.toFixed(2);
+                        simEl.style.color = similarity > 0.8 ? 'hsl(var(--success))' : similarity > 0.5 ? 'hsl(var(--warning))' : 'hsl(var(--primary))';
+                    }
+                }
+            } catch (error) {
+                console.error('Pose detection error:', error);
+            }
+
+            poseAnimationId = requestAnimationFrame(detectPoseFrame);
+        }
+
+        function drawPose(pose) {
+            if (!poseCtx) return;
+            poseCtx.clearRect(0, 0, poseCanvas.width, poseCanvas.height);
+
+            // Draw connections
+            poseCtx.strokeStyle = 'hsl(262, 83%, 58%)';
+            poseCtx.lineWidth = 3;
+            poseCtx.lineCap = 'round';
+
+            SKELETON_CONNECTIONS.forEach(([start, end]) => {
+                const startKp = pose.keypoints.find(kp => kp.name === start);
+                const endKp = pose.keypoints.find(kp => kp.name === end);
+                if (startKp && endKp && startKp.score > 0.3 && endKp.score > 0.3) {
+                    poseCtx.beginPath();
+                    poseCtx.moveTo(startKp.x, startKp.y);
+                    poseCtx.lineTo(endKp.x, endKp.y);
+                    poseCtx.stroke();
+                }
+            });
+
+            // Draw keypoints
+            pose.keypoints.forEach(kp => {
+                if (kp.score > 0.3) {
+                    const isFace = ['nose', 'left_eye', 'right_eye', 'left_ear', 'right_ear'].includes(kp.name);
+                    const isArm = ['left_shoulder', 'right_shoulder', 'left_elbow', 'right_elbow', 'left_wrist', 'right_wrist'].includes(kp.name);
+
+                    let color = 'hsl(38, 92%, 50%)'; // legs - warning color
+                    if (isFace) color = 'hsl(262, 83%, 58%)'; // primary
+                    if (isArm) color = 'hsl(142, 76%, 36%)'; // success
+
+                    poseCtx.beginPath();
+                    poseCtx.arc(kp.x, kp.y, 6, 0, 2 * Math.PI);
+                    poseCtx.fillStyle = color;
+                    poseCtx.fill();
+                    poseCtx.strokeStyle = 'white';
+                    poseCtx.lineWidth = 2;
+                    poseCtx.stroke();
+                }
+            });
+        }
+
+        function computePoseEmbedding(pose) {
+            // Create 34-dim embedding (x, y for each of 17 keypoints, normalized)
+            const embedding = new Float32Array(34);
+            const width = poseCanvas.width || 640;
+            const height = poseCanvas.height || 480;
+
+            KEYPOINT_NAMES.forEach((name, i) => {
+                const kp = pose.keypoints.find(k => k.name === name);
+                if (kp && kp.score > 0.3) {
+                    embedding[i * 2] = kp.x / width;
+                    embedding[i * 2 + 1] = kp.y / height;
+                } else {
+                    embedding[i * 2] = 0;
+                    embedding[i * 2 + 1] = 0;
+                }
+            });
+
+            return embedding;
+        }
+
+        function computePoseSimilarity(pose1, pose2) {
+            let dot = 0, norm1 = 0, norm2 = 0;
+            for (let i = 0; i < pose1.length; i++) {
+                dot += pose1[i] * pose2[i];
+                norm1 += pose1[i] * pose1[i];
+                norm2 += pose2[i] * pose2[i];
+            }
+            norm1 = Math.sqrt(norm1);
+            norm2 = Math.sqrt(norm2);
+            if (norm1 === 0 || norm2 === 0) return 0;
+            return dot / (norm1 * norm2);
+        }
+
+        function visualizePoseEmbedding(embedding) {
+            if (!poseEmbeddingBars) return;
+            poseEmbeddingBars.innerHTML = '';
+            for (let i = 0; i < embedding.length; i++) {
+                const bar = document.createElement('div');
+                bar.className = 'embedding-bar';
+                const val = embedding[i];
+                bar.style.height = `${Math.max(3, val * 100)}%`;
+                bar.style.background = i % 2 === 0
+                    ? 'linear-gradient(to top, hsl(262, 80%, 55%), hsl(280, 70%, 50%))'
+                    : 'linear-gradient(to top, hsl(142, 70%, 45%), hsl(160, 60%, 40%))';
+                bar.style.opacity = 0.5 + val * 0.5;
+                poseEmbeddingBars.appendChild(bar);
+            }
+        }
+
+        function setReferencePose() {
+            if (!poseDetector || !poseStream) return;
+            poseDetector.estimatePoses(poseVideo).then(poses => {
+                if (poses.length > 0) {
+                    referencePose = computePoseEmbedding(poses[0]);
+                    poseLog('Reference pose captured', 'success');
+                }
+            });
+        }
+
+        // Event listeners
+        if (startPoseBtn) startPoseBtn.addEventListener('click', startPoseDetection);
+        if (stopPoseBtn) stopPoseBtn.addEventListener('click', stopPoseDetection);
+        if (setPoseReferenceBtn) setPoseReferenceBtn.addEventListener('click', setReferencePose);
+        if (toggleSkeletonBtn) {
+            toggleSkeletonBtn.addEventListener('click', () => {
+                showSkeleton = !showSkeleton;
+                toggleSkeletonBtn.textContent = showSkeleton ? '🦴 Hide Skeleton' : '🦴 Show Skeleton';
+                poseLog(`Skeleton ${showSkeleton ? 'shown' : 'hidden'}`);
+            });
+        }
+
+        // Examples
+        window.loadExample = function(type) {
+            const output = document.getElementById('example-output');
+            const examples = {
+                'visual-search': {
+                    title: '🔍 Visual Product Search',
+                    code: `// Extract embedding from user's photo
+const userPhoto = embedder.extract(uploadedPixels, 224, 224);
+
+// Compare against product catalog
+const results = products
+  .map(p => ({
+    ...p,
+    similarity: embedder.cosine_similarity(userPhoto, p.embedding)
+  }))
+  .sort((a, b) => b.similarity - a.similarity)
+  .slice(0, 10);
+
+// Display top matches
+results.forEach(r => console.log(r.name, r.similarity.toFixed(3)));`
+                },
+                'face-verify': {
+                    title: '👤 Face Verification',
+                    code: `// Extract embeddings from two face images
+const face1 = embedder.extract(photo1Pixels, 224, 224);
+const face2 = embedder.extract(photo2Pixels, 224, 224);
+
+// Compare similarity
+const similarity = embedder.cosine_similarity(face1, face2);
+
+// Threshold for same person (typically 0.6-0.8)
+const isSamePerson = similarity > 0.7;
+console.log('Match:', isSamePerson, 'Score:', similarity.toFixed(3));`
+                },
+                'duplicate-detect': {
+                    title: '🔄 Duplicate Detection',
+                    code: `// Build embedding index for all images
+const index = images.map(img => ({
+  id: img.id,
+  embedding: embedder.extract(img.pixels, 224, 224)
+}));
+
+// Find duplicates (similarity > 0.95)
+const duplicates = [];
+for (let i = 0; i < index.length; i++) {
+  for (let j = i + 1; j < index.length; j++) {
+    const sim = embedder.cosine_similarity(index[i].embedding, index[j].embedding);
+    if (sim > 0.95) {
+      duplicates.push({ a: index[i].id, b: index[j].id, similarity: sim });
+    }
+  }
+}
+console.log('Found', duplicates.length, 'duplicate pairs');`
+                },
+                'style-match': {
+                    title: '🎨 Art Style Matching',
+                    code: `// Analyze art style by embedding
+const artwork = embedder.extract(artworkPixels, 224, 224);
+
+// Compare to known style references
+const styles = [
+  { name: 'Impressionist', embedding: impressionistRef },
+  { name: 'Cubist', embedding: cubistRef },
+  { name: 'Surrealist', embedding: surrealistRef }
+];
+
+const matches = styles
+  .map(s => ({ ...s, score: embedder.cosine_similarity(artwork, s.embedding) }))
+  .sort((a, b) => b.score - a.score);
+
+console.log('Style:', matches[0].name, 'Confidence:', matches[0].score.toFixed(3));`
+                },
+                'quality-check': {
+                    title: '✅ Quality Control',
+                    code: `// Reference "perfect" product image
+const referenceEmbedding = embedder.extract(referencePixels, 224, 224);
+
+// Check production items
+function checkQuality(itemPixels) {
+  const embedding = embedder.extract(itemPixels, 224, 224);
+  const similarity = embedder.cosine_similarity(embedding, referenceEmbedding);
+
+  // Flag items below threshold
+  const passed = similarity > 0.85;
+  return { passed, similarity, deviation: 1 - similarity };
+}
+
+// Inspect item
+const result = checkQuality(itemPixels);
+console.log('QC:', result.passed ? 'PASS' : 'FAIL', result.similarity.toFixed(3));`
+                },
+                'scene-cluster': {
+                    title: '🗂️ Scene Clustering',
+                    code: `// Extract embeddings for all photos
+const embeddings = photos.map(p => ({
+  id: p.id,
+  embedding: embedder.extract(p.pixels, 224, 224)
+}));
+
+// Simple k-means clustering (pseudo-code)
+function cluster(embeddings, k = 5) {
+  // Initialize centroids randomly
+  let centroids = embeddings.slice(0, k).map(e => e.embedding);
+
+  // Assign each embedding to nearest centroid
+  return embeddings.map(e => {
+    const distances = centroids.map(c =>
+      1 - embedder.cosine_similarity(e.embedding, c)
+    );
+    return { ...e, cluster: distances.indexOf(Math.min(...distances)) };
+  });
+}
+
+const clustered = cluster(embeddings, 5);
+console.log('Clustered', clustered.length, 'photos into 5 groups');`
+                },
+                'pose-tracking': {
+                    title: '🏃 Pose Tracking',
+                    code: `// Initialize MoveNet pose detector
+const detector = await poseDetection.createDetector(
+  poseDetection.SupportedModels.MoveNet,
+  { modelType: 'SinglePose.Lightning', enableSmoothing: true }
+);
+
+// Track poses over time
+const poseHistory = [];
+
+async function trackPose(videoFrame) {
+  const poses = await detector.estimatePoses(videoFrame);
+  if (poses.length > 0) {
+    const pose = poses[0];
+
+    // Extract 34-dim pose embedding (x,y for 17 keypoints)
+    const embedding = new Float32Array(34);
+    pose.keypoints.forEach((kp, i) => {
+      embedding[i * 2] = kp.x / videoWidth;
+      embedding[i * 2 + 1] = kp.y / videoHeight;
+    });
+
+    poseHistory.push({ timestamp: Date.now(), embedding, keypoints: pose.keypoints });
+
+    // Detect movement by comparing to previous frame
+    if (poseHistory.length > 1) {
+      const prev = poseHistory[poseHistory.length - 2];
+      const movement = computeMovement(prev.embedding, embedding);
+      console.log('Movement:', movement.toFixed(3));
+    }
+  }
+}
+
+function computeMovement(pose1, pose2) {
+  let sum = 0;
+  for (let i = 0; i < pose1.length; i++) {
+    sum += Math.abs(pose1[i] - pose2[i]);
+  }
+  return sum / pose1.length;
+}`
+                },
+                'image-retrieval': {
+                    title: '🗃️ Image Retrieval System',
+                    code: `// Build a searchable image database with HNSW index
+class ImageIndex {
+  constructor() {
+    this.embeddings = [];
+    this.metadata = [];
+  }
+
+  // Add image to index
+  async add(imagePixels, metadata) {
+    const embedding = embedder.extract(imagePixels, 224, 224);
+    this.embeddings.push(embedding);
+    this.metadata.push(metadata);
+    return this.embeddings.length - 1;
+  }
+
+  // Search for similar images
+  search(queryPixels, topK = 5) {
+    const query = embedder.extract(queryPixels, 224, 224);
+
+    // Compute similarities to all indexed images
+    const results = this.embeddings.map((emb, idx) => ({
+      index: idx,
+      metadata: this.metadata[idx],
+      similarity: embedder.cosine_similarity(query, emb)
+    }));
+
+    // Return top-K matches
+    return results
+      .sort((a, b) => b.similarity - a.similarity)
+      .slice(0, topK);
+  }
+
+  // Batch index multiple images
+  async batchAdd(images) {
+    const results = [];
+    for (const img of images) {
+      const idx = await this.add(img.pixels, img.metadata);
+      results.push(idx);
+    }
+    return results;
+  }
+}
+
+// Usage
+const index = new ImageIndex();
+await index.batchAdd(catalogImages);
+const matches = index.search(userQueryImage, 10);`
+                },
+                'content-moderation': {
+                    title: '🛡️ Content Moderation',
+                    code: `// Detect similar inappropriate content using embeddings
+class ContentModerator {
+  constructor() {
+    this.blocklist = []; // Known bad content embeddings
+    this.threshold = 0.85; // Similarity threshold
+  }
+
+  // Add known bad content to blocklist
+  addToBlocklist(imagePixels, reason) {
+    const embedding = embedder.extract(imagePixels, 224, 224);
+    this.blocklist.push({ embedding, reason, addedAt: Date.now() });
+  }
+
+  // Check if content should be blocked
+  moderate(imagePixels) {
+    const embedding = embedder.extract(imagePixels, 224, 224);
+
+    for (const blocked of this.blocklist) {
+      const similarity = embedder.cosine_similarity(embedding, blocked.embedding);
+      if (similarity > this.threshold) {
+        return {
+          blocked: true,
+          reason: blocked.reason,
+          similarity: similarity,
+          matchedContent: blocked
+        };
+      }
+    }
+
+    return { blocked: false, similarity: 0 };
+  }
+
+  // Find all similar blocked content
+  findMatches(imagePixels, threshold = 0.7) {
+    const embedding = embedder.extract(imagePixels, 224, 224);
+
+    return this.blocklist
+      .map(b => ({
+        ...b,
+        similarity: embedder.cosine_similarity(embedding, b.embedding)
+      }))
+      .filter(b => b.similarity > threshold)
+      .sort((a, b) => b.similarity - a.similarity);
+  }
+}
+
+const moderator = new ContentModerator();
+moderator.addToBlocklist(badContentPixels, 'inappropriate');
+const result = moderator.moderate(userUploadPixels);
+if (result.blocked) console.log('BLOCKED:', result.reason);`
+                },
+                'recommendation': {
+                    title: '💡 Visual Recommendations',
+                    code: `// Recommend visually similar items using embeddings
+class RecommendationEngine {
+  constructor(catalog) {
+    this.catalog = catalog.map(item => ({
+      ...item,
+      embedding: embedder.extract(item.pixels, 224, 224)
+    }));
+  }
+
+  // Get recommendations based on user's viewed items
+  recommend(viewedItems, count = 5) {
+    // Compute centroid of viewed items
+    const viewedEmbeddings = viewedItems.map(item =>
+      embedder.extract(item.pixels, 224, 224)
+    );
+    const centroid = this.computeCentroid(viewedEmbeddings);
+
+    // Find catalog items most similar to centroid
+    const viewedIds = new Set(viewedItems.map(i => i.id));
+
+    return this.catalog
+      .filter(item => !viewedIds.has(item.id))
+      .map(item => ({
+        ...item,
+        score: embedder.cosine_similarity(item.embedding, centroid)
+      }))
+      .sort((a, b) => b.score - a.score)
+      .slice(0, count);
+  }
+
+  computeCentroid(embeddings) {
+    const dim = embeddings[0].length;
+    const centroid = new Float32Array(dim);
+    for (const emb of embeddings) {
+      for (let i = 0; i < dim; i++) centroid[i] += emb[i];
+    }
+    const norm = Math.sqrt(centroid.reduce((s, v) => s + v*v, 0));
+    for (let i = 0; i < dim; i++) centroid[i] /= norm;
+    return centroid;
+  }
+
+  // Find items similar to a specific item
+  getSimilar(itemId, count = 5) {
+    const item = this.catalog.find(i => i.id === itemId);
+    if (!item) return [];
+
+    return this.catalog
+      .filter(i => i.id !== itemId)
+      .map(i => ({
+        ...i,
+        similarity: embedder.cosine_similarity(item.embedding, i.embedding)
+      }))
+      .sort((a, b) => b.similarity - a.similarity)
+      .slice(0, count);
+  }
+}
+
+const engine = new RecommendationEngine(productCatalog);
+const recommendations = engine.recommend(userViewedProducts, 10);`
+                },
+                'video-keyframes': {
+                    title: '🎥 Video Keyframe Extraction',
+                    code: `// Extract unique keyframes from video using embedding similarity
+class KeyframeExtractor {
+  constructor(threshold = 0.7) {
+    this.threshold = threshold; // Scene change threshold
+    this.keyframes = [];
+  }
+
+  // Process video frame by frame
+  async processFrame(framePixels, timestamp) {
+    const embedding = embedder.extract(framePixels, 224, 224);
+
+    // First frame is always a keyframe
+    if (this.keyframes.length === 0) {
+      this.keyframes.push({ embedding, timestamp, isKeyframe: true });
+      return true;
+    }
+
+    // Compare to previous keyframe
+    const lastKeyframe = this.keyframes[this.keyframes.length - 1];
+    const similarity = embedder.cosine_similarity(embedding, lastKeyframe.embedding);
+
+    // If scene changed significantly, mark as new keyframe
+    if (similarity < this.threshold) {
+      this.keyframes.push({ embedding, timestamp, isKeyframe: true });
+      return true;
+    }
+
+    return false;
+  }
+
+  // Get all keyframe timestamps
+  getKeyframes() {
+    return this.keyframes.map(kf => kf.timestamp);
+  }
+
+  // Create video summary
+  summarize(targetCount = 10) {
+    // Cluster keyframes and pick representatives
+    const embeddings = this.keyframes.map(kf => kf.embedding);
+
+    // Simple: evenly space keyframes
+    const step = Math.floor(this.keyframes.length / targetCount);
+    return this.keyframes
+      .filter((_, i) => i % step === 0)
+      .slice(0, targetCount);
+  }
+}
+
+// Process video
+const extractor = new KeyframeExtractor(0.65);
+for (let t = 0; t < videoDuration; t += 1) {
+  const frame = getFrameAt(video, t);
+  const isKeyframe = await extractor.processFrame(frame, t);
+  if (isKeyframe) console.log('Keyframe at', t, 'seconds');
+}
+console.log('Found', extractor.getKeyframes().length, 'keyframes');`
+                },
+                'self-learning': {
+                    title: '🧠 Self-Learning System',
+                    code: `// Adaptive learning system using embedding memory
+class SelfLearningClassifier {
+  constructor() {
+    this.categories = new Map(); // category -> embeddings[]
+    this.feedbackHistory = [];
+    this.learningRate = 0.1;
+  }
+
+  // Learn from labeled examples
+  learn(imagePixels, label) {
+    const embedding = embedder.extract(imagePixels, 224, 224);
+
+    if (!this.categories.has(label)) {
+      this.categories.set(label, []);
+    }
+    this.categories.get(label).push(embedding);
+
+    console.log('Learned:', label, '| Total examples:', this.categories.get(label).length);
+  }
+
+  // Predict category with confidence
+  predict(imagePixels) {
+    const embedding = embedder.extract(imagePixels, 224, 224);
+    const scores = [];
+
+    for (const [label, examples] of this.categories) {
+      // Average similarity to all examples in category
+      const avgSim = examples.reduce((sum, ex) =>
+        sum + embedder.cosine_similarity(embedding, ex), 0
+      ) / examples.length;
+
+      scores.push({ label, confidence: avgSim });
+    }
+
+    return scores.sort((a, b) => b.confidence - a.confidence)[0];
+  }
+
+  // Feedback loop: reinforce correct predictions
+  feedback(imagePixels, predictedLabel, wasCorrect, correctLabel = null) {
+    this.feedbackHistory.push({
+      timestamp: Date.now(),
+      predicted: predictedLabel,
+      correct: wasCorrect,
+      actual: correctLabel || predictedLabel
+    });
+
+    // If incorrect, add to correct category
+    if (!wasCorrect && correctLabel) {
+      this.learn(imagePixels, correctLabel);
+      console.log('Correction learned:', correctLabel);
+    }
+
+    // Prune low-confidence examples periodically
+    if (this.feedbackHistory.length % 100 === 0) {
+      this.consolidate();
+    }
+  }
+
+  // Consolidate knowledge by removing outliers
+  consolidate() {
+    for (const [label, examples] of this.categories) {
+      if (examples.length < 5) continue;
+
+      // Compute centroid
+      const centroid = this.computeCentroid(examples);
+
+      // Keep only examples within 2 std devs
+      const similarities = examples.map(e =>
+        embedder.cosine_similarity(e, centroid)
+      );
+      const mean = similarities.reduce((a, b) => a + b) / similarities.length;
+      const std = Math.sqrt(
+        similarities.reduce((s, v) => s + (v - mean) ** 2, 0) / similarities.length
+      );
+
+      const filtered = examples.filter((_, i) =>
+        similarities[i] > mean - 2 * std
+      );
+
+      this.categories.set(label, filtered);
+      console.log('Consolidated', label, ':', examples.length, '->', filtered.length);
+    }
+  }
+
+  computeCentroid(embeddings) {
+    const dim = embeddings[0].length;
+    const centroid = new Float32Array(dim);
+    for (const emb of embeddings) {
+      for (let i = 0; i < dim; i++) centroid[i] += emb[i];
+    }
+    const norm = Math.sqrt(centroid.reduce((s, v) => s + v * v, 0));
+    for (let i = 0; i < dim; i++) centroid[i] /= norm;
+    return centroid;
+  }
+
+  // Export model state
+  export() {
+    const data = {};
+    for (const [label, examples] of this.categories) {
+      data[label] = examples.map(e => Array.from(e));
+    }
+    return JSON.stringify(data);
+  }
+
+  // Import model state
+  import(jsonStr) {
+    const data = JSON.parse(jsonStr);
+    for (const [label, examples] of Object.entries(data)) {
+      this.categories.set(label, examples.map(e => new Float32Array(e)));
+    }
+  }
+}
+
+// Usage: Train on initial examples
+const classifier = new SelfLearningClassifier();
+classifier.learn(dogImage, 'dog');
+classifier.learn(catImage, 'cat');
+
+// Predict new image
+const prediction = classifier.predict(newImage);
+console.log('Predicted:', prediction.label, prediction.confidence.toFixed(3));
+
+// User corrects if wrong
+classifier.feedback(newImage, prediction.label, false, 'bird');`
+                },
+                'incremental-learning': {
+                    title: '📈 Incremental Learning',
+                    code: `// Learn continuously without forgetting previous knowledge
+class IncrementalLearner {
+  constructor() {
+    this.prototypes = new Map(); // label -> prototype embedding
+    this.sampleCounts = new Map(); // label -> count
+    this.memory = []; // Recent examples for replay
+    this.memorySize = 100;
+  }
+
+  // Update prototype incrementally (online learning)
+  update(imagePixels, label) {
+    const embedding = embedder.extract(imagePixels, 224, 224);
+    const count = (this.sampleCounts.get(label) || 0) + 1;
+
+    if (!this.prototypes.has(label)) {
+      // First example for this class
+      this.prototypes.set(label, embedding);
+    } else {
+      // Running average: new_proto = (old * (n-1) + new) / n
+      const oldProto = this.prototypes.get(label);
+      const newProto = new Float32Array(embedding.length);
+      for (let i = 0; i < embedding.length; i++) {
+        newProto[i] = (oldProto[i] * (count - 1) + embedding[i]) / count;
+      }
+      // L2 normalize
+      const norm = Math.sqrt(newProto.reduce((s, v) => s + v*v, 0));
+      for (let i = 0; i < embedding.length; i++) newProto[i] /= norm;
+      this.prototypes.set(label, newProto);
+    }
+
+    this.sampleCounts.set(label, count);
+
+    // Add to memory buffer (replay buffer)
+    this.memory.push({ embedding, label });
+    if (this.memory.length > this.memorySize) {
+      this.memory.shift(); // Remove oldest
+    }
+  }
+
+  // Classify using nearest prototype
+  classify(imagePixels) {
+    const embedding = embedder.extract(imagePixels, 224, 224);
+    let bestLabel = null, bestSim = -1;
+
+    for (const [label, proto] of this.prototypes) {
+      const sim = embedder.cosine_similarity(embedding, proto);
+      if (sim > bestSim) {
+        bestSim = sim;
+        bestLabel = label;
+      }
+    }
+
+    return { label: bestLabel, confidence: bestSim };
+  }
+
+  // Experience replay to prevent forgetting
+  replay() {
+    const shuffled = [...this.memory].sort(() => Math.random() - 0.5);
+    for (const sample of shuffled.slice(0, 10)) {
+      // Re-learn from memory
+      this.update(sample.embedding, sample.label);
+    }
+    console.log('Replayed', Math.min(10, this.memory.length), 'samples');
+  }
+
+  // Get learning statistics
+  stats() {
+    return {
+      classes: this.prototypes.size,
+      totalSamples: [...this.sampleCounts.values()].reduce((a, b) => a + b, 0),
+      memoryUsed: this.memory.length,
+      perClass: Object.fromEntries(this.sampleCounts)
+    };
+  }
+}
+
+const learner = new IncrementalLearner();
+
+// Stream of new data
+for (const sample of dataStream) {
+  learner.update(sample.pixels, sample.label);
+
+  // Periodic replay to consolidate memory
+  if (learner.memory.length % 20 === 0) {
+    learner.replay();
+  }
+}
+
+console.log('Stats:', learner.stats());`
+                },
+                'few-shot': {
+                    title: '🎯 Few-Shot Learning',
+                    code: `// Learn new categories from just 1-5 examples
+class FewShotLearner {
+  constructor() {
+    this.support = new Map(); // label -> support embeddings
+  }
+
+  // Register support examples (1-5 per class)
+  registerClass(label, supportImages) {
+    const embeddings = supportImages.map(img =>
+      embedder.extract(img, 224, 224)
+    );
+    this.support.set(label, embeddings);
+    console.log('Registered class:', label, 'with', embeddings.length, 'examples');
+  }
+
+  // Classify using prototypical networks approach
+  classify(queryPixels, k = 1) {
+    const queryEmb = embedder.extract(queryPixels, 224, 224);
+    const scores = [];
+
+    for (const [label, supportEmbeddings] of this.support) {
+      // Compute prototype (mean of support embeddings)
+      const prototype = this.computePrototype(supportEmbeddings);
+
+      // Distance to prototype
+      const similarity = embedder.cosine_similarity(queryEmb, prototype);
+      scores.push({ label, similarity });
+    }
+
+    // Return top-k predictions
+    return scores
+      .sort((a, b) => b.similarity - a.similarity)
+      .slice(0, k);
+  }
+
+  computePrototype(embeddings) {
+    const dim = embeddings[0].length;
+    const proto = new Float32Array(dim);
+    for (const emb of embeddings) {
+      for (let i = 0; i < dim; i++) proto[i] += emb[i];
+    }
+    for (let i = 0; i < dim; i++) proto[i] /= embeddings.length;
+    // Normalize
+    const norm = Math.sqrt(proto.reduce((s, v) => s + v*v, 0));
+    for (let i = 0; i < dim; i++) proto[i] /= norm;
+    return proto;
+  }
+
+  // N-way K-shot episode
+  episode(supportSets, queryImage) {
+    // supportSets: { labelA: [img1, img2], labelB: [img3] }
+    for (const [label, images] of Object.entries(supportSets)) {
+      this.registerClass(label, images);
+    }
+    return this.classify(queryImage);
+  }
+}
+
+// Example: 3-way 2-shot classification
+const learner = new FewShotLearner();
+learner.registerClass('apple', [appleImg1, appleImg2]);
+learner.registerClass('banana', [bananaImg1, bananaImg2]);
+learner.registerClass('orange', [orangeImg1, orangeImg2]);
+
+const result = learner.classify(unknownFruit);
+console.log('Predicted:', result[0].label, result[0].similarity.toFixed(3));`
+                },
+                'gesture-control': {
+                    title: '🖐️ Gesture Control',
+                    code: `// Gesture detection using pose keypoints
+const GESTURES = {
+  'HANDS_UP': (pose) => {
+    const lWrist = getKeypoint(pose, 'left_wrist');
+    const rWrist = getKeypoint(pose, 'right_wrist');
+    const lShoulder = getKeypoint(pose, 'left_shoulder');
+    const rShoulder = getKeypoint(pose, 'right_shoulder');
+
+    // Both wrists above shoulders
+    return lWrist && rWrist && lShoulder && rShoulder &&
+           lWrist.y < lShoulder.y && rWrist.y < rShoulder.y;
+  },
+
+  'T_POSE': (pose) => {
+    const lWrist = getKeypoint(pose, 'left_wrist');
+    const rWrist = getKeypoint(pose, 'right_wrist');
+    const lShoulder = getKeypoint(pose, 'left_shoulder');
+    const rShoulder = getKeypoint(pose, 'right_shoulder');
+
+    // Arms extended horizontally (wrists at shoulder height)
+    const armSpan = Math.abs(lWrist.x - rWrist.x);
+    const yDiff = Math.abs(lWrist.y - rWrist.y);
+    return armSpan > 400 && yDiff < 50;
+  },
+
+  'SQUAT': (pose) => {
+    const lKnee = getKeypoint(pose, 'left_knee');
+    const lHip = getKeypoint(pose, 'left_hip');
+    // Knee above hip indicates squat
+    return lKnee && lHip && lKnee.y > lHip.y + 50;
+  }
+};
+
+function detectGesture(pose) {
+  for (const [name, detector] of Object.entries(GESTURES)) {
+    if (detector(pose)) {
+      return name;
+    }
+  }
+  return null;
+}
+
+// Real-time gesture detection loop
+async function gestureLoop() {
+  const poses = await detector.estimatePoses(video);
+  if (poses.length > 0) {
+    const gesture = detectGesture(poses[0]);
+    if (gesture) {
+      console.log('Detected gesture:', gesture);
+      handleGesture(gesture); // Trigger app action
+    }
+  }
+  requestAnimationFrame(gestureLoop);
+}`
+                }
+            };
+
+            const ex = examples[type];
+            output.innerHTML = `
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-icon">💻</div>
+                        <div>
+                            <div class="card-title">${ex.title}</div>
+                            <div class="card-description">Example code</div>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <pre style="background: #0d1117; border-radius: calc(var(--radius) - 2px); padding: 1rem; overflow-x: auto; font-size: 0.8rem; line-height: 1.6;"><code style="color: hsl(var(--foreground));">${ex.code}</code></pre>
+                    </div>
+                </div>
+            `;
+        };
+
+        // ==================== INTERACTIVE DEMOS ====================
+
+        // Similarity Search Demo
+        const similaritySearchGrid = document.getElementById('similarity-search-grid');
+        const similarityResults = document.getElementById('similarity-results');
+        const searchSamples = [
+            'https://picsum.photos/seed/search1/112/112',
+            'https://picsum.photos/seed/search2/112/112',
+            'https://picsum.photos/seed/search3/112/112',
+            'https://picsum.photos/seed/search4/112/112',
+            'https://picsum.photos/seed/search5/112/112',
+            'https://picsum.photos/seed/search6/112/112',
+            'https://picsum.photos/seed/search7/112/112',
+            'https://picsum.photos/seed/search8/112/112'
+        ];
+        const searchEmbeddings = [];
+
+        async function initSimilaritySearch() {
+            if (!similaritySearchGrid) return;
+            for (let i = 0; i < searchSamples.length; i++) {
+                const div = document.createElement('div');
+                div.style.cssText = 'aspect-ratio: 1; border-radius: 8px; overflow: hidden; cursor: pointer; border: 2px solid transparent; transition: all 0.2s;';
+                div.innerHTML = `<img src="${searchSamples[i]}" style="width: 100%; height: 100%; object-fit: cover;" crossorigin="anonymous">`;
+                div.dataset.index = i;
+                div.onclick = () => runSimilaritySearch(i);
+                similaritySearchGrid.appendChild(div);
+            }
+        }
+
+        async function runSimilaritySearch(queryIndex) {
+            if (!embedder || searchEmbeddings.length === 0) {
+                // Extract embeddings first
+                similarityResults.innerHTML = '<span style="color: hsl(var(--muted-foreground));">Loading embeddings...</span>';
+                for (let i = 0; i < searchSamples.length; i++) {
+                    const img = new Image();
+                    img.crossOrigin = 'anonymous';
+                    await new Promise(r => { img.onload = r; img.src = searchSamples[i]; });
+                    const canvas = document.createElement('canvas');
+                    canvas.width = 224; canvas.height = 224;
+                    canvas.getContext('2d').drawImage(img, 0, 0, 224, 224);
+                    const imageData = canvas.getContext('2d').getImageData(0, 0, 224, 224);
+                    const rgb = new Uint8Array(224 * 224 * 3);
+                    for (let j = 0, k = 0; j < imageData.data.length; j += 4, k += 3) {
+                        rgb[k] = imageData.data[j]; rgb[k+1] = imageData.data[j+1]; rgb[k+2] = imageData.data[j+2];
+                    }
+                    searchEmbeddings[i] = embedder.extract(rgb, 224, 224);
+                }
+            }
+
+            // Compute similarities
+            const query = searchEmbeddings[queryIndex];
+            const scores = searchEmbeddings.map((emb, i) => ({
+                index: i,
+                similarity: i === queryIndex ? 1.0 : embedder.cosine_similarity(query, emb)
+            })).sort((a, b) => b.similarity - a.similarity);
+
+            // Update UI
+            similaritySearchGrid.querySelectorAll('div').forEach((div, i) => {
+                const score = scores.find(s => s.index === i);
+                div.style.borderColor = i === queryIndex ? 'hsl(var(--primary))' : score.similarity > 0.5 ? 'hsl(var(--success))' : 'transparent';
+                div.style.opacity = 0.5 + score.similarity * 0.5;
+            });
+
+            similarityResults.innerHTML = scores.map((s, rank) =>
+                `<span style="display: inline-block; margin: 2px 4px; padding: 2px 6px; background: hsl(var(--secondary)); border-radius: 4px; font-size: 0.75rem;">` +
+                `#${rank + 1}: Img${s.index + 1} (${s.similarity.toFixed(2)})</span>`
+            ).join('');
+        }
+
+        // Motion Detection Demo
+        let motionStream = null, motionRunning = false, lastMotionEmbedding = null;
+        const motionVideo = document.getElementById('motion-video');
+        const startMotionBtn = document.getElementById('start-motion-btn');
+        const stopMotionBtn = document.getElementById('stop-motion-btn');
+        const motionBadge = document.getElementById('motion-badge');
+        const motionScore = document.getElementById('motion-score');
+        const motionBar = document.getElementById('motion-bar');
+
+        if (startMotionBtn) {
+            startMotionBtn.onclick = async () => {
+                if (!embedder) {
+                    alert('WASM not loaded yet. Please wait.');
+                    return;
+                }
+                try {
+                    motionStream = await navigator.mediaDevices.getUserMedia({ video: { width: 320, height: 240, facingMode: 'user' } });
+                    motionVideo.srcObject = motionStream;
+                    // Wait for video to be ready
+                    await new Promise(resolve => {
+                        motionVideo.onloadedmetadata = () => {
+                            motionVideo.play();
+                            resolve();
+                        };
+                    });
+                    // Give camera time to warm up
+                    await new Promise(r => setTimeout(r, 500));
+                    motionRunning = true;
+                    lastMotionEmbedding = null;
+                    startMotionBtn.classList.add('hidden');
+                    stopMotionBtn.classList.remove('hidden');
+                    console.log('[Motion] Started detection');
+                    detectMotion();
+                } catch (e) {
+                    console.error('Motion camera error:', e);
+                    alert('Camera access denied: ' + e.message);
+                }
+            };
+        }
+
+        if (stopMotionBtn) {
+            stopMotionBtn.onclick = () => {
+                motionRunning = false;
+                if (motionStream) { motionStream.getTracks().forEach(t => t.stop()); motionStream = null; }
+                motionVideo.srcObject = null;
+                startMotionBtn.classList.remove('hidden');
+                stopMotionBtn.classList.add('hidden');
+                lastMotionEmbedding = null;
+                console.log('[Motion] Stopped detection');
+            };
+        }
+
+        function detectMotion() {
+            if (!motionRunning || !embedder || !motionStream) {
+                console.log('[Motion] Skipping - not ready');
+                return;
+            }
+
+            // Check video is actually playing
+            if (motionVideo.readyState < 2 || motionVideo.videoWidth === 0) {
+                console.log('[Motion] Video not ready, retrying...');
+                setTimeout(detectMotion, 200);
+                return;
+            }
+
+            try {
+                const canvas = document.createElement('canvas');
+                canvas.width = 224; canvas.height = 224;
+                const ctx = canvas.getContext('2d');
+                // Center crop the video
+                const vw = motionVideo.videoWidth, vh = motionVideo.videoHeight;
+                const size = Math.min(vw, vh);
+                ctx.drawImage(motionVideo, (vw-size)/2, (vh-size)/2, size, size, 0, 0, 224, 224);
+                const imageData = ctx.getImageData(0, 0, 224, 224);
+                const rgb = new Uint8Array(224 * 224 * 3);
+                for (let i = 0, j = 0; i < imageData.data.length; i += 4, j += 3) {
+                    rgb[j] = imageData.data[i]; rgb[j+1] = imageData.data[i+1]; rgb[j+2] = imageData.data[i+2];
+                }
+                const embedding = embedder.extract(rgb, 224, 224);
+
+                if (lastMotionEmbedding) {
+                    const similarity = embedder.cosine_similarity(embedding, lastMotionEmbedding);
+                    // More sensitive: (1 - similarity) ranges 0-2 typically, amplify to 0-100%
+                    const change = (1 - similarity) * 10; // Increased amplification
+                    const changePercent = Math.min(100, Math.max(0, change * 100)).toFixed(0);
+
+                    if (motionScore) motionScore.textContent = changePercent + '%';
+                    if (motionBar) motionBar.style.width = changePercent + '%';
+
+                    // Threshold for motion detection
+                    const hasMotion = change > 0.15; // Lower threshold = more sensitive
+                    if (motionBadge) {
+                        motionBadge.textContent = hasMotion ? 'Motion!' : 'No Motion';
+                        motionBadge.style.background = hasMotion ? 'hsl(0, 62%, 50%)' : 'hsl(142, 76%, 36%)';
+                    }
+                }
+                lastMotionEmbedding = embedding;
+            } catch (e) {
+                console.error('[Motion] Error:', e);
+            }
+
+            if (motionRunning) {
+                setTimeout(detectMotion, 150); // ~6-7 FPS for motion detection
+            }
+        }
+
+        // A/B Comparison Demo
+        const compareDropA = document.getElementById('compare-drop-a');
+        const compareDropB = document.getElementById('compare-drop-b');
+        const compareInputA = document.getElementById('compare-input-a');
+        const compareInputB = document.getElementById('compare-input-b');
+        const compareScore = document.getElementById('compare-score');
+        let compareEmbeddingA = null, compareEmbeddingB = null;
+
+        function setupCompareDrop(dropEl, inputEl, side) {
+            if (!dropEl || !inputEl) return;
+            dropEl.onclick = () => inputEl.click();
+            dropEl.ondragover = e => { e.preventDefault(); dropEl.classList.add('drag-over'); };
+            dropEl.ondragleave = () => dropEl.classList.remove('drag-over');
+            dropEl.ondrop = e => { e.preventDefault(); dropEl.classList.remove('drag-over'); handleCompareFile(e.dataTransfer.files[0], dropEl, side); };
+            inputEl.onchange = e => handleCompareFile(e.target.files[0], dropEl, side);
+        }
+
+        async function handleCompareFile(file, dropEl, side) {
+            if (!file || !embedder) return;
+            const reader = new FileReader();
+            reader.onload = async e => {
+                const img = new Image();
+                img.onload = async () => {
+                    dropEl.innerHTML = `<img src="${e.target.result}" style="width: 100%; height: 100%; object-fit: cover; border-radius: 8px;">`;
+                    const canvas = document.createElement('canvas');
+                    canvas.width = 224; canvas.height = 224;
+                    canvas.getContext('2d').drawImage(img, 0, 0, 224, 224);
+                    const imageData = canvas.getContext('2d').getImageData(0, 0, 224, 224);
+                    const rgb = new Uint8Array(224 * 224 * 3);
+                    for (let i = 0, j = 0; i < imageData.data.length; i += 4, j += 3) {
+                        rgb[j] = imageData.data[i]; rgb[j+1] = imageData.data[i+1]; rgb[j+2] = imageData.data[i+2];
+                    }
+                    if (side === 'a') compareEmbeddingA = embedder.extract(rgb, 224, 224);
+                    else compareEmbeddingB = embedder.extract(rgb, 224, 224);
+                    updateCompareScore();
+                };
+                img.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function updateCompareScore() {
+            if (compareEmbeddingA && compareEmbeddingB && embedder) {
+                const sim = embedder.cosine_similarity(compareEmbeddingA, compareEmbeddingB);
+                compareScore.textContent = sim.toFixed(3);
+                compareScore.style.color = sim > 0.7 ? 'hsl(var(--success))' : sim > 0.4 ? 'hsl(var(--warning))' : 'hsl(var(--primary))';
+            }
+        }
+
+        setupCompareDrop(compareDropA, compareInputA, 'a');
+        setupCompareDrop(compareDropB, compareInputB, 'b');
+
+        // Batch Processor Demo
+        const batchDrop = document.getElementById('batch-drop');
+        const batchInput = document.getElementById('batch-input');
+        const batchProgress = document.getElementById('batch-progress');
+        const batchCount = document.getElementById('batch-count');
+        const batchBar = document.getElementById('batch-bar');
+        const batchResults = document.getElementById('batch-results');
+
+        if (batchDrop && batchInput) {
+            batchDrop.onclick = () => batchInput.click();
+            batchDrop.ondragover = e => { e.preventDefault(); batchDrop.classList.add('drag-over'); };
+            batchDrop.ondragleave = () => batchDrop.classList.remove('drag-over');
+            batchDrop.ondrop = e => { e.preventDefault(); batchDrop.classList.remove('drag-over'); processBatch(e.dataTransfer.files); };
+            batchInput.onchange = e => processBatch(e.target.files);
+        }
+
+        async function processBatch(files) {
+            if (!embedder) return;
+            const fileArray = Array.from(files).filter(f => f.type.startsWith('image/')).slice(0, 20);
+            if (fileArray.length === 0) return;
+            batchProgress.style.display = 'block';
+            batchResults.innerHTML = '';
+            const results = [];
+
+            for (let i = 0; i < fileArray.length; i++) {
+                batchCount.textContent = `${i + 1}/${fileArray.length}`;
+                batchBar.style.width = `${((i + 1) / fileArray.length) * 100}%`;
+
+                const file = fileArray[i];
+                const start = performance.now();
+                await new Promise(resolve => {
+                    const reader = new FileReader();
+                    reader.onload = e => {
+                        const img = new Image();
+                        img.onload = () => {
+                            const canvas = document.createElement('canvas');
+                            canvas.width = 224; canvas.height = 224;
+                            canvas.getContext('2d').drawImage(img, 0, 0, 224, 224);
+                            const imageData = canvas.getContext('2d').getImageData(0, 0, 224, 224);
+                            const rgb = new Uint8Array(224 * 224 * 3);
+                            for (let j = 0, k = 0; j < imageData.data.length; j += 4, k += 3) {
+                                rgb[k] = imageData.data[j]; rgb[k+1] = imageData.data[j+1]; rgb[k+2] = imageData.data[j+2];
+                            }
+                            const embedding = embedder.extract(rgb, 224, 224);
+                            const elapsed = performance.now() - start;
+                            results.push({ name: file.name, time: elapsed, embedding });
+                            resolve();
+                        };
+                        img.src = e.target.result;
+                    };
+                    reader.readAsDataURL(file);
+                });
+            }
+
+            const avgTime = results.reduce((s, r) => s + r.time, 0) / results.length;
+            batchResults.innerHTML = `<div style="margin-bottom: 0.5rem; color: hsl(var(--success));">✓ Processed ${results.length} images (avg ${avgTime.toFixed(1)}ms/image)</div>` +
+                results.map(r => `<div style="color: hsl(var(--muted-foreground));">• ${r.name.substring(0, 20)}... (${r.time.toFixed(1)}ms)</div>`).join('');
+        }
+
+        // Embedding Explorer Demo
+        const explorerDrop = document.getElementById('explorer-drop');
+        const explorerInput = document.getElementById('explorer-input');
+        const explorerBars = document.getElementById('explorer-bars');
+        const explorerStats = document.getElementById('explorer-stats');
+        const explorerHover = document.getElementById('explorer-hover');
+
+        if (explorerDrop && explorerInput) {
+            explorerDrop.onclick = () => explorerInput.click();
+            explorerDrop.ondragover = e => { e.preventDefault(); explorerDrop.classList.add('drag-over'); };
+            explorerDrop.ondragleave = () => explorerDrop.classList.remove('drag-over');
+            explorerDrop.ondrop = e => { e.preventDefault(); explorerDrop.classList.remove('drag-over'); exploreEmbedding(e.dataTransfer.files[0]); };
+            explorerInput.onchange = e => exploreEmbedding(e.target.files[0]);
+        }
+
+        async function exploreEmbedding(file) {
+            if (!file || !embedder) return;
+            const reader = new FileReader();
+            reader.onload = e => {
+                const img = new Image();
+                img.onload = () => {
+                    explorerDrop.innerHTML = `<img src="${e.target.result}" style="height: 40px; border-radius: 4px;">`;
+                    const canvas = document.createElement('canvas');
+                    canvas.width = 224; canvas.height = 224;
+                    canvas.getContext('2d').drawImage(img, 0, 0, 224, 224);
+                    const imageData = canvas.getContext('2d').getImageData(0, 0, 224, 224);
+                    const rgb = new Uint8Array(224 * 224 * 3);
+                    for (let i = 0, j = 0; i < imageData.data.length; i += 4, j += 3) {
+                        rgb[j] = imageData.data[i]; rgb[j+1] = imageData.data[i+1]; rgb[j+2] = imageData.data[i+2];
+                    }
+                    const embedding = embedder.extract(rgb, 224, 224);
+
+                    // Visualize
+                    explorerBars.innerHTML = '';
+                    for (let i = 0; i < embedding.length; i++) {
+                        const bar = document.createElement('div');
+                        bar.className = 'embedding-bar';
+                        const val = embedding[i];
+                        bar.style.height = `${Math.max(3, Math.abs(val) * 100)}%`;
+                        bar.style.background = val > 0 ? 'hsl(262, 80%, 55%)' : 'hsl(340, 70%, 50%)';
+                        bar.style.opacity = 0.5 + Math.abs(val) * 0.5;
+                        bar.onmouseenter = () => { explorerHover.textContent = `Dim ${i}: ${val.toFixed(4)}`; };
+                        explorerBars.appendChild(bar);
+                    }
+
+                    // Stats
+                    const mean = embedding.reduce((a, b) => a + b) / embedding.length;
+                    const max = Math.max(...embedding);
+                    const min = Math.min(...embedding);
+                    const posCount = embedding.filter(v => v > 0).length;
+                    explorerStats.innerHTML = `
+                        <div style="background: hsl(var(--secondary)); padding: 0.5rem; border-radius: 4px; text-align: center;">
+                            <div style="font-weight: 600;">${mean.toFixed(4)}</div><div style="color: hsl(var(--muted-foreground));">Mean</div>
+                        </div>
+                        <div style="background: hsl(var(--secondary)); padding: 0.5rem; border-radius: 4px; text-align: center;">
+                            <div style="font-weight: 600;">${max.toFixed(4)}</div><div style="color: hsl(var(--muted-foreground));">Max</div>
+                        </div>
+                        <div style="background: hsl(var(--secondary)); padding: 0.5rem; border-radius: 4px; text-align: center;">
+                            <div style="font-weight: 600;">${posCount}/${embedding.length - posCount}</div><div style="color: hsl(var(--muted-foreground));">+/-</div>
+                        </div>`;
+                };
+                img.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
+
+        // Anomaly Detection Demo
+        const anomalyDrop = document.getElementById('anomaly-drop');
+        const anomalyInput = document.getElementById('anomaly-input');
+        const anomalyGrid = document.getElementById('anomaly-grid');
+        const anomalyResult = document.getElementById('anomaly-result');
+
+        if (anomalyDrop && anomalyInput) {
+            anomalyDrop.onclick = () => anomalyInput.click();
+            anomalyDrop.ondragover = e => { e.preventDefault(); anomalyDrop.classList.add('drag-over'); };
+            anomalyDrop.ondragleave = () => anomalyDrop.classList.remove('drag-over');
+            anomalyDrop.ondrop = e => { e.preventDefault(); anomalyDrop.classList.remove('drag-over'); detectAnomalies(e.dataTransfer.files); };
+            anomalyInput.onchange = e => detectAnomalies(e.target.files);
+        }
+
+        async function detectAnomalies(files) {
+            if (!embedder) return;
+            const fileArray = Array.from(files).filter(f => f.type.startsWith('image/')).slice(0, 8);
+            if (fileArray.length < 4) { anomalyResult.innerHTML = 'Upload at least 4 images'; return; }
+
+            anomalyGrid.innerHTML = '';
+            const items = [];
+
+            for (const file of fileArray) {
+                await new Promise(resolve => {
+                    const reader = new FileReader();
+                    reader.onload = e => {
+                        const img = new Image();
+                        img.onload = () => {
+                            const canvas = document.createElement('canvas');
+                            canvas.width = 224; canvas.height = 224;
+                            canvas.getContext('2d').drawImage(img, 0, 0, 224, 224);
+                            const imageData = canvas.getContext('2d').getImageData(0, 0, 224, 224);
+                            const rgb = new Uint8Array(224 * 224 * 3);
+                            for (let i = 0, j = 0; i < imageData.data.length; i += 4, j += 3) {
+                                rgb[j] = imageData.data[i]; rgb[j+1] = imageData.data[i+1]; rgb[j+2] = imageData.data[i+2];
+                            }
+                            items.push({ src: e.target.result, embedding: embedder.extract(rgb, 224, 224) });
+                            resolve();
+                        };
+                        img.src = e.target.result;
+                    };
+                    reader.readAsDataURL(file);
+                });
+            }
+
+            // Compute average similarity for each image
+            items.forEach((item, i) => {
+                let totalSim = 0;
+                items.forEach((other, j) => {
+                    if (i !== j) totalSim += embedder.cosine_similarity(item.embedding, other.embedding);
+                });
+                item.avgSimilarity = totalSim / (items.length - 1);
+            });
+
+            // Find outliers (low average similarity)
+            const threshold = items.reduce((s, i) => s + i.avgSimilarity, 0) / items.length * 0.8;
+            let anomalyCount = 0;
+
+            items.forEach(item => {
+                const isAnomaly = item.avgSimilarity < threshold;
+                if (isAnomaly) anomalyCount++;
+                const div = document.createElement('div');
+                div.style.cssText = `aspect-ratio: 1; border-radius: 8px; overflow: hidden; border: 3px solid ${isAnomaly ? 'hsl(var(--destructive))' : 'hsl(var(--success))'}; position: relative;`;
+                div.innerHTML = `<img src="${item.src}" style="width: 100%; height: 100%; object-fit: cover;"><div style="position: absolute; bottom: 2px; right: 2px; background: rgba(0,0,0,0.8); padding: 2px 4px; border-radius: 3px; font-size: 0.65rem;">${item.avgSimilarity.toFixed(2)}</div>`;
+                anomalyGrid.appendChild(div);
+            });
+
+            anomalyResult.innerHTML = `Found <span style="color: hsl(var(--destructive));">${anomalyCount}</span> potential anomaly${anomalyCount !== 1 ? 's' : ''} (red border)`;
+        }
+
+        // ==================== SELF-LEARNING DEMOS ====================
+
+        // Shared classifier state
+        const classifier = {
+            classes: new Map(), // className -> { embeddings: [], color: string }
+            colors: ['hsl(262, 83%, 58%)', 'hsl(142, 76%, 36%)', 'hsl(38, 92%, 50%)', 'hsl(0, 62%, 50%)', 'hsl(200, 70%, 50%)', 'hsl(280, 60%, 50%)'],
+            colorIndex: 0,
+            feedbackLog: [],
+            totalTests: 0,
+            correctTests: 0
+        };
+
+        // Helper: Extract embedding from image file
+        async function extractEmbeddingFromFile(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = e => {
+                    const img = new Image();
+                    img.onload = () => {
+                        const canvas = document.createElement('canvas');
+                        canvas.width = 224; canvas.height = 224;
+                        canvas.getContext('2d').drawImage(img, 0, 0, 224, 224);
+                        const imageData = canvas.getContext('2d').getImageData(0, 0, 224, 224);
+                        const rgb = new Uint8Array(224 * 224 * 3);
+                        for (let i = 0, j = 0; i < imageData.data.length; i += 4, j += 3) {
+                            rgb[j] = imageData.data[i]; rgb[j+1] = imageData.data[i+1]; rgb[j+2] = imageData.data[i+2];
+                        }
+                        resolve({ embedding: embedder.extract(rgb, 224, 224), dataUrl: e.target.result });
+                    };
+                    img.onerror = reject;
+                    img.src = e.target.result;
+                };
+                reader.onerror = reject;
+                reader.readAsDataURL(file);
+            });
+        }
+
+        // Helper: Classify using stored prototypes
+        function classifyEmbedding(embedding) {
+            if (classifier.classes.size === 0) return null;
+            const scores = [];
+            for (const [className, data] of classifier.classes) {
+                if (data.embeddings.length === 0) continue;
+                // Compute prototype (mean embedding)
+                const proto = computePrototype(data.embeddings);
+                const sim = embedder.cosine_similarity(embedding, proto);
+                scores.push({ className, similarity: sim, color: data.color, count: data.embeddings.length });
+            }
+            return scores.sort((a, b) => b.similarity - a.similarity);
+        }
+
+        function computePrototype(embeddings) {
+            const dim = embeddings[0].length;
+            const proto = new Float32Array(dim);
+            for (const emb of embeddings) {
+                for (let i = 0; i < dim; i++) proto[i] += emb[i];
+            }
+            for (let i = 0; i < dim; i++) proto[i] /= embeddings.length;
+            const norm = Math.sqrt(proto.reduce((s, v) => s + v*v, 0));
+            for (let i = 0; i < dim; i++) proto[i] /= norm;
+            return proto;
+        }
+
+        // Live Classifier
+        const addClassBtn = document.getElementById('add-class-btn');
+        const classNameInput = document.getElementById('class-name-input');
+        const classContainers = document.getElementById('class-containers');
+        const classifyDrop = document.getElementById('classify-drop');
+        const classifyInput = document.getElementById('classify-input');
+        const classifyResult = document.getElementById('classify-result');
+
+        if (addClassBtn) {
+            addClassBtn.onclick = () => {
+                const name = classNameInput.value.trim();
+                if (!name || classifier.classes.has(name)) return;
+                const color = classifier.colors[classifier.colorIndex++ % classifier.colors.length];
+                classifier.classes.set(name, { embeddings: [], color, thumbnails: [] });
+                renderClassContainers();
+                classNameInput.value = '';
+                updateMemoryBank();
+            };
+        }
+
+        function renderClassContainers() {
+            if (!classContainers) return;
+            classContainers.innerHTML = '';
+            for (const [name, data] of classifier.classes) {
+                const container = document.createElement('div');
+                container.style.cssText = `background: hsl(var(--secondary)); border: 2px solid ${data.color}; border-radius: 8px; padding: 0.5rem; min-width: 120px;`;
+                container.innerHTML = `
+                    <div style="font-size: 0.8rem; font-weight: 600; color: ${data.color}; margin-bottom: 0.25rem;">${name} (${data.embeddings.length})</div>
+                    <div class="class-thumbs" style="display: flex; gap: 2px; flex-wrap: wrap; min-height: 30px;"></div>
+                    <input type="file" class="class-file-input" multiple accept="image/*" style="display: none;">
+                `;
+                const thumbsDiv = container.querySelector('.class-thumbs');
+                const fileInput = container.querySelector('.class-file-input');
+
+                // Show thumbnails
+                data.thumbnails.slice(-6).forEach(thumb => {
+                    const img = document.createElement('img');
+                    img.src = thumb;
+                    img.style.cssText = 'width: 24px; height: 24px; object-fit: cover; border-radius: 3px;';
+                    thumbsDiv.appendChild(img);
+                });
+
+                // Drop zone behavior
+                container.ondragover = e => { e.preventDefault(); container.style.borderStyle = 'dashed'; };
+                container.ondragleave = () => { container.style.borderStyle = 'solid'; };
+                container.ondrop = async e => {
+                    e.preventDefault();
+                    container.style.borderStyle = 'solid';
+                    for (const file of e.dataTransfer.files) {
+                        if (!file.type.startsWith('image/')) continue;
+                        const result = await extractEmbeddingFromFile(file);
+                        data.embeddings.push(result.embedding);
+                        data.thumbnails.push(result.dataUrl);
+                    }
+                    renderClassContainers();
+                    updateMemoryBank();
+                };
+
+                container.onclick = () => fileInput.click();
+                fileInput.onchange = async e => {
+                    for (const file of e.target.files) {
+                        const result = await extractEmbeddingFromFile(file);
+                        data.embeddings.push(result.embedding);
+                        data.thumbnails.push(result.dataUrl);
+                    }
+                    renderClassContainers();
+                    updateMemoryBank();
+                };
+
+                classContainers.appendChild(container);
+            }
+        }
+
+        // Classification drop zone
+        if (classifyDrop && classifyInput) {
+            classifyDrop.onclick = () => classifyInput.click();
+            classifyDrop.ondragover = e => { e.preventDefault(); classifyDrop.classList.add('drag-over'); };
+            classifyDrop.ondragleave = () => classifyDrop.classList.remove('drag-over');
+            classifyDrop.ondrop = async e => { e.preventDefault(); classifyDrop.classList.remove('drag-over'); await doClassify(e.dataTransfer.files[0]); };
+            classifyInput.onchange = async e => await doClassify(e.target.files[0]);
+        }
+
+        async function doClassify(file) {
+            if (!file || !embedder) return;
+            const result = await extractEmbeddingFromFile(file);
+            const scores = classifyEmbedding(result.embedding);
+
+            if (!scores || scores.length === 0) {
+                classifyResult.innerHTML = '<span style="color: hsl(var(--muted-foreground));">Add classes first!</span>';
+                return;
+            }
+
+            const top = scores[0];
+            classifyResult.innerHTML = `
+                <div style="display: flex; align-items: center; justify-content: center; gap: 0.75rem;">
+                    <img src="${result.dataUrl}" style="width: 48px; height: 48px; object-fit: cover; border-radius: 6px;">
+                    <div>
+                        <div style="font-size: 1.25rem; font-weight: 700; color: ${top.color};">${top.className}</div>
+                        <div style="font-size: 0.8rem; color: hsl(var(--muted-foreground));">Confidence: ${(top.similarity * 100).toFixed(1)}%</div>
+                    </div>
+                </div>
+                <div style="margin-top: 0.5rem; display: flex; gap: 0.25rem; justify-content: center; flex-wrap: wrap;">
+                    ${scores.slice(0, 4).map(s => `<span style="font-size: 0.7rem; padding: 2px 6px; background: ${s.color}22; color: ${s.color}; border-radius: 4px;">${s.className}: ${(s.similarity * 100).toFixed(0)}%</span>`).join('')}
+                </div>
+            `;
+
+            // Add to feedback log
+            classifier.totalTests++;
+            updateFeedbackStats();
+        }
+
+        // Few-Shot Learning
+        const fewshotClasses = { A: [], B: [], C: [] };
+        const fewshotEmbeddings = { A: [], B: [], C: [] };
+
+        ['a', 'b', 'c'].forEach(letter => {
+            const dropEl = document.getElementById(`fewshot-class-${letter}`);
+            const inputEl = document.getElementById(`fewshot-input-${letter}`);
+            const countEl = document.getElementById(`fewshot-count-${letter}`);
+            const classKey = letter.toUpperCase();
+
+            if (dropEl && inputEl) {
+                dropEl.onclick = () => inputEl.click();
+                dropEl.ondragover = e => { e.preventDefault(); dropEl.classList.add('drag-over'); };
+                dropEl.ondragleave = () => dropEl.classList.remove('drag-over');
+                dropEl.ondrop = async e => {
+                    e.preventDefault();
+                    dropEl.classList.remove('drag-over');
+                    for (const file of e.dataTransfer.files) {
+                        if (!file.type.startsWith('image/')) continue;
+                        const result = await extractEmbeddingFromFile(file);
+                        fewshotEmbeddings[classKey].push(result.embedding);
+                    }
+                    countEl.textContent = `${fewshotEmbeddings[classKey].length} examples`;
+                };
+                inputEl.onchange = async e => {
+                    for (const file of e.target.files) {
+                        const result = await extractEmbeddingFromFile(file);
+                        fewshotEmbeddings[classKey].push(result.embedding);
+                    }
+                    countEl.textContent = `${fewshotEmbeddings[classKey].length} examples`;
+                };
+            }
+        });
+
+        const fewshotTest = document.getElementById('fewshot-test');
+        const fewshotTestInput = document.getElementById('fewshot-test-input');
+        const fewshotResult = document.getElementById('fewshot-result');
+
+        if (fewshotTest && fewshotTestInput) {
+            fewshotTest.onclick = () => fewshotTestInput.click();
+            fewshotTest.ondragover = e => { e.preventDefault(); fewshotTest.classList.add('drag-over'); };
+            fewshotTest.ondragleave = () => fewshotTest.classList.remove('drag-over');
+            fewshotTest.ondrop = async e => { e.preventDefault(); fewshotTest.classList.remove('drag-over'); await fewshotClassify(e.dataTransfer.files[0]); };
+            fewshotTestInput.onchange = async e => await fewshotClassify(e.target.files[0]);
+        }
+
+        async function fewshotClassify(file) {
+            if (!file || !embedder) return;
+            const result = await extractEmbeddingFromFile(file);
+            const scores = [];
+            const classColors = { A: 'hsl(262, 83%, 58%)', B: 'hsl(142, 76%, 36%)', C: 'hsl(38, 92%, 50%)' };
+
+            for (const [cls, embs] of Object.entries(fewshotEmbeddings)) {
+                if (embs.length === 0) continue;
+                const proto = computePrototype(embs);
+                const sim = embedder.cosine_similarity(result.embedding, proto);
+                scores.push({ cls, similarity: sim, color: classColors[cls] });
+            }
+
+            if (scores.length === 0) {
+                fewshotResult.innerHTML = '<span style="color: hsl(var(--warning));">Add examples to classes first!</span>';
+                return;
+            }
+
+            scores.sort((a, b) => b.similarity - a.similarity);
+            fewshotResult.innerHTML = `<span style="font-weight: 700; color: ${scores[0].color};">Class ${scores[0].cls}</span> (${(scores[0].similarity * 100).toFixed(1)}%) ` +
+                scores.slice(1).map(s => `<span style="color: ${s.color}; font-size: 0.8rem;">${s.cls}: ${(s.similarity * 100).toFixed(0)}%</span>`).join(' ');
+        }
+
+        // Incremental Learning
+        const incrementalModel = { positive: [], negative: [] };
+        const incPosCount = document.getElementById('inc-pos-count');
+        const incNegCount = document.getElementById('inc-neg-count');
+        const incrementalAdd = document.getElementById('incremental-add');
+        const incrementalInput = document.getElementById('incremental-input');
+        const incrementalClass = document.getElementById('incremental-class');
+        const incrementalTest = document.getElementById('incremental-test');
+        const incrementalTestInput = document.getElementById('incremental-test-input');
+        const incrementalResult = document.getElementById('incremental-result');
+        const incrementalReset = document.getElementById('incremental-reset');
+
+        if (incrementalAdd && incrementalInput) {
+            incrementalAdd.onclick = () => incrementalInput.click();
+            incrementalAdd.ondragover = e => { e.preventDefault(); incrementalAdd.classList.add('drag-over'); };
+            incrementalAdd.ondragleave = () => incrementalAdd.classList.remove('drag-over');
+            incrementalAdd.ondrop = async e => { e.preventDefault(); incrementalAdd.classList.remove('drag-over'); await addIncrementalExample(e.dataTransfer.files[0]); };
+            incrementalInput.onchange = async e => await addIncrementalExample(e.target.files[0]);
+        }
+
+        async function addIncrementalExample(file) {
+            if (!file || !embedder) return;
+            const cls = incrementalClass.value;
+            const result = await extractEmbeddingFromFile(file);
+            incrementalModel[cls].push(result.embedding);
+            incPosCount.textContent = incrementalModel.positive.length;
+            incNegCount.textContent = incrementalModel.negative.length;
+        }
+
+        if (incrementalTest && incrementalTestInput) {
+            incrementalTest.onclick = () => incrementalTestInput.click();
+            incrementalTest.ondragover = e => { e.preventDefault(); incrementalTest.classList.add('drag-over'); };
+            incrementalTest.ondragleave = () => incrementalTest.classList.remove('drag-over');
+            incrementalTest.ondrop = async e => { e.preventDefault(); incrementalTest.classList.remove('drag-over'); await testIncremental(e.dataTransfer.files[0]); };
+            incrementalTestInput.onchange = async e => await testIncremental(e.target.files[0]);
+        }
+
+        async function testIncremental(file) {
+            if (!file || !embedder) return;
+            const result = await extractEmbeddingFromFile(file);
+            let posSim = 0, negSim = 0;
+
+            if (incrementalModel.positive.length > 0) {
+                const posProto = computePrototype(incrementalModel.positive);
+                posSim = embedder.cosine_similarity(result.embedding, posProto);
+            }
+            if (incrementalModel.negative.length > 0) {
+                const negProto = computePrototype(incrementalModel.negative);
+                negSim = embedder.cosine_similarity(result.embedding, negProto);
+            }
+
+            const isPositive = posSim > negSim;
+            incrementalResult.innerHTML = `
+                <div style="text-align: center; padding: 0.5rem; background: ${isPositive ? 'hsla(142, 76%, 36%, 0.2)' : 'hsla(0, 62%, 50%, 0.2)'}; border-radius: 6px;">
+                    <div style="font-weight: 700; color: ${isPositive ? 'hsl(var(--success))' : 'hsl(var(--destructive))'};">${isPositive ? 'Positive (+)' : 'Negative (-)'}</div>
+                    <div style="font-size: 0.8rem; color: hsl(var(--muted-foreground));">+: ${(posSim * 100).toFixed(1)}% | -: ${(negSim * 100).toFixed(1)}%</div>
+                </div>`;
+        }
+
+        if (incrementalReset) {
+            incrementalReset.onclick = () => {
+                incrementalModel.positive = [];
+                incrementalModel.negative = [];
+                incPosCount.textContent = '0';
+                incNegCount.textContent = '0';
+                incrementalResult.innerHTML = '';
+            };
+        }
+
+        // Memory Bank
+        function updateMemoryBank() {
+            const grid = document.getElementById('memory-bank-grid');
+            const stats = document.getElementById('memory-stats');
+            if (!grid) return;
+
+            let totalEmbs = 0;
+            grid.innerHTML = '';
+
+            for (const [name, data] of classifier.classes) {
+                totalEmbs += data.embeddings.length;
+                data.thumbnails.slice(-12).forEach(thumb => {
+                    const div = document.createElement('div');
+                    div.style.cssText = `aspect-ratio: 1; border-radius: 4px; overflow: hidden; border: 2px solid ${data.color};`;
+                    div.innerHTML = `<img src="${thumb}" style="width: 100%; height: 100%; object-fit: cover;">`;
+                    div.title = name;
+                    grid.appendChild(div);
+                });
+            }
+
+            if (totalEmbs === 0) {
+                grid.innerHTML = '<div style="grid-column: span 6; text-align: center; color: hsl(var(--muted-foreground)); font-size: 0.85rem; padding: 1rem;">No memories yet.</div>';
+            }
+
+            const sizeKB = (totalEmbs * 512 * 4 / 1024).toFixed(1);
+            stats.textContent = `${classifier.classes.size} classes • ${totalEmbs} embeddings • ${sizeKB} KB`;
+        }
+
+        // Export/Import Memory
+        const exportMemoryBtn = document.getElementById('export-memory-btn');
+        const importMemoryBtn = document.getElementById('import-memory-btn');
+        const importMemoryInput = document.getElementById('import-memory-input');
+
+        if (exportMemoryBtn) {
+            exportMemoryBtn.onclick = () => {
+                const data = {};
+                for (const [name, d] of classifier.classes) {
+                    data[name] = { embeddings: d.embeddings.map(e => Array.from(e)), color: d.color };
+                }
+                const blob = new Blob([JSON.stringify(data)], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a'); a.href = url; a.download = 'classifier-memory.json'; a.click();
+            };
+        }
+
+        if (importMemoryBtn && importMemoryInput) {
+            importMemoryBtn.onclick = () => importMemoryInput.click();
+            importMemoryInput.onchange = async e => {
+                const file = e.target.files[0];
+                if (!file) return;
+                const text = await file.text();
+                const data = JSON.parse(text);
+                for (const [name, d] of Object.entries(data)) {
+                    classifier.classes.set(name, {
+                        embeddings: d.embeddings.map(e => new Float32Array(e)),
+                        color: d.color,
+                        thumbnails: []
+                    });
+                }
+                renderClassContainers();
+                updateMemoryBank();
+            };
+        }
+
+        // Feedback Stats
+        function updateFeedbackStats() {
+            const totalEl = document.getElementById('feedback-total');
+            const correctEl = document.getElementById('feedback-correct');
+            const accuracyEl = document.getElementById('feedback-accuracy');
+            if (totalEl) totalEl.textContent = classifier.totalTests;
+            if (correctEl) correctEl.textContent = classifier.correctTests;
+            if (accuracyEl) accuracyEl.textContent = classifier.totalTests > 0 ? `${(classifier.correctTests / classifier.totalTests * 100).toFixed(0)}%` : '—';
+        }
+
+        // Camera Training
+        let trainingStream = null;
+        const trainingVideo = document.getElementById('training-video');
+        const startTrainingCamBtn = document.getElementById('start-training-cam-btn');
+        const stopTrainingCamBtn = document.getElementById('stop-training-cam-btn');
+        const captureTrainingBtn = document.getElementById('capture-training-btn');
+        const autoCaptureBtna = document.getElementById('auto-capture-btn');
+        const camClassInput = document.getElementById('cam-class-input');
+        const camTrainingLog = document.getElementById('cam-training-log');
+        const trainingClassBadge = document.getElementById('training-class-badge');
+
+        if (startTrainingCamBtn) {
+            startTrainingCamBtn.onclick = async () => {
+                try {
+                    trainingStream = await navigator.mediaDevices.getUserMedia({ video: { width: 320, height: 240 } });
+                    trainingVideo.srcObject = trainingStream;
+                    startTrainingCamBtn.classList.add('hidden');
+                    stopTrainingCamBtn.classList.remove('hidden');
+                    captureTrainingBtn.disabled = false;
+                    autoCaptureBtna.disabled = false;
+                } catch (e) { console.error(e); }
+            };
+        }
+
+        if (stopTrainingCamBtn) {
+            stopTrainingCamBtn.onclick = () => {
+                if (trainingStream) { trainingStream.getTracks().forEach(t => t.stop()); trainingStream = null; }
+                trainingVideo.srcObject = null;
+                startTrainingCamBtn.classList.remove('hidden');
+                stopTrainingCamBtn.classList.add('hidden');
+                captureTrainingBtn.disabled = true;
+                autoCaptureBtna.disabled = true;
+            };
+        }
+
+        if (captureTrainingBtn) {
+            captureTrainingBtn.onclick = () => captureTrainingFrame();
+        }
+
+        if (autoCaptureBtna) {
+            autoCaptureBtna.onclick = async () => {
+                for (let i = 0; i < 5; i++) {
+                    await captureTrainingFrame();
+                    await new Promise(r => setTimeout(r, 500));
+                }
+            };
+        }
+
+        async function captureTrainingFrame() {
+            if (!embedder || !trainingStream) return;
+            const className = camClassInput.value.trim() || 'default';
+
+            const canvas = document.createElement('canvas');
+            canvas.width = 224; canvas.height = 224;
+            canvas.getContext('2d').drawImage(trainingVideo, 0, 0, 224, 224);
+            const imageData = canvas.getContext('2d').getImageData(0, 0, 224, 224);
+            const rgb = new Uint8Array(224 * 224 * 3);
+            for (let i = 0, j = 0; i < imageData.data.length; i += 4, j += 3) {
+                rgb[j] = imageData.data[i]; rgb[j+1] = imageData.data[i+1]; rgb[j+2] = imageData.data[i+2];
+            }
+            const embedding = embedder.extract(rgb, 224, 224);
+            const dataUrl = canvas.toDataURL();
+
+            if (!classifier.classes.has(className)) {
+                const color = classifier.colors[classifier.colorIndex++ % classifier.colors.length];
+                classifier.classes.set(className, { embeddings: [], color, thumbnails: [] });
+            }
+
+            const data = classifier.classes.get(className);
+            data.embeddings.push(embedding);
+            data.thumbnails.push(dataUrl);
+
+            trainingClassBadge.textContent = `${className} (${data.embeddings.length})`;
+            trainingClassBadge.style.background = data.color;
+
+            camTrainingLog.innerHTML = `<div style="color: hsl(var(--success));">+ Added to "${className}" (${data.embeddings.length} total)</div>` + camTrainingLog.innerHTML;
+            renderClassContainers();
+            updateMemoryBank();
+        }
+
+        // Initialize similarity search when WASM loads
+        setTimeout(initSimilaritySearch, 2000);
+
+        // Events
+        dropZone.addEventListener('click', () => fileInput.click());
+        dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+        dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+        dropZone.addEventListener('drop', e => { e.preventDefault(); dropZone.classList.remove('drag-over'); handleFiles(e.dataTransfer.files); });
+        fileInput.addEventListener('change', e => handleFiles(e.target.files));
+
+        function handleFiles(files) {
+            Array.from(files).forEach(file => {
+                if (!file.type.startsWith('image/')) return;
+                const reader = new FileReader();
+                reader.onload = e => {
+                    const img = new Image();
+                    img.onload = () => { addImage(img, file.name); log(`Loaded: ${file.name}`, 'success'); };
+                    img.src = e.target.result;
+                };
+                reader.readAsDataURL(file);
+            });
+        }
+
+        extractBtn.addEventListener('click', extractFeatures);
+        clearBtn.addEventListener('click', () => { images = []; renderPreviews(); updateButtons(); similarityMatrix.innerHTML = ''; embeddingBars.innerHTML = ''; document.getElementById('stat-time').textContent = '0ms'; log('Cleared', 'info'); });
+        startCameraBtn.addEventListener('click', startCamera);
+        stopCameraBtn.addEventListener('click', stopCamera);
+        captureBtn.addEventListener('click', captureFrame);
+        realtimeBtn.addEventListener('click', startRealtime);
+        stopRealtimeBtn.addEventListener('click', stopRealtime);
+        setReferenceBtn.addEventListener('click', setReferenceEmbedding);
+
+        // Init
+        initWasm();
+    </script>
+</body>
+</html>

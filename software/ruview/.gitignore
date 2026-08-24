@@ -1,0 +1,42 @@
+.DS_Store
+**/.DS_Store
+
+# Python/runtime byproducts
+__pycache__/
+*.pyc
+.venv/
+
+# Keep raw measurement exports intentionally versioned for this BLL repo.
+# If later measurements become too large, move them to an external archive
+# and replace them with checksums plus summary CSVs.
+
+# Raw captures and server logs stay local until they have passed a separate
+# privacy and reproducibility review.
+data/raw/
+logs/
+
+# RuView runtime and hardware-local state. These paths are intentionally not
+# part of the Observatory source/documentation publication.
+CLAUDE.local.md
+.swarm/
+.claude/
+.claude-flow/
+/.claude-plugin/
+.mcp.json
+CLAUDE.md
+**/CLAUDE.md
+data/recordings/
+**/data/recordings/
+firmware/**/build/
+firmware/**/managed_components/
+firmware/**/dependencies.lock
+firmware/**/sdkconfig
+firmware/**/sdkconfig.old
+firmware/**/sdkconfig.defaults.bak
+v2/target/
+v2/data/*.sqlite3
+v2/data/*.sqlite3-*
+
+# Provisioning exports can contain WiFi credentials.
+**/nvs_*.bin
+**/nvs_*.csv

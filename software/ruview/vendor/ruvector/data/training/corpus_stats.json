@@ -1,0 +1,18 @@
+{
+  "total_records": 132,
+  "total_estimated_tokens": 672420,
+  "per_source": {
+    "adr": {
+      "count": 131,
+      "estimated_tokens": 672357
+    },
+    "claude-routing": {
+      "count": 1,
+      "estimated_tokens": 63
+    }
+  },
+  "quality_histogram": {
+    "0.9-1.0": 132
+  },
+  "exported_at": "2026-03-28T11:58:50.319983+00:00"
+}

@@ -1,0 +1,30 @@
+{
+  "name": "dragnes",
+  "version": "0.1.0",
+  "private": true,
+  "description": "DrAgnes -- AI-Powered Dermatology Intelligence Platform",
+  "type": "module",
+  "scripts": {
+    "dev": "vite dev",
+    "build": "vite build",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
+    "deploy": "bash scripts/deploy.sh"
+  },
+  "devDependencies": {
+    "@sveltejs/adapter-node": "^5.0.0",
+    "@sveltejs/kit": "^2.0.0",
+    "@sveltejs/vite-plugin-svelte": "^5.0.0",
+    "svelte": "^5.0.0",
+    "svelte-check": "^4.0.0",
+    "tailwindcss": "^3.4.0",
+    "postcss": "^8.4.0",
+    "autoprefixer": "^10.4.0",
+    "typescript": "^5.5.0",
+    "vite": "^6.0.0",
+    "vitest": "^3.0.0",
+    "unplugin-icons": "^0.21.0",
+    "@iconify-json/carbon": "^1.1.0"
+  }
+}

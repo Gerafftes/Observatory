@@ -1,0 +1,62 @@
+[package]
+name = "midstream-wasm"
+version = "1.0.0"
+authors = ["Midstream Contributors"]
+edition = "2021"
+rust-version = "1.81"
+description = "WebAssembly bindings for Midstream temporal comparison, scheduling, and meta-learning"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/midstream/midstream"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+# Feature flags follow ADR-0025: additive, off-by-default, prefixed.
+# A consumer of `@midstream/wasm` opts into the subsystems they need;
+# the historical "everything by default" behaviour is preserved as the
+# `full` meta-feature for one release while ecosystem users migrate.
+[features]
+default = []
+temporal = []
+scheduler = []
+strange-loop = []
+quic = []
+# Meta-feature: enables every published subsystem. Equivalent to the
+# pre-ADR-0025 `default` set. Deprecate one minor after migration.
+full = ["temporal", "scheduler", "strange-loop", "quic"]
+
+[dependencies]
+wasm-bindgen = "0.2.89"
+wasm-bindgen-futures = "0.4.39"
+js-sys = "0.3.66"
+serde = { version = "1.0", features = ["derive"] }
+serde-wasm-bindgen = "0.6.3"
+getrandom = { version = "0.2", features = ["js"] }
+console_error_panic_hook = "0.1.7"
+
+# Web APIs
+web-sys = { version = "0.3.66", features = [
+    "console",
+    "Performance",
+    "Window",
+    "Navigator",
+    "WorkerGlobalScope",
+    "DedicatedWorkerGlobalScope",
+    "MessageEvent",
+    "MessagePort",
+    "Crypto",
+    "SubtleCrypto",
+] }
+
+[dev-dependencies]
+wasm-bindgen-test = "0.3.39"
+
+[profile.release]
+opt-level = "z"     # Optimize for size
+lto = true          # Enable Link Time Optimization
+codegen-units = 1   # Reduce number of codegen units to increase optimizations
+panic = "abort"     # Abort on panic (smaller binary)
+strip = true        # Strip symbols
+
+[package.metadata.wasm-pack.profile.release]
+wasm-opt = ["-Oz", "--enable-mutable-globals", "--enable-bulk-memory", "--enable-nontrapping-float-to-int"]

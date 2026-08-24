@@ -1,0 +1,37 @@
+[
+  {
+    "title": "Skylights Over Libya",
+    "content": "Sometimes the sky itself seems to glow.  Usually, this means you are seeing a cloud reflecting sunlight or moonlight.  If the glow appears as a faint band of light running across the whole sky, you are probably seeing the combined light from the billions of stars that compose our Milky Way Galaxy.  ... | Media: image | URL: https://apod.nasa.gov/apod/image/1012/skylights_tezel.jpg",
+    "timestamp": "2010-12-28T00:00:00Z",
+    "source": "nasa_apod",
+    "confidence": 0.92
+  },
+  {
+    "title": "Comet NEOWISE over Stonehenge",
+    "content": "Have you ever seen a comet? Tonight -- and likely the next few nights -- should be a good chance. Go outside just at sunset and look to your northwest.  The lower your horizon, the better.  Binoculars may help, but if your sky is cloudless and dark, all you should need is your unaided eyes and patie... | Media: image | URL: https://apod.nasa.gov/apod/image/2007/NeowiseStonehenge_Deval_960.jpg",
+    "timestamp": "2020-07-14T00:00:00Z",
+    "source": "nasa_apod",
+    "confidence": 0.92
+  },
+  {
+    "title": "Spiral Galaxy NGC 2566 from Webb",
+    "content": "What\u2019s happening in the center of spiral galaxy NGC 2566? First, the eight rays that appear to be coming out of the center in the featured infrared image are not real \u2014 they are diffraction spikes caused by the mechanical structure of the Webb space telescope itself. The center of NGC 2566 is bright... | Media: image | URL: https://apod.nasa.gov/apod/image/2505/NGC2256_Webb_960.jpg",
+    "timestamp": "2025-05-26T00:00:00Z",
+    "source": "nasa_apod",
+    "confidence": 0.92
+  },
+  {
+    "title": "Milky Way over the Pinnacles in Australia",
+    "content": "What strange world is this? Earth. In the foreground of the featured image are the Pinnacles, unusual rock spires in Nambung National Park in Western Australia. Made of ancient sea shells (limestone), how these human-sized picturesque spires formed remains unknown.  In the background, just past the ... | Media: image | URL: https://apod.nasa.gov/apod/image/2010/PinnaclesGalaxy_Goh_1080.jpg",
+    "timestamp": "2020-10-11T00:00:00Z",
+    "source": "nasa_apod",
+    "confidence": 0.92
+  },
+  {
+    "title": "X-ray Moon and X-ray Star",
+    "content": "An X-ray star winks out behind the Moon in these before and after views of a lunar occultation of the galactic X-ray source designated GX5-1. The false color images were made using data from the ROSAT orbiting observatory and show high energy X-rays in yellow (mostly from GX5-1), and lower energy X-... | Media: image | URL: https://apod.nasa.gov/apod/image/gx5moon_rosat_crop.gif",
+    "timestamp": "1996-02-27T00:00:00Z",
+    "source": "nasa_apod",
+    "confidence": 0.92
+  }
+]
