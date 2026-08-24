@@ -45,6 +45,10 @@ Preview:
 
 ![PCB-02 top preview](preview/PCB-02-top.png)
 
+Reference preview with the final `PCB-02` and `@gerafftes` silkscreen:
+
+![PCB-02 reference preview](preview/PCB-02-reference.png)
+
 The KiCad source files in this folder are included so the revision can be inspected or edited.
 
 These checks validate the PCB files and connectivity. They do not prove that the existing ESP or LD2450 hardware is functional.
