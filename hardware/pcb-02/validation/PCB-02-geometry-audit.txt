@@ -1,0 +1,25 @@
+PCB-02 geometry and footprint audit
+Created: 2026-08-24
+
+Copper routing
+- Track segments: 46
+- Segments outside horizontal, vertical, or 45 degrees: 0
+- 90-degree junctions: 0
+- 90-degree transitions at pads or vias: 0
+
+Capacitors
+- C1: Capacitor_SMD:C_0805_2012Metric_Pad1.18x1.45mm_HandSolder
+- C2: Capacitor_SMD:C_1206_3216Metric_Pad1.33x1.80mm_HandSolder
+
+ESP32-C3 SuperMini header
+- Pads: 16 through-hole pads on 2.54 mm pitch
+- Pad size: 1.70 x 1.70 mm
+- Finished drill definition: 1.00 mm
+- Nominal annular ring from footprint geometry: 0.35 mm
+
+Case geometry comparison with PCB-01
+- Outer coordinate range: X 148.96 to 175.41 mm; Y 55.76 to 92.18 mm
+- Outer size: 26.45 x 36.42 mm, identical to PCB-01
+- Mounting hole 1: X 163.50 mm, Y 89.00 mm, drill 2.20 mm
+- Mounting hole 2: X 172.00 mm, Y 89.00 mm, drill 2.20 mm
+- Mounting-hole positions and drills are identical to PCB-01

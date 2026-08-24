@@ -59,6 +59,7 @@ Die drei wichtigsten Einstiegspunkte sind:
 1. [Aktueller D6-/mmWave-Arbeitsstand](08-aktueller-arbeitsstand-d6-und-position.md)
 2. [Ergebnisberichte](results/)
 3. [PCB-01-Fertigungsdaten](hardware/pcb-01/)
+4. [PCB-02-Fertigungsdaten und KiCad-Quellen](hardware/pcb-02/)
 
 Die verwendete RX-Firmware und der Sensing-Server stammen aus dem separaten
 Upstream-Projekt [ruvnet/RuView](https://github.com/ruvnet/RuView). Die lokalen
@@ -249,6 +250,10 @@ Fertigungsvorschau zeigt den verwendeten Platinenstand:
 
 Die [Gerber- und Bohrdaten von PCB-01](hardware/pcb-01/) liegen mit SHA-256 und
 Fertigungshinweis im Repository.
+
+Die überarbeitete [PCB-02 mit KiCad-Quellen, Prüfberichten und Bestellarchiv](hardware/pcb-02/)
+verwendet wieder SMD-Kondensatoren, Standard-Pinheader-Pads für den ESP32-C3
+und dieselben Außenmaße sowie Montagebohrungen wie PCB-01.
 
 Als Gehäuse für die ESP32-S3-Boards ist das externe MakerWorld-Modell
 [*ESP32 S3 Wroom Case*](https://makerworld.com/de/models/1456361-esp32-s3-wroom-case#profileId-1517915)
