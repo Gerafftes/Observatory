@@ -1,0 +1,3 @@
+[submodule "examples/vectorvroom"]
+	path = examples/vectorvroom
+	url = https://github.com/shaal/VectorVroom.git

@@ -6,11 +6,30 @@ __pycache__/
 *.pyc
 .venv/
 
-# Keep raw measurement exports intentionally versioned for this BLL repo.
-# If later measurements become too large, move them to an external archive
-# and replace them with checksums plus summary CSVs.
-
-# Raw captures and server logs stay local until they have passed a separate
-# privacy and reproducibility review.
+# Private measurement and runtime data stay local. Public reports and
+# aggregate CSV files belong under results/ instead.
 data/raw/
 logs/
+**/data/recordings/
+*.sqlite3
+*.sqlite3-*
+
+# Credentials and device-specific provisioning exports.
+.env
+.env.*
+!.env.example
+**/nvs_*.bin
+**/nvs_*.csv
+CLAUDE.local.md
+.mcp.json
+
+# Generated software outputs. The source snapshot under software/ruview/
+# remains reproducible from its manifests and lockfiles.
+**/target/
+**/node_modules/
+**/.vite/
+firmware/**/build/
+firmware/**/managed_components/
+firmware/**/dependencies.lock
+firmware/**/sdkconfig
+firmware/**/sdkconfig.old

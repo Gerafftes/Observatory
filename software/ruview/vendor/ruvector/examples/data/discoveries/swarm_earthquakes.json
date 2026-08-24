@@ -1,0 +1,162 @@
+[
+  {
+    "title": "M5.3 Off the coast of Aisen, Chile",
+    "content": "M5.3 at Off the coast of Aisen, Chile. Depth: 10km",
+    "category": "anomaly",
+    "tags": [
+      "earth",
+      "seismic",
+      "earthquake",
+      "shallow"
+    ],
+    "domain": "earth-science",
+    "source_api": "USGS",
+    "timestamp": "2026-03-15T21:59:51Z",
+    "confidence": 0.85,
+    "data_points": 1
+  },
+  {
+    "title": "M5.3 67 km SSW of Chirilagua, El Salvador",
+    "content": "M5.3 at 67 km SSW of Chirilagua, El Salvador. Depth: 55.856km",
+    "category": "anomaly",
+    "tags": [
+      "earth",
+      "seismic",
+      "earthquake",
+      "shallow"
+    ],
+    "domain": "earth-science",
+    "source_api": "USGS",
+    "timestamp": "2026-03-15T21:59:51Z",
+    "confidence": 0.85,
+    "data_points": 1
+  },
+  {
+    "title": "M5.1 Kuril Islands",
+    "content": "M5.1 at Kuril Islands. Depth: 10km",
+    "category": "anomaly",
+    "tags": [
+      "earth",
+      "seismic",
+      "earthquake",
+      "shallow"
+    ],
+    "domain": "earth-science",
+    "source_api": "USGS",
+    "timestamp": "2026-03-15T21:59:51Z",
+    "confidence": 0.85,
+    "data_points": 1
+  },
+  {
+    "title": "M5.1 northern Mid-Atlantic Ridge",
+    "content": "M5.1 at northern Mid-Atlantic Ridge. Depth: 10km",
+    "category": "anomaly",
+    "tags": [
+      "earth",
+      "seismic",
+      "earthquake",
+      "shallow"
+    ],
+    "domain": "earth-science",
+    "source_api": "USGS",
+    "timestamp": "2026-03-15T21:59:51Z",
+    "confidence": 0.85,
+    "data_points": 1
+  },
+  {
+    "title": "M4.5 87 km W of El Aguilar, Argentina",
+    "content": "M4.5 at 87 km W of El Aguilar, Argentina. Depth: 229.541km",
+    "category": "anomaly",
+    "tags": [
+      "earth",
+      "seismic",
+      "earthquake",
+      "shallow"
+    ],
+    "domain": "earth-science",
+    "source_api": "USGS",
+    "timestamp": "2026-03-15T21:59:51Z",
+    "confidence": 0.85,
+    "data_points": 1
+  },
+  {
+    "title": "M5.2 South Sandwich Islands region",
+    "content": "M5.2 at South Sandwich Islands region. Depth: 73.994km",
+    "category": "anomaly",
+    "tags": [
+      "earth",
+      "seismic",
+      "earthquake",
+      "shallow"
+    ],
+    "domain": "earth-science",
+    "source_api": "USGS",
+    "timestamp": "2026-03-15T21:59:51Z",
+    "confidence": 0.85,
+    "data_points": 1
+  },
+  {
+    "title": "M5.1 southern Mid-Atlantic Ridge",
+    "content": "M5.1 at southern Mid-Atlantic Ridge. Depth: 10km",
+    "category": "anomaly",
+    "tags": [
+      "earth",
+      "seismic",
+      "earthquake",
+      "shallow"
+    ],
+    "domain": "earth-science",
+    "source_api": "USGS",
+    "timestamp": "2026-03-15T21:59:51Z",
+    "confidence": 0.85,
+    "data_points": 1
+  },
+  {
+    "title": "M5 south of the Kermadec Islands",
+    "content": "M5 at south of the Kermadec Islands. Depth: 10km",
+    "category": "anomaly",
+    "tags": [
+      "earth",
+      "seismic",
+      "earthquake",
+      "shallow"
+    ],
+    "domain": "earth-science",
+    "source_api": "USGS",
+    "timestamp": "2026-03-15T21:59:51Z",
+    "confidence": 0.85,
+    "data_points": 1
+  },
+  {
+    "title": "M5 116 km E of Yamada, Japan",
+    "content": "M5 at 116 km E of Yamada, Japan. Depth: 25.896km",
+    "category": "anomaly",
+    "tags": [
+      "earth",
+      "seismic",
+      "earthquake",
+      "shallow"
+    ],
+    "domain": "earth-science",
+    "source_api": "USGS",
+    "timestamp": "2026-03-15T21:59:51Z",
+    "confidence": 0.85,
+    "data_points": 1
+  },
+  {
+    "title": "M4.7 south of the Kermadec Islands",
+    "content": "M4.7 at south of the Kermadec Islands. Depth: 344.041km",
+    "category": "anomaly",
+    "tags": [
+      "earth",
+      "seismic",
+      "earthquake",
+      "deep-focus"
+    ],
+    "domain": "earth-science",
+    "source_api": "USGS",
+    "timestamp": "2026-03-15T21:59:51Z",
+    "confidence": 0.85,
+    "data_points": 1
+  }
+]

@@ -1,0 +1,67 @@
+[
+  {
+    "title": "Santa Monica Basin Buoy 46025 - 2026-03-15T23:10",
+    "content": "Water temp: 17.3\u00b0C, Air temp: 16.0\u00b0C, Pressure: 1014.8 hPa, Wind: 2.0 m/s from 280\u00b0, Wave height: 0.8 m, Dew point: 14.1\u00b0C",
+    "timestamp": "2026-03-15T23:10:00Z",
+    "source": "noaa_ndbc",
+    "confidence": 0.95,
+    "metadata": {
+      "buoy_id": "46025",
+      "location": "Santa Monica Basin, CA",
+      "lat": 33.749,
+      "lon": -119.053
+    }
+  },
+  {
+    "title": "Santa Monica Basin Buoy 46025 - 2026-03-15T23:00",
+    "content": "Water temp: 17.3\u00b0C, Air temp: 16.0\u00b0C, Pressure: 1014.8 hPa, Wind: 2.0 m/s from 280\u00b0, Wave height: N/A m, Dew point: 14.1\u00b0C",
+    "timestamp": "2026-03-15T23:00:00Z",
+    "source": "noaa_ndbc",
+    "confidence": 0.95,
+    "metadata": {
+      "buoy_id": "46025",
+      "location": "Santa Monica Basin, CA",
+      "lat": 33.749,
+      "lon": -119.053
+    }
+  },
+  {
+    "title": "Santa Monica Basin Buoy 46025 - 2026-03-15T22:50",
+    "content": "Water temp: 17.2\u00b0C, Air temp: 15.9\u00b0C, Pressure: 1015.1 hPa, Wind: 2.0 m/s from 290\u00b0, Wave height: 0.8 m, Dew point: 14.0\u00b0C",
+    "timestamp": "2026-03-15T22:50:00Z",
+    "source": "noaa_ndbc",
+    "confidence": 0.95,
+    "metadata": {
+      "buoy_id": "46025",
+      "location": "Santa Monica Basin, CA",
+      "lat": 33.749,
+      "lon": -119.053
+    }
+  },
+  {
+    "title": "Santa Monica Basin Buoy 46025 - 2026-03-15T22:40",
+    "content": "Water temp: 17.2\u00b0C, Air temp: 15.9\u00b0C, Pressure: 1015.2 hPa, Wind: 2.0 m/s from 290\u00b0, Wave height: N/A m, Dew point: 14.0\u00b0C",
+    "timestamp": "2026-03-15T22:40:00Z",
+    "source": "noaa_ndbc",
+    "confidence": 0.95,
+    "metadata": {
+      "buoy_id": "46025",
+      "location": "Santa Monica Basin, CA",
+      "lat": 33.749,
+      "lon": -119.053
+    }
+  },
+  {
+    "title": "Santa Monica Basin Buoy 46025 - 2026-03-15T22:30",
+    "content": "Water temp: 17.3\u00b0C, Air temp: 15.8\u00b0C, Pressure: 1015.2 hPa, Wind: 2.0 m/s from 280\u00b0, Wave height: N/A m, Dew point: 14.0\u00b0C",
+    "timestamp": "2026-03-15T22:30:00Z",
+    "source": "noaa_ndbc",
+    "confidence": 0.95,
+    "metadata": {
+      "buoy_id": "46025",
+      "location": "Santa Monica Basin, CA",
+      "lat": 33.749,
+      "lon": -119.053
+    }
+  }
+]

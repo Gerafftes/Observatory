@@ -1,0 +1,141 @@
+{
+  "domain": "biomimetic-systems",
+  "generated": "2026-03-16T14:00:00Z",
+  "entries": [
+    {
+      "title": "Slime Mold Computing — Physarum Optimization Networks",
+      "category": "pattern",
+      "content": "Physarum polycephalum (slime mold) solves shortest path, Steiner tree, and network design problems through protoplasmic flow dynamics. When food sources are placed at city locations, the organism forms networks matching optimal transport solutions (Tokyo rail network experiment). The mechanism uses positive feedback (flow reinforces tubes) and negative feedback (unused tubes decay). Physarum-inspired algorithms solve TSP and multi-objective optimization. Physarum machines implement unconventional logic gates.",
+      "tags": ["Physarum", "slime-mold", "biological-computing", "network-optimization", "unconventional-computing"],
+      "confidence": 0.87,
+      "novelty": 0.85,
+      "source": "research"
+    },
+    {
+      "title": "Mycelial Networks — Distributed Intelligence Underground",
+      "category": "pattern",
+      "content": "Fungal mycelial networks form distributed computing systems spanning hectares. The 'wood wide web' transfers nutrients, chemical signals, and electrical impulses between trees. Electrical signals in mycelium show patterns resembling neural spiking with up to 50 distinct signal clusters. Paul Stamets proposes mycelium as Earth's natural internet. Research explores mycelium-based computing substrates, biosensors, and materials (mycelium leather, packaging, building insulation) as sustainable alternatives.",
+      "tags": ["mycelium", "fungal-network", "distributed-computing", "wood-wide-web", "bio-computing"],
+      "confidence": 0.84,
+      "novelty": 0.86,
+      "source": "research"
+    },
+    {
+      "title": "Ant Colony Optimization — Stigmergic Problem Solving",
+      "category": "architecture",
+      "content": "Ant Colony Optimization (ACO) algorithms mimic how ant colonies find shortest paths through pheromone trail reinforcement. Dorigo's original Ant System solves TSP competitively. MAX-MIN Ant System and Ant Colony System improve convergence. Industrial applications include vehicle routing (Swiss Post), network routing (AntNet), and scheduling. The stigmergy principle — indirect coordination through environment modification — applies broadly to swarm robotics and multi-agent systems.",
+      "tags": ["ant-colony-optimization", "ACO", "stigmergy", "Dorigo", "combinatorial-optimization"],
+      "confidence": 0.92,
+      "novelty": 0.72,
+      "source": "research"
+    },
+    {
+      "title": "Bee Algorithm — Foraging-Based Search Optimization",
+      "category": "architecture",
+      "content": "The Bee Algorithm models honey bee foraging with scout bees performing global search and recruited forager bees exploiting promising areas. The Artificial Bee Colony (ABC) algorithm uses employed bees, onlooker bees, and scout bees for exploration-exploitation balance. Waggle dance communication inspires information sharing mechanisms in optimization. Applications include training neural networks, image processing, and protein structure prediction. The algorithm excels in multi-modal optimization landscapes.",
+      "tags": ["bee-algorithm", "ABC", "foraging-optimization", "waggle-dance", "multi-modal-search"],
+      "confidence": 0.88,
+      "novelty": 0.74,
+      "source": "research"
+    },
+    {
+      "title": "Intel Loihi 2 — Second-Generation Neuromorphic Processor",
+      "category": "architecture",
+      "content": "Loihi 2 implements 1 million programmable spiking neurons with on-chip learning rules. The 7nm chip supports arbitrary neuron models via microcode, enabling researchers to program custom dynamics. Graded spikes (multi-bit) and programmable synaptic delays enhance computational expressiveness. Benchmarks show 100x energy efficiency over GPUs for sparse event-driven workloads. The Lava software framework provides a Python API for developing neuromorphic algorithms. INRC community has published 100+ papers.",
+      "tags": ["Loihi-2", "neuromorphic", "spiking-neurons", "Intel", "event-driven-computing"],
+      "confidence": 0.90,
+      "novelty": 0.80,
+      "source": "research"
+    },
+    {
+      "title": "Memristor Computing — Resistance-Based Memory and Logic",
+      "category": "architecture",
+      "content": "Memristors — resistors with memory — enable in-memory computing that eliminates the von Neumann bottleneck. HP Labs demonstrated the first physical memristor in 2008 (predicted by Chua in 1971). Crossbar arrays perform matrix-vector multiplication in O(1) time for neural network inference. Memristive synapses enable analog weight storage for neuromorphic computing. Challenges include device variability, endurance, and programming precision. Commercial memristor-based AI accelerators target edge inference.",
+      "tags": ["memristor", "in-memory-computing", "crossbar-array", "analog-compute", "Chua"],
+      "confidence": 0.86,
+      "novelty": 0.81,
+      "source": "research"
+    },
+    {
+      "title": "DNA Data Storage — Petabytes Per Gram",
+      "category": "solution",
+      "content": "DNA achieves theoretical storage density of 455 exabytes per gram with billion-year stability. Twist Bioscience synthesizes custom oligos encoding digital data in nucleotide sequences. Error correction codes (Reed-Solomon, fountain codes) handle synthesis/sequencing errors. Microsoft demonstrated fully automated DNA read-write in 2019. Current costs ($3,500/MB write, $1,000/MB read) limit DNA storage to archival use cases. Enzymatic synthesis (Molecular Assemblies, DNA Script) aims to reduce costs 1000x.",
+      "tags": ["DNA-storage", "data-density", "oligonucleotide", "archival-storage", "enzymatic-synthesis"],
+      "confidence": 0.88,
+      "novelty": 0.79,
+      "source": "research"
+    },
+    {
+      "title": "Molecular Motors — Biological Nanomachines",
+      "category": "pattern",
+      "content": "Biological molecular motors convert chemical energy into mechanical work with near-100% efficiency. Kinesin walks along microtubules carrying cargo. ATP synthase is a rotary motor generating cellular energy. Bacterial flagellar motors rotate at 1000 rpm. Myosin powers muscle contraction. Synthetic molecular motors (Feringa) achieve unidirectional rotation under light. Applications include molecular-scale cargo transport, smart materials that actuate on command, and molecular pumps for drug delivery systems.",
+      "tags": ["molecular-motors", "kinesin", "ATP-synthase", "nanomachine", "biological-motor"],
+      "confidence": 0.90,
+      "novelty": 0.77,
+      "source": "research"
+    },
+    {
+      "title": "Termite-Inspired Construction — Self-Organizing Architecture",
+      "category": "solution",
+      "content": "Termite mounds achieve passive climate control maintaining ±1°C temperature in 40°C deserts through convection-driven ventilation channels. Eastgate Centre in Harare, Zimbabwe mimics this design, using 90% less energy than conventional buildings. Harvard's TERMES robots demonstrate decentralized construction without blueprints — each robot follows local rules that emerge into complex structures. Termite-inspired algorithms apply to 3D printing, construction robotics, and self-assembling space habitats.",
+      "tags": ["termite-architecture", "passive-cooling", "TERMES", "self-organizing", "biomimetic-construction"],
+      "confidence": 0.87,
+      "novelty": 0.82,
+      "source": "research"
+    },
+    {
+      "title": "Lotus Effect — Self-Cleaning Nanostructured Surfaces",
+      "category": "solution",
+      "content": "The lotus leaf's self-cleaning property arises from hierarchical micro/nanostructures combined with hydrophobic wax crystals, creating superhydrophobicity (contact angle >150°). Water droplets roll off carrying dirt particles. Biomimetic applications include self-cleaning coatings (Lotusan paint), anti-icing surfaces for aircraft, and anti-biofouling marine coatings. Inverse lotus effect creates superhydrophilic surfaces for fog harvesting. Understanding wetting dynamics at the nanoscale bridges biology, materials science, and fluid mechanics.",
+      "tags": ["lotus-effect", "superhydrophobic", "self-cleaning", "nanostructure", "wetting"],
+      "confidence": 0.91,
+      "novelty": 0.73,
+      "source": "research"
+    },
+    {
+      "title": "Whale Fin Tubercles — Biomimetic Aerodynamics",
+      "category": "solution",
+      "content": "Humpback whale pectoral fin leading edge tubercles (bumps) improve hydrodynamic performance by 32% at high angles of attack. Tubercles create streamwise vortices that energize the boundary layer and delay stall. WhalePower Corporation commercialized tubercle-enhanced wind turbine blades, fans, and hydrofoils. Applications extend to aircraft wings, drone propellers, and compressor blades. The mechanism — passive vortex generation for flow control — represents a biological solution overlooked by conventional aerodynamics for over a century.",
+      "tags": ["whale-tubercles", "biomimetic-aerodynamics", "boundary-layer", "WhalePower", "stall-delay"],
+      "confidence": 0.88,
+      "novelty": 0.80,
+      "source": "research"
+    },
+    {
+      "title": "Mantis Shrimp Vision — Hyperspectral Biological Sensors",
+      "category": "pattern",
+      "content": "Mantis shrimp possess 16 types of photoreceptors (humans have 3) spanning UV to far-red, plus circular and linear polarization detection. Their ommatidia include quarter-wave retarders operating across the visible spectrum — an optical engineering feat unmatched by human technology. Biomimetic cameras inspired by mantis shrimp vision detect cancer (through polarization differences in tissue), improve underwater imaging, and enable polarimetric remote sensing. The biological polarization optics inspire achromatic wave plate design.",
+      "tags": ["mantis-shrimp", "hyperspectral", "polarization-vision", "biomimetic-sensor", "photoreceptor"],
+      "confidence": 0.86,
+      "novelty": 0.83,
+      "source": "research"
+    },
+    {
+      "title": "Artificial Immune Systems — Bio-Inspired Anomaly Detection",
+      "category": "architecture",
+      "content": "Artificial Immune Systems (AIS) adapt biological immune mechanisms for computational problems. Negative selection algorithm detects anomalies by learning what is normal (self) and flagging non-self. Clonal selection (CLONALG) evolves antibody populations for optimization. Danger theory models focus on damage signals rather than self/non-self distinction. AIS applications include network intrusion detection, spam filtering, and fault diagnosis. The immune network theory inspires distributed multi-agent systems with emergent collective memory.",
+      "tags": ["artificial-immune-system", "negative-selection", "clonal-selection", "anomaly-detection", "danger-theory"],
+      "confidence": 0.84,
+      "novelty": 0.78,
+      "source": "research"
+    },
+    {
+      "title": "Echolocation-Inspired Sensing — Bat Sonar Algorithms",
+      "category": "solution",
+      "content": "Bats navigate using frequency-modulated chirps and Doppler-shift analysis with microsecond precision. Bat algorithm (Yang, 2010) uses echolocation-inspired search with adaptive loudness and pulse rate. Bio-sonar principles improve ultrasonic sensing for autonomous vehicles, indoor navigation, and industrial inspection. Constant-frequency/frequency-modulated (CF/FM) designs from horseshoe bats inspire adaptive radar waveforms. Cochlear-inspired signal processing achieves better clutter rejection than conventional matched filtering.",
+      "tags": ["echolocation", "bat-algorithm", "bio-sonar", "frequency-modulation", "adaptive-sensing"],
+      "confidence": 0.85,
+      "novelty": 0.79,
+      "source": "research"
+    },
+    {
+      "title": "Tardigrade-Inspired Bioprotection — Extremophile Survival",
+      "category": "pattern",
+      "content": "Tardigrades survive extreme conditions (vacuum, radiation, desiccation, temperatures from -272°C to 150°C) through unique proteins: trehalose sugar glass formation, damage suppressor protein Dsup (protects DNA from radiation), and intrinsically disordered proteins that vitrify on drying. Tardigrade-derived proteins improve desiccation tolerance of human cells and stabilize vaccines without refrigeration. Understanding cryptobiosis informs astrobiology (life on Mars), cryopreservation, and engineered organisms for harsh environments.",
+      "tags": ["tardigrade", "extremophile", "cryptobiosis", "Dsup-protein", "desiccation-tolerance"],
+      "confidence": 0.87,
+      "novelty": 0.84,
+      "source": "research"
+    }
+  ]
+}

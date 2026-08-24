@@ -623,7 +623,7 @@ RX1 hat dieses Gate inzwischen bestanden. Das Board meldete ESP32-S3 Revision
 0.2, 16 MB physischen Flash und 8 MB PSRAM. Es wurde absichtlich mit dem
 verifizierten 8-MB-Layout geflasht; Schreibvorgang und Hashprüfung waren
 erfolgreich. Der Bootlog bestätigte Node-ID 1, Kanal 6, Edge-Tier 0, aktiven
-TX-Filter und Zielserver `CSI_HOST_IP:5005`. RX2 bestand anschließend
+TX-Filter und Zielserver `192.168.4.50:5005`. RX2 bestand anschließend
 dasselbe Gate mit Node-ID 2; RX3 ebenso mit Node-ID 3. Beide meldeten dieselbe
 Funk-/Filterkonfiguration. RX4 bestand es anschließend mit Node-ID 4. Die
 fehlende WLAN-Verbindung war bei ausgeschaltetem TX beziehungsweise CSI-AP
@@ -636,7 +636,7 @@ bleibt unverändert; `esp32-csi-node` 0.7.0 ist ausschließlich die RX-Firmware.
 Die neue Quellbindung benötigt keine Senderänderung, weil Filterung und
 Laufzeitnachweis auf RX1 bis RX4 stattfinden. TX-Inventur und serieller Boot
 sind inzwischen ebenfalls bestanden: ESP32-S3,
-16 MB Flash, 8 MB PSRAM, stabiler Start und SoftAP auf `CSI_AP_IP` ohne
+16 MB Flash, 8 MB PSRAM, stabiler Start und SoftAP auf `192.168.4.1` ohne
 Brownout- oder Reset-Schleife. DHCP/Gateway und 32-Byte-Broadcastempfang sind
 mit dem verbundenen Mac ebenfalls bestanden; `45,5 Hz` wurden im stabileren
 10-Sekunden-Fenster gemessen. Die gemeinsame Discovery muss Kanal 6 und die
@@ -895,7 +895,7 @@ kaschiert. Dann werden die Fehler nach Punkt, RX und Merkmal ausgewertet.
 - 32-Byte-UDP-Broadcasts im stabileren 10-Sekunden-Fenster mit `45,5 Hz`
   empfangen
 - CSI-WLAN-Interface anschließend auf die in RX1 bis RX4 gespeicherte
-  Serveradresse `CSI_HOST_IP/24` gesetzt
+  Serveradresse `192.168.4.50/24` gesetzt
 - TX weiterhin unverändert und nicht geflasht
 - Kanal 6 im Senderbuild fest; Laufzeitbestätigung folgt im gemeinsamen
   RX-Discovery-Lauf
@@ -932,13 +932,13 @@ kaschiert. Dann werden die Fehler nach Punkt, RX und Merkmal ausgewertet.
   CLI-Optionen erneut geprüft
 - nächster Schritt erfordert wieder Hardware und CSI-WLAN: Mac an normale
   Betriebsposition, TX und RX1 bis RX4 einschalten, CSI-Interface mit
-  `CSI_HOST_IP`, dann unversiegelte 25-Sekunden-Discovery
+  `192.168.4.50`, dann unversiegelte 25-Sekunden-Discovery
 
 ### 2026-08-09 — Gemeinsamer 1TX-/4RX-Lauf und korrigierter Serverbuild
 
 - Mac an normaler Betriebsposition, TX und RX1 bis RX4 gemeinsam live geprüft
-- nach DHCP-Adresse `CSI_NODE_IP_6` das CSI-Interface wieder auf die dauerhaft von
-  allen RX erwartete Adresse `CSI_HOST_IP/24` gesetzt
+- nach DHCP-Adresse `192.168.4.6` das CSI-Interface wieder auf die dauerhaft von
+  allen RX erwartete Adresse `192.168.4.50/24` gesetzt
 - alle vier RX frisch empfangen; 10-Sekunden-Inventur enthielt ausschließlich
   vollständige `0x07`-Bindings, keine Legacy-CSI-Pakete
 - pro RX dominantes 64-Subcarrier-Raster und kleinere Zahl gültiger
@@ -987,7 +987,7 @@ kaschiert. Dann werden die Fehler nach Punkt, RX und Merkmal ausgewertet.
 - räumliche Beschreibung: gleiche Höhe wie RX4, 4 cm von RX4 entfernt auf der
   von RX2 wegführenden Linie
 - Türzustand für die vollständige Serie: geschlossen
-- CSI-WLAN verbunden; Mac weiterhin auf `CSI_HOST_IP/24`
+- CSI-WLAN verbunden; Mac weiterhin auf `192.168.4.50/24`
 - jetzige Mac-Position unterscheidet sich vom historischen Aufbau „Mac
   mittig“; neue Leerraumreferenz zwingend, alte Kalibrierung nicht übertragbar
 - TX per `flash_id` als ESP32-S3 Revision 0.2 mit 16 MB Flash und 8 MB PSRAM
@@ -1128,10 +1128,10 @@ Detailnachweis:
   `f72af68fb505f6355851941baf7c656d29aea05face8e09ed1aaec105a9ab086`
 - keinerlei Flash-, OTA- oder Konfigurationsschreibzugriff durchgeführt
 - Nutzer bestätigte angeschlossenen HLK-LD2450 und laufenden TX
-- Mac war bei der Prüfung im Heimnetz auf `HOME_LAN_IP`, nicht im
-  CSI-Subnetz `CSI_SUBNET`
-- `CSI_SSID` ist als bevorzugtes WLAN gespeichert; der explizite
-  Verbindungsversuch meldete jedoch `Could not find network CSI_SSID`
+- Mac war bei der Prüfung im Heimnetz auf `192.168.178.121`, nicht im
+  CSI-Subnetz `192.168.4.0/24`
+- `csi-test` ist als bevorzugtes WLAN gespeichert; der explizite
+  Verbindungsversuch meldete jedoch `Could not find network csi-test`
 - ESP initialisiert den WLAN-STA-Modus, erhält aber keine IP; deshalb werden
   HTTP-/UDP-Transport und die nachgelagerte UART-Radarschleife noch nicht
   gestartet
@@ -1139,35 +1139,35 @@ Detailnachweis:
   live nachgewiesen
 - durch die neu hinzugekommene mmWave-Hardware und Verkabelung ist der
   endgültige Aufbau noch nicht als Setup v2 versiegelt
-- nächstes Gate: TX-SoftAP `CSI_SSID` wieder sichtbar machen, Mac und ESP ins
+- nächstes Gate: TX-SoftAP `csi-test` wieder sichtbar machen, Mac und ESP ins
   CSI-Netz bringen und danach WLAN, UART-Radar und UDP getrennt verifizieren
 
 ### 2026-08-14 — mmWave-Knoten im CSI-Netz erreichbar
 
-- Nutzer verband den Mac mit dem wieder sichtbaren TX-SoftAP `CSI_SSID`
-- TX unter `CSI_AP_IP`, ESP32-C3 unter `CSI_NODE_IP_2` und Mac zunächst per
-  DHCP unter `CSI_NODE_IP_3` im selben `/24`-Netz nachgewiesen
+- Nutzer verband den Mac mit dem wieder sichtbaren TX-SoftAP `csi-test`
+- TX unter `192.168.4.1`, ESP32-C3 unter `192.168.4.2` und Mac zunächst per
+  DHCP unter `192.168.4.3` im selben `/24`-Netz nachgewiesen
 - ESP verband sich auf Kanal 6 per WPA2-PSK mit dem TX; gemeldeter RSSI beim
   Start `-78 dBm`
 - ESP erhielt seine IP und startete den HTTP-Status-/Modus-/OTA-Dienst auf
   Port `8032`
 - read-only Statusabfrage erfolgreich: Knoten `MMWAVE1`, Sensor
   `HLK-LD2450`, Modus `calibration`, UART RX GPIO20, TX GPIO21 bei 256000 Baud
-- laufende Firmware sendet Radarframes fest an `CSI_HOST_IP:5010`; diese
+- laufende Firmware sendet Radarframes fest an `192.168.4.50:5010`; diese
   reservierte Adresse war im Netz bei der Vorprüfung unbeantwortet
-- Versuch, `CSI_HOST_IP` als Alias zu setzen, scheiterte ausschließlich an
+- Versuch, `192.168.4.50` als Alias zu setzen, scheiterte ausschließlich an
   den macOS-Administratorrechten; es wurde keine Netzwerkkonfiguration
   verändert
 - nächstes Gate: Administrator setzt die dokumentierte Mac-Adresse
-  `CSI_HOST_IP`; danach echtes LD2450-UDP-Paket empfangen und validieren
+  `192.168.4.50`; danach echtes LD2450-UDP-Paket empfangen und validieren
 
 ### 2026-08-14 — CSI-Zieladresse aktiv, noch keine LD2450-Frames
 
-- Mac-Adresse `CSI_HOST_IP/24` zusätzlich zu DHCP-Adresse `CSI_NODE_IP_3`
+- Mac-Adresse `192.168.4.50/24` zusätzlich zu DHCP-Adresse `192.168.4.3`
   erfolgreich auf `en0` bestätigt
-- ESP-Ziel `CSI_HOST_IP:5010` und Statusdienst weiterhin erreichbar
+- ESP-Ziel `192.168.4.50:5010` und Statusdienst weiterhin erreichbar
 - erster UDP-Empfangsversuch mit `nc` über 15 Sekunden ohne Paket
-- unabhängiger, direkt an `CSI_HOST_IP:5010` gebundener Socket-Empfänger mit
+- unabhängiger, direkt an `192.168.4.50:5010` gebundener Socket-Empfänger mit
   10-Sekunden-Timeout ebenfalls ohne Paket
 - Netzadressierung und Listenerfehler damit als primäre Ursache weitgehend
   ausgeschlossen
@@ -1187,3 +1187,102 @@ Detailnachweis:
 - nächster sicherer Schritt: ESP/PCB vollständig stromlos machen, LD2450 an
   PCB-01 anschließen, erst danach wieder mit Strom versorgen und den UDP-Test
   wiederholen
+
+### 2026-08-18 — Bekanntes Firmwarepaket auf mmWave-ESP erneut geflasht
+
+- Nutzerauftrag: das bekannte, WLAN-konfigurierte Image auf den ESP für den
+  mmWave-Sensor erneut laden
+- angeschlossenes Board war ein anderes ESP32-C3 als der zuvor geprüfte Knoten:
+  gerätebezogene Kennung redigiert, Revision v0.4, 4 MB Flash
+- die zunächst nur beschriebene App-Partition bootete nicht, weil die
+  Partitionstabelle und OTA-Metadaten dieses Boards leer waren (`0xff`); der
+  Bootloader meldete deshalb `invalid header`
+- NVS mit Zugangsdaten wurde nicht gelöscht oder beschrieben
+- danach vollständiges bekanntes Paket geschrieben und für jeden Bereich
+  `Hash of data verified` bestätigt:
+  Bootloader `0x0000`, Partitionstabelle `0x8000`, OTA-Daten `0xf000`, App
+  `0x20000`
+- Boot danach erfolgreich: ESP-IDF-Bootloader, Partitionstabelle mit `ota_0`,
+  App `esp32-mmwave-node` Version `0.1.0`, Start `MMWAVE1` im
+  Kalibrierungsmodus
+- der aktuelle Bootnachweis enthält noch keine WLAN-IP, weil der TX-SoftAP
+  `csi-test` zum Prüfzeitpunkt nicht aktiv war
+- nächstes Gate: TX einschalten, `csi-test` verbinden und den WLAN-/HTTP-/UART-
+  und UDP-Datenpfad dieses nun initialisierten Boards prüfen
+
+### 2026-08-21 — ESP mit angeschlossenem Sensor read-only geprüft
+
+- USB-Seriell-Port (gerätebezogene Kennung redigiert) wieder sichtbar
+- ESP bootet aus `ota_0` vollständig und startet `MMWAVE1` in
+  `calibration`; Partitionstabelle und App sind intakt
+- ESP erkennt das WLAN auf Kanal 6 und versucht wiederholt die Authentifizierung,
+  erreicht aber keinen `GOT_IP`-Zustand
+- HTTP-Status unter `192.168.4.2:8032` daher nicht erreichbar; kein gültiger
+  Radar-UDP-Nachweis möglich
+- macOS meldet aktuell `not associated` zum AirPort-Netz; vorhandene
+  `192.168.4.x`-Adressen sind damit kein gültiger Verbindungsnachweis
+- Firmware startet die Radar-UART-Aufgabe erst nach erfolgreicher WLAN-
+  Verbindung; ein fehlendes UDP-Paket beweist in diesem Zustand noch nichts
+  über den angeschlossenen LD2450
+- nächstes Gate: TX-SoftAP stabil einschalten und den Mac tatsächlich mit
+  `csi-test` verbinden; danach `/ota/status`, UART-Diagnose und UDP erneut prüfen
+
+### 2026-08-21 — Mac-WLAN verbunden, ESP-Authentifizierung bleibt offen
+
+- genauere CoreWLAN-Prüfung korrigiert den vorherigen Zwischenbefund: Der Mac
+  ist mit einem WPA2-Infrastruktur-WLAN auf Kanal 6 verbunden, Signal/Noise
+  `-58/-83 dBm`; TX-ARP `192.168.4.1` ist sichtbar
+- die ältere `networksetup -getairportnetwork`-Ausgabe `not associated` ist
+  damit als inkonsistenter/stale Diagnosewert zu behandeln
+- ESP sieht das WLAN, wiederholt aber `state: init -> auth` und
+  `auth -> init (0x200)` ohne `GOT_IP`
+- ESP-HTTP-Status und Radar-UDP bleiben deshalb unerreichbar; der
+  angeschlossene LD2450 kann in diesem Zustand noch nicht als live sichtbar
+  bestätigt werden
+- nächster Diagnosepunkt ist die WPA2-Konfiguration des ESP gegenüber dem
+  aktuell laufenden TX-SoftAP, nicht die Mac-WLAN-Verbindung
+
+### 2026-08-21 — Clientbegrenzung als Ursache ausgeschlossen
+
+- Mac-WLAN für einen kontrollierten Test kurz deaktiviert; der ESP scheiterte
+  auch ohne weiteren Client wiederholt an `auth -> init (0x200)`
+- WLAN danach wieder aktiviert; expliziter Verbindungsversuch des Mac mit
+  `csi-test` scheiterte mit macOS-Fehler `-3900`
+- damit ist der TX-SoftAP zum Prüfzeitpunkt nicht zuverlässig verfügbar;
+  vorherige `.2`-IP und ARP-Einträge waren stale und kein Verbindungsnachweis
+- kein Flash- oder NVS-Schreibzugriff in diesem Test
+- nächstes Gate: TX-SoftAP selbst neu starten und erst nach erfolgreicher
+  sichtbarer Mac-Verbindung den ESP- und LD2450-Datenpfad erneut prüfen
+
+### 2026-08-21 — `csi-test` sichtbar, Authentifizierung weiterhin nicht bestanden
+
+- Nutzer bestätigt, dass `csi-test` in der WLAN-Auswahl sichtbar ist
+- ein erneuter read-only/gezielter Verbindungsversuch des Macs mit dem im
+  Schlüsselbund vorhandenen WLAN-Schlüssel erzeugte weiterhin keinen gültigen
+  `networksetup`-Verbindungsnachweis
+- CoreWLAN meldet dabei widersprüchlich einen verbundenen Kanal-6-Eintrag mit
+  teilweise stale wirkenden Signalwerten; die SSID bleibt durch macOS
+  redigiert und ist damit nicht als `csi-test` identifiziert
+- der ESP wiederholt weiterhin `init -> auth -> init (0x200)` und erreicht
+  keinen `GOT_IP`-Zustand
+- Schlussfolgerung: Sichtbarkeit des SSID-Beacons genügt noch nicht; der
+  aktuelle TX-SoftAP muss neu gestartet und anschließend eine echte Mac-
+  Verbindung bestätigt werden, bevor Sensor/UART/UDP bewertet werden
+
+### 2026-08-21 — Vergleichs-ESP ohne LD2450 besteht den WLAN-Test
+
+- zweiter ESP32-C3 ohne angeschlossenen LD2450 per USB geprüft; gerätebezogene
+  Kennung redigiert
+- derselbe bekannte Firmwarestand `esp32-mmwave-node` v0.1.0 bootet sauber
+- WLAN-Anmeldung erfolgreich: `connected with csi-test`, BSSID redigiert,
+  WPA2-PSK, Kanal 6, RSSI `-79 dBm`
+- ESP erhält `192.168.4.2`; HTTP-Status-/Modus-/OTA-Server startet auf Port
+  `8032`
+- damit sind TX-SoftAP, SSID/PSK und der WLAN-/Firmwarepfad grundsätzlich
+  funktionsfähig, auch ohne mmWave-Sensor
+- der Fehler des ursprünglichen Boards liegt damit wahrscheinlich an diesem
+  ESP selbst oder an dessen gespeicherter
+  WLAN-Konfiguration/NVS; der LD2450 ist nicht die Ursache des beobachteten
+  Authentifizierungsfehlers
+- nächstes Gate: funktionierenden Vergleichs-ESP mit dem LD2450 verbinden und
+  danach UART-Bytes sowie gültige Radarframes prüfen

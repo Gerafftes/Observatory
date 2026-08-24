@@ -1,0 +1,107 @@
+syntax = "proto3";
+
+// ruvector Hailo embedding service — multi-Pi cluster RPC surface.
+// Compiled by tonic-build into Rust stubs in step 14 (ADR-167 §5).
+package ruvector.hailo.v1;
+
+service Embedding {
+  // Single-text embed. Worker tokenizes locally + runs through its own
+  // /dev/hailo0 + returns the L2-normalised vector.
+  rpc Embed (EmbedRequest) returns (EmbedResponse);
+
+  // Batched server-streaming embed. Client sends N texts in one RPC;
+  // worker streams back per-text responses as soon as each is ready.
+  // Eliminates per-call RPC overhead; lets the NPU pipeline multiple
+  // texts without round-trip stalls. Order is preserved via `index`.
+  rpc EmbedStream (EmbedBatchRequest) returns (stream EmbedStreamResponse);
+
+  // Cheap health probe for the coordinator's per-worker EWMA tracker.
+  // Returns version + device id + model fingerprint so the coordinator
+  // can refuse to fan out to a worker running a different model.
+  rpc Health (HealthRequest) returns (HealthResponse);
+
+  // Worker-side counters + latency stats. Sampled snapshot — no
+  // expensive aggregation server-side. Coordinator can scrape this for
+  // dashboards / Prometheus pipelines without a separate /metrics
+  // endpoint.
+  rpc GetStats (StatsRequest) returns (StatsResponse);
+}
+
+message EmbedRequest {
+  string text = 1;
+  // Override the worker's compile-time max_seq if needed (e.g. shorter
+  // for low-latency probes). 0 = use worker default.
+  uint32 max_seq = 2;
+  // Coordinator-set correlation ID. 26-char ULID by convention (iter
+  // 109; legacy 24-char hex still accepted). Worker
+  // logs it via a `request_id` tracing field so coordinator + worker
+  // log lines for the same RPC can be joined. Empty string = caller
+  // didn't set one (the worker logs it as "-").
+  string request_id = 3;
+}
+
+message EmbedResponse {
+  repeated float vector = 1;   // unit-norm f32, length = dim
+  uint32 dim = 2;              // 384 for all-MiniLM-L6-v2
+  int64  latency_us = 3;       // server-side wall time
+}
+
+// Batched embed request used by EmbedStream.
+message EmbedBatchRequest {
+  repeated string texts = 1;
+  uint32 max_seq = 2;
+  string request_id = 3;       // batch-level correlation
+}
+
+// One per-text streamed reply. Order in the stream may not match input
+// order under future parallelism; consumers must use `index`.
+message EmbedStreamResponse {
+  uint32 index = 1;            // 0..N-1, matches input slot
+  repeated float vector = 2;
+  uint32 dim = 3;
+  int64  latency_us = 4;       // per-text wall time on the worker
+}
+
+message HealthRequest {}
+
+message HealthResponse {
+  string version = 1;            // "ruvector-hailo X.Y.Z"
+  string device_id = 2;          // PCIe BDF, e.g. "0001:01:00.0"
+  string model_fingerprint = 3;  // sha256 of HEF + tokenizer (hex)
+  bool   ready = 4;              // false during boot / during HEF reload
+  // Iter-96 (ADR-174 §93 follow-up): on-die NPU temperature in Celsius.
+  // Hailo-8 has two thermal sensors per die; both reported.
+  // 0.0 means "read failed" or "no sensor reported" — coordinator
+  // treats either as "skip the temp gauge for this tick".
+  float  npu_temp_ts0_celsius = 5;
+  float  npu_temp_ts1_celsius = 6;
+}
+
+message StatsRequest {}
+
+message StatsResponse {
+  uint64 embed_count          = 1;  // successful embed RPCs since boot
+  uint64 error_count          = 2;  // failed embed RPCs since boot
+  uint64 health_count         = 3;  // health RPCs since boot
+  // Wall-clock latency stats over a moving window (server-side).
+  // Coordinator can scrape these into a Prometheus counter/histogram.
+  uint64 latency_us_sum       = 4;  // monotonic sum
+  uint64 latency_us_min       = 5;  // since boot
+  uint64 latency_us_max       = 6;  // since boot
+  // Wall-clock seconds since the worker process started.
+  uint64 uptime_seconds       = 7;
+  // Iter-105 (ADR-172 §3b follow-up): per-peer rate limiter visibility.
+  // 0 means the limiter is disabled (RUVECTOR_RATE_LIMIT_RPS unset/0)
+  // or no denials have happened. Coordinator-side stats CLI surfaces
+  // both as Prometheus gauges so a sudden spike in denials is grep-able.
+  uint64 rate_limit_denials       = 8;  // ResourceExhausted returned since boot
+  uint64 rate_limit_tracked_peers = 9;  // distinct peers seen since boot
+  // Iter 257 — surface RUVECTOR_NPU_POOL_SIZE the worker resolved at
+  // startup. Lets the cluster-side stats CLI + bench --prom output
+  // differentiate "single-pipeline worker" vs "pool=N worker" measurements.
+  // 1 = single-pipeline default (iter-235 baseline); >=2 enables the
+  // iter-237 HefEmbedderPool. Backward-compatible proto3 add: old
+  // clients see this as 0 ("unknown"), new clients see the resolved
+  // value.
+  uint32 npu_pool_size            = 10;
+}

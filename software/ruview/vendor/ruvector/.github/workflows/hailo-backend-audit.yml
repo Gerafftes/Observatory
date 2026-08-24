@@ -1,0 +1,223 @@
+# ruvector-hailo CI: cargo-audit + cargo-deny + clippy + test pyramid
+#
+# Closes ADR-172 §5c (no cargo-audit in CI). Runs on every push +
+# PR touching the hailo-backend branch's three crates. Independent of
+# the parent workspace's CI because the hailo crates are excluded from
+# the default workspace build (need libhailort for the worker bin).
+name: hailo-backend audit
+
+on:
+  push:
+    branches: [hailo-backend, main]
+    paths:
+      - 'crates/ruvector-hailo-cluster/**'
+      - 'crates/ruvector-hailo/**'
+      - 'crates/ruvector-mmwave/**'
+      - 'crates/hailort-sys/**'
+      - 'docs/adr/ADR-167-*.md'
+      - 'docs/adr/ADR-168-*.md'
+      - 'docs/adr/ADR-169-*.md'
+      - 'docs/adr/ADR-170-*.md'
+      - 'docs/adr/ADR-171-*.md'
+      - 'docs/adr/ADR-172-*.md'
+      - 'docs/adr/ADR-173-*.md'
+      - 'docs/adr/ADR-174-*.md'
+      - '.github/workflows/hailo-backend-audit.yml'
+  pull_request:
+    paths:
+      - 'crates/ruvector-hailo-cluster/**'
+      - 'crates/ruvector-hailo/**'
+      - 'crates/ruvector-mmwave/**'
+      - 'crates/hailort-sys/**'
+      - '.github/workflows/hailo-backend-audit.yml'
+
+jobs:
+  audit:
+    name: cargo-audit (cluster)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install protoc
+        run: sudo apt-get update && sudo apt-get install -y protobuf-compiler
+      - name: Install cargo-audit
+        run: cargo install --locked cargo-audit
+      - name: Run cargo audit
+        # Iter 228 — run from the workspace root since iter-219's
+        # workspace rejoin moved Cargo.lock there. cargo-audit doesn't
+        # walk up to find a workspace lock from a sub-crate directory;
+        # it errors with "Couldn't load Cargo.lock". The audit's job is
+        # workspace-wide anyway (it's the lock that defines the dep
+        # tree, not the cluster crate's manifest).
+        run: |
+          cargo audit --deny warnings \
+              --ignore RUSTSEC-2024-0436 `# paste — unmaintained, transitive via candle` \
+              --ignore RUSTSEC-2025-0134 `# rustls-pemfile — transitive via tonic-tls` \
+              --ignore RUSTSEC-2025-0141 `# bincode 1.x — workspace-wide pin via rkyv etc.` \
+              --ignore RUSTSEC-2026-0115 `# imageproc 0.25 — unsound, transitive via ruvector-scipix; outside hailo scope` \
+              --ignore RUSTSEC-2026-0116 `# imageproc 0.25 — unsound, transitive via ruvector-scipix; outside hailo scope` \
+              --ignore RUSTSEC-2026-0117 `# imageproc 0.25 — unsound, transitive via ruvector-scipix; outside hailo scope`
+
+  deny:
+    name: cargo-deny (license + bans + sources)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install protoc
+        run: sudo apt-get update && sudo apt-get install -y protobuf-compiler
+      - name: Install cargo-deny
+        run: cargo install --locked cargo-deny
+      - name: Run cargo deny check (cluster)
+        working-directory: crates/ruvector-hailo-cluster
+        # Reads deny.toml at the crate root (committed iter 92).
+        # Targets x86_64 + aarch64 deploys; allowlist of MIT/Apache/BSD/
+        # ISC licenses; denies wildcards + unknown registries + unknown
+        # git sources. Iter 98: now wired into CI.
+        run: cargo deny --log-level error check
+      - name: Run cargo deny check (hailo)
+        working-directory: crates/ruvector-hailo
+        # Iter 202 — closes the iter-177 coverage gap. Both hailo +
+        # cluster crates ship a deny.toml, but CI only audited the
+        # cluster's. Now both feed the same gate so a future change
+        # that adds a denied license to the hailo dep tree (candle /
+        # tokenizers / safetensors chain via cpu-fallback, or
+        # hailort-sys via hailo) fails fast.
+        run: cargo deny --log-level error --all-features check
+
+  clippy:
+    name: clippy --all-targets -D warnings (cluster)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install protoc
+        run: sudo apt-get update && sudo apt-get install -y protobuf-compiler
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            crates/ruvector-hailo-cluster/target
+          # Iter 227 — cache key now points at the workspace-root
+          # Cargo.lock since iter-219 removed the per-crate
+          # `crates/ruvector-hailo-cluster/Cargo.lock`. Keeping the
+          # stale reference would have resolved to an empty hash via
+          # `hashFiles()` of a missing path, collapsing every branch's
+          # cache to the same key → false hits on unrelated trees.
+          key: ${{ runner.os }}-cargo-${{ hashFiles('Cargo.lock') }}
+      - name: Run clippy
+        working-directory: crates/ruvector-hailo-cluster
+        run: cargo clippy --all-targets -- -D warnings
+
+  test:
+    name: test (cluster — lib + integration + cli + doctest)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install protoc
+        run: sudo apt-get update && sudo apt-get install -y protobuf-compiler
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            crates/ruvector-hailo-cluster/target
+          # Iter 227 — workspace-root Cargo.lock (see clippy job).
+          key: ${{ runner.os }}-cargo-test-${{ hashFiles('Cargo.lock') }}
+      - name: Run all suites
+        working-directory: crates/ruvector-hailo-cluster
+        run: cargo test
+      - name: Run all suites (--features tls)
+        # ADR-172 §1a iter-99 mitigation. The `tls` feature gates the
+        # rustls-backed transport + the tls_roundtrip integration test;
+        # CI must exercise it so a future regression on the TLS code
+        # path doesn't slip past the default-feature build.
+        working-directory: crates/ruvector-hailo-cluster
+        run: cargo test --features tls
+      - name: Run doctests
+        working-directory: crates/ruvector-hailo-cluster
+        run: cargo test --doc
+      # Iter 244 — fast smoke check on the iter-80 dispatch microbench.
+      # `-- --test` runs each bench function exactly once instead of
+      # the criterion default (~100 iterations × warmup), keeping CI
+      # cost <30s while still catching:
+      #   * bench harness panic from a removed dep / API change
+      #   * imports broken by a refactor of the cluster surface
+      #   * a hot-path function getting renamed without updating bench
+      # Doesn't do regression detection on numbers — that requires
+      # baseline-file comparison and is parked for a separate iter.
+      - name: Smoke-test dispatch microbench
+        working-directory: crates/ruvector-hailo-cluster
+        run: cargo bench --bench dispatch -- --test
+      # Iter 115/118: shared mmwave parser crate. Tested independently
+      # so a regression in the parser fails CI before it can corrupt
+      # both the firmware and the host bridge that depend on it.
+      - name: Test shared mmwave parser crate
+        working-directory: crates/ruvector-mmwave
+        run: cargo test --all-features
+      - name: Clippy shared mmwave parser crate
+        working-directory: crates/ruvector-mmwave
+        run: cargo clippy --all-targets --all-features -- -D warnings
+      # Iter 202 — explicitly run ruvector-hailo lib tests so the
+      # iter-198 hef_verify cases (magic-byte + sha256-pin coverage)
+      # are gated in CI. The cluster crate's `cargo test` only runs
+      # cluster-owned tests; dependency lib tests aren't transitively
+      # covered. Default build (no `hailo` feature → no libhailort
+      # required) is enough to exercise hef_verify; the cpu-fallback
+      # feature path picks up host_embeddings + tokenizer tests.
+      - name: Test hailo crate (default features)
+        working-directory: crates/ruvector-hailo
+        run: cargo test
+      - name: Test hailo crate (--features cpu-fallback)
+        working-directory: crates/ruvector-hailo
+        run: cargo test --features cpu-fallback
+      - name: Clippy hailo crate
+        working-directory: crates/ruvector-hailo
+        run: cargo clippy --all-targets -- -D warnings
+
+  aarch64-cross-build:
+    # Iter 122/128: cross-compile every sensor bridge for the Pi 5
+    # (aarch64). All three bridges deploy on the same arch as the
+    # worker (radar lives on the Pi alongside the cluster), so each
+    # is guard-railed against a transitive dep that doesn't
+    # cross-compile.
+    name: cross-build aarch64 (all bridges)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install protoc + aarch64 cross-toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y protobuf-compiler gcc-aarch64-linux-gnu
+      - name: Add aarch64 rustup target
+        run: rustup target add aarch64-unknown-linux-gnu
+      - name: Cross-build all three bridges for aarch64
+        # Iter 228 — workspace-rooted (iter-219 rejoin moved target/
+        # to the repo root) and explicit `-p` flags so a workspace-wide
+        # cross-compile of unrelated crates doesn't get pulled in.
+        env:
+          CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER: aarch64-linux-gnu-gcc
+        run: |
+          cargo build --release --target aarch64-unknown-linux-gnu -p ruvector-hailo-cluster --bin ruvector-mmwave-bridge
+          cargo build --release --target aarch64-unknown-linux-gnu -p ruvector-hailo-cluster --bin ruview-csi-bridge
+          cargo build --release --target aarch64-unknown-linux-gnu -p ruvector-hailo-cluster --bin ruvllm-bridge
+      - name: Verify each ELF is aarch64
+        run: |
+          for bin in ruvector-mmwave-bridge ruview-csi-bridge ruvllm-bridge; do
+            elf="target/aarch64-unknown-linux-gnu/release/$bin"
+            file "$elf" | grep -q 'ARM aarch64' || { echo "FAIL: $bin not aarch64"; exit 1; }
+            echo "  ✓ $bin"
+          done
+
+  doc-warnings:
+    name: missing-docs check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install protoc
+        run: sudo apt-get update && sudo apt-get install -y protobuf-compiler
+      - name: Build docs with -D missing-docs
+        working-directory: crates/ruvector-hailo-cluster
+        env:
+          RUSTDOCFLAGS: "-D missing-docs"
+        run: cargo doc --no-deps --lib

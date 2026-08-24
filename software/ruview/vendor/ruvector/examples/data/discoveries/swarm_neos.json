@@ -1,0 +1,66 @@
+[
+  {
+    "title": "NEO: (2007 EG)",
+    "content": "(2007 EG) at 1712752.820333085km. Vel: 27968.6392624107km/h. Diam: 73.4581486599m",
+    "category": "anomaly",
+    "tags": [
+      "space",
+      "neo",
+      "asteroid",
+      "close-approach"
+    ],
+    "domain": "space-science",
+    "source_api": "NASA NEO",
+    "timestamp": "2026-03-15T21:59:51Z",
+    "confidence": 0.88,
+    "data_points": 1
+  },
+  {
+    "title": "NEO: (2007 RF2) [HAZARDOUS]",
+    "content": "(2007 RF2) at 28952325.0358558km. Vel: 51133.9868820554km/h. Diam: 430.566244241m",
+    "category": "anomaly",
+    "tags": [
+      "space",
+      "neo",
+      "asteroid",
+      "hazardous"
+    ],
+    "domain": "space-science",
+    "source_api": "NASA NEO",
+    "timestamp": "2026-03-15T21:59:51Z",
+    "confidence": 0.88,
+    "data_points": 1
+  },
+  {
+    "title": "NEO: (2024 CW2)",
+    "content": "(2024 CW2) at 1703646.768066611km. Vel: 27983.2105829603km/h. Diam: 80.8053245222m",
+    "category": "anomaly",
+    "tags": [
+      "space",
+      "neo",
+      "asteroid",
+      "close-approach"
+    ],
+    "domain": "space-science",
+    "source_api": "NASA NEO",
+    "timestamp": "2026-03-15T21:59:51Z",
+    "confidence": 0.88,
+    "data_points": 1
+  },
+  {
+    "title": "NEO: (2026 EC1)",
+    "content": "(2026 EC1) at 1540333.929902668km. Vel: 44992.1941790807km/h. Diam: 25.0057554041m",
+    "category": "anomaly",
+    "tags": [
+      "space",
+      "neo",
+      "asteroid",
+      "close-approach"
+    ],
+    "domain": "space-science",
+    "source_api": "NASA NEO",
+    "timestamp": "2026-03-15T21:59:51Z",
+    "confidence": 0.88,
+    "data_points": 1
+  }
+]

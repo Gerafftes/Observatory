@@ -1,0 +1,139 @@
+[
+  {
+    "title": "A Cloudy Fit to the Atmosphere of WASP-107 b",
+    "content": "Authors: Helong Huang, Michiel Min, Chris W. Ormel, Achr\u00e8ne Dyrek, Nicolas Crouzet. Abstract: Context. WASP-107 b has been observed comprehensively by JWST in the near- and mid-IR bands, making it an ideal planet to probe the composition and internal dynamics. Recent analysis reveals a 8-10 um silicate feature, but it still remains uncertain how silicate clouds form on this planet. Aims. We aim at fitting the complete JWST spectrum of WASP-107 b, from 0.9 um to 12 um with a physically motivated cloud model and self-consistent temperature profile. Methods. Two-stream radiative transfer is",
+    "timestamp": "2026-03-12T15:22:29Z",
+    "source": "arxiv",
+    "confidence": 0.92,
+    "metadata": {
+      "url": "http://arxiv.org/abs/2603.12047v1",
+      "categories": [
+        "astro-ph.EP"
+      ]
+    }
+  },
+  {
+    "title": "The Cold Debris Disk Surveys I. Host Star Properties",
+    "content": "Authors: Scott J. Kenyon, Benjamin C. Bromley, Joan R. Najita. Abstract: We describe the dynamical, photometric, and spectroscopic data available for stars targeted by Spitzer and Herschel to search for cold circumstellar dust emission from debris disks, a collection that we name the Cold Debris Disk Surveys (CDDS). These data include Hipparcos and Gaia parallaxes, 0.4-1250 micron photometry, spectral types, effective temperatures, gravities, bolometric luminosities, visual extinctions, metallicities, lithium abundances, rotational periods, projected rotational veloc",
+    "timestamp": "2026-03-12T14:45:42Z",
+    "source": "arxiv",
+    "confidence": 0.92,
+    "metadata": {
+      "url": "http://arxiv.org/abs/2603.11994v1",
+      "categories": [
+        "astro-ph.SR",
+        "astro-ph.EP",
+        "astro-ph.GA"
+      ]
+    }
+  },
+  {
+    "title": "Equilibrium figure of Haumea and possible detection by stellar occultation",
+    "content": "Authors: C. Staelen, N. Rambaux, F. Chambat, J. C. Castillo-Rogez. Abstract: The equilibrium figure of dwarf planet Haumea is studied to determine if the observed shape is compatible with a differentiated hydrostatic body. Three groups of interior models of Haumea are assumed, all with a rocky core and a volatile-rich outer shell that may contain some porosity. A third layer located between the core and the outer shell has a density suggesting partial differentiation or the presence of a large fraction of organic matter. Using the code BALEINES, which solves for the equi",
+    "timestamp": "2026-03-12T10:50:44Z",
+    "source": "arxiv",
+    "confidence": 0.92,
+    "metadata": {
+      "url": "http://arxiv.org/abs/2603.11787v1",
+      "categories": [
+        "astro-ph.EP"
+      ]
+    }
+  },
+  {
+    "title": "Self-consistent-field method for triaxial differentiated bodies in hydrostatic equilibrium",
+    "content": "Authors: C. Staelen, J. -M. Hur\u00e9. Abstract: Recent observations and models of Haumea and Quaoar suggest that both bodies are triaxial, but their shapes are inconsistent with Jacobi ellipsoids. To determine whether these objects can be at hydrostatic equilibrium, we propose a new numerical code, BALEINES, to study the hydrostatic shape of triaxial differentiated bodies. The fluid mass is assumed to be made of several homogeneous layers, which allowed us to rewrite the gravitational potential as a sum of proper surface integrals. In contras",
+    "timestamp": "2026-03-12T10:02:14Z",
+    "source": "arxiv",
+    "confidence": 0.92,
+    "metadata": {
+      "url": "http://arxiv.org/abs/2603.11754v1",
+      "categories": [
+        "astro-ph.EP",
+        "astro-ph.IM"
+      ]
+    }
+  },
+  {
+    "title": "Atmospheric Escape Rates from Mars - If it Orbited an Old M-Dwarf Star",
+    "content": "Authors: David A. Brain, Ofer Cohen, Thomas E. Cravens, Kevin France, Alex Glocer. Abstract: Atmospheric escape is an important process that influences the evolution of planetary atmospheres. A variety of physical mechanisms can contribute to escape from an atmosphere, including thermal escape, ion escape, photochemical escape, and sputtering. Here we estimate escape rates via each of these processes for a hypothetical Mars-like exoplanet orbiting Barnard's star (an old, inactive M dwarf star). We place the planet at an orbital distance that receives the same total stellar flux as it do",
+    "timestamp": "2026-03-12T05:32:42Z",
+    "source": "arxiv",
+    "confidence": 0.92,
+    "metadata": {
+      "url": "http://arxiv.org/abs/2603.11561v1",
+      "categories": [
+        "astro-ph.EP"
+      ]
+    }
+  },
+  {
+    "title": "Cold giant discoveries from a joint radial-velocity and astrometry framework",
+    "content": "Authors: Pablo A. Pe\u00f1a, James S. Jenkins, Fabo Feng, Douglas R. Alves, Florence de Almeida. Abstract: The population of long-period giant planets shapes planetary system architectures and formation pathways, but these cold Jupiters remain relatively unexplored. Radial velocity (RV) surveys lose sensitivity at multi-AU separations, while transit surveys have poor detection probability at long periods. Absolute astrometry from the Hipparcos and Gaia missions offer an additional source for stellar motion that can break the orbital inclination degeneracy and strengthen detection confidence. This is ",
+    "timestamp": "2026-03-11T18:15:48Z",
+    "source": "arxiv",
+    "confidence": 0.92,
+    "metadata": {
+      "url": "http://arxiv.org/abs/2603.11202v1",
+      "categories": [
+        "astro-ph.EP",
+        "astro-ph.IM"
+      ]
+    }
+  },
+  {
+    "title": "AREPAS: A Resource for Exploring Protostellar Accretion Systems - Data Release I",
+    "content": "Authors: Marbely Micolta, Thanawuth Thanathibodee, Katya Gozman, Nuria Calvet. Abstract: We present AREPAS, a visualization tool for the exploration of the first data release of the open library of magnetospheric accretion models for T Tauri Stars. The dataset covers the typical observed range of spectral types, mass accretion rates and inclinations of typical protoplanetary disks. This data release includes the emission lines: H$\u03b1$, H$\u03b2$, H$\u03b3$, Pa$\u03b2$, Pa$\u03b3$, Pa$\u03b4$, Br$\u03b3$, Ca II K, Ca II 8498 \u00c5, Ca II 8542 \u00c5. AREPAS allows for parameter exploration and the comparison of models to us",
+    "timestamp": "2026-03-11T17:59:01Z",
+    "source": "arxiv",
+    "confidence": 0.92,
+    "metadata": {
+      "url": "http://arxiv.org/abs/2603.11151v1",
+      "categories": [
+        "astro-ph.SR",
+        "astro-ph.EP",
+        "astro-ph.IM"
+      ]
+    }
+  },
+  {
+    "title": "Oxygenated False Positive Biosignatures in Mars-like Exoplanet Atmospheres",
+    "content": "Authors: Margaret Turcotte Seavey, Shawn Domagal-Goldman, Amber Young, Jaime Crouse, Jacob Lustig-Yaeger. Abstract: Oxygen is a well-studied biosignature. Studying potential abiotic pathways for O2 build-up in exoplanet atmospheres is essential for evaluating whether the detection of O2 would constitute a biosignature detection on other worlds. Previous modeling efforts in the literature demonstrated that detectable abiotic O2 and O3 can be produced through CO2 photolysis for rocky planets around M dwarf stars. Building on modeling approaches from previous studies, we use photochemical simulations to reassess",
+    "timestamp": "2026-03-11T17:45:53Z",
+    "source": "arxiv",
+    "confidence": 0.92,
+    "metadata": {
+      "url": "http://arxiv.org/abs/2603.11017v1",
+      "categories": [
+        "astro-ph.EP"
+      ]
+    }
+  },
+  {
+    "title": "Masses of Potentially Habitable Planets Characterized by the Habitable Worlds Observatory",
+    "content": "Authors: Kaz Gary, B. Scott Gaudi, Eduardo Bendek, Tyler Robinson, Renyu Hu. Abstract: Constraints on the masses of exoplanets directly imaged and characterized by the Habitable Worlds Observatory (HWO) are crucial for categorizing these planets and interpreting their spectra. In particular, achieving a mass measurement with a precision of approximately 10% or better may be necessary to identify the dominant gaseous species in the atmospheres of Earth-like planets. This is essential for assessing their habitability and interpreting potential biosignatures (arXiv:2502.01513). Space",
+    "timestamp": "2026-03-11T17:29:09Z",
+    "source": "arxiv",
+    "confidence": 0.92,
+    "metadata": {
+      "url": "http://arxiv.org/abs/2603.11146v1",
+      "categories": [
+        "astro-ph.IM",
+        "astro-ph.EP"
+      ]
+    }
+  },
+  {
+    "title": "Martian concretion sizes predicted from two independently constrained inputs: atmospheric dust grain size and obliquity-forced wetting duration",
+    "content": "Authors: Samuel Cody. Abstract: Diagenetic concretions have been identified at multiple widely separated sites on Mars, including Meridiani Planum (Opportunity), Gale crater (Curiosity), and Jezero crater (Perseverance). Solid concretions at all sites fall within the millimetre size range (typically 1-6 mm diameter), despite differing cement mineralogies. The one substantial outlier -- centimetre-to-decimetre-scale hollow concretions on Bradbury Rise -- formed in coarser basaltic sandstone via a distinct mechanism. I propose t",
+    "timestamp": "2026-03-11T17:06:29Z",
+    "source": "arxiv",
+    "confidence": 0.92,
+    "metadata": {
+      "url": "http://arxiv.org/abs/2603.11143v1",
+      "categories": [
+        "astro-ph.EP"
+      ]
+    }
+  }
+]

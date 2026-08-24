@@ -1,0 +1,195 @@
+{
+  "domain": "dark-frontiers",
+  "generated": "2026-03-16T14:00:00Z",
+  "entries": [
+    {
+      "title": "Dark Matter Detection — WIMPs and Beyond",
+      "category": "pattern",
+      "content": "Weakly Interacting Massive Particles remain the leading dark matter candidate. Direct detection experiments (XENON-nT, LZ, PandaX) use multi-ton liquid xenon time projection chambers to detect nuclear recoils from WIMP-nucleus scattering. Current limits exclude WIMP-nucleon cross sections above 10^-47 cm² for 30 GeV WIMPs. The neutrino fog — irreducible background from coherent neutrino-nucleus scattering — sets a fundamental sensitivity floor that next-generation experiments will approach.",
+      "tags": ["dark-matter", "WIMP", "XENON", "direct-detection", "neutrino-fog"],
+      "confidence": 0.92,
+      "novelty": 0.78,
+      "source": "research"
+    },
+    {
+      "title": "Axion Dark Matter — The Invisible Particle",
+      "category": "pattern",
+      "content": "Axions, originally proposed to solve the strong CP problem in QCD, are compelling dark matter candidates with masses ~1-100 microeV. The ADMX experiment uses a tunable microwave cavity in a strong magnetic field to detect axion-to-photon conversion. ABRACADABRA searches for axion-induced magnetic flux. Axion miniclusters and stars could enhance local density for detection. CASPEr searches for axion-induced nuclear precession using NMR techniques.",
+      "tags": ["axion", "ADMX", "CP-problem", "microwave-cavity", "axion-photon-conversion"],
+      "confidence": 0.88,
+      "novelty": 0.82,
+      "source": "research"
+    },
+    {
+      "title": "Dark Energy — The Accelerating Universe Mystery",
+      "category": "pattern",
+      "content": "Dark energy constitutes 68% of the universe's energy density and drives accelerating expansion discovered via Type Ia supernovae (Perlmutter, Riess, Schmidt — Nobel 2011). The simplest explanation is Einstein's cosmological constant (vacuum energy), but the predicted value exceeds observations by 120 orders of magnitude — the worst prediction in physics. Alternatives include quintessence (dynamic scalar field), phantom energy (w < -1), and modified gravity (f(R), DGP braneworld). DESI baryon acoustic oscillation measurements are testing these models.",
+      "tags": ["dark-energy", "cosmological-constant", "quintessence", "accelerating-expansion", "DESI"],
+      "confidence": 0.91,
+      "novelty": 0.79,
+      "source": "research"
+    },
+    {
+      "title": "Dark Photons — Hidden Sector Force Carriers",
+      "category": "pattern",
+      "content": "Dark photons are hypothetical gauge bosons of a hidden U(1) symmetry that kinetically mix with ordinary photons. They could mediate dark matter self-interactions and explain galactic rotation curve anomalies. Experiments search for dark photon production in fixed-target experiments (HPS, DarkLight), electron beam dumps, and meson decays. Dark photon masses of 10 MeV - 10 GeV are actively probed. If they exist, dark photons would open a portal between visible and dark sectors.",
+      "tags": ["dark-photon", "hidden-sector", "kinetic-mixing", "gauge-boson", "dark-force"],
+      "confidence": 0.80,
+      "novelty": 0.85,
+      "source": "research"
+    },
+    {
+      "title": "Sterile Neutrinos — Right-Handed Ghost Particles",
+      "category": "pattern",
+      "content": "Sterile neutrinos interact only gravitationally and through mixing with active neutrinos. keV-mass sterile neutrinos are warm dark matter candidates detectable through X-ray line emission from galaxy clusters. The 3.5 keV line controversy (initially observed by XMM-Newton in Andromeda and Perseus) remains unresolved. Short-baseline neutrino oscillation anomalies (LSND, MiniBooNE) hint at eV-mass sterile neutrinos but tension exists with cosmological constraints.",
+      "tags": ["sterile-neutrino", "warm-dark-matter", "3.5-keV-line", "neutrino-oscillation", "right-handed"],
+      "confidence": 0.78,
+      "novelty": 0.83,
+      "source": "research"
+    },
+    {
+      "title": "Primordial Black Holes — Dark Matter from the Big Bang",
+      "category": "pattern",
+      "content": "Primordial black holes (PBHs) formed from density fluctuations in the early universe could constitute some or all dark matter. LIGO/Virgo detections of unexpectedly massive black hole mergers revived PBH interest. Microlensing surveys (OGLE, Subaru HSC) constrain PBH abundance in the stellar mass range. Asteroid-mass PBHs (10^17-10^22 g) remain viable dark matter candidates. Hawking radiation from light PBHs could produce detectable gamma-ray signatures.",
+      "tags": ["primordial-black-holes", "dark-matter", "microlensing", "Hawking-radiation", "early-universe"],
+      "confidence": 0.82,
+      "novelty": 0.84,
+      "source": "research"
+    },
+    {
+      "title": "Cosmic Strings — Topological Defects from Phase Transitions",
+      "category": "pattern",
+      "content": "Cosmic strings are one-dimensional topological defects formed during symmetry-breaking phase transitions in the early universe. String theory predicts fundamental strings stretched to cosmic scales (cosmic superstrings). Detection methods include gravitational wave backgrounds (NANOGrav pulsar timing), gravitational lensing (distinctive double images), and CMB temperature discontinuities. The NANOGrav 15-year dataset shows a stochastic gravitational wave background potentially consistent with cosmic string contributions.",
+      "tags": ["cosmic-strings", "topological-defects", "NANOGrav", "gravitational-waves", "phase-transition"],
+      "confidence": 0.78,
+      "novelty": 0.86,
+      "source": "research"
+    },
+    {
+      "title": "Magnetic Monopoles — Dirac's Missing Symmetry",
+      "category": "pattern",
+      "content": "Dirac showed in 1931 that a single magnetic monopole would explain electric charge quantization. Grand Unified Theories predict superheavy monopoles (10^16 GeV) produced in the Big Bang. The MoEDAL experiment at CERN searches for monopole production at LHC energies. MACRO and IceCube constrain cosmic monopole flux. Spin ice materials host emergent magnetic monopole quasiparticles that mimic fundamental monopole behavior, enabling tabletop monopole physics studies.",
+      "tags": ["magnetic-monopole", "Dirac", "charge-quantization", "MoEDAL", "spin-ice"],
+      "confidence": 0.75,
+      "novelty": 0.85,
+      "source": "research"
+    },
+    {
+      "title": "Proton Decay — Testing Grand Unification",
+      "category": "pattern",
+      "content": "Grand Unified Theories predict proton decay with lifetimes of 10^34-10^36 years. Super-Kamiokande's 50-kiloton water Cherenkov detector sets the strongest limits: >2.4×10^34 years for p→e+π0. Hyper-Kamiokande (260 kilotons, starting ~2027) will improve sensitivity 10-fold. JUNO and DUNE provide complementary channels. Observation of proton decay would confirm GUT-scale physics and profoundly impact our understanding of matter stability and the ultimate fate of the universe.",
+      "tags": ["proton-decay", "grand-unification", "Super-Kamiokande", "baryon-number", "matter-stability"],
+      "confidence": 0.85,
+      "novelty": 0.80,
+      "source": "research"
+    },
+    {
+      "title": "Baryon Asymmetry — Why Matter Exists",
+      "category": "pattern",
+      "content": "The universe contains 10^9 photons per baryon, implying near-complete matter-antimatter annihilation after the Big Bang with a tiny matter excess. Sakharov conditions require baryon number violation, C/CP violation, and departure from thermal equilibrium. The Standard Model provides insufficient CP violation by ~10 orders of magnitude. Proposed mechanisms include electroweak baryogenesis, leptogenesis (heavy right-handed neutrinos), and Affleck-Dine mechanism in supersymmetry.",
+      "tags": ["baryon-asymmetry", "Sakharov-conditions", "CP-violation", "leptogenesis", "matter-antimatter"],
+      "confidence": 0.88,
+      "novelty": 0.79,
+      "source": "research"
+    },
+    {
+      "title": "Vacuum Decay — The Universe's Ultimate Catastrophe",
+      "category": "pattern",
+      "content": "If the Higgs field sits in a metastable vacuum (the measured Higgs mass of 125 GeV suggests this), quantum tunneling could nucleate a bubble of true vacuum expanding at light speed, destroying all structure. The tunneling probability is exponentially suppressed with a lifetime exceeding 10^100 years. New physics (supersymmetry, extra Higgs bosons) could stabilize the vacuum. Precise measurements of the top quark mass are critical — stability vs metastability depends on m_top to within current uncertainties.",
+      "tags": ["vacuum-decay", "metastability", "Higgs-field", "false-vacuum", "quantum-tunneling"],
+      "confidence": 0.85,
+      "novelty": 0.84,
+      "source": "research"
+    },
+    {
+      "title": "Boltzmann Brains — Entropy Fluctuation Observers",
+      "category": "pattern",
+      "content": "In an eternally expanding universe with positive cosmological constant, thermal fluctuations will eventually produce any configuration — including conscious observers (Boltzmann brains) vastly outnumbering evolved observers. This creates a measure problem: most observers would be random fluctuations with false memories. Cosmological models are constrained to avoid Boltzmann brain domination. Solutions include dynamical dark energy that eventually decays, or finite de Sitter entropy arguments limiting the number of accessible states.",
+      "tags": ["Boltzmann-brain", "entropy-fluctuation", "measure-problem", "de-Sitter", "observer-paradox"],
+      "confidence": 0.75,
+      "novelty": 0.88,
+      "source": "research"
+    },
+    {
+      "title": "Simulation Hypothesis — Physics Tests for Simulated Reality",
+      "category": "pattern",
+      "content": "Bostrom's simulation argument suggests at least one of three propositions is true: civilizations go extinct before creating simulations, they choose not to simulate, or we likely live in a simulation. Potential physical signatures include: discrete spacetime structure at the Planck scale, cosmic ray energy cutoffs from lattice artifacts (GZK cutoff reinterpreted), and information-theoretic bounds on physical complexity. Landauer's principle connecting information erasure to entropy provides a thermodynamic link.",
+      "tags": ["simulation-hypothesis", "Bostrom", "discrete-spacetime", "computational-universe", "Landauer"],
+      "confidence": 0.65,
+      "novelty": 0.90,
+      "source": "research"
+    },
+    {
+      "title": "Great Filter — Existential Risk and Cosmic Silence",
+      "category": "pattern",
+      "content": "The Great Filter hypothesis explains the Fermi paradox by positing an extremely unlikely step in the evolution from dead matter to galaxy-spanning civilization. If the filter is behind us (abiogenesis, eukaryogenesis, intelligence), we are rare but safe. If ahead (nuclear war, AI misalignment, ecological collapse), civilizations routinely self-destruct. Finding simple life on Mars would be alarming — pushing the filter toward our future. The concept connects astrobiology to existential risk research.",
+      "tags": ["Great-Filter", "Fermi-paradox", "existential-risk", "rare-Earth", "civilizational-collapse"],
+      "confidence": 0.82,
+      "novelty": 0.81,
+      "source": "research"
+    },
+    {
+      "title": "Fermi Paradox Solutions — Where Is Everybody?",
+      "category": "pattern",
+      "content": "Over 75 proposed solutions to the Fermi paradox span categories: rare intelligence (rare Earth, Great Filter), sociological (zoo hypothesis, dark forest theory, sustainability filter), temporal (we are too early, civilizations are brief), and physical (interstellar travel is impractical, communication modes we don't detect). The Dark Forest hypothesis (Liu Cixin) suggests civilizations hide to avoid existential threats. Dissolving the paradox: perhaps the universe is too young, or our search volume too small.",
+      "tags": ["Fermi-paradox", "dark-forest", "zoo-hypothesis", "SETI", "rare-intelligence"],
+      "confidence": 0.85,
+      "novelty": 0.78,
+      "source": "research"
+    },
+    {
+      "title": "Gravitational Wave Astronomy — New Window on the Universe",
+      "category": "solution",
+      "content": "LIGO/Virgo/KAGRA detect gravitational waves from binary mergers (black holes, neutron stars), probing strong-field gravity. Pulsar timing arrays (NANOGrav, EPTA) detected a nanohertz gravitational wave background from supermassive black hole mergers. LISA (launching 2035) will detect millihertz waves from massive BH mergers and galactic binaries. Einstein Telescope and Cosmic Explorer will reach cosmological distances. Multi-messenger astronomy combining GW + EM + neutrinos reveals neutron star equation of state.",
+      "tags": ["gravitational-waves", "LIGO", "LISA", "pulsar-timing", "multi-messenger"],
+      "confidence": 0.93,
+      "novelty": 0.75,
+      "source": "research"
+    },
+    {
+      "title": "Quantum Gravity — Unifying General Relativity and Quantum Mechanics",
+      "category": "pattern",
+      "content": "The incompatibility between general relativity and quantum mechanics is fundamental physics' deepest problem. String theory proposes vibrating strings in 10/11 dimensions. Loop quantum gravity quantizes spacetime geometry directly, predicting discrete area and volume spectra. Causal dynamical triangulations build spacetime from simplicial building blocks. Asymptotic safety suggests gravity is non-perturbatively renormalizable. Experimental signatures (modified dispersion relations, Planck-scale effects in GRBs) remain elusive.",
+      "tags": ["quantum-gravity", "string-theory", "loop-quantum-gravity", "Planck-scale", "unification"],
+      "confidence": 0.85,
+      "novelty": 0.80,
+      "source": "research"
+    },
+    {
+      "title": "Extra Dimensions — Beyond Three Spatial Dimensions",
+      "category": "pattern",
+      "content": "String theory requires 6-7 extra spatial dimensions, compactified at scales too small to observe directly. Large Extra Dimensions (ADD model) with TeV-scale gravity could explain the hierarchy problem. Randall-Sundrum warped extra dimensions generate the electroweak scale from Planck-scale physics. LHC searches for Kaluza-Klein graviton resonances and microscopic black holes constrain extra dimension sizes. Tabletop gravity experiments (Cavendish-type) test deviations from 1/r² below 50 micrometers.",
+      "tags": ["extra-dimensions", "Kaluza-Klein", "Randall-Sundrum", "compactification", "hierarchy-problem"],
+      "confidence": 0.80,
+      "novelty": 0.82,
+      "source": "research"
+    },
+    {
+      "title": "Antimatter Gravity — Does Antimatter Fall Up?",
+      "category": "pattern",
+      "content": "The ALPHA-g experiment at CERN measured gravitational acceleration of antihydrogen, confirming antimatter falls down with g consistent with normal matter (within 25% precision). This rules out strong anti-gravity but leaves room for subtle differences. The AEgIS and GBAR experiments aim for 1% precision. CPT symmetry and the equivalence principle predict identical gravitational behavior, but some quantum gravity theories predict violations. Any difference would revolutionize physics and potentially explain the baryon asymmetry.",
+      "tags": ["antimatter-gravity", "ALPHA-g", "antihydrogen", "CPT-symmetry", "equivalence-principle"],
+      "confidence": 0.87,
+      "novelty": 0.84,
+      "source": "research"
+    },
+    {
+      "title": "Neutron Star Interior — The Densest Observable Matter",
+      "category": "pattern",
+      "content": "Neutron star cores reach 5-10 times nuclear density, entering a regime where the equation of state is unknown. Possible exotic phases include deconfined quark matter, color superconductivity, hyperons, kaon condensates, and strange quark matter (strange stars). NICER X-ray timing measurements constrain the mass-radius relation. Gravitational wave signals from neutron star mergers (GW170817) probe the tidal deformability. The existence of 2+ solar mass neutron stars rules out many soft equations of state.",
+      "tags": ["neutron-star", "dense-matter", "quark-matter", "equation-of-state", "NICER"],
+      "confidence": 0.89,
+      "novelty": 0.80,
+      "source": "research"
+    },
+    {
+      "title": "Information Paradox — Black Hole Entropy and Unitarity",
+      "category": "pattern",
+      "content": "Hawking radiation appears to destroy information, violating quantum unitarity. The Page curve describes how entanglement entropy of radiation should decrease after the Page time. Recent breakthroughs using the island formula and quantum extremal surfaces reproduce the Page curve in simplified models, suggesting information escapes via subtle correlations. The ER=EPR conjecture connects entanglement to wormholes. Resolving the paradox requires understanding quantum gravity's treatment of horizons and singularities.",
+      "tags": ["information-paradox", "Hawking-radiation", "Page-curve", "island-formula", "ER-EPR"],
+      "confidence": 0.86,
+      "novelty": 0.83,
+      "source": "research"
+    }
+  ]
+}

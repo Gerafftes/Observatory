@@ -1,0 +1,100 @@
+[
+  {
+    "title": "Equatorial Climate: 2026-03-08",
+    "content": "Location: Equator (0,0) | Temp Max: 28.2C | Temp Min: 27.3C | Precipitation: 6.1mm | Range: 0.9C",
+    "timestamp": "2026-03-08T00:00:00Z",
+    "source": "open_meteo",
+    "confidence": 0.9
+  },
+  {
+    "title": "Equatorial Climate: 2026-03-09",
+    "content": "Location: Equator (0,0) | Temp Max: 28.9C | Temp Min: 27.3C | Precipitation: 15.1mm | Range: 1.6C",
+    "timestamp": "2026-03-09T00:00:00Z",
+    "source": "open_meteo",
+    "confidence": 0.9
+  },
+  {
+    "title": "Equatorial Climate: 2026-03-10",
+    "content": "Location: Equator (0,0) | Temp Max: 28.5C | Temp Min: 27.5C | Precipitation: 8.5mm | Range: 1.0C",
+    "timestamp": "2026-03-10T00:00:00Z",
+    "source": "open_meteo",
+    "confidence": 0.9
+  },
+  {
+    "title": "Equatorial Climate: 2026-03-11",
+    "content": "Location: Equator (0,0) | Temp Max: 28.5C | Temp Min: 27.5C | Precipitation: 4.2mm | Range: 1.0C",
+    "timestamp": "2026-03-11T00:00:00Z",
+    "source": "open_meteo",
+    "confidence": 0.9
+  },
+  {
+    "title": "Equatorial Climate: 2026-03-12",
+    "content": "Location: Equator (0,0) | Temp Max: 28.7C | Temp Min: 27.9C | Precipitation: 0.2mm | Range: 0.8C",
+    "timestamp": "2026-03-12T00:00:00Z",
+    "source": "open_meteo",
+    "confidence": 0.9
+  },
+  {
+    "title": "Equatorial Climate: 2026-03-13",
+    "content": "Location: Equator (0,0) | Temp Max: 28.8C | Temp Min: 28.0C | Precipitation: 0.1mm | Range: 0.8C",
+    "timestamp": "2026-03-13T00:00:00Z",
+    "source": "open_meteo",
+    "confidence": 0.9
+  },
+  {
+    "title": "Equatorial Climate: 2026-03-14",
+    "content": "Location: Equator (0,0) | Temp Max: 28.6C | Temp Min: 27.9C | Precipitation: 1.7mm | Range: 0.7C",
+    "timestamp": "2026-03-14T00:00:00Z",
+    "source": "open_meteo",
+    "confidence": 0.9
+  },
+  {
+    "title": "Equatorial Climate: 2026-03-15",
+    "content": "Location: Equator (0,0) | Temp Max: 28.4C | Temp Min: 27.3C | Precipitation: 0.9mm | Range: 1.1C",
+    "timestamp": "2026-03-15T00:00:00Z",
+    "source": "open_meteo",
+    "confidence": 0.9
+  },
+  {
+    "title": "Equatorial Climate: 2026-03-16",
+    "content": "Location: Equator (0,0) | Temp Max: 28.2C | Temp Min: 27.4C | Precipitation: 3.2mm | Range: 0.8C",
+    "timestamp": "2026-03-16T00:00:00Z",
+    "source": "open_meteo",
+    "confidence": 0.9
+  },
+  {
+    "title": "Equatorial Climate: 2026-03-17",
+    "content": "Location: Equator (0,0) | Temp Max: 28.6C | Temp Min: 27.6C | Precipitation: 0.8mm | Range: 1.0C",
+    "timestamp": "2026-03-17T00:00:00Z",
+    "source": "open_meteo",
+    "confidence": 0.9
+  },
+  {
+    "title": "Equatorial Climate: 2026-03-18",
+    "content": "Location: Equator (0,0) | Temp Max: 28.5C | Temp Min: 28.1C | Precipitation: 0.1mm | Range: 0.4C",
+    "timestamp": "2026-03-18T00:00:00Z",
+    "source": "open_meteo",
+    "confidence": 0.9
+  },
+  {
+    "title": "Equatorial Climate: 2026-03-19",
+    "content": "Location: Equator (0,0) | Temp Max: 28.7C | Temp Min: 28.0C | Precipitation: 0.0mm | Range: 0.7C",
+    "timestamp": "2026-03-19T00:00:00Z",
+    "source": "open_meteo",
+    "confidence": 0.9
+  },
+  {
+    "title": "Equatorial Climate: 2026-03-20",
+    "content": "Location: Equator (0,0) | Temp Max: 28.6C | Temp Min: 28.0C | Precipitation: 0.3mm | Range: 0.6C",
+    "timestamp": "2026-03-20T00:00:00Z",
+    "source": "open_meteo",
+    "confidence": 0.9
+  },
+  {
+    "title": "Equatorial Climate: 2026-03-21",
+    "content": "Location: Equator (0,0) | Temp Max: 28.6C | Temp Min: 28.0C | Precipitation: 0.3mm | Range: 0.6C",
+    "timestamp": "2026-03-21T00:00:00Z",
+    "source": "open_meteo",
+    "confidence": 0.9
+  }
+]

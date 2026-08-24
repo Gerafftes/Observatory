@@ -1,0 +1,231 @@
+{
+  "domain": "exotic-ai-architectures",
+  "generated": "2026-03-16T14:00:00Z",
+  "entries": [
+    {
+      "title": "Liquid Neural Networks — Continuous-Time Adaptive Computation",
+      "category": "architecture",
+      "content": "Liquid Neural Networks (LNNs), developed at MIT CSAIL, use continuous-time ODE-based neurons that adapt their dynamics to input streams. Unlike fixed-weight networks, LNN synapses evolve via Neural ODE solvers, enabling compact models (19 neurons for autonomous driving) that generalize across distribution shifts. The closed-form continuous-depth variant (CfC) eliminates numerical ODE solving, achieving 1000x speedup while maintaining expressiveness.",
+      "tags": ["liquid-neural-networks", "neural-ode", "continuous-time", "adaptive-computation", "MIT-CSAIL"],
+      "confidence": 0.92,
+      "novelty": 0.88,
+      "source": "research"
+    },
+    {
+      "title": "Kolmogorov-Arnold Networks — Learnable Activation Functions on Edges",
+      "category": "architecture",
+      "content": "KANs replace fixed activation functions (ReLU, GELU) with learnable univariate functions on network edges, inspired by the Kolmogorov-Arnold representation theorem. Each edge learns a B-spline activation, making the network inherently interpretable — scientists can read off symbolic formulas. KANs achieve higher accuracy than MLPs with 100x fewer parameters on scientific tasks like PDE solving and knot theory.",
+      "tags": ["KAN", "kolmogorov-arnold", "learnable-activations", "interpretable-ai", "B-spline"],
+      "confidence": 0.90,
+      "novelty": 0.92,
+      "source": "research"
+    },
+    {
+      "title": "Mamba — Selective State Space Models for Linear-Time Sequences",
+      "category": "architecture",
+      "content": "Mamba introduces input-dependent selection into structured state space models (S4), achieving Transformer-quality language modeling with linear O(n) scaling instead of quadratic attention. The selective scan mechanism dynamically adjusts which information flows through the recurrence based on content. Mamba-2 formalizes the connection between SSMs and attention via structured masked attention, enabling hybrid architectures.",
+      "tags": ["mamba", "state-space-model", "selective-scan", "linear-attention", "sequence-modeling"],
+      "confidence": 0.93,
+      "novelty": 0.85,
+      "source": "research"
+    },
+    {
+      "title": "Mixture of Experts — Sparse Conditional Computation at Scale",
+      "category": "architecture",
+      "content": "MoE architectures activate only a subset of parameters per token via learned routing. Switch Transformers demonstrated trillion-parameter models with constant compute cost. GShard and Expert Choice routing improved load balancing. Mixtral 8x7B showed MoE can match GPT-3.5 quality at fraction of inference cost by routing each token to 2 of 8 expert FFN blocks.",
+      "tags": ["mixture-of-experts", "sparse-computation", "routing", "switch-transformer", "conditional-compute"],
+      "confidence": 0.94,
+      "novelty": 0.75,
+      "source": "research"
+    },
+    {
+      "title": "Neural ODEs — Continuous-Depth Residual Networks",
+      "category": "architecture",
+      "content": "Neural ODEs parameterize the derivative of hidden states as a neural network, using adaptive ODE solvers for forward and adjoint-method backpropagation. This enables continuous normalizing flows for density estimation, irregular time series modeling, and memory-efficient training. FFJORD extends this to free-form Jacobian flows, while Augmented Neural ODEs add extra dimensions to avoid trajectory crossing limitations.",
+      "tags": ["neural-ode", "continuous-depth", "adjoint-method", "normalizing-flows", "FFJORD"],
+      "confidence": 0.89,
+      "novelty": 0.80,
+      "source": "research"
+    },
+    {
+      "title": "Hypernetworks — Networks That Generate Network Weights",
+      "category": "architecture",
+      "content": "Hypernetworks use one neural network to generate the weights of another, enabling dynamic weight adaptation without gradient updates. HyperCLOVA and LoRA-like approaches use small hypernetworks to produce task-specific weight perturbations. This paradigm enables few-shot adaptation, continual learning without catastrophic forgetting, and neural architecture search through weight-space exploration.",
+      "tags": ["hypernetworks", "weight-generation", "meta-learning", "dynamic-weights", "task-adaptation"],
+      "confidence": 0.85,
+      "novelty": 0.82,
+      "source": "research"
+    },
+    {
+      "title": "Graph Neural Networks for Physics Simulation",
+      "category": "architecture",
+      "content": "GNNs model physical systems as interaction graphs where nodes are particles/objects and edges carry force/constraint messages. MeshGraphNets simulate fluid dynamics, cloth, and deformation with 1000x speedup over FEM solvers. Learned simulators from DeepMind generalize across mesh resolutions and can reverse-simulate for design optimization. Equivariant GNNs (SE(3)-Transformers) respect physical symmetries.",
+      "tags": ["graph-neural-networks", "physics-simulation", "MeshGraphNet", "equivariant", "learned-simulator"],
+      "confidence": 0.91,
+      "novelty": 0.78,
+      "source": "research"
+    },
+    {
+      "title": "Differentiable Programming — End-to-End Gradient Optimization",
+      "category": "pattern",
+      "content": "Differentiable programming extends neural networks to entire programs by making all operations differentiable. JAX's autodiff through arbitrary Python, differentiable renderers (NeRF, 3D Gaussian Splatting), differentiable physics engines (DiffTaichi), and differentiable logic programming enable gradient-based optimization of traditionally discrete systems. This bridges the gap between learned and engineered components.",
+      "tags": ["differentiable-programming", "autodiff", "JAX", "end-to-end", "gradient-optimization"],
+      "confidence": 0.90,
+      "novelty": 0.76,
+      "source": "research"
+    },
+    {
+      "title": "Neural Cellular Automata — Self-Organizing Learned Systems",
+      "category": "architecture",
+      "content": "Neural CAs replace hand-designed cellular automata rules with learned neural networks, enabling self-organizing pattern generation, texture synthesis, and morphogenesis simulation. Growing Neural Cellular Automata can regenerate target images from any initial state and self-repair when damaged. Extensions to 3D enable learned voxel growth and self-assembling structures for soft robotics.",
+      "tags": ["neural-cellular-automata", "self-organization", "morphogenesis", "emergent-behavior", "regeneration"],
+      "confidence": 0.86,
+      "novelty": 0.90,
+      "source": "research"
+    },
+    {
+      "title": "World Models — Learning Environment Dynamics for Planning",
+      "category": "architecture",
+      "content": "World models learn compressed representations of environment dynamics, enabling agents to plan via imagination. Ha and Schmidhuber's original VAE+RNN world model trained RL agents entirely in dreams. DreamerV3 masters diverse domains with a single algorithm using discrete world model representations. GAIA-1 from Wayve learns driving world models from video, generating realistic future driving scenarios.",
+      "tags": ["world-models", "model-based-rl", "dreamer", "latent-dynamics", "imagination-planning"],
+      "confidence": 0.91,
+      "novelty": 0.79,
+      "source": "research"
+    },
+    {
+      "title": "Foundation Models for Robotics — RT-2 and Generalist Agents",
+      "category": "architecture",
+      "content": "RT-2 (Robotic Transformer 2) directly maps vision-language model outputs to robot actions, transferring web knowledge to physical manipulation. The model outputs action tokens as text, enabling chain-of-thought reasoning about physics. Open X-Embodiment aggregates data across 22 robot types for cross-embodiment transfer. This paradigm shift treats robot control as a language modeling problem.",
+      "tags": ["foundation-models", "robotics", "RT-2", "vision-language-action", "cross-embodiment"],
+      "confidence": 0.88,
+      "novelty": 0.85,
+      "source": "research"
+    },
+    {
+      "title": "Morphological Computation — Body as Computer",
+      "category": "pattern",
+      "content": "Morphological computation offloads information processing to the physical body structure. Soft robotic grippers compute grasp strategies through material compliance rather than control algorithms. Reservoir computing in physical substrates (water, springs, origami) exploits natural dynamics for computation. This challenges the brain-body dualism in AI and suggests simpler controllers for complex behavior.",
+      "tags": ["morphological-computation", "embodied-intelligence", "soft-robotics", "reservoir-computing", "physical-computation"],
+      "confidence": 0.82,
+      "novelty": 0.87,
+      "source": "research"
+    },
+    {
+      "title": "Neuromorphic Spiking Neural Networks — Event-Driven Computing",
+      "category": "architecture",
+      "content": "Spiking neural networks process information through discrete spike events rather than continuous activations, achieving 100-1000x energy efficiency on neuromorphic chips (Intel Loihi 2, SynSense). Surrogate gradient methods enable backpropagation through spikes. Hybrid SNN-ANN architectures combine spike efficiency for temporal processing with ANN accuracy for spatial features in vision and audio tasks.",
+      "tags": ["spiking-neural-networks", "neuromorphic", "event-driven", "Loihi", "energy-efficient"],
+      "confidence": 0.88,
+      "novelty": 0.83,
+      "source": "research"
+    },
+    {
+      "title": "Retrieval-Augmented Generation — External Memory for LLMs",
+      "category": "pattern",
+      "content": "RAG architectures decouple knowledge storage from reasoning by retrieving relevant documents at inference time. Dense passage retrieval with HNSW indexing enables sub-millisecond search over billions of passages. Self-RAG adds learned retrieval and critique tokens. Adaptive RAG decides per-query whether retrieval is needed. RAPTOR hierarchically clusters and summarizes documents for multi-scale retrieval.",
+      "tags": ["RAG", "retrieval-augmented", "dense-retrieval", "HNSW", "external-memory"],
+      "confidence": 0.95,
+      "novelty": 0.70,
+      "source": "research"
+    },
+    {
+      "title": "Test-Time Compute — Scaling Inference Instead of Parameters",
+      "category": "pattern",
+      "content": "Test-time compute scaling allocates more computation at inference for harder problems. Chain-of-thought, tree-of-thought, and Monte Carlo tree search over reasoning paths improve accuracy without retraining. DeepSeek-R1 and OpenAI o1 demonstrate that scaling inference compute yields returns comparable to scaling training compute, suggesting a fundamental duality between parameter count and inference budget.",
+      "tags": ["test-time-compute", "inference-scaling", "chain-of-thought", "MCTS", "reasoning"],
+      "confidence": 0.93,
+      "novelty": 0.82,
+      "source": "research"
+    },
+    {
+      "title": "Diffusion Models — Score-Based Generative Modeling",
+      "category": "architecture",
+      "content": "Diffusion models learn to reverse a noise-adding process, generating samples by iterative denoising. Score matching with Langevin dynamics provides the theoretical foundation. Flow matching and rectified flows straighten generation trajectories for faster sampling. Consistency models distill diffusion into single-step generators. Applications span images (Stable Diffusion), video (Sora), audio (AudioLDM), proteins (RFDiffusion), and materials design.",
+      "tags": ["diffusion-models", "score-matching", "flow-matching", "generative-ai", "denoising"],
+      "confidence": 0.95,
+      "novelty": 0.72,
+      "source": "research"
+    },
+    {
+      "title": "Geometric Deep Learning — Symmetry-Preserving Neural Architectures",
+      "category": "architecture",
+      "content": "Geometric deep learning unifies CNNs, GNNs, and Transformers through the lens of symmetry and invariance. Equivariant neural networks respect group symmetries (rotation, translation, permutation) by construction. E(3)-equivariant networks revolutionized molecular property prediction. Gauge-equivariant mesh CNNs process data on curved surfaces. The framework provides principled architecture design based on the symmetries of the problem domain.",
+      "tags": ["geometric-deep-learning", "equivariance", "symmetry", "group-theory", "invariance"],
+      "confidence": 0.89,
+      "novelty": 0.84,
+      "source": "research"
+    },
+    {
+      "title": "Energy-Based Models — Unified Framework for Discriminative and Generative",
+      "category": "architecture",
+      "content": "EBMs assign scalar energy values to input configurations, with low energy indicating compatible/likely states. Unlike normalized probabilistic models, EBMs avoid intractable partition functions. Joint Energy Models unify classification and generation. Contrastive learning (SimCLR, CLIP) implicitly trains energy functions. MCMC sampling from learned energy landscapes enables flexible generation, composition of concepts, and out-of-distribution detection.",
+      "tags": ["energy-based-models", "contrastive-learning", "MCMC", "unnormalized", "compositional"],
+      "confidence": 0.86,
+      "novelty": 0.79,
+      "source": "research"
+    },
+    {
+      "title": "Causal Representation Learning — Moving Beyond Correlations",
+      "category": "pattern",
+      "content": "Causal representation learning aims to discover causal variables and their relationships from observational data. ICA-based methods identify independent causal mechanisms under intervention. CausalVAE disentangles latent factors with causal graph structure. This addresses the fundamental limitation of correlation-based deep learning — learned features that are causally meaningful transfer better across domains and enable counterfactual reasoning.",
+      "tags": ["causal-learning", "representation-learning", "disentanglement", "interventions", "counterfactual"],
+      "confidence": 0.84,
+      "novelty": 0.88,
+      "source": "research"
+    },
+    {
+      "title": "Neural Radiance Fields and 3D Gaussian Splatting",
+      "category": "architecture",
+      "content": "NeRF represents 3D scenes as continuous volumetric functions mapping coordinates to color and density, enabling photorealistic novel view synthesis. 3D Gaussian Splatting replaces neural rendering with differentiable rasterization of explicit Gaussians, achieving real-time rendering at 100+ FPS. Extensions enable dynamic scenes (4D), text-to-3D generation (DreamFusion), and SLAM with Gaussian scene representations.",
+      "tags": ["NeRF", "gaussian-splatting", "neural-rendering", "3D-reconstruction", "novel-view-synthesis"],
+      "confidence": 0.93,
+      "novelty": 0.75,
+      "source": "research"
+    },
+    {
+      "title": "Memory-Augmented Neural Networks — Differentiable External Storage",
+      "category": "architecture",
+      "content": "MANNs extend neural networks with external read-write memory banks accessed through attention mechanisms. Neural Turing Machines and Differentiable Neural Computers demonstrated algorithmic learning. Modern approaches include MemoryFormer (replacing FFN with memory lookup), Memorizing Transformers (kNN over past activations), and Infini-attention (compressive memory for unbounded context). These architectures bridge the gap between parametric and non-parametric models.",
+      "tags": ["memory-augmented", "external-memory", "neural-turing-machine", "differentiable-memory", "unbounded-context"],
+      "confidence": 0.87,
+      "novelty": 0.81,
+      "source": "research"
+    },
+    {
+      "title": "Embodied AI — Learning Through Physical Interaction",
+      "category": "pattern",
+      "content": "Embodied AI agents learn by physically interacting with environments rather than from static datasets. Habitat and AI2-THOR provide photorealistic simulation. Sim-to-real transfer bridges the reality gap via domain randomization and system identification. Mobile ALOHA demonstrates bimanual manipulation learning from human demonstrations. The key insight is that grounded physical experience provides learning signals unavailable in text or image corpora.",
+      "tags": ["embodied-ai", "sim-to-real", "physical-interaction", "manipulation", "grounded-learning"],
+      "confidence": 0.87,
+      "novelty": 0.80,
+      "source": "research"
+    },
+    {
+      "title": "Constitutional AI — Self-Alignment Through Principles",
+      "category": "pattern",
+      "content": "Constitutional AI replaces human feedback with AI self-evaluation against explicit principles (a constitution). The model critiques and revises its own outputs, then trains on the improved responses via RLAIF. This scales alignment beyond human annotation bandwidth. Extensions include debate (two AIs argue before a judge), recursive reward modeling, and process-based oversight that evaluates reasoning steps rather than final answers.",
+      "tags": ["constitutional-ai", "RLAIF", "self-alignment", "AI-safety", "scalable-oversight"],
+      "confidence": 0.91,
+      "novelty": 0.77,
+      "source": "research"
+    },
+    {
+      "title": "Quantum Neural Networks — Variational Circuits for Learning",
+      "category": "architecture",
+      "content": "Quantum neural networks use parameterized quantum circuits as trainable function approximators. Variational Quantum Eigensolvers and QAOA encode optimization problems into quantum gates. Quantum kernel methods exploit exponentially large Hilbert spaces for feature mapping. Current NISQ devices face noise limitations, but error-mitigated circuits on 100+ qubit processors show advantage for specific molecular simulation and combinatorial optimization tasks.",
+      "tags": ["quantum-neural-networks", "variational-circuits", "NISQ", "quantum-advantage", "quantum-kernel"],
+      "confidence": 0.78,
+      "novelty": 0.91,
+      "source": "research"
+    },
+    {
+      "title": "Hyperdimensional Computing — High-Dimensional Sparse Representations",
+      "category": "architecture",
+      "content": "HDC encodes information in 10,000-dimensional binary or bipolar vectors where similarity is measured by Hamming or cosine distance. Operations (bind, bundle, permute) compose representations algebraically. HDC achieves competitive accuracy with single-pass learning (no backpropagation), runs efficiently on edge devices, and naturally supports few-shot learning. Brain-inspired holographic representations enable robust computation in noisy or faulty hardware.",
+      "tags": ["hyperdimensional-computing", "vector-symbolic", "holographic", "single-pass-learning", "edge-ai"],
+      "confidence": 0.83,
+      "novelty": 0.86,
+      "source": "research"
+    }
+  ]
+}

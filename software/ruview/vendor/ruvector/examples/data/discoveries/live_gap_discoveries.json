@@ -1,0 +1,242 @@
+[
+  {
+    "title": "PubMed: Development of a Novel GABAB Receptor Modulator as an Alternative to Phenibut: Insights from Molecular Modeling and In Vivo Studies.",
+    "content": "Medical/genomics paper: Development of a Novel GABAB Receptor Modulator as an Alternative to Phenibut: Insights from Molecular Modeling and In Vivo Studies.. Journal: Curr Neuropharmacol. PMID: 41832720.",
+    "category": "pattern",
+    "tags": [
+      "medical",
+      "pubmed",
+      "research",
+      "gap-fill"
+    ],
+    "domain": "medical-genomics",
+    "source_api": "PubMed E-utilities",
+    "timestamp": "2026-03-15T19:25:16Z",
+    "confidence": 0.82,
+    "data_points": 1
+  },
+  {
+    "title": "PubMed: A Computational Strategy to Identify Hub Genes in Pathway Analysis of Gamma Tocotrienol-treated MCF-7 Cells and Molecular Docking Study Using Selected Phytochemicals as Therapeutic Agents.",
+    "content": "Medical/genomics paper: A Computational Strategy to Identify Hub Genes in Pathway Analysis of Gamma Tocotrienol-treated MCF-7 Cells and Molecular Docking Study Using Selected Phytochemicals as Therapeutic Agents.. Journal: Curr Med Chem. PMID: 41832702.",
+    "category": "pattern",
+    "tags": [
+      "medical",
+      "pubmed",
+      "research",
+      "gap-fill"
+    ],
+    "domain": "medical-genomics",
+    "source_api": "PubMed E-utilities",
+    "timestamp": "2026-03-15T19:25:16Z",
+    "confidence": 0.82,
+    "data_points": 1
+  },
+  {
+    "title": "PubMed: The potential of Actinobacteria in Combating Antimicrobial Resistance: A Review of Biotechnological Applications.",
+    "content": "Medical/genomics paper: The potential of Actinobacteria in Combating Antimicrobial Resistance: A Review of Biotechnological Applications.. Journal: Curr Med Chem. PMID: 41832700.",
+    "category": "pattern",
+    "tags": [
+      "medical",
+      "pubmed",
+      "research",
+      "gap-fill"
+    ],
+    "domain": "medical-genomics",
+    "source_api": "PubMed E-utilities",
+    "timestamp": "2026-03-15T19:25:16Z",
+    "confidence": 0.82,
+    "data_points": 1
+  },
+  {
+    "title": "PubMed: Molecular Landscape of Natural Compounds and Tailored Signaling Pathways in the Battle Against Breast Cancer.",
+    "content": "Medical/genomics paper: Molecular Landscape of Natural Compounds and Tailored Signaling Pathways in the Battle Against Breast Cancer.. Journal: Curr Pharm Des. PMID: 41832682.",
+    "category": "pattern",
+    "tags": [
+      "medical",
+      "pubmed",
+      "research",
+      "gap-fill"
+    ],
+    "domain": "medical-genomics",
+    "source_api": "PubMed E-utilities",
+    "timestamp": "2026-03-15T19:25:16Z",
+    "confidence": 0.82,
+    "data_points": 1
+  },
+  {
+    "title": "PubMed: Thrombosis in paroxysmal nocturnal hemoglobinuria in the complement inhibitor era: mechanisms, risk stratification, and clinical management.",
+    "content": "Medical/genomics paper: Thrombosis in paroxysmal nocturnal hemoglobinuria in the complement inhibitor era: mechanisms, risk stratification, and clinical management.. Journal: Int J Hematol. PMID: 41832377.",
+    "category": "pattern",
+    "tags": [
+      "medical",
+      "pubmed",
+      "research",
+      "gap-fill"
+    ],
+    "domain": "medical-genomics",
+    "source_api": "PubMed E-utilities",
+    "timestamp": "2026-03-15T19:25:16Z",
+    "confidence": 0.82,
+    "data_points": 1
+  },
+  {
+    "title": "M4.5 earthquake: 87 km W of El Aguilar, Argentina",
+    "content": "M4.5 at 87 km W of El Aguilar, Argentina. Depth: 229.541 km. Significant event.",
+    "category": "anomaly",
+    "tags": [
+      "earth",
+      "seismic",
+      "gap-fill",
+      "significant"
+    ],
+    "domain": "earth-science",
+    "source_api": "USGS Earthquake Hazards",
+    "timestamp": "2026-03-15T19:25:16Z",
+    "confidence": 0.88,
+    "data_points": 1
+  },
+  {
+    "title": "M4.7 earthquake: south of the Kermadec Islands",
+    "content": "M4.7 at south of the Kermadec Islands. Depth: 344.041 km. Deep-focus subduction event.",
+    "category": "anomaly",
+    "tags": [
+      "earth",
+      "seismic",
+      "gap-fill",
+      "deep-focus"
+    ],
+    "domain": "earth-science",
+    "source_api": "USGS Earthquake Hazards",
+    "timestamp": "2026-03-15T19:25:16Z",
+    "confidence": 0.88,
+    "data_points": 1
+  },
+  {
+    "title": "M6.3 earthquake: 85 km W of Vallenar, Chile",
+    "content": "M6.3 at 85 km W of Vallenar, Chile. Depth: 10 km. Significant event.",
+    "category": "anomaly",
+    "tags": [
+      "earth",
+      "seismic",
+      "gap-fill",
+      "significant"
+    ],
+    "domain": "earth-science",
+    "source_api": "USGS Earthquake Hazards",
+    "timestamp": "2026-03-15T19:25:16Z",
+    "confidence": 0.88,
+    "data_points": 1
+  },
+  {
+    "title": "M4.6 earthquake: Fiji region",
+    "content": "M4.6 at Fiji region. Depth: 583.592 km. Deep-focus subduction event.",
+    "category": "anomaly",
+    "tags": [
+      "earth",
+      "seismic",
+      "gap-fill",
+      "deep-focus"
+    ],
+    "domain": "earth-science",
+    "source_api": "USGS Earthquake Hazards",
+    "timestamp": "2026-03-15T19:25:16Z",
+    "confidence": 0.88,
+    "data_points": 1
+  },
+  {
+    "title": "M4.6 earthquake: south of the Fiji Islands",
+    "content": "M4.6 at south of the Fiji Islands. Depth: 527.385 km. Deep-focus subduction event.",
+    "category": "anomaly",
+    "tags": [
+      "earth",
+      "seismic",
+      "gap-fill",
+      "deep-focus"
+    ],
+    "domain": "earth-science",
+    "source_api": "USGS Earthquake Hazards",
+    "timestamp": "2026-03-15T19:25:16Z",
+    "confidence": 0.88,
+    "data_points": 1
+  },
+  {
+    "title": "Gravitational wave: S251117dq",
+    "content": "GW superevent S251117dq (category: Production). FAR: 5.867636084251777E-15 Hz. Preferred: unknown. LIGO/Virgo/KAGRA detection.",
+    "category": "anomaly",
+    "tags": [
+      "space",
+      "gravitational-wave",
+      "ligo",
+      "gap-fill"
+    ],
+    "domain": "space-science",
+    "source_api": "LIGO GraceDB",
+    "timestamp": "2026-03-15T19:25:16Z",
+    "confidence": 0.90,
+    "data_points": 1
+  },
+  {
+    "title": "Gravitational wave: S251117bc",
+    "content": "GW superevent S251117bc (category: Production). FAR: 5.40702E-7 Hz. Preferred: unknown. LIGO/Virgo/KAGRA detection.",
+    "category": "anomaly",
+    "tags": [
+      "space",
+      "gravitational-wave",
+      "ligo",
+      "gap-fill"
+    ],
+    "domain": "space-science",
+    "source_api": "LIGO GraceDB",
+    "timestamp": "2026-03-15T19:25:16Z",
+    "confidence": 0.90,
+    "data_points": 1
+  },
+  {
+    "title": "Gravitational wave: S251116en",
+    "content": "GW superevent S251116en (category: Production). FAR: 1.305573813122074E-12 Hz. Preferred: unknown. LIGO/Virgo/KAGRA detection.",
+    "category": "anomaly",
+    "tags": [
+      "space",
+      "gravitational-wave",
+      "ligo",
+      "gap-fill"
+    ],
+    "domain": "space-science",
+    "source_api": "LIGO GraceDB",
+    "timestamp": "2026-03-15T19:25:16Z",
+    "confidence": 0.90,
+    "data_points": 1
+  },
+  {
+    "title": "Gravitational wave: S251112cm",
+    "content": "GW superevent S251112cm (category: Production). FAR: 5.102904E-9 Hz. Preferred: unknown. LIGO/Virgo/KAGRA detection.",
+    "category": "anomaly",
+    "tags": [
+      "space",
+      "gravitational-wave",
+      "ligo",
+      "gap-fill"
+    ],
+    "domain": "space-science",
+    "source_api": "LIGO GraceDB",
+    "timestamp": "2026-03-15T19:25:16Z",
+    "confidence": 0.90,
+    "data_points": 1
+  },
+  {
+    "title": "Gravitational wave: S251110cc",
+    "content": "GW superevent S251110cc (category: Production). FAR: 6.5082E-7 Hz. Preferred: unknown. LIGO/Virgo/KAGRA detection.",
+    "category": "anomaly",
+    "tags": [
+      "space",
+      "gravitational-wave",
+      "ligo",
+      "gap-fill"
+    ],
+    "domain": "space-science",
+    "source_api": "LIGO GraceDB",
+    "timestamp": "2026-03-15T19:25:16Z",
+    "confidence": 0.90,
+    "data_points": 1
+  }
+]

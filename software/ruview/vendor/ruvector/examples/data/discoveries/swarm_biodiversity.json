@@ -1,0 +1,72 @@
+[
+  {
+    "title": "Mammal Observation: Puma concolor",
+    "content": "Species: Puma concolor | Country: United States of America | Location: (44.59237, -121.27005) | Basis: HUMAN_OBSERVATION | Dataset: iNaturalist research-grade observations",
+    "timestamp": "2026-01-02T12:30:25",
+    "source": "gbif_biodiversity",
+    "confidence": 0.85
+  },
+  {
+    "title": "Mammal Observation: Puma concolor",
+    "content": "Species: Puma concolor | Country: United States of America | Location: (25.80229, -81.407287) | Basis: HUMAN_OBSERVATION | Dataset: iNaturalist research-grade observations",
+    "timestamp": "2026-01-05T09:09:35",
+    "source": "gbif_biodiversity",
+    "confidence": 0.85
+  },
+  {
+    "title": "Mammal Observation: Puma concolor",
+    "content": "Species: Puma concolor | Country: Canada | Location: (49.602607, -117.252706) | Basis: HUMAN_OBSERVATION | Dataset: iNaturalist research-grade observations",
+    "timestamp": "2026-01-01T12:45",
+    "source": "gbif_biodiversity",
+    "confidence": 0.85
+  },
+  {
+    "title": "Mammal Observation: Puma concolor",
+    "content": "Species: Puma concolor | Country: United States of America | Location: (42.488633, -119.685295) | Basis: HUMAN_OBSERVATION | Dataset: iNaturalist research-grade observations",
+    "timestamp": "2026-01-01T10:27:14",
+    "source": "gbif_biodiversity",
+    "confidence": 0.85
+  },
+  {
+    "title": "Mammal Observation: Puma concolor",
+    "content": "Species: Puma concolor | Country: Canada | Location: (50.791167, -114.580362) | Basis: HUMAN_OBSERVATION | Dataset: iNaturalist research-grade observations",
+    "timestamp": "2026-01-05T15:24",
+    "source": "gbif_biodiversity",
+    "confidence": 0.85
+  },
+  {
+    "title": "Mammal Observation: Puma concolor",
+    "content": "Species: Puma concolor | Country: United States of America | Location: (27.761753, -81.464306) | Basis: HUMAN_OBSERVATION | Dataset: iNaturalist research-grade observations",
+    "timestamp": "2026-01-05T17:07",
+    "source": "gbif_biodiversity",
+    "confidence": 0.85
+  },
+  {
+    "title": "Mammal Observation: Puma concolor",
+    "content": "Species: Puma concolor | Country: United States of America | Location: (37.507261, -122.306757) | Basis: HUMAN_OBSERVATION | Dataset: iNaturalist research-grade observations",
+    "timestamp": "2026-01-09T00:45",
+    "source": "gbif_biodiversity",
+    "confidence": 0.85
+  },
+  {
+    "title": "Mammal Observation: Puma concolor",
+    "content": "Species: Puma concolor | Country: Argentina | Location: (-39.037751, -64.240752) | Basis: HUMAN_OBSERVATION | Dataset: iNaturalist research-grade observations",
+    "timestamp": "2026-01-25T18:37",
+    "source": "gbif_biodiversity",
+    "confidence": 0.85
+  },
+  {
+    "title": "Mammal Observation: Puma concolor",
+    "content": "Species: Puma concolor | Country: United States of America | Location: (33.768646, -117.727584) | Basis: HUMAN_OBSERVATION | Dataset: iNaturalist research-grade observations",
+    "timestamp": "2026-01-14T17:27",
+    "source": "gbif_biodiversity",
+    "confidence": 0.85
+  },
+  {
+    "title": "Mammal Observation: Puma concolor",
+    "content": "Species: Puma concolor | Country: United States of America | Location: (35.387352, -120.73742) | Basis: HUMAN_OBSERVATION | Dataset: iNaturalist research-grade observations",
+    "timestamp": "2026-01-16T13:10:20",
+    "source": "gbif_biodiversity",
+    "confidence": 0.85
+  }
+]

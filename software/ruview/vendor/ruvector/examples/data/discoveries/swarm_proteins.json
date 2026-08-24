@@ -1,0 +1,162 @@
+[
+  {
+    "title": "Protein: Insulin",
+    "content": "UniProt P01308: Insulin. Gene: INS",
+    "category": "pattern",
+    "tags": [
+      "genomics",
+      "protein",
+      "uniprot",
+      "gap-fill"
+    ],
+    "domain": "medical-genomics",
+    "source_api": "UniProt",
+    "timestamp": "2026-03-15T21:59:51Z",
+    "confidence": 0.88,
+    "data_points": 1
+  },
+  {
+    "title": "Protein: Insulin receptor",
+    "content": "UniProt P06213: Insulin receptor. Gene: INSR",
+    "category": "pattern",
+    "tags": [
+      "genomics",
+      "protein",
+      "uniprot",
+      "gap-fill"
+    ],
+    "domain": "medical-genomics",
+    "source_api": "UniProt",
+    "timestamp": "2026-03-15T21:59:51Z",
+    "confidence": 0.88,
+    "data_points": 1
+  },
+  {
+    "title": "Protein: Hemoglobin subunit beta",
+    "content": "UniProt P68871: Hemoglobin subunit beta. Gene: HBB",
+    "category": "pattern",
+    "tags": [
+      "genomics",
+      "protein",
+      "uniprot",
+      "gap-fill"
+    ],
+    "domain": "medical-genomics",
+    "source_api": "UniProt",
+    "timestamp": "2026-03-15T21:59:51Z",
+    "confidence": 0.88,
+    "data_points": 1
+  },
+  {
+    "title": "Protein: Hemoglobin subunit delta",
+    "content": "UniProt P02042: Hemoglobin subunit delta. Gene: HBD",
+    "category": "pattern",
+    "tags": [
+      "genomics",
+      "protein",
+      "uniprot",
+      "gap-fill"
+    ],
+    "domain": "medical-genomics",
+    "source_api": "UniProt",
+    "timestamp": "2026-03-15T21:59:51Z",
+    "confidence": 0.88,
+    "data_points": 1
+  },
+  {
+    "title": "Protein: Collagen alpha-1(VII) chain",
+    "content": "UniProt Q02388: Collagen alpha-1(VII) chain. Gene: COL7A1",
+    "category": "pattern",
+    "tags": [
+      "genomics",
+      "protein",
+      "uniprot",
+      "gap-fill"
+    ],
+    "domain": "medical-genomics",
+    "source_api": "UniProt",
+    "timestamp": "2026-03-15T21:59:51Z",
+    "confidence": 0.88,
+    "data_points": 1
+  },
+  {
+    "title": "Protein: Collagen alpha-2(VIII) chain",
+    "content": "UniProt P25067: Collagen alpha-2(VIII) chain. Gene: COL8A2",
+    "category": "pattern",
+    "tags": [
+      "genomics",
+      "protein",
+      "uniprot",
+      "gap-fill"
+    ],
+    "domain": "medical-genomics",
+    "source_api": "UniProt",
+    "timestamp": "2026-03-15T21:59:51Z",
+    "confidence": 0.88,
+    "data_points": 1
+  },
+  {
+    "title": "Protein: Keratin, type I cytoskeletal 14",
+    "content": "UniProt P02533: Keratin, type I cytoskeletal 14. Gene: KRT14",
+    "category": "pattern",
+    "tags": [
+      "genomics",
+      "protein",
+      "uniprot",
+      "gap-fill"
+    ],
+    "domain": "medical-genomics",
+    "source_api": "UniProt",
+    "timestamp": "2026-03-15T21:59:51Z",
+    "confidence": 0.88,
+    "data_points": 1
+  },
+  {
+    "title": "Protein: Keratin-like protein KRT222",
+    "content": "UniProt Q8N1A0: Keratin-like protein KRT222. Gene: KRT222",
+    "category": "pattern",
+    "tags": [
+      "genomics",
+      "protein",
+      "uniprot",
+      "gap-fill"
+    ],
+    "domain": "medical-genomics",
+    "source_api": "UniProt",
+    "timestamp": "2026-03-15T21:59:51Z",
+    "confidence": 0.88,
+    "data_points": 1
+  },
+  {
+    "title": "Protein: Albumin",
+    "content": "UniProt P02768: Albumin. Gene: ALB",
+    "category": "pattern",
+    "tags": [
+      "genomics",
+      "protein",
+      "uniprot",
+      "gap-fill"
+    ],
+    "domain": "medical-genomics",
+    "source_api": "UniProt",
+    "timestamp": "2026-03-15T21:59:51Z",
+    "confidence": 0.88,
+    "data_points": 1
+  },
+  {
+    "title": "Protein: Afamin",
+    "content": "UniProt P43652: Afamin. Gene: AFM",
+    "category": "pattern",
+    "tags": [
+      "genomics",
+      "protein",
+      "uniprot",
+      "gap-fill"
+    ],
+    "domain": "medical-genomics",
+    "source_api": "UniProt",
+    "timestamp": "2026-03-15T21:59:51Z",
+    "confidence": 0.88,
+    "data_points": 1
+  }
+]

@@ -1,0 +1,34 @@
+[
+  {
+    "title": "World Bank: US GDP 2024",
+    "content": "US GDP (current USD): 28750956130731.2 for 2024. Source: World Bank Development Indicators.",
+    "category": "pattern",
+    "tags": [
+      "economics",
+      "worldbank",
+      "gdp",
+      "indicator"
+    ],
+    "domain": "economics-finance",
+    "source_api": "World Bank API",
+    "timestamp": "2026-03-15T19:25:16Z",
+    "confidence": 0.90,
+    "data_points": 1
+  },
+  {
+    "title": "World Bank: US GDP 2023",
+    "content": "US GDP (current USD): 27292170793214.4 for 2023. Source: World Bank Development Indicators.",
+    "category": "pattern",
+    "tags": [
+      "economics",
+      "worldbank",
+      "gdp",
+      "indicator"
+    ],
+    "domain": "economics-finance",
+    "source_api": "World Bank API",
+    "timestamp": "2026-03-15T19:25:16Z",
+    "confidence": 0.90,
+    "data_points": 1
+  }
+]

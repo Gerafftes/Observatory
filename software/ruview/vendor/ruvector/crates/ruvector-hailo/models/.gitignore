@@ -1,0 +1,9 @@
+# Model binaries — produced by Hailo Dataflow Compiler (x86 only) and
+# distributed via Git LFS / S3 mirror, not committed inline. See ADR-167
+# §2.4 and `models/README.md` for the rebuild path.
+*.hef
+*.bin
+*.onnx
+*.tflite
+*.pt
+*.weights

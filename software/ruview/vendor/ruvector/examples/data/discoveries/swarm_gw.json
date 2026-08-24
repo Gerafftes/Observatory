@@ -1,0 +1,130 @@
+[
+  {
+    "title": "GW event: S251117dq",
+    "content": "Superevent S251117dq cat=Production FAR=5.867636084251777E-15Hz. Preferred: ?",
+    "category": "anomaly",
+    "tags": [
+      "space",
+      "gravitational-wave",
+      "ligo",
+      "gap-fill"
+    ],
+    "domain": "space-science",
+    "source_api": "LIGO GraceDB",
+    "timestamp": "2026-03-15T21:59:51Z",
+    "confidence": 0.92,
+    "data_points": 1
+  },
+  {
+    "title": "GW event: S251117bc",
+    "content": "Superevent S251117bc cat=Production FAR=5.40702E-7Hz. Preferred: ?",
+    "category": "anomaly",
+    "tags": [
+      "space",
+      "gravitational-wave",
+      "ligo",
+      "gap-fill"
+    ],
+    "domain": "space-science",
+    "source_api": "LIGO GraceDB",
+    "timestamp": "2026-03-15T21:59:51Z",
+    "confidence": 0.92,
+    "data_points": 1
+  },
+  {
+    "title": "GW event: S251116en",
+    "content": "Superevent S251116en cat=Production FAR=1.305573813122074E-12Hz. Preferred: ?",
+    "category": "anomaly",
+    "tags": [
+      "space",
+      "gravitational-wave",
+      "ligo",
+      "gap-fill"
+    ],
+    "domain": "space-science",
+    "source_api": "LIGO GraceDB",
+    "timestamp": "2026-03-15T21:59:51Z",
+    "confidence": 0.92,
+    "data_points": 1
+  },
+  {
+    "title": "GW event: S251112cm",
+    "content": "Superevent S251112cm cat=Production FAR=5.102904E-9Hz. Preferred: ?",
+    "category": "anomaly",
+    "tags": [
+      "space",
+      "gravitational-wave",
+      "ligo",
+      "gap-fill"
+    ],
+    "domain": "space-science",
+    "source_api": "LIGO GraceDB",
+    "timestamp": "2026-03-15T21:59:51Z",
+    "confidence": 0.92,
+    "data_points": 1
+  },
+  {
+    "title": "GW event: S251110cc",
+    "content": "Superevent S251110cc cat=Production FAR=6.5082E-7Hz. Preferred: ?",
+    "category": "anomaly",
+    "tags": [
+      "space",
+      "gravitational-wave",
+      "ligo",
+      "gap-fill"
+    ],
+    "domain": "space-science",
+    "source_api": "LIGO GraceDB",
+    "timestamp": "2026-03-15T21:59:51Z",
+    "confidence": 0.92,
+    "data_points": 1
+  },
+  {
+    "title": "GW event: S251110q",
+    "content": "Superevent S251110q cat=Production FAR=3.62896E-7Hz. Preferred: ?",
+    "category": "anomaly",
+    "tags": [
+      "space",
+      "gravitational-wave",
+      "ligo",
+      "gap-fill"
+    ],
+    "domain": "space-science",
+    "source_api": "LIGO GraceDB",
+    "timestamp": "2026-03-15T21:59:51Z",
+    "confidence": 0.92,
+    "data_points": 1
+  },
+  {
+    "title": "GW event: S251108fi",
+    "content": "Superevent S251108fi cat=Production FAR=1.313444747400684E-12Hz. Preferred: ?",
+    "category": "anomaly",
+    "tags": [
+      "space",
+      "gravitational-wave",
+      "ligo",
+      "gap-fill"
+    ],
+    "domain": "space-science",
+    "source_api": "LIGO GraceDB",
+    "timestamp": "2026-03-15T21:59:51Z",
+    "confidence": 0.92,
+    "data_points": 1
+  },
+  {
+    "title": "GW event: S251108dn",
+    "content": "Superevent S251108dn cat=Production FAR=9.446361708874871E-18Hz. Preferred: ?",
+    "category": "anomaly",
+    "tags": [
+      "space",
+      "gravitational-wave",
+      "ligo",
+      "gap-fill"
+    ],
+    "domain": "space-science",
+    "source_api": "LIGO GraceDB",
+    "timestamp": "2026-03-15T21:59:51Z",
+    "confidence": 0.92,
+    "data_points": 1
+  }
+]

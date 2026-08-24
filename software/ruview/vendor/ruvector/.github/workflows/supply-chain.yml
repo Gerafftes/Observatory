@@ -1,0 +1,170 @@
+name: supply-chain
+
+# Defence-in-depth against supply-chain attacks on the ruvector
+# workspace's dependency tree. Five layers, in roughly increasing
+# cost order:
+#
+#  1. `dependency-review`  — PRs introducing known-vulnerable deps fail
+#  2. `cargo-audit`        — RustSec advisory DB scan of the workspace Cargo.lock
+#  3. `cargo-deny`         — license / ban / source policy on the crate graph
+#  4. `npm-audit`          — npm registry advisory scan of the npm/ workspace
+#  5. `lockfile-integrity` — workspace lockfiles match Cargo.toml / package.json
+#
+# Mirrors the same 5-layer pattern landed on sublinear-time-solver
+# (see PR ruvnet/sublinear-time-solver#25). Policy lives in `deny.toml`
+# at the workspace root; npm policy is enforced inline because there's
+# no equivalent config file for `npm audit`.
+#
+# Workspace scope:
+#  - Rust  : workspace root `Cargo.lock` (covers ~136 member crates).
+#            Per-crate Cargo.lock files for excluded crates (fuzz/, pgrx,
+#            hailo standalone) are intentionally skipped — those crates
+#            have their own publishing surface and run their own audits.
+#  - npm   : `npm/package-lock.json` is the only tracked npm lockfile.
+#            Root + examples/* lockfiles are gitignored by design (only
+#            `npm/` is the publish surface).
+#  - GitHub: dependabot.yml covers github-actions workflow uses lines.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    # Weekly Tuesday 09:23 UTC — offset 6 min from sublinear's 09:17
+    # so the two crates don't pile onto the GH Actions scheduler at
+    # the same minute.
+    - cron: '23 9 * * 2'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: read
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  # ─────────────────────────────────────────────────────────────────
+  # Layer 1: PR-time dependency review (GitHub native)
+  #
+  # Requires the repo's "Dependency graph" feature to be enabled in
+  # Settings → Code security and analysis. If it's off, the action
+  # exits with "Dependency review is not supported on this repository".
+  # `continue-on-error: true` until the setting is flipped — the other
+  # 4 layers still hard-gate.
+  # ─────────────────────────────────────────────────────────────────
+  dependency-review:
+    name: dependency-review (PRs only)
+    runs-on: ubuntu-22.04
+    if: github.event_name == 'pull_request'
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - name: dependency-review-action
+        uses: actions/dependency-review-action@v4
+        with:
+          fail-on-severity: moderate
+          allow-licenses: MIT, Apache-2.0, BSD-2-Clause, BSD-3-Clause, ISC, Unicode-DFS-2016, Unicode-3.0, MPL-2.0, Zlib, CC0-1.0, BSL-1.0, CDLA-Permissive-2.0
+          comment-summary-in-pr: on-failure
+
+  # ─────────────────────────────────────────────────────────────────
+  # Layer 2: cargo-audit against the RustSec advisory DB
+  # ─────────────────────────────────────────────────────────────────
+  cargo-audit:
+    name: cargo audit (RustSec advisories)
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: install cargo-audit
+        run: cargo install --locked cargo-audit
+      - name: cargo audit (vulnerabilities only)
+        # Default behaviour: errors on RUSTSEC `vulnerability` advisories,
+        # warns on `unmaintained` / `unsound` / `notice`. The two tools
+        # split responsibility cleanly:
+        #   * cargo audit = "is there a known CVE in our tree?"
+        #   * cargo deny  = "does our tree match our policy?"
+        #     (including the ignore list for un-fixable warnings with
+        #     explicit justifications + re-review dates in deny.toml).
+        # Using `--deny warnings` would double-count what deny.toml
+        # already triages.
+        run: cargo audit
+
+  # ─────────────────────────────────────────────────────────────────
+  # Layer 3: cargo-deny — license / source / ban policy
+  # ─────────────────────────────────────────────────────────────────
+  cargo-deny:
+    name: cargo deny (license + source + ban policy)
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: install cargo-deny
+        run: cargo install --locked cargo-deny
+      - name: cargo deny check
+        run: cargo deny check
+
+  # ─────────────────────────────────────────────────────────────────
+  # Layer 4: npm audit (workspace `npm/`)
+  # ─────────────────────────────────────────────────────────────────
+  npm-audit:
+    name: npm audit (npm/ workspace)
+    runs-on: ubuntu-22.04
+    defaults:
+      run:
+        working-directory: npm
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: npm audit (production deps, critical only)
+        # `npm audit` reads `package-lock.json` directly — no install
+        # / node_modules required. Skipping the install step is also
+        # the cleanest anti-supply-chain hardening: a compromised
+        # transitive cannot land its preinstall / postinstall payload
+        # on the CI runner if we never run install.
+        #
+        # ruvector has 58 workspace packages with a complex transitive
+        # tree (gRPC, Google Cloud SDKs, ML toolchains, napi binaries).
+        # `package.json` overrides at the workspace root force-pin the
+        # transitives that the audit DB flags as critical (vm2 to
+        # 3.11.5+, fast-xml-parser to 5.7+, protobufjs to 7.5.6+,
+        # @google-cloud/redis to 5.x). Those overrides cleared the
+        # 3 criticals + 17 highs that the unfixed lockfile carried.
+        #
+        # 19 highs remain (mostly @typescript-eslint, fastify, tar,
+        # cacache, gl/js-pytorch ML helpers). Cutover plan: tighten
+        # to `--audit-level=high` once that backlog drains below ~5
+        # (target: Q3 2026, driven by Dependabot PRs). Re-review on
+        # each minor release.
+        run: npm audit --omit=dev --audit-level=critical
+
+  # ─────────────────────────────────────────────────────────────────
+  # Layer 5: lockfile integrity (Cargo workspace root)
+  # ─────────────────────────────────────────────────────────────────
+  lockfile-integrity:
+    name: lockfile integrity (Cargo.lock)
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Cargo.lock is up to date (workspace root)
+        # `cargo metadata --locked` exits non-zero if Cargo.lock is
+        # missing entries or doesn't match Cargo.toml. Only reads, no
+        # network on cache hit. Workspace root only — per-crate locks
+        # for excluded members get audited inside their own CI.
+        #
+        # npm-side lockfile integrity is implicitly checked by the
+        # `npm audit` step in the previous job: `npm audit` exits
+        # ENOLOCK if `package-lock.json` is missing or malformed,
+        # and resolves the workspace graph from it. A standalone
+        # `npm ci` step doesn't add value because ruvector ships
+        # napi platform binaries as `optionalDependencies`, and the
+        # workspace mixes peer-skewed versions of internal packages
+        # which `npm ci` rejects strictly even though they are
+        # `peerOptional`.
+        run: cargo metadata --locked --format-version 1 > /dev/null

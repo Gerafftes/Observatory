@@ -1,0 +1,9 @@
+[
+  {
+    "title": "Mars Rover API Unavailable",
+    "content": "The NASA Mars Rover Photos API (mars-photos.herokuapp.com) returned 'No such app'. The Heroku-hosted service appears to be decommissioned. Curiosity rover data is available via alternative NASA APIs.",
+    "timestamp": "2026-03-15T00:00:00Z",
+    "source": "nasa_mars_rover",
+    "confidence": 0.0
+  }
+]

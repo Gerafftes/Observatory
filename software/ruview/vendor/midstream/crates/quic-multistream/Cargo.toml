@@ -1,0 +1,67 @@
+[package]
+name = "midstreamer-quic"
+version = "0.3.0"
+edition = "2021"
+rust-version = "1.81"
+description = "QUIC multi-stream support for native and WASM targets"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/ruvnet/midstream"
+keywords = ["quic", "multistream", "wasm", "network", "midstream"]
+categories = ["network-programming", "wasm", "web-programming"]
+
+[lints]
+workspace = true
+
+[features]
+# By default, midstreamer-quic verifies server certificates using the OS
+# platform trust store (per ADR-0011). The feature below substitutes a
+# verifier that accepts ALL certificates; it is intended for benches and
+# integration tests against self-signed loopback servers and MUST NEVER be
+# enabled in production builds. Enabling it also emits a runtime warning
+# on every `QuicConnection::connect`.
+default = []
+insecure-dev-only-skip-server-verification = []
+
+[dependencies]
+serde = { version = "1.0", features = ["derive"] }
+thiserror = "2.0"
+futures = "0.3"
+tracing = "0.1"
+# `QuicTransport` embedding trait (v0.3.0). Required on native targets;
+# WASM build doesn't expose the trait (WebTransport has different
+# stream semantics) so the dep is dead-code-eliminated there.
+async-trait = "0.1"
+
+# Native dependencies
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+quinn = "0.11"
+rustls-platform-verifier = "0.6"
+rcgen = "0.12"
+tokio = { version = "1.42", features = ["full"] }
+
+# WASM dependencies
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+web-sys = { version = "0.3", features = [
+    "WebTransport",
+    "WebTransportBidirectionalStream",
+    "WebTransportSendStream",
+    "WebTransportReceiveStream",
+    "WebTransportDatagramDuplexStream",
+    "ReadableStream",
+    "WritableStream",
+] }
+wasm-bindgen = "0.2"
+wasm-bindgen-futures = "0.4"
+js-sys = "0.3"
+
+[dev-dependencies]
+tokio-test = "0.4"
+serde_json = "1.0"
+criterion = { version = "0.5", features = ["async_tokio", "html_reports"] }
+# Property-based test baseline per ADR-0038. See
+# `tests/proptest_priority_stats.rs`.
+proptest = "1"
+
+[[bench]]
+name = "quic_bench"
+harness = false

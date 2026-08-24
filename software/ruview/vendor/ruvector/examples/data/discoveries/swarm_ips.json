@@ -1,0 +1,18 @@
+[
+  {
+    "title": "IPS: M2M_CATALOG",
+    "content": "Interplanetary shock at 2026-03-13T07:06Z. Location: Earth",
+    "category": "anomaly",
+    "tags": [
+      "space",
+      "interplanetary-shock",
+      "solar-wind",
+      "gap-fill"
+    ],
+    "domain": "space-science",
+    "source_api": "NASA DONKI",
+    "timestamp": "2026-03-15T21:59:51Z",
+    "confidence": 0.85,
+    "data_points": 1
+  }
+]

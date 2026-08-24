@@ -1,0 +1,114 @@
+{
+  "schema_version": 2,
+  "coordinate_system": "x_length_y_height_z_width_lower_left_floor",
+  "room_dimensions_mm": "__ROOM_DIMENSIONS_MM__",
+  "transmitter": {
+    "position_mm": "__TX_POSITION_MM__",
+    "firmware": {
+      "target": "__TX_FIRMWARE_TARGET__",
+      "version": "__TX_FIRMWARE_VERSION__",
+      "artifact_sha256": "__TX_FIRMWARE_ARTIFACT_SHA256__"
+    }
+  },
+  "receivers": [
+    {
+      "rx_id": 1,
+      "position_mm": "__RX1_POSITION_MM__",
+      "firmware": {
+        "target": "__RX1_FIRMWARE_TARGET__",
+        "version": "__RX1_FIRMWARE_VERSION__",
+        "artifact_sha256": "__RX1_FIRMWARE_ARTIFACT_SHA256__"
+      },
+      "expected_grid": {
+        "center_frequency_mhz": "__RX1_CENTER_FREQUENCY_MHZ__",
+        "antenna_count": "__RX1_ANTENNA_COUNT__",
+        "subcarrier_count": "__RX1_SUBCARRIER_COUNT__",
+        "ppdu_type": "__RX1_PPDU_TYPE__",
+        "layout_flags": "__RX1_LAYOUT_FLAGS__"
+      }
+    },
+    {
+      "rx_id": 2,
+      "position_mm": "__RX2_POSITION_MM__",
+      "firmware": {
+        "target": "__RX2_FIRMWARE_TARGET__",
+        "version": "__RX2_FIRMWARE_VERSION__",
+        "artifact_sha256": "__RX2_FIRMWARE_ARTIFACT_SHA256__"
+      },
+      "expected_grid": {
+        "center_frequency_mhz": "__RX2_CENTER_FREQUENCY_MHZ__",
+        "antenna_count": "__RX2_ANTENNA_COUNT__",
+        "subcarrier_count": "__RX2_SUBCARRIER_COUNT__",
+        "ppdu_type": "__RX2_PPDU_TYPE__",
+        "layout_flags": "__RX2_LAYOUT_FLAGS__"
+      }
+    },
+    {
+      "rx_id": 3,
+      "position_mm": "__RX3_POSITION_MM__",
+      "firmware": {
+        "target": "__RX3_FIRMWARE_TARGET__",
+        "version": "__RX3_FIRMWARE_VERSION__",
+        "artifact_sha256": "__RX3_FIRMWARE_ARTIFACT_SHA256__"
+      },
+      "expected_grid": {
+        "center_frequency_mhz": "__RX3_CENTER_FREQUENCY_MHZ__",
+        "antenna_count": "__RX3_ANTENNA_COUNT__",
+        "subcarrier_count": "__RX3_SUBCARRIER_COUNT__",
+        "ppdu_type": "__RX3_PPDU_TYPE__",
+        "layout_flags": "__RX3_LAYOUT_FLAGS__"
+      }
+    },
+    {
+      "rx_id": 4,
+      "position_mm": "__RX4_POSITION_MM__",
+      "firmware": {
+        "target": "__RX4_FIRMWARE_TARGET__",
+        "version": "__RX4_FIRMWARE_VERSION__",
+        "artifact_sha256": "__RX4_FIRMWARE_ARTIFACT_SHA256__"
+      },
+      "expected_grid": {
+        "center_frequency_mhz": "__RX4_CENTER_FREQUENCY_MHZ__",
+        "antenna_count": "__RX4_ANTENNA_COUNT__",
+        "subcarrier_count": "__RX4_SUBCARRIER_COUNT__",
+        "ppdu_type": "__RX4_PPDU_TYPE__",
+        "layout_flags": "__RX4_LAYOUT_FLAGS__"
+      }
+    }
+  ],
+  "recording_host": {
+    "kind": "mac",
+    "position_mm": "__RECORDING_HOST_POSITION_MM__",
+    "placement_revision": "__RECORDING_HOST_PLACEMENT_REVISION__",
+    "cable_revision": "__RECORDING_HOST_CABLE_REVISION__"
+  },
+  "radio": {
+    "channel": "__WIFI_CHANNEL__",
+    "tx_filter_identity": {
+      "scheme": "sha256-ruview-tx-filter-mac-v1",
+      "sha256": "__TX_FILTER_IDENTITY_SHA256__"
+    }
+  },
+  "environment": {
+    "layout_revision": "__LAYOUT_REVISION__",
+    "furniture_revision": "__FURNITURE_REVISION__",
+    "door_state_revision": "__DOOR_STATE_REVISION__"
+  },
+  "mmwave": {
+    "node_id": "__MMWAVE_NODE_ID__",
+    "sensor": "HLK-LD2450",
+    "firmware": {
+      "target": "esp32c3",
+      "version": "__MMWAVE_FIRMWARE_VERSION__",
+      "artifact_sha256": "__MMWAVE_FIRMWARE_ARTIFACT_SHA256__"
+    },
+    "mounting_position_mm": "__MMWAVE_MOUNTING_POSITION_MM__",
+    "mounting_revision": "__MMWAVE_MOUNTING_REVISION__",
+    "transform": {
+      "origin_x_mm": "__MMWAVE_ORIGIN_X_MM__",
+      "origin_z_mm": "__MMWAVE_ORIGIN_Z_MM__",
+      "yaw_mdeg": "__MMWAVE_YAW_MDEG__",
+      "raw_x_inverted": "__MMWAVE_RAW_X_INVERTED__"
+    }
+  }
+}

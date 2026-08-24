@@ -1,0 +1,184 @@
+[
+  {
+    "title": "M4.4 Deep Earthquake - 252 km WNW of Houma, Tonga",
+    "content": "Magnitude 4.4 earthquake at 252 km WNW of Houma, Tonga. Depth: 519.2 km. Coordinates: [-20.6389, -177.6605]. Type: mb. Significance: 298.",
+    "timestamp": "2026-03-14T17:23:12.686000Z",
+    "source": "USGS Earthquake Hazards Program",
+    "confidence": 0.98
+  },
+  {
+    "title": "M4 Deep Earthquake - 250 km NNE of Ama, Japan",
+    "content": "Magnitude 4 earthquake at 250 km NNE of Ama, Japan. Depth: 419.5 km. Coordinates: [38.2275, 134.0262]. Type: mb. Significance: 246.",
+    "timestamp": "2026-03-14T10:19:12.478000Z",
+    "source": "USGS Earthquake Hazards Program",
+    "confidence": 0.98
+  },
+  {
+    "title": "M4.7 Deep Earthquake - south of the Kermadec Islands",
+    "content": "Magnitude 4.7 earthquake at south of the Kermadec Islands. Depth: 344.0 km. Coordinates: [-34.4738, 179.4341]. Type: mb. Significance: 340.",
+    "timestamp": "2026-03-13T16:15:43.953000Z",
+    "source": "USGS Earthquake Hazards Program",
+    "confidence": 0.98
+  },
+  {
+    "title": "M4.1 Deep Earthquake - 9 km SE of Maizuru, Japan",
+    "content": "Magnitude 4.1 earthquake at 9 km SE of Maizuru, Japan. Depth: 368.1 km. Coordinates: [35.3832, 135.4012]. Type: mb. Significance: 259.",
+    "timestamp": "2026-03-12T17:41:22.999000Z",
+    "source": "USGS Earthquake Hazards Program",
+    "confidence": 0.98
+  },
+  {
+    "title": "M4.2 Deep Earthquake - 245 km NW of Manado, Indonesia",
+    "content": "Magnitude 4.2 earthquake at 245 km NW of Manado, Indonesia. Depth: 484.4 km. Coordinates: [3.0121, 123.2489]. Type: mb. Significance: 271.",
+    "timestamp": "2026-03-12T12:05:21.536000Z",
+    "source": "USGS Earthquake Hazards Program",
+    "confidence": 0.98
+  },
+  {
+    "title": "M4.6 Deep Earthquake - Fiji region",
+    "content": "Magnitude 4.6 earthquake at Fiji region. Depth: 583.6 km. Coordinates: [-21.9499, -179.5707]. Type: mb. Significance: 326.",
+    "timestamp": "2026-03-11T22:40:27.848000Z",
+    "source": "USGS Earthquake Hazards Program",
+    "confidence": 0.98
+  },
+  {
+    "title": "M4.6 Deep Earthquake - south of the Fiji Islands",
+    "content": "Magnitude 4.6 earthquake at south of the Fiji Islands. Depth: 527.4 km. Coordinates: [-23.6175, 179.9668]. Type: mb. Significance: 326.",
+    "timestamp": "2026-03-10T00:42:13.552000Z",
+    "source": "USGS Earthquake Hazards Program",
+    "confidence": 0.98
+  },
+  {
+    "title": "M4.7 Deep Earthquake - south of the Fiji Islands",
+    "content": "Magnitude 4.7 earthquake at south of the Fiji Islands. Depth: 525.0 km. Coordinates: [-26.3028, 179.4480]. Type: mb. Significance: 340.",
+    "timestamp": "2026-03-09T23:33:32.603000Z",
+    "source": "USGS Earthquake Hazards Program",
+    "confidence": 0.98
+  },
+  {
+    "title": "M6 Deep Earthquake - 12 km W of Anacapri, Italy",
+    "content": "Magnitude 6 earthquake at 12 km W of Anacapri, Italy. Depth: 381.7 km. Coordinates: [40.5650, 14.0671]. Type: mww. Significance: 556.",
+    "timestamp": "2026-03-09T23:03:54.405000Z",
+    "source": "USGS Earthquake Hazards Program",
+    "confidence": 0.98
+  },
+  {
+    "title": "M4.8 Deep Earthquake - 263 km WNW of Houma, Tonga",
+    "content": "Magnitude 4.8 earthquake at 263 km WNW of Houma, Tonga. Depth: 557.1 km. Coordinates: [-20.1731, -177.5993]. Type: mb. Significance: 354.",
+    "timestamp": "2026-03-09T22:03:47.342000Z",
+    "source": "USGS Earthquake Hazards Program",
+    "confidence": 0.98
+  },
+  {
+    "title": "M4.6 Deep Earthquake - south of the Fiji Islands",
+    "content": "Magnitude 4.6 earthquake at south of the Fiji Islands. Depth: 497.4 km. Coordinates: [-24.9497, 179.7839]. Type: mb. Significance: 326.",
+    "timestamp": "2026-03-09T19:07:52.017000Z",
+    "source": "USGS Earthquake Hazards Program",
+    "confidence": 0.98
+  },
+  {
+    "title": "M4.1 Deep Earthquake - 5 km SSE of Maizuru, Japan",
+    "content": "Magnitude 4.1 earthquake at 5 km SSE of Maizuru, Japan. Depth: 364.5 km. Coordinates: [35.4041, 135.3463]. Type: mb. Significance: 259.",
+    "timestamp": "2026-03-09T11:59:31.202000Z",
+    "source": "USGS Earthquake Hazards Program",
+    "confidence": 0.98
+  },
+  {
+    "title": "M4.3 Deep Earthquake - 242 km SSE of Ambon, Indonesia",
+    "content": "Magnitude 4.3 earthquake at 242 km SSE of Ambon, Indonesia. Depth: 332.6 km. Coordinates: [-5.8378, 128.6370]. Type: mb. Significance: 284.",
+    "timestamp": "2026-03-09T08:10:59.649000Z",
+    "source": "USGS Earthquake Hazards Program",
+    "confidence": 0.98
+  },
+  {
+    "title": "M4.7 Deep Earthquake - Mariana Islands region",
+    "content": "Magnitude 4.7 earthquake at Mariana Islands region. Depth: 303.6 km. Coordinates: [21.6109, 143.1160]. Type: mb. Significance: 340.",
+    "timestamp": "2026-03-08T19:08:04.188000Z",
+    "source": "USGS Earthquake Hazards Program",
+    "confidence": 0.98
+  },
+  {
+    "title": "M4.9 Deep Earthquake - south of the Fiji Islands",
+    "content": "Magnitude 4.9 earthquake at south of the Fiji Islands. Depth: 534.8 km. Coordinates: [-26.2922, -179.8568]. Type: mb. Significance: 369.",
+    "timestamp": "2026-03-08T10:59:15.325000Z",
+    "source": "USGS Earthquake Hazards Program",
+    "confidence": 0.98
+  },
+  {
+    "title": "M4.3 Deep Earthquake - 119 km SE of Alo, Wallis and Futuna",
+    "content": "Magnitude 4.3 earthquake at 119 km SE of Alo, Wallis and Futuna. Depth: 391.6 km. Coordinates: [-15.0562, -177.3137]. Type: mb. Significance: 284.",
+    "timestamp": "2026-03-08T08:39:35.606000Z",
+    "source": "USGS Earthquake Hazards Program",
+    "confidence": 0.98
+  },
+  {
+    "title": "M4.5 Deep Earthquake - 75 km NNE of Rabaul, Papua New Guinea",
+    "content": "Magnitude 4.5 earthquake at 75 km NNE of Rabaul, Papua New Guinea. Depth: 460.2 km. Coordinates: [-3.5604, 152.3884]. Type: mb. Significance: 312.",
+    "timestamp": "2026-03-08T04:03:23.454000Z",
+    "source": "USGS Earthquake Hazards Program",
+    "confidence": 0.98
+  },
+  {
+    "title": "M4.3 Deep Earthquake - Izu Islands, Japan region",
+    "content": "Magnitude 4.3 earthquake at Izu Islands, Japan region. Depth: 422.5 km. Coordinates: [29.1998, 139.3941]. Type: mb. Significance: 284.",
+    "timestamp": "2026-03-06T10:49:17.959000Z",
+    "source": "USGS Earthquake Hazards Program",
+    "confidence": 0.98
+  },
+  {
+    "title": "M4.9 Deep Earthquake - south of the Fiji Islands",
+    "content": "Magnitude 4.9 earthquake at south of the Fiji Islands. Depth: 386.3 km. Coordinates: [-22.2632, -178.1532]. Type: mb. Significance: 369.",
+    "timestamp": "2026-03-06T10:38:22.762000Z",
+    "source": "USGS Earthquake Hazards Program",
+    "confidence": 0.98
+  },
+  {
+    "title": "M4.8 Deep Earthquake - Fiji region",
+    "content": "Magnitude 4.8 earthquake at Fiji region. Depth: 618.1 km. Coordinates: [-21.9494, -179.6247]. Type: mb. Significance: 354.",
+    "timestamp": "2026-03-05T21:56:32.628000Z",
+    "source": "USGS Earthquake Hazards Program",
+    "confidence": 0.98
+  },
+  {
+    "title": "M4.3 Deep Earthquake - 109 km S of Alo, Wallis and Futuna",
+    "content": "Magnitude 4.3 earthquake at 109 km S of Alo, Wallis and Futuna. Depth: 403.7 km. Coordinates: [-15.2856, -178.2633]. Type: mb. Significance: 284.",
+    "timestamp": "2026-03-05T21:20:55.133000Z",
+    "source": "USGS Earthquake Hazards Program",
+    "confidence": 0.98
+  },
+  {
+    "title": "M4.6 Deep Earthquake - 199 km N of Likis\u00e1, Timor Leste",
+    "content": "Magnitude 4.6 earthquake at 199 km N of Likis\u00e1, Timor Leste. Depth: 546.3 km. Coordinates: [-6.7905, 125.1486]. Type: mb. Significance: 326.",
+    "timestamp": "2026-03-05T01:43:30.999000Z",
+    "source": "USGS Earthquake Hazards Program",
+    "confidence": 0.98
+  },
+  {
+    "title": "M4.8 Deep Earthquake - south of the Fiji Islands",
+    "content": "Magnitude 4.8 earthquake at south of the Fiji Islands. Depth: 534.0 km. Coordinates: [-23.8694, -179.8388]. Type: mb. Significance: 354.",
+    "timestamp": "2026-03-05T01:42:27.501000Z",
+    "source": "USGS Earthquake Hazards Program",
+    "confidence": 0.98
+  },
+  {
+    "title": "M4.5 Deep Earthquake - south of the Fiji Islands",
+    "content": "Magnitude 4.5 earthquake at south of the Fiji Islands. Depth: 526.9 km. Coordinates: [-23.6463, -179.8153]. Type: mb. Significance: 312.",
+    "timestamp": "2026-03-04T10:08:26.656000Z",
+    "source": "USGS Earthquake Hazards Program",
+    "confidence": 0.98
+  },
+  {
+    "title": "M4.3 Deep Earthquake - Bonin Islands, Japan region",
+    "content": "Magnitude 4.3 earthquake at Bonin Islands, Japan region. Depth: 500.8 km. Coordinates: [27.4027, 139.8684]. Type: mb. Significance: 284.",
+    "timestamp": "2026-03-03T05:37:23.637000Z",
+    "source": "USGS Earthquake Hazards Program",
+    "confidence": 0.98
+  },
+  {
+    "title": "M6.3 Deep Earthquake - Fiji region",
+    "content": "Magnitude 6.3 earthquake at Fiji region. Depth: 579.0 km. Coordinates: [-21.8035, -179.4529]. Type: mww. Significance: 611.",
+    "timestamp": "2026-03-01T05:44:41.923000Z",
+    "source": "USGS Earthquake Hazards Program",
+    "confidence": 0.98
+  }
+]

@@ -1,0 +1,68 @@
+[
+  {
+    "title": "Global COVID-19 Summary",
+    "content": "Total cases: 704,753,890, Deaths: 7,010,681, Recovered: 675,619,811, Active: 22,123,398, Critical: 34,794, Affected countries: 231",
+    "timestamp": "2026-03-15T23:40:50.724000+00:00",
+    "source": "disease_sh",
+    "confidence": 0.88,
+    "metadata": {
+      "cases_per_million": 90413,
+      "deaths_per_million": 899.4
+    }
+  },
+  {
+    "title": "COVID-19: Chile",
+    "content": "Cases today: 1,215, Deaths today: 0, Total cases: 5,384,853, Total deaths: 64,497, Active: 67,906, Critical: 7",
+    "timestamp": "2026-03-15T23:40:51.102000+00:00",
+    "source": "disease_sh",
+    "confidence": 0.85,
+    "metadata": {
+      "country_code": "CL",
+      "population": 19250195
+    }
+  },
+  {
+    "title": "COVID-19: USA",
+    "content": "Cases today: 1,151, Deaths today: 7, Total cases: 111,820,082, Total deaths: 1,219,487, Active: 786,167, Critical: 940",
+    "timestamp": "2026-03-15T23:40:51.069000+00:00",
+    "source": "disease_sh",
+    "confidence": 0.85,
+    "metadata": {
+      "country_code": "US",
+      "population": 334805269
+    }
+  },
+  {
+    "title": "COVID-19: Hong Kong",
+    "content": "Cases today: 696, Deaths today: 34, Total cases: 2,937,609, Total deaths: 14,924, Active: 6,646, Critical: 0",
+    "timestamp": "2026-03-15T23:40:51.121000+00:00",
+    "source": "disease_sh",
+    "confidence": 0.85,
+    "metadata": {
+      "country_code": "HK",
+      "population": 7604299
+    }
+  },
+  {
+    "title": "COVID-19: Australia",
+    "content": "Cases today: 664, Deaths today: 0, Total cases: 11,853,144, Total deaths: 24,414, Active: 8,716, Critical: 3",
+    "timestamp": "2026-03-15T23:40:51.085000+00:00",
+    "source": "disease_sh",
+    "confidence": 0.85,
+    "metadata": {
+      "country_code": "AU",
+      "population": 26068792
+    }
+  },
+  {
+    "title": "COVID-19: Germany",
+    "content": "Cases today: 73, Deaths today: 16, Total cases: 38,828,995, Total deaths: 183,027, Active: 405,368, Critical: 0",
+    "timestamp": "2026-03-15T23:40:51.073000+00:00",
+    "source": "disease_sh",
+    "confidence": 0.85,
+    "metadata": {
+      "country_code": "DE",
+      "population": 83883596
+    }
+  }
+]

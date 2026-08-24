@@ -1,0 +1,186 @@
+{
+  "domain": "convergent-technologies",
+  "generated": "2026-03-16T14:00:00Z",
+  "entries": [
+    {
+      "title": "NBIC Convergence — Nano-Bio-Info-Cogno Integration",
+      "category": "architecture",
+      "content": "NBIC convergence describes the synergistic combination of nanotechnology, biotechnology, information technology, and cognitive science. Originally articulated by Roco and Bainbridge at NSF in 2002, the framework predicts that advances in one domain accelerate all others. Examples include DNA nanotechnology (bio+nano), brain-computer interfaces (cogno+info), and smart drug delivery (nano+bio+info). The European CTEKS variant adds society and ethics as a fifth pillar.",
+      "tags": ["NBIC", "convergence", "nanotechnology", "biotechnology", "transdisciplinary"],
+      "confidence": 0.88,
+      "novelty": 0.75,
+      "source": "research"
+    },
+    {
+      "title": "Brain-Computer Interfaces — Direct Neural Communication",
+      "category": "architecture",
+      "content": "BCIs translate neural activity into digital commands. Neuralink's N1 implant uses 1024 electrode threads for high-bandwidth cortical recording. Synchron's Stentrode deploys via blood vessels without open brain surgery. Non-invasive BCIs using EEG achieve 90%+ accuracy for binary decisions. Utah arrays have enabled paralyzed patients to type at 90 characters/minute. Key challenges include long-term biocompatibility, signal drift, and real-time decoding of complex motor intentions.",
+      "tags": ["BCI", "Neuralink", "Synchron", "neural-interface", "motor-decoding"],
+      "confidence": 0.91,
+      "novelty": 0.80,
+      "source": "research"
+    },
+    {
+      "title": "Digital Twins for Biological Systems",
+      "category": "architecture",
+      "content": "Digital twins create computational replicas of biological systems that update in real-time from sensor data. The Human Digital Twin project aims to simulate individual patients for personalized medicine. Organ-on-chip devices coupled with computational models enable drug testing without animal trials. Whole-cell models (M. genitalium by Karr et al.) simulate complete cellular metabolism, gene expression, and division with 28 integrated submodels.",
+      "tags": ["digital-twin", "personalized-medicine", "organ-on-chip", "whole-cell-model", "computational-biology"],
+      "confidence": 0.87,
+      "novelty": 0.82,
+      "source": "research"
+    },
+    {
+      "title": "Programmable Matter — Shape-Shifting Materials",
+      "category": "architecture",
+      "content": "Programmable matter changes its physical properties (shape, density, conductivity) on command. Claytronics uses millions of catom spheres with electrostatic latching. DNA origami creates nanoscale programmable structures. 4D printing adds time as a dimension — objects self-fold after printing in response to heat, moisture, or light. Metamaterials with tunable electromagnetic properties enable programmable optics. Military interest in reconfigurable structures drives significant DARPA funding.",
+      "tags": ["programmable-matter", "claytronics", "4D-printing", "metamaterials", "shape-shifting"],
+      "confidence": 0.80,
+      "novelty": 0.88,
+      "source": "research"
+    },
+    {
+      "title": "Molecular Machines — Nobel Prize Chemistry 2016",
+      "category": "architecture",
+      "content": "Synthetic molecular machines (Sauvage, Stoddart, Feringa) perform controlled mechanical work at the nanoscale. Molecular motors rotate unidirectionally under light. Molecular elevators, muscles, and pumps have been demonstrated. Feringa's nanocar drives across surfaces. Applications include drug delivery via molecular valves on mesoporous silica, molecular computing through mechanical logic gates, and self-propelling nanobots for targeted therapy in blood vessels.",
+      "tags": ["molecular-machines", "nanomotors", "Feringa", "nanocar", "molecular-valves"],
+      "confidence": 0.90,
+      "novelty": 0.79,
+      "source": "research"
+    },
+    {
+      "title": "Self-Replicating Systems — Von Neumann Kinematic Machines",
+      "category": "pattern",
+      "content": "Von Neumann's self-reproducing automata theory establishes minimum complexity for self-replication. Modern implementations include RepRap 3D printers that print their own parts, DNA-based autocatalytic sets, and proposed lunar von Neumann probes that mine regolith for components. Self-replicating molecular systems (autocatalytic RNA, template-directed synthesis) bridge the gap between chemistry and biology. The theoretical framework informs both synthetic biology and space colonization strategies.",
+      "tags": ["self-replication", "von-Neumann", "RepRap", "autocatalytic", "artificial-life"],
+      "confidence": 0.82,
+      "novelty": 0.85,
+      "source": "research"
+    },
+    {
+      "title": "Xenobots — Living Programmable Organisms",
+      "category": "solution",
+      "content": "Xenobots are synthetic biological machines designed by evolutionary algorithms and assembled from frog (Xenopus laevis) stem cells. They move, self-heal, and exhibit emergent behaviors not present in normal frog anatomy. Xenobots 2.0 can self-replicate through kinematic self-replication — gathering loose cells into new organisms. Anthrobots made from human tracheal cells show wound-healing capabilities. These blur the boundary between organism and machine.",
+      "tags": ["xenobots", "anthrobots", "living-machines", "kinematic-replication", "synthetic-biology"],
+      "confidence": 0.88,
+      "novelty": 0.91,
+      "source": "research"
+    },
+    {
+      "title": "Synthetic Biology Circuits — Engineering Life",
+      "category": "architecture",
+      "content": "Synthetic biology applies engineering principles to biological systems. Genetic circuits implement logic gates (AND, OR, NOT) in living cells. Toggle switches, oscillators (repressilator), and state machines enable cellular computation. CRISPR-based gene drives can modify wild populations. Cell-free systems extract transcription-translation machinery for rapid prototyping. iGEM standardized biological parts enable modular genetic design with predictable behavior.",
+      "tags": ["synthetic-biology", "genetic-circuits", "repressilator", "CRISPR", "iGEM"],
+      "confidence": 0.91,
+      "novelty": 0.77,
+      "source": "research"
+    },
+    {
+      "title": "Space Elevator — Carbon Nanotube Tether to Orbit",
+      "category": "architecture",
+      "content": "A space elevator uses a tether from Earth's surface to geostationary orbit (35,786 km), with climbers ascending electrically. Carbon nanotubes and boron nitride nanotubes approach the required tensile strength (~63 GPa). ISEC designs include a marine platform anchor, 100-ton capacity climbers, and progressive deployment. Lunar and Martian elevators are feasible with existing materials (Kevlar). Cost reduction from $20,000/kg to $200/kg would revolutionize space access.",
+      "tags": ["space-elevator", "carbon-nanotubes", "geostationary", "space-access", "tether"],
+      "confidence": 0.72,
+      "novelty": 0.83,
+      "source": "research"
+    },
+    {
+      "title": "Dyson Sphere Concepts — Megastructure Engineering",
+      "category": "architecture",
+      "content": "Freeman Dyson proposed that advanced civilizations would construct shells around stars to capture total luminous output. Modern variants include Dyson swarms (independent orbiting collectors), Matrioshka brains (nested computing shells), and stellar engines (asymmetric mirrors for star propulsion). Detection methods search for infrared excess and anomalous dimming in stellar surveys. KIC 8462852 (Tabby's Star) showed transit signatures initially consistent with megastructure construction.",
+      "tags": ["Dyson-sphere", "megastructure", "stellar-engineering", "Kardashev", "infrared-excess"],
+      "confidence": 0.75,
+      "novelty": 0.86,
+      "source": "research"
+    },
+    {
+      "title": "Artificial Photosynthesis — Solar Fuels Production",
+      "category": "solution",
+      "content": "Artificial photosynthesis mimics biological light reactions to split water and reduce CO2 into fuels. Photoelectrochemical cells use semiconductor-catalyst assemblies achieving >10% solar-to-hydrogen efficiency. Bio-hybrid systems couple photosystem II with synthetic catalysts. The Joint Center for Artificial Photosynthesis demonstrated 10% efficient CO2-to-fuel conversion. Challenges include catalyst stability, selectivity for multi-carbon products, and scaling from lab to industrial deployment.",
+      "tags": ["artificial-photosynthesis", "solar-fuels", "water-splitting", "photoelectrochemistry", "CO2-reduction"],
+      "confidence": 0.87,
+      "novelty": 0.78,
+      "source": "research"
+    },
+    {
+      "title": "Gecko Adhesion — Van der Waals Nanoscale Attachment",
+      "category": "pattern",
+      "content": "Gecko feet achieve reversible adhesion through millions of nanoscale spatulae generating van der Waals forces. Each seta branches into hundreds of 200nm spatulae, collectively supporting 40x body weight. Synthetic gecko adhesives (Geckskin, DARPA Z-Man) use carbon nanotubes or PDMS microstructures. Self-cleaning properties prevent contamination. Applications span climbing robots, surgical tissue adhesives, space debris capture, and reusable tape replacing screws and bolts.",
+      "tags": ["gecko-adhesion", "van-der-Waals", "biomimetic-adhesive", "spatulae", "self-cleaning"],
+      "confidence": 0.90,
+      "novelty": 0.74,
+      "source": "research"
+    },
+    {
+      "title": "Spider Silk — Strongest Natural Fiber",
+      "category": "pattern",
+      "content": "Spider dragline silk combines tensile strength (1.3 GPa) with extensibility (30-40%), yielding toughness exceeding Kevlar per weight. The hierarchical beta-sheet nanocrystal structure within amorphous matrix creates this unique combination. Recombinant spider silk production in bacteria, yeast, and transgenic silkworms enables industrial scaling. Bolt Threads and Spiber commercialize recombinant silk for textiles. Medical applications include biodegradable sutures, nerve guides, and bone scaffolds.",
+      "tags": ["spider-silk", "biomaterial", "beta-sheet", "recombinant-silk", "high-performance-fiber"],
+      "confidence": 0.91,
+      "novelty": 0.73,
+      "source": "research"
+    },
+    {
+      "title": "Self-Healing Materials — Autonomous Damage Repair",
+      "category": "solution",
+      "content": "Self-healing materials autonomously repair damage without external intervention. Microcapsule systems (White, 2001) release healing agent when cracks rupture embedded capsules. Vascular networks provide continuous healing agent supply. Intrinsic self-healing polymers use reversible covalent bonds (Diels-Alder), supramolecular interactions, or shape-memory effects. Self-healing concrete uses embedded bacteria that produce calcite. Applications include aircraft coatings, phone screens, and infrastructure.",
+      "tags": ["self-healing", "microcapsule", "reversible-bonds", "autonomous-repair", "smart-materials"],
+      "confidence": 0.88,
+      "novelty": 0.79,
+      "source": "research"
+    },
+    {
+      "title": "Structural Color — Photonic Nanostructures in Nature",
+      "category": "pattern",
+      "content": "Morpho butterfly wings produce vivid blue without pigments through multilayer interference in nanoscale ridges. Photonic crystals in opals, beetle shells, and peacock feathers create angle-dependent structural colors. Biomimetic structural color eliminates toxic dyes and enables dynamic color-changing surfaces. Vantablack and ultra-white coatings use nanostructured surfaces for extreme absorption/reflection. Applications include anti-counterfeiting, energy-efficient displays, and radiative cooling.",
+      "tags": ["structural-color", "photonic-crystals", "Morpho-butterfly", "biomimetic-optics", "nanostructure"],
+      "confidence": 0.89,
+      "novelty": 0.76,
+      "source": "research"
+    },
+    {
+      "title": "DNA Computing — Molecular Information Processing",
+      "category": "architecture",
+      "content": "DNA computing uses Watson-Crick base pairing for parallel computation. Adleman solved a 7-node Hamiltonian path problem in 1994. DNA strand displacement cascades implement arbitrary Boolean circuits. DNA origami creates 2D/3D nanostructures as computational scaffolds. DNA storage achieves 215 petabytes per gram with 100% retrieval accuracy. Microsoft demonstrated automated DNA data read-write cycles. DNA neural networks perform pattern classification using molecular reactions.",
+      "tags": ["DNA-computing", "strand-displacement", "DNA-origami", "molecular-computing", "DNA-storage"],
+      "confidence": 0.87,
+      "novelty": 0.81,
+      "source": "research"
+    },
+    {
+      "title": "Biomimetic Robotics — Boston Dynamics and Beyond",
+      "category": "solution",
+      "content": "Bio-inspired robots replicate animal locomotion strategies. Boston Dynamics' Atlas achieves human-like parkour through model-predictive control. Spot uses gait patterns from quadruped locomotion research. Soft robots (octopus-inspired) navigate confined spaces without rigid joints. Insect-scale robots (RoboBee) achieve controlled flight at 80mg. Snake robots navigate rubble for search-and-rescue. Manta ray robots glide efficiently for ocean monitoring. Each design exploits biomechanical principles that outperform engineered solutions.",
+      "tags": ["biomimetic-robotics", "Boston-Dynamics", "soft-robots", "locomotion", "bio-inspired"],
+      "confidence": 0.91,
+      "novelty": 0.74,
+      "source": "research"
+    },
+    {
+      "title": "Von Neumann Probes — Self-Replicating Space Exploration",
+      "category": "architecture",
+      "content": "Von Neumann probes are hypothetical self-replicating spacecraft that mine asteroid resources to build copies, exponentially exploring the galaxy. A single probe could colonize the Milky Way in 1-10 million years. Robert Freitas' Repro probe design uses in-situ resource utilization on asteroids. The concept informs SETI — if such probes are feasible, the Fermi paradox deepens. Breakthrough Starshot's gram-scale probes represent a non-replicating first step toward interstellar exploration.",
+      "tags": ["von-Neumann-probe", "self-replicating", "interstellar", "ISRU", "Fermi-paradox"],
+      "confidence": 0.75,
+      "novelty": 0.87,
+      "source": "research"
+    },
+    {
+      "title": "Swarm Intelligence — Collective Problem Solving",
+      "category": "pattern",
+      "content": "Swarm intelligence emerges from simple local interactions among decentralized agents. Ant colony optimization solves TSP-class problems through pheromone trail reinforcement. Particle swarm optimization explores continuous search spaces. Bee algorithm combines local exploitation with global exploration via waggle dance communication. Kilobot swarms of 1000 robots self-organize into shapes. Swarm principles apply to drone coordination, network routing, crowd management, and distributed computing architectures.",
+      "tags": ["swarm-intelligence", "ant-colony", "particle-swarm", "collective-behavior", "self-organization"],
+      "confidence": 0.92,
+      "novelty": 0.72,
+      "source": "research"
+    },
+    {
+      "title": "Neuromorphic Chips — Brain-Inspired Hardware",
+      "category": "architecture",
+      "content": "Neuromorphic processors implement neural computation directly in hardware for orders-of-magnitude energy efficiency. Intel Loihi 2 has 1 million neurons with on-chip learning. IBM TrueNorth uses 1 million spiking neurons for pattern recognition at 70mW. SynSense Speck processes vision in real-time at microwatt power. BrainScaleS uses analog circuits for accelerated neural simulation. Memristor-based neuromorphic systems enable in-memory computing that eliminates the von Neumann bottleneck.",
+      "tags": ["neuromorphic", "Loihi", "TrueNorth", "memristor", "in-memory-computing"],
+      "confidence": 0.89,
+      "novelty": 0.80,
+      "source": "research"
+    }
+  ]
+}

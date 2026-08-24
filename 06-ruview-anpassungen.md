@@ -2,13 +2,18 @@
 
 Dieses Projekt verwendet [ruvnet/RuView](https://github.com/ruvnet/RuView) als Softwarebasis für RX-Firmware und Sensing-Server.
 
-Der RuView-Quellcode selbst bleibt ein separates Upstream-Repository. Dieses BLL-Repo dokumentiert nur, welche lokalen Änderungen im Projektverlauf vorbereitet oder getestet wurden.
+Der vollständige verwendete Quellstand liegt inzwischen unter
+[`software/ruview/`](software/README.md) direkt im Observatory-Repository. Die
+früheren RuView-Submodule sind dort als normale Dateien vendiert, sodass kein
+zweiter RuView-Checkout erforderlich ist. Dieses Dokument erklärt, welche
+Observatory-spezifischen Änderungen im Projektverlauf vorbereitet oder getestet
+wurden.
 
 ## Lokale Firmware-Idee: HTTP-Config-Endpunkt
 
 Motivation:
 
-- Die RX-Knoten mussten mehrfach neu provisioniert werden, weil sich die Mac-IP im `CSI_SSID`-Netz geändert hatte.
+- Die RX-Knoten mussten mehrfach neu provisioniert werden, weil sich die Mac-IP im `csi-test`-Netz geändert hatte.
 - OTA-Status war über WLAN erreichbar, der OTA-Upload war aber ohne PSK gesperrt (`403 Forbidden`).
 - Ziel war, spätere Änderungen wie `target_ip`, `node_id`, `edge_tier` oder `csi_channel` ohne USB per WLAN setzen zu können.
 
@@ -17,7 +22,7 @@ Vorbereitete lokale Änderung:
 - `config_server.c`
 - `config_server.h`
 - Registrierung in `main.c` auf dem bestehenden HTTP-/OTA-Server
-- Beispiel-Endpoint: `POST /config?target_ip=CSI_HOST_IP&reboot=1`
+- Beispiel-Endpoint: `POST /config?target_ip=192.168.4.50&reboot=1`
 
 Status:
 
@@ -81,7 +86,8 @@ Einordnung:
 
 ## Lokale Diagnose- und Klassifikationsänderungen vom 2026-07-18
 
-Die folgenden Änderungen liegen im separaten lokalen RuView-Arbeitsbaum. Sie sind hier dokumentiert, aber nicht Bestandteil dieses Dokumentations-Repositories:
+Die folgenden Änderungen sind im eingebetteten RuView-Quellstand enthalten und
+werden hier zusätzlich fachlich dokumentiert:
 
 - Raummaße und TX-Position zusätzlich zu den RX-Positionen an die UI übertragen
 - TX/RX-Marker beschriftet und räumlich nach den gemessenen Koordinaten dargestellt

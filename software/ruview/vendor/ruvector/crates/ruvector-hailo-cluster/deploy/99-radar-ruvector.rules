@@ -1,0 +1,25 @@
+# udev rule for radar UART tty nodes (ADR-063, iter 119).
+#
+# Grants the `ruvector-bridge` system group rw on the typical USB
+# serial bridges that 60 GHz mmWave radar dev kits enumerate through:
+#
+#   * Seeed MR60BHA2 USB stick → CP210x (10c4:ea60) → /dev/ttyUSB*
+#   * HLK-LD2410 USB module    → CH340  (1a86:7523) → /dev/ttyUSB*
+#   * Custom MR60 boards       → native USB-CDC     → /dev/ttyACM*
+#
+# Match SUBSYSTEM == tty and any of the typical USB serial drivers.
+# install-mmwave-bridge.sh drops this file at
+# /etc/udev/rules.d/99-radar-ruvector.rules and triggers udev to
+# re-evaluate existing nodes — no replug needed.
+
+# CP210x USB-UART (Silicon Labs)
+SUBSYSTEM=="tty", ATTRS{idVendor}=="10c4", ATTRS{idProduct}=="ea60", GROUP="ruvector-bridge", MODE="0660"
+
+# CH340 USB-UART (QinHeng)
+SUBSYSTEM=="tty", ATTRS{idVendor}=="1a86", ATTRS{idProduct}=="7523", GROUP="ruvector-bridge", MODE="0660"
+
+# FTDI FT232 USB-UART (less common but present on some custom boards)
+SUBSYSTEM=="tty", ATTRS{idVendor}=="0403", ATTRS{idProduct}=="6001", GROUP="ruvector-bridge", MODE="0660"
+
+# Native USB-CDC (e.g. radars built on RP2040 or STM32 with on-chip USB)
+SUBSYSTEM=="tty", DRIVERS=="cdc_acm", ATTRS{idVendor}=="*", GROUP="ruvector-bridge", MODE="0660"

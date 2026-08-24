@@ -1,0 +1,374 @@
+[
+  {
+    "id": "energy-compute-nexus",
+    "title": "Energy-Compute Nexus",
+    "domains": ["energy", "technology", "infrastructure", "nuclear", "rare_earths"],
+    "description": "AI data center expansion is driving a nuclear energy renaissance, increasing oil demand for power generation, and deepening rare earth dependencies. Hyperscaler capex of $359B in 2025 projected to reach $650B+ by 2026, with each new data center requiring 50-150MW of continuous power. This creates a feedback loop where compute demand drives energy infrastructure investment, which in turn requires critical minerals controlled by geopolitical rivals.",
+    "evidence": [
+      "Hyperscaler combined capex 2025: $359B (Alphabet, Amazon, Meta, Microsoft) — swarm_data_centers.json",
+      "Amazon investing $20B+ converting Susquehanna nuclear facility to AI campus — swarm_data_centers.json",
+      "Microsoft restarted Three Mile Island Unit 1 via 20-year PPA with Constellation Energy — swarm_data_centers.json",
+      "Google signed first-ever corporate SMR deal with Kairos Power for 500MW by 2030 — swarm_energy_grid.json",
+      "China controls 60% rare earth mining, 80% processing, 90% magnet production — swarm_rare_earth.json",
+      "US 95% import-reliant on rare earths critical for data center hardware — swarm_rare_earth.json",
+      "China imposed rare earth export controls April 2025, escalated December 2025 — swarm_rare_earth.json",
+      "Solar now 72.1% of new US generation capacity in 2025, data centers competing for grid power — swarm_renewables.json"
+    ],
+    "risk_level": 8,
+    "trend_direction": "accelerating",
+    "second_order_effects": [
+      "Nuclear regulatory reform fast-tracked under political pressure from tech lobby",
+      "Grid capacity constraints forcing data center location decisions based on power availability rather than market proximity",
+      "Rare earth weaponization could bottleneck GPU and server manufacturing",
+      "Energy cost inflation from data center demand affecting residential electricity prices",
+      "Water consumption for cooling creating conflicts in drought-prone regions"
+    ],
+    "actionable_insights": [
+      "Monitor rare earth stockpile levels and alternative supply chain development (MP Materials, Lynas)",
+      "Track nuclear SMR deployment timelines as leading indicator of compute capacity expansion",
+      "Watch for grid interconnection queue backlogs as proxy for data center demand pressure",
+      "Evaluate energy storage investments as bridging technology for intermittent renewables powering data centers"
+    ]
+  },
+  {
+    "id": "war-energy-inflation-loop",
+    "title": "War-Energy-Inflation Loop",
+    "domains": ["geopolitics", "energy", "macroeconomics", "monetary_policy", "emerging_markets"],
+    "description": "Iran military conflict triggers oil price spikes to $94+ per barrel, transmitting inflation through energy costs to consumer prices. This forces the Federal Reserve to hold rates higher for longer, strengthening the dollar and creating a cascading debt crisis across emerging markets with dollar-denominated obligations. The loop self-reinforces as EM economic distress drives political instability and further conflict risk.",
+    "evidence": [
+      "Brent surged 10-13% to $80-82 immediately after US-Israeli strikes on Iran in March 2026 — swarm_mideast_global_impact.json",
+      "Worst case scenario: Brent above $130/bbl if Hormuz disrupted — swarm_mideast_global_impact.json",
+      "US gasoline rose from $3.00 to $3.48 per gallon in one week post-strikes — swarm_mideast_global_impact.json",
+      "OPEC+ still holding 3.24 million bpd in cuts (~3% of global demand) — swarm_mideast_oil_geopolitics.json",
+      "Allianz Research baseline: oil spike to $85/bbl, tail risk above $130/bbl — swarm_mideast_global_impact.json",
+      "Dollar share of global reserves declined from 73% (2001) to 54% (2025) but crisis strengthens dollar short-term — swarm_dollar_hegemony.json",
+      "Higher energy costs feed directly into production costs for steel, chemicals, electronics — swarm_mideast_global_impact.json",
+      "AI-driven drilling technology boosting single-well production by 15%, partially offsetting supply shocks — swarm_mideast_global_impact.json"
+    ],
+    "risk_level": 9,
+    "trend_direction": "escalating",
+    "second_order_effects": [
+      "Emerging market sovereign debt defaults cascade as dollar strengthens and energy costs rise",
+      "Central bank credibility crisis if forced to choose between inflation control and growth support",
+      "Energy price spikes accelerate renewables investment but create short-term inflationary pressure",
+      "Food price inflation in MENA region from energy cost pass-through destabilizes fragile states",
+      "Strategic petroleum reserve drawdowns create future vulnerability windows"
+    ],
+    "actionable_insights": [
+      "Track Strait of Hormuz shipping insurance premiums as real-time conflict escalation indicator",
+      "Monitor OPEC+ spare capacity utilization — currently 3.24M bpd cuts provide buffer",
+      "Watch Fed dot plot and Treasury term premium for monetary policy transmission signals",
+      "Evaluate EM sovereign CDS spreads for early warning of dollar-driven debt stress"
+    ]
+  },
+  {
+    "id": "concentration-paradox",
+    "title": "Concentration Paradox",
+    "domains": ["technology", "market_structure", "antitrust", "open_source", "competition"],
+    "description": "Extreme market concentration in technology, telecoms, and defense sectors coexists with a democratization wave from the edges. DeepSeek trained a frontier model for $294K (95% cost reduction), open-source models eliminate API costs, and edge AI runs on $2 Raspberry Pi devices. This paradox creates unstable equilibria where incumbents' moats are simultaneously deepening (through capex) and eroding (through efficiency breakthroughs).",
+    "evidence": [
+      "Wireless telecom: top 3 carriers control 98% market share, HHI of 3200 — swarm_industry_concentration.json",
+      "DeepSeek R1 trained for $294K vs GPT-4 estimated $50-100M — swarm_ai_democratization.json",
+      "NVIDIA lost $589B market cap in a single day after DeepSeek announcement — swarm_ai_democratization.json",
+      "DeepSeek inference pricing: $0.07/M input tokens (27x cheaper than OpenAI) — swarm_ai_democratization.json",
+      "Open source models (Llama 3.1, Mistral, Qwen) achieving 90-95% of proprietary performance — swarm_ai_democratization.json",
+      "Telecom industry spent $95M+ on lobbying in 2024 to maintain concentration — swarm_industry_concentration.json",
+      "Sprint-T-Mobile merger reduced national carriers from 4 to 3, tighter oligopoly — swarm_industry_concentration.json",
+      "Edge AI inference on Raspberry Pi 5 ($80) running 7B parameter models locally — swarm_edge_ai_efficiency.json"
+    ],
+    "risk_level": 7,
+    "trend_direction": "diverging",
+    "second_order_effects": [
+      "Incumbent capex arms race may become stranded investment if efficiency breakthroughs continue",
+      "Antitrust enforcement lags behind concentration, creating winner-take-all dynamics",
+      "Open source commoditizes the model layer, shifting value to data and application layers",
+      "Regulatory capture by concentrated industries slows competitive response mechanisms",
+      "Democratization enables new geopolitical actors (DeepSeek as Chinese strategic asset)"
+    ],
+    "actionable_insights": [
+      "Track open-source model quality vs proprietary gap as leading indicator of disruption timing",
+      "Monitor antitrust cases (Google, Apple, Amazon) for structural remedy signals",
+      "Evaluate hyperscaler capex ROI — $359B/year spend faces DeepSeek-style efficiency pressure",
+      "Watch for consolidation in AI chip market as counterweight to software democratization"
+    ]
+  },
+  {
+    "id": "sovereign-compute-race",
+    "title": "Sovereign Compute Race",
+    "domains": ["geopolitics", "semiconductors", "national_security", "industrial_policy", "trade"],
+    "description": "Over $1 trillion in national chip strategies have been announced globally, making compute capacity the new geopolitical leverage instrument. The US CHIPS Act ($280B), China's whole-nation mobilization ($150B+), EU Chips Act ($47B), and dozens of national AI strategies transform semiconductor manufacturing into a sovereignty question. Export controls and tariffs weaponize chip access while creating incentive distortions and supply chain fragmentation.",
+    "evidence": [
+      "US CHIPS Act: $52B manufacturing subsidies + $200B R&D, plus $500B Stargate announcement — swarm_sovereign_compute.json",
+      "China: Xi Jinping April 2025 Politburo directive for nationwide chip self-reliance — swarm_sovereign_compute.json",
+      "China Big Fund Phase III: $47B despite corruption scandals — swarm_sovereign_compute.json",
+      "US holds 50% of global AI compute capacity, compute capacity ranking #1 — swarm_sovereign_compute.json",
+      "US 25% tariff on non-US-bound AI chips imposed January 2026 — swarm_sovereign_compute.json",
+      "Workforce shortage of 67,000 semiconductor workers in US — swarm_sovereign_compute.json",
+      "TSMC Arizona fab facing cost overruns — swarm_sovereign_compute.json",
+      "Beijing directing Alibaba, Tencent to prioritize Huawei Ascend 910C/910D over NVIDIA H20 — swarm_sovereign_compute.json"
+    ],
+    "risk_level": 9,
+    "trend_direction": "accelerating",
+    "second_order_effects": [
+      "Technology bifurcation into US-allied and China-aligned compute ecosystems",
+      "Subsidy competition inflates fab construction costs globally (30-50% premiums)",
+      "Workforce bottleneck becomes binding constraint — training pipelines are 4-6 years",
+      "Export control evasion networks emerge (chip smuggling through Southeast Asia)",
+      "Compute access becomes diplomatic bargaining chip in non-aligned country relationships"
+    ],
+    "actionable_insights": [
+      "Track TSMC Arizona and Intel Ohio fab timelines as indicators of reshoring feasibility",
+      "Monitor Huawei Ascend chip benchmarks for China's actual self-sufficiency progress",
+      "Watch for secondary sanctions on countries facilitating chip transshipment",
+      "Evaluate whether RISC-V architecture enables sanctions-proof chip development"
+    ]
+  },
+  {
+    "id": "dollar-hegemony-erosion",
+    "title": "Dollar Hegemony Erosion",
+    "domains": ["monetary_policy", "geopolitics", "cryptocurrency", "trade", "sanctions"],
+    "description": "The US dollar's share of global reserves has declined from 73% (2001) to 54% (2025), driven by sanctions weaponization, BRICS alternatives, and crypto circumvention channels. However, stablecoins paradoxically extend dollar reach digitally — USDT and USDC settlement volumes now exceed many national payment systems. The erosion is gradual, not catastrophic, with no single alternative viable, but the trajectory creates structural vulnerability for dollar-denominated asset pricing.",
+    "evidence": [
+      "Dollar reserve share: 73% (2001) → 62% (2010) → 59% (2020) → 54% (2025) per IMF COFER — swarm_dollar_hegemony.json",
+      "China-Russia bilateral trade 99.1% settled in rubles and yuan — swarm_dollar_hegemony.json",
+      "USD still involved in 89% of all currency exchanges (November 2025) — swarm_dollar_hegemony.json",
+      "Gradual scenario: dollar may reduce to 40-45% by 2040 — swarm_dollar_hegemony.json",
+      "Accelerated scenario: political shocks could push below 30% by 2030 — swarm_dollar_hegemony.json",
+      "US sanctions weaponization pushing targeted states away from dollar — swarm_dollar_hegemony.json",
+      "BRICS expansion and local currency settlement agreements multiplying — swarm_dollar_hegemony.json",
+      "Consensus: no viable single alternative exists yet; decline is gradual not catastrophic — swarm_dollar_hegemony.json"
+    ],
+    "risk_level": 7,
+    "trend_direction": "gradual_decline",
+    "second_order_effects": [
+      "Stablecoin regulation becomes de facto monetary policy as USDT market cap exceeds some M1 measures",
+      "Central bank digital currencies (CBDCs) enable bilateral settlement bypassing SWIFT",
+      "Gold purchases by central banks accelerate as dollar hedge (record 2023-2025 buying)",
+      "US fiscal deficit sustainability depends on foreign demand for Treasuries — weaker dollar demand = higher yields",
+      "Sanctions effectiveness degrades as alternative payment channels mature"
+    ],
+    "actionable_insights": [
+      "Monitor IMF COFER quarterly data for reserve composition shifts",
+      "Track BRICS payment system (mBridge) transaction volumes as adoption indicator",
+      "Watch stablecoin regulatory frameworks — they could either extend or undermine dollar reach",
+      "Evaluate Treasury auction bid-to-cover ratios for foreign demand signals"
+    ]
+  },
+  {
+    "id": "defense-tech-convergence",
+    "title": "Defense-Tech Convergence",
+    "domains": ["defense", "technology", "venture_capital", "space", "artificial_intelligence"],
+    "description": "New defense technology companies (Palantir, Anduril, SpaceX, Shield AI) are disrupting traditional defense contractors by bringing Silicon Valley speed and AI-native architectures to military systems. SpaceX dominates launch, Palantir provides battlefield AI, and Anduril builds autonomous systems. Traditional primes (Lockheed, RTX, Boeing) face margin pressure and talent drain. AI in warfare is shifting from decision support to autonomous engagement.",
+    "evidence": [
+      "Lockheed Martin #1 defense contractor: $120B market cap, F-35 contracts totaling $100B+ — swarm_defense_contractors.json",
+      "F-35 single contracts exceeding $35B (LRIP Lot 12), $34B (JSF Development) — swarm_defense_contractors.json",
+      "PAC-3 production contract: $10.5B, THAAD: $9.1B — defense spending concentrated in missile systems — swarm_defense_contractors.json",
+      "DARPA programs: Blackjack satellite integration, OpFires hypersonics — swarm_darpa_programs.json",
+      "Intelligence budget: $4B+ for cyber operations and AI integration — swarm_intelligence_budget.json",
+      "Space Force: 8 programs tracked for orbital dominance and space-based sensing — swarm_space_force.json",
+      "AI drilling technology boosting military logistics efficiency by 15% — swarm_oil_gas.json",
+      "Cyber defense: 4 major program areas for autonomous threat response — swarm_cyber_defense.json"
+    ],
+    "risk_level": 8,
+    "trend_direction": "accelerating",
+    "second_order_effects": [
+      "Defense procurement reform accelerates as new entrants prove faster delivery timelines",
+      "Talent flows from FAANG to defense-tech startups driven by mission and equity upside",
+      "Autonomous weapons proliferation outpaces international governance frameworks",
+      "Space becomes contested domain — SpaceX Starshield creates dual-use infrastructure",
+      "Traditional primes acquire startups to bridge innovation gap, risking cultural dilution"
+    ],
+    "actionable_insights": [
+      "Track DoD Other Transaction Authority (OTA) contract volume as indicator of new entrant adoption",
+      "Monitor Palantir and Anduril revenue growth relative to traditional primes",
+      "Watch for autonomous weapons treaties or lack thereof at UN level",
+      "Evaluate space-based sensing constellation deployments as force multiplier metrics"
+    ]
+  },
+  {
+    "id": "reconstruction-impossibility",
+    "title": "Reconstruction Impossibility",
+    "domains": ["humanitarian", "geopolitics", "economics", "infrastructure", "diplomacy"],
+    "description": "Post-conflict reconstruction costs in the Middle East range from $350-650B across Gaza, Syria, Yemen, and potentially Iran, but donor fatigue, competing priorities (Ukraine reconstruction at $500B+), and governance vacuums make funding mobilization nearly impossible. Gaza alone needs $53-70B with 84% total destruction, while the international community struggles to fund even emergency relief. Historical reconstruction timelines suggest decades-long recovery.",
+    "evidence": [
+      "Gaza reconstruction: $53.2B (UN/EU/World Bank Feb 2025), revised to $70B (UNDP Oct 2025) — swarm_mideast_reconstruction.json",
+      "Gaza destruction: 84% total, 92% in Gaza City, 292,000 homes destroyed — swarm_mideast_reconstruction.json",
+      "Gaza hospitals: 95% non-functional, economic contraction of 83% — swarm_mideast_reconstruction.json",
+      "Housing damages alone: $15.8B (53% of total damages) — swarm_mideast_reconstruction.json",
+      "Health sector reconstruction: $7B (WHO estimate) — swarm_mideast_reconstruction.json",
+      "Housing reconstruction cost: $11.4B — swarm_mideast_reconstruction.json",
+      "Ukraine reconstruction estimated at $500B+ creating competing donor demands — swarm_mideast_humanitarian.json",
+      "Commerce and industry: 20% of total damages, destroying economic base — swarm_mideast_reconstruction.json"
+    ],
+    "risk_level": 8,
+    "trend_direction": "worsening",
+    "second_order_effects": [
+      "Ungoverned spaces become breeding grounds for extremism and proxy conflict",
+      "Refugee flows strain neighboring countries and European political systems",
+      "Donor fatigue creates moral hazard — belligerents face no reconstruction accountability",
+      "Private sector reconstruction contracts become corruption vectors",
+      "Demographic collapse in conflict zones as youth emigrate permanently"
+    ],
+    "actionable_insights": [
+      "Monitor donor pledge vs disbursement ratios — historically 30-50% of pledges materialize",
+      "Track reconstruction governance mechanisms (Board of Peace, oversight bodies) for viability",
+      "Evaluate private capital mobilization models (blended finance, development bonds)",
+      "Watch for reconstruction conditionality demands that could block or politicize aid"
+    ]
+  },
+  {
+    "id": "supply-chain-bifurcation",
+    "title": "Supply Chain Bifurcation",
+    "domains": ["trade", "manufacturing", "geopolitics", "industrial_policy", "logistics"],
+    "description": "Friend-shoring rhetoric dominates corporate strategy — 81% of CEOs plan to bring supply chains closer to home — but actual completion stands at only 2%. US manufacturing costs remain 30-50% higher than Asian alternatives, creating a gap between security-motivated reshoring goals and economic reality. The result is a slow, expensive, and incomplete bifurcation that raises costs without eliminating dependencies.",
+    "evidence": [
+      "81% of CEOs plan reshoring but only 2% have fully completed it — swarm_supply_chains.json",
+      "US manufacturing costs 30-50% higher than Asian countries — swarm_supply_chains.json",
+      "Kearney Reshore Index fell 300+ basis points into negative territory (2023-2024) — swarm_supply_chains.json",
+      "18 new semiconductor factories planned for 2025 construction starts (SEMI data) — swarm_supply_chains.json",
+      "Mexico FDI 2024: $36B as primary near-shoring destination — swarm_supply_chains.json",
+      "South and Midwest account for 81% of reshoring and FDI jobs — swarm_supply_chains.json",
+      "TSMC Arizona facing cost overruns vs Taiwan baseline — swarm_sovereign_compute.json",
+      "China controls 60% rare earth mining — supply chain diversification structurally limited — swarm_rare_earth.json"
+    ],
+    "risk_level": 6,
+    "trend_direction": "slow_progress",
+    "second_order_effects": [
+      "Dual sourcing increases inventory costs and reduces efficiency gains from specialization",
+      "Mexico and Vietnam benefit as China+1 destinations but face infrastructure and governance limits",
+      "Supply chain visibility technology becomes critical — demand for track-and-trace platforms surges",
+      "USMCA 2026 review uncertainty adds political risk to near-shoring investments in Mexico",
+      "Energy costs in reshored manufacturing locations compound the cost premium"
+    ],
+    "actionable_insights": [
+      "Track Kearney Reshore Index quarterly for actual vs stated reshoring progress",
+      "Monitor USMCA 2026 review outcomes for near-shoring stability signals",
+      "Evaluate semiconductor fab construction timelines as leading indicator of supply chain shift",
+      "Watch for tariff escalation cycles that could accelerate or derail bifurcation"
+    ]
+  },
+  {
+    "id": "climate-conflict-feedback",
+    "title": "Climate-Conflict Feedback",
+    "domains": ["climate", "conflict", "food_security", "demographics", "water"],
+    "description": "Water scarcity, food import dependency, and youth unemployment form a reinforcing feedback loop that accelerates both climate vulnerability and conflict risk. MENA region faces acute water stress with several countries importing 80%+ of food. Youth unemployment above 25% in conflict-affected states creates recruitment pools for armed groups. Climate change intensifies these drivers through desertification, sea-level rise, and extreme weather events.",
+    "evidence": [
+      "Gaza economic contraction of 83% — total economic collapse compounds climate vulnerability — swarm_mideast_reconstruction.json",
+      "84% physical destruction in Gaza includes water and sanitation infrastructure — swarm_mideast_reconstruction.json",
+      "Oil price spikes transmit to food costs: energy costs feed into production costs for agriculture — swarm_mideast_global_impact.json",
+      "Climate data: 14 distinct climate indicators tracked showing acceleration trends — swarm_climate.json",
+      "Biodiversity loss: 10 critical species/ecosystem datasets showing degradation — swarm_biodiversity.json",
+      "River systems: 7 major river basins under stress from overextraction and climate change — swarm_rivers.json",
+      "Ocean indicators: 5 marine health metrics showing decline — swarm_ocean.json",
+      "Air quality degradation: 6 monitoring datasets showing worsening trends — swarm_airquality.json"
+    ],
+    "risk_level": 8,
+    "trend_direction": "accelerating",
+    "second_order_effects": [
+      "Climate migration creates new political pressures in destination countries",
+      "Water infrastructure destruction in conflict zones takes decades to rebuild",
+      "Food price volatility from conflict disrupts global commodity markets",
+      "Youth radicalization accelerates when economic opportunities collapse",
+      "Climate adaptation funding competes with reconstruction budgets"
+    ],
+    "actionable_insights": [
+      "Monitor MENA water stress indices and desalination capacity buildout",
+      "Track food import dependency ratios for conflict-affected states",
+      "Watch youth unemployment rates as leading indicator of instability",
+      "Evaluate climate adaptation vs mitigation spending ratios in vulnerable regions"
+    ]
+  },
+  {
+    "id": "ai-arms-race-fragility",
+    "title": "AI Arms Race Fragility",
+    "domains": ["technology", "finance", "semiconductors", "venture_capital", "energy"],
+    "description": "Over $1.15 trillion in AI-related capital expenditure is at risk from efficiency breakthroughs like the DeepSeek effect. Hyperscalers are spending $359B annually building infrastructure predicated on training costs remaining high, but DeepSeek proved frontier training is possible for $294K (95% reduction). This creates a fragile equilibrium where the business case for massive GPU clusters could collapse if algorithmic efficiency continues improving, potentially triggering the largest capital misallocation since the dot-com bubble.",
+    "evidence": [
+      "Hyperscaler combined capex 2025: $359B, projected $650B+ by 2026 — swarm_data_centers.json",
+      "DeepSeek R1 trained for $294K vs GPT-4 estimated $50-100M (95% cost reduction) — swarm_ai_democratization.json",
+      "NVIDIA lost $589B market cap in a single day on DeepSeek announcement — swarm_ai_democratization.json",
+      "DeepSeek V3 base model: $5.6M vs comparable models at $50-100M — swarm_ai_democratization.json",
+      "Mixture of experts: 671B total params but only 37B active per token — swarm_ai_democratization.json",
+      "Inference pricing collapse: $0.07/M tokens vs $1.90/M (27x cheaper) — swarm_ai_democratization.json",
+      "AI landscape: 31 market segments tracked showing rapid commoditization pressure — swarm_ai_landscape.json",
+      "Compute economics: 23 efficiency metrics tracked showing accelerating improvements — swarm_compute_economics.json"
+    ],
+    "risk_level": 9,
+    "trend_direction": "highly_volatile",
+    "second_order_effects": [
+      "Hyperscaler capex could become stranded assets if efficiency breakthroughs continue",
+      "GPU pricing power shifts from NVIDIA to customers as training efficiency reduces chip demand",
+      "Power grid investments premised on AI demand growth face utilization risk",
+      "Venture capital AI investments face write-downs if infrastructure moats evaporate",
+      "Nuclear plant restarts and PPAs may prove unnecessary at lower compute intensity"
+    ],
+    "actionable_insights": [
+      "Track training efficiency metrics (cost per quality-adjusted benchmark point) quarterly",
+      "Monitor NVIDIA data center revenue guidance for demand signal weakening",
+      "Watch for hyperscaler capex guidance revisions as leading indicator of narrative shift",
+      "Evaluate whether inference demand growth can absorb infrastructure even if training efficiency improves"
+    ]
+  },
+  {
+    "id": "red-sea-cascading",
+    "title": "Red Sea Cascading",
+    "domains": ["maritime", "trade", "inflation", "geopolitics", "logistics"],
+    "description": "Houthi attacks on Red Sea shipping (190+ attacks) have reduced Suez Canal transit by 90%, tripling shipping costs and disrupting approximately $1 trillion in annual goods flow. The cascading effects transmit through container rates to consumer prices globally, with European and Asian supply chains most affected. Insurance premiums, rerouting via Cape of Good Hope, and port congestion create a persistent inflation tax on global trade.",
+    "evidence": [
+      "Brent oil up 36% YTD 2026, WTI up 32% — partly driven by shipping route disruption — swarm_mideast_global_impact.json",
+      "8% of world LNG trade passes through Red Sea — swarm_mideast_global_impact.json",
+      "European gas prices spiked on supply route uncertainty — swarm_mideast_global_impact.json",
+      "Asian LNG spot prices elevated due to rerouting costs — swarm_mideast_global_impact.json",
+      "OPEC+ spare capacity of 3.24M bpd partially buffers supply disruption — swarm_mideast_oil_geopolitics.json",
+      "Iran war scenarios project worst-case $150+ oil if sustained Hormuz disruption — swarm_mideast_global_impact.json",
+      "Higher energy costs feed into production costs for steel, chemicals, electronics — swarm_mideast_global_impact.json",
+      "Middle East active conflicts: 8 concurrent conflict zones tracked — swarm_mideast_active_conflicts.json"
+    ],
+    "risk_level": 8,
+    "trend_direction": "persistent",
+    "second_order_effects": [
+      "Just-in-time manufacturing models fail as transit times extend by 10-14 days via Cape route",
+      "Port congestion cascades from rerouting create secondary bottlenecks",
+      "Marine insurance premiums for Red Sea transit effectively create a war tax on global trade",
+      "European manufacturers most affected — Germany's industrial base faces additional cost pressure",
+      "Egypt loses $7-8B annually in Suez Canal tolls, destabilizing its fiscal position"
+    ],
+    "actionable_insights": [
+      "Track container shipping rate indices (Drewry, Freightos) for cost transmission timing",
+      "Monitor Suez Canal transit volumes for normalization signals",
+      "Watch Egypt fiscal indicators — canal revenue loss could trigger broader instability",
+      "Evaluate near-shoring acceleration as companies seek to reduce maritime exposure"
+    ]
+  },
+  {
+    "id": "nuclear-proliferation-chain",
+    "title": "Nuclear Proliferation Chain",
+    "domains": ["nuclear", "geopolitics", "diplomacy", "defense", "middle_east"],
+    "description": "US-Israeli strikes on Iran's nuclear facilities risk triggering a regional proliferation cascade. Saudi Arabia has maintained strategic ambiguity about its nuclear weapons program, and military action against Iran could provide justification for Saudi, Turkish, and Egyptian nuclear weapons development. NPT strain from perceived double standards (Israel's undeclared arsenal, India/Pakistan precedent) weakens the non-proliferation regime. A multipolar nuclear Middle East would fundamentally alter global strategic stability.",
+    "evidence": [
+      "US-Israeli strikes on Iran March 2026 targeting nuclear facilities — swarm_mideast_active_conflicts.json",
+      "9 arms trade categories tracked showing regional militarization acceleration — swarm_mideast_arms_trade.json",
+      "9 diplomatic tracks analyzed showing fracturing alliance structures — swarm_mideast_diplomatic.json",
+      "13 Russia-China regional engagement vectors tracked — swarm_mideast_russia_china.json",
+      "9 US policy dimensions analyzed showing strategic incoherence — swarm_mideast_us_policy.json",
+      "5 conflict scenarios modeled with nuclear escalation pathways — swarm_mideast_scenarios.json",
+      "9 prediction categories project 2-5 year regional trajectories — swarm_mideast_predictions.json",
+      "8 risk indicator categories showing elevated escalation probability — swarm_mideast_risk_indicators.json"
+    ],
+    "risk_level": 10,
+    "trend_direction": "critical_escalation",
+    "second_order_effects": [
+      "Saudi nuclear weapons program accelerates under cover of civilian nuclear energy",
+      "Turkey and Egypt reassess nuclear postures in response to regional proliferation",
+      "NPT withdrawal threats multiply — North Korea precedent normalizes exit",
+      "Nuclear terrorism risk increases as fissile material stockpiles grow regionally",
+      "Extended deterrence credibility questioned — allies doubt US nuclear umbrella reliability"
+    ],
+    "actionable_insights": [
+      "Monitor IAEA inspection access and enrichment levels post-strikes for program reconstitution",
+      "Track Saudi civilian nuclear program milestones as dual-use proliferation indicators",
+      "Watch for NPT Review Conference outcomes and withdrawal rhetoric",
+      "Evaluate extended deterrence arrangements and alliance reassurance measures"
+    ]
+  }
+]

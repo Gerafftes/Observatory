@@ -1,0 +1,49 @@
+[Unit]
+Description=ruOS thermal supervisor — Pi 5 + Hailo-8 thermal snapshot
+Documentation=https://github.com/ruvnet/ruvector
+After=network-online.target
+
+[Service]
+# Type=oneshot pairs with ruos-thermal.timer for periodic snapshots
+# without holding a long-running process. The reader is fast (~1ms on
+# Pi 5); 30s cadence is plenty for fleet observability.
+Type=oneshot
+
+# The supervisor reads sysfs thermal + cpufreq paths (world-readable on
+# Pi 5) and writes the textfile-collector output (root-owned dir).
+# Runs as root for write access; the hardening directives below clamp
+# the rest of the attack surface so this is a single-purpose privileged
+# job, not a general-purpose root daemon. A future iter-95+ subscriber
+# binary that does cpufreq writes will need similar root access via a
+# separate unit.
+User=root
+Group=root
+
+# Atomic-write the textfile-collector output. Path matches the default
+# node_exporter --collector.textfile.directory on Pi 5 deploys.
+ExecStart=/bin/sh -c '/usr/local/bin/ruos-thermal --prom > /var/lib/node_exporter/textfile_collector/ruos-thermal.prom.tmp && mv /var/lib/node_exporter/textfile_collector/ruos-thermal.prom.tmp /var/lib/node_exporter/textfile_collector/ruos-thermal.prom'
+
+# Hardening — read-only daemon should reach almost nothing.
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictAddressFamilies=AF_UNIX
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+SystemCallFilter=~@privileged @resources
+
+# Allow writing only to the textfile-collector dir.
+ReadWritePaths=/var/lib/node_exporter/textfile_collector
+
+[Install]
+WantedBy=multi-user.target

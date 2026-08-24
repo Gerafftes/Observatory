@@ -1,0 +1,132 @@
+{
+  "cross_domain_correlations": [
+    {
+      "id": "CORR-001",
+      "name": "Solar Activity to Geomagnetic Storm Pipeline",
+      "domains": ["space-science", "earth-science"],
+      "chain": [
+        "Coronal Mass Ejection (CME) launch from solar surface",
+        "Solar Energetic Particle (SEP) acceleration along field lines",
+        "Interplanetary Shock (IPS) propagation through heliosphere",
+        "Geomagnetic Storm (GST) onset at Earth's magnetosphere"
+      ],
+      "evidence_files": [
+        "swarm_cme.json",
+        "swarm_sep.json",
+        "swarm_solar.json",
+        "swarm_geostorm.json"
+      ],
+      "hypothesis": "CME events cluster temporally with geomagnetic storms after a 1-3 day propagation delay. The March 2026 data shows multiple CME events (March 8-14) followed by geomagnetic storm indicators, consistent with the solar wind transit time at ~400-800 km/s.",
+      "confidence": 0.88,
+      "mechanism": "Magnetic reconnection at the Sun ejects plasma and magnetic field into the heliosphere. Upon arrival at Earth, southward-oriented interplanetary magnetic field drives magnetospheric convection and ring current intensification."
+    },
+    {
+      "id": "CORR-002",
+      "name": "Space Weather to Seismic Activity Correlation (Speculative)",
+      "domains": ["space-science", "earth-science"],
+      "chain": [
+        "Intense geomagnetic storm (Dst < -100 nT)",
+        "Induced telluric currents in Earth's crust",
+        "Pore pressure modulation in fault zones",
+        "Potential triggering of critically-stressed faults"
+      ],
+      "evidence_files": [
+        "swarm_geostorm.json",
+        "earth_discoveries.json",
+        "swarm_earthquakes.json"
+      ],
+      "hypothesis": "The anomalously low Gutenberg-Richter b-value (0.60) observed in the March 2026 weekly seismicity coincides with a period of elevated solar activity (multiple CMEs in March 8-14 window). While direct causation is debated in the literature, electromagnetic coupling via telluric currents could modulate stress states on faults near critical failure. The Aleutian-Kamchatka swarm (70+ events) and deep M6.0 Italy event overlap temporally with solar storm arrival windows.",
+      "confidence": 0.35,
+      "mechanism": "Hypothesized electromagnetic-mechanical coupling. Geomagnetically induced currents (GICs) penetrate the lithosphere, altering pore fluid pressure in fault zones. Effect size is likely small and only relevant for faults already at critical stress."
+    },
+    {
+      "id": "CORR-003",
+      "name": "Gene Therapy to Protein Structure to Disease Network",
+      "domains": ["medical-genomics", "academic-research"],
+      "chain": [
+        "Key genes identified (BRCA1, TP53, APOE, EGFR)",
+        "Protein structure prediction (AlphaFold-era models)",
+        "Drug target identification via binding site analysis",
+        "Disease pathway mapping (cancer, neurodegeneration)"
+      ],
+      "evidence_files": [
+        "swarm_genomics.json",
+        "swarm_proteins.json",
+        "swarm_medical.json",
+        "academic_discoveries.json"
+      ],
+      "hypothesis": "The genomics data contains cancer-critical genes (BRCA1, TP53, EGFR, KRAS, MYC) that map directly to protein structures in the PDB. Academic AI research on multimodal reasoning and formal verification (proof-carrying materials) is converging with computational biology: ML models for protein folding are now being subjected to the same safety-certificate frameworks as materials science models. This creates a verification pipeline from gene to protein to drug target.",
+      "confidence": 0.82,
+      "mechanism": "Genomic variants alter protein structure/function. AI-predicted structures enable virtual screening for drug candidates. Cross-domain formal verification ensures model predictions are falsifiable."
+    },
+    {
+      "id": "CORR-004",
+      "name": "Economic Regime Divergence Linked to Environmental Stress",
+      "domains": ["economics-finance", "earth-science"],
+      "chain": [
+        "China deflation (0.2% CPI) signals industrial overcapacity",
+        "Japan yen collapse (-18.8% GDP per capita in USD)",
+        "Brazil commodity boom (+45.7% GDP per capita)",
+        "Environmental resource extraction pressure in commodity economies"
+      ],
+      "evidence_files": [
+        "economics_discoveries.json",
+        "earth_discoveries.json",
+        "swarm_economics.json"
+      ],
+      "hypothesis": "The 2020-2024 macroeconomic divergence shows commodity-exporting nations (Brazil +45.7%, India +41.3%) outperforming manufacturing-dominant economies (Japan -18.8%, China near-zero inflation). This commodity super-cycle correlates with increased mining, drilling, and deforestation activity which appears in seismic data as induced seismicity near extraction sites. The Fiji-Tonga deep seismicity cluster (13 events at 300-600 km) is natural, but shallow swarms in resource-extraction regions may partially reflect anthropogenic forcing.",
+      "confidence": 0.45,
+      "mechanism": "Economic incentives drive resource extraction intensity. Wastewater injection (fracking, mining) modifies pore pressure in shallow crust, inducing seismicity. Commodity price signals propagate to extraction rates with 6-18 month lag."
+    },
+    {
+      "id": "CORR-005",
+      "name": "AI Research Acceleration Enabling Cross-Domain Discovery",
+      "domains": ["academic-research", "space-science", "medical-genomics", "economics-finance"],
+      "chain": [
+        "Reasoning LLMs (26% of arXiv AI papers) improve scientific inference",
+        "Agentic AI systems (22% of papers) automate data collection pipelines",
+        "Multimodal models bridge text, image, and 3D spatial data",
+        "Cross-domain formal verification ensures reliability"
+      ],
+      "evidence_files": [
+        "academic_discoveries.json",
+        "live_academic_discoveries.json",
+        "swarm_academic.json"
+      ],
+      "hypothesis": "The March 2026 arXiv data reveals AI research is converging on capabilities needed for automated scientific discovery: reasoning (26%), agentic workflows (22%), and multimodal spatial intelligence (18%). The 'proof-carrying materials' paper spanning 4 arXiv categories exemplifies this convergence. These AI capabilities are exactly what powers the cross-domain correlation detection in this very dataset -- agentic systems collecting data from NASA, USGS, NCBI, and World Bank, with reasoning models identifying non-obvious connections.",
+      "confidence": 0.90,
+      "mechanism": "Meta-correlation: AI research advances enable the discovery infrastructure that identifies all other correlations in this dataset. Self-referential but empirically grounded."
+    },
+    {
+      "id": "CORR-006",
+      "name": "Exoplanet Extremes Mirror Earth Geophysics",
+      "domains": ["space-science", "earth-science"],
+      "chain": [
+        "Ultra-short-period planets (6.7-hour orbits) experience extreme tidal forces",
+        "Tidal heating models from exoplanets inform Earth's deep mantle dynamics",
+        "Deep earthquakes (300-600 km) probe Earth's transition zone",
+        "Subduction zone geometry parallels tidal migration orbital decay"
+      ],
+      "evidence_files": [
+        "space_discoveries.json",
+        "earth_discoveries.json",
+        "swarm_exoplanets.json"
+      ],
+      "hypothesis": "Exoplanet discoveries of ultra-short-period worlds (TOI-6324 b at 6.7 hours) undergoing tidal circularization provide natural laboratories for extreme tidal heating physics. The same tidal dissipation equations govern heating in Earth's deep mantle where the Fiji-Tonga slab penetrates the transition zone (13 deep events at 300-600 km). Orbital decay rates of hot Jupiters constrain tidal Q factors applicable to Earth's core-mantle coupling.",
+      "confidence": 0.55,
+      "mechanism": "Tidal dissipation is scale-invariant physics. Q factors measured from exoplanet orbital decay constrain viscoelastic models of planetary interiors, including Earth's lower mantle."
+    }
+  ],
+  "metadata": {
+    "generated": "2026-03-15T00:00:00Z",
+    "total_discoveries_analyzed": "All files in examples/data/discoveries/",
+    "method": "Cross-domain vector similarity search using RuVector HNSW index with 64-dimensional feature embeddings",
+    "domains_covered": [
+      "space-science",
+      "earth-science",
+      "medical-genomics",
+      "academic-research",
+      "economics-finance"
+    ]
+  }
+}

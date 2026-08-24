@@ -1,0 +1,240 @@
+[
+  {
+    "title": "WorldBank: GDP (current US$) China 2024",
+    "content": "GDP (current US$) for China (2024): 18743803170827.2",
+    "category": "pattern",
+    "tags": [
+      "economics",
+      "worldbank",
+      "CN",
+      "indicator",
+      "gap-fill"
+    ],
+    "domain": "economics-finance",
+    "source_api": "World Bank",
+    "timestamp": "2026-03-15T21:59:51Z",
+    "confidence": 0.90,
+    "data_points": 1
+  },
+  {
+    "title": "WorldBank: GDP (current US$) China 2023",
+    "content": "GDP (current US$) for China (2023): 18270356654533.2",
+    "category": "pattern",
+    "tags": [
+      "economics",
+      "worldbank",
+      "CN",
+      "indicator",
+      "gap-fill"
+    ],
+    "domain": "economics-finance",
+    "source_api": "World Bank",
+    "timestamp": "2026-03-15T21:59:51Z",
+    "confidence": 0.90,
+    "data_points": 1
+  },
+  {
+    "title": "WorldBank: GDP (current US$) China 2022",
+    "content": "GDP (current US$) for China (2022): 18316765021690.2",
+    "category": "pattern",
+    "tags": [
+      "economics",
+      "worldbank",
+      "CN",
+      "indicator",
+      "gap-fill"
+    ],
+    "domain": "economics-finance",
+    "source_api": "World Bank",
+    "timestamp": "2026-03-15T21:59:51Z",
+    "confidence": 0.90,
+    "data_points": 1
+  },
+  {
+    "title": "WorldBank: Inflation, consumer prices (annual %) China 2024",
+    "content": "Inflation, consumer prices (annual %) for China (2024): 0.218128938439177",
+    "category": "pattern",
+    "tags": [
+      "economics",
+      "worldbank",
+      "CN",
+      "indicator",
+      "gap-fill"
+    ],
+    "domain": "economics-finance",
+    "source_api": "World Bank",
+    "timestamp": "2026-03-15T21:59:51Z",
+    "confidence": 0.90,
+    "data_points": 1
+  },
+  {
+    "title": "WorldBank: Inflation, consumer prices (annual %) China 2023",
+    "content": "Inflation, consumer prices (annual %) for China (2023): 0.234836828893051",
+    "category": "pattern",
+    "tags": [
+      "economics",
+      "worldbank",
+      "CN",
+      "indicator",
+      "gap-fill"
+    ],
+    "domain": "economics-finance",
+    "source_api": "World Bank",
+    "timestamp": "2026-03-15T21:59:51Z",
+    "confidence": 0.90,
+    "data_points": 1
+  },
+  {
+    "title": "WorldBank: Inflation, consumer prices (annual %) China 2022",
+    "content": "Inflation, consumer prices (annual %) for China (2022): 1.97357555739051",
+    "category": "pattern",
+    "tags": [
+      "economics",
+      "worldbank",
+      "CN",
+      "indicator",
+      "gap-fill"
+    ],
+    "domain": "economics-finance",
+    "source_api": "World Bank",
+    "timestamp": "2026-03-15T21:59:51Z",
+    "confidence": 0.90,
+    "data_points": 1
+  },
+  {
+    "title": "WorldBank: Unemployment, total (% of total labor force) (modeled ILO estimate) China 2025",
+    "content": "Unemployment, total (% of total labor force) (modeled ILO estimate) for China (2025): 4.615",
+    "category": "pattern",
+    "tags": [
+      "economics",
+      "worldbank",
+      "CN",
+      "indicator",
+      "gap-fill"
+    ],
+    "domain": "economics-finance",
+    "source_api": "World Bank",
+    "timestamp": "2026-03-15T21:59:51Z",
+    "confidence": 0.90,
+    "data_points": 1
+  },
+  {
+    "title": "WorldBank: Unemployment, total (% of total labor force) (modeled ILO estimate) China 2024",
+    "content": "Unemployment, total (% of total labor force) (modeled ILO estimate) for China (2024): 4.59",
+    "category": "pattern",
+    "tags": [
+      "economics",
+      "worldbank",
+      "CN",
+      "indicator",
+      "gap-fill"
+    ],
+    "domain": "economics-finance",
+    "source_api": "World Bank",
+    "timestamp": "2026-03-15T21:59:51Z",
+    "confidence": 0.90,
+    "data_points": 1
+  },
+  {
+    "title": "WorldBank: Unemployment, total (% of total labor force) (modeled ILO estimate) China 2023",
+    "content": "Unemployment, total (% of total labor force) (modeled ILO estimate) for China (2023): 4.67",
+    "category": "pattern",
+    "tags": [
+      "economics",
+      "worldbank",
+      "CN",
+      "indicator",
+      "gap-fill"
+    ],
+    "domain": "economics-finance",
+    "source_api": "World Bank",
+    "timestamp": "2026-03-15T21:59:51Z",
+    "confidence": 0.90,
+    "data_points": 1
+  },
+  {
+    "title": "WorldBank: Unemployment, total (% of total labor force) (modeled ILO estimate) China 2022",
+    "content": "Unemployment, total (% of total labor force) (modeled ILO estimate) for China (2022): 4.98",
+    "category": "pattern",
+    "tags": [
+      "economics",
+      "worldbank",
+      "CN",
+      "indicator",
+      "gap-fill"
+    ],
+    "domain": "economics-finance",
+    "source_api": "World Bank",
+    "timestamp": "2026-03-15T21:59:51Z",
+    "confidence": 0.90,
+    "data_points": 1
+  },
+  {
+    "title": "WorldBank: Foreign direct investment, net inflows (BoP, current US$) China 2024",
+    "content": "Foreign direct investment, net inflows (BoP, current US$) for China (2024): 18556141172.84",
+    "category": "pattern",
+    "tags": [
+      "economics",
+      "worldbank",
+      "CN",
+      "indicator",
+      "gap-fill"
+    ],
+    "domain": "economics-finance",
+    "source_api": "World Bank",
+    "timestamp": "2026-03-15T21:59:51Z",
+    "confidence": 0.90,
+    "data_points": 1
+  },
+  {
+    "title": "WorldBank: Foreign direct investment, net inflows (BoP, current US$) China 2023",
+    "content": "Foreign direct investment, net inflows (BoP, current US$) for China (2023): 51338076801.59",
+    "category": "pattern",
+    "tags": [
+      "economics",
+      "worldbank",
+      "CN",
+      "indicator",
+      "gap-fill"
+    ],
+    "domain": "economics-finance",
+    "source_api": "World Bank",
+    "timestamp": "2026-03-15T21:59:51Z",
+    "confidence": 0.90,
+    "data_points": 1
+  },
+  {
+    "title": "WorldBank: Foreign direct investment, net inflows (BoP, current US$) China 2022",
+    "content": "Foreign direct investment, net inflows (BoP, current US$) for China (2022): 190203789092.51",
+    "category": "pattern",
+    "tags": [
+      "economics",
+      "worldbank",
+      "CN",
+      "indicator",
+      "gap-fill"
+    ],
+    "domain": "economics-finance",
+    "source_api": "World Bank",
+    "timestamp": "2026-03-15T21:59:51Z",
+    "confidence": 0.90,
+    "data_points": 1
+  },
+  {
+    "title": "WorldBank: Government expenditure on education, total (% of GDP) China 2023",
+    "content": "Government expenditure on education, total (% of GDP) for China (2023): 4.00127983093262",
+    "category": "pattern",
+    "tags": [
+      "economics",
+      "worldbank",
+      "CN",
+      "indicator",
+      "gap-fill"
+    ],
+    "domain": "economics-finance",
+    "source_api": "World Bank",
+    "timestamp": "2026-03-15T21:59:51Z",
+    "confidence": 0.90,
+    "data_points": 1
+  }
+]

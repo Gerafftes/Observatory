@@ -1,0 +1,88 @@
+[Unit]
+Description=ruvector Hailo embedding worker (ADR-172 §3a hardened)
+Documentation=https://github.com/ruvnet/ruvector
+# Keep going until tailscaled is up if we depend on tailnet identity
+# (the worker itself doesn't, but operators commonly want it on the
+# tailnet for ACL-gated access).
+Wants=network-online.target tailscaled.service
+After=network-online.target tailscaled.service
+# Iter 205 — bound the restart-on-failure loop. Without these, a worker
+# that fails at startup (e.g., RUVECTOR_HEF_SHA256 mismatch from iter
+# 174, missing model.hef, vstream alloc fail) restarts every 2 s
+# indefinitely, churning the log + the NPU. With this, after 5 failed
+# starts inside a 60 s window systemd parks the unit in `failed` state
+# so the operator sees the issue instead of a perpetually-restarting
+# loop. Iter-185's clean shutdown path (process::exit(0)) is treated
+# as success and doesn't count toward the burst.
+StartLimitBurst=5
+StartLimitIntervalSec=60
+
+[Service]
+Type=simple
+# ADR-172 §3a iter-106 drop-root: dedicated unprivileged system user
+# with no home, no shell, no supplementary groups. /dev/hailo0 access
+# comes from the 99-hailo-ruvector.rules udev rule that gives this
+# group rw on every hailo[0-9]+ device.
+User=ruvector-worker
+Group=ruvector-worker
+DynamicUser=no
+
+# State / config / runtime dirs are systemd-managed: created at start
+# with 0750 owned by User/Group, removed on `systemctl stop` only when
+# the corresponding *Mode* says so. We keep state across stops so the
+# worker doesn't lose its model dir on restart.
+StateDirectory=ruvector-hailo
+StateDirectoryMode=0750
+RuntimeDirectory=ruvector-hailo
+RuntimeDirectoryMode=0750
+WorkingDirectory=/var/lib/ruvector-hailo
+
+EnvironmentFile=-/etc/ruvector-hailo.env
+ExecStart=/usr/local/bin/ruvector-hailo-worker
+Restart=on-failure
+RestartSec=2
+
+# Sane defaults for an inference daemon — let the kernel kill us before
+# we eat the box, and don't let us trample on someone else's CPU sched.
+LimitNOFILE=8192
+Nice=-5
+
+# Hardening — tighter now that we're not root. The worker doesn't need
+# any caps in the bounding set; HailoRT's userspace lib does syscalls
+# that the kernel grants on the basis of /dev/hailo0's permissions
+# (group rw via udev rule), not capabilities.
+NoNewPrivileges=yes
+CapabilityBoundingSet=
+AmbientCapabilities=
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=no
+ProtectControlGroups=yes
+ProtectKernelModules=yes
+ProtectKernelTunables=yes
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+SystemCallFilter=~@privileged @resources @mount @swap @reboot
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+ProtectClock=yes
+ProtectHostname=yes
+ProtectKernelLogs=yes
+ProtectProc=invisible
+DevicePolicy=closed
+DeviceAllow=/dev/hailo0 rw
+DeviceAllow=/dev/hailo1 rw
+DeviceAllow=/dev/hailo2 rw
+DeviceAllow=/dev/hailo3 rw
+
+# Pipe structured logs to journald with rate-limit headroom.
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

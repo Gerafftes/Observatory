@@ -1,0 +1,186 @@
+{
+  "domain": "quantum-biology",
+  "generated": "2026-03-16T14:00:00Z",
+  "entries": [
+    {
+      "title": "Quantum Coherence in Photosynthesis — The FMO Complex",
+      "category": "pattern",
+      "content": "The Fenna-Matthews-Olson complex in green sulfur bacteria shows long-lived quantum coherence at physiological temperatures, enabling near-perfect energy transfer efficiency. 2D electronic spectroscopy revealed oscillatory signals lasting hundreds of femtoseconds, suggesting quantum superposition guides excitonic energy along optimal pathways. Vibrationally assisted energy transfer (VAET) explains how protein vibrations protect coherence from thermal decoherence in warm, wet biological environments.",
+      "tags": ["quantum-coherence", "photosynthesis", "FMO-complex", "exciton-transfer", "VAET"],
+      "confidence": 0.90,
+      "novelty": 0.85,
+      "source": "research"
+    },
+    {
+      "title": "Quantum Tunneling in Enzyme Catalysis",
+      "category": "pattern",
+      "content": "Hydrogen tunneling in enzyme active sites accelerates reaction rates beyond classical transition state theory predictions. Kinetic isotope effects (KIE) with deuterium substitution reveal tunneling contributions in alcohol dehydrogenase, soybean lipoxygenase, and aromatic amine dehydrogenase. The protein scaffold creates a compressed donor-acceptor distance that enhances tunneling probability. Temperature-independent KIEs suggest tunneling dominates rather than merely contributing to catalysis.",
+      "tags": ["quantum-tunneling", "enzyme-catalysis", "kinetic-isotope-effect", "hydrogen-transfer", "transition-state"],
+      "confidence": 0.88,
+      "novelty": 0.82,
+      "source": "research"
+    },
+    {
+      "title": "Radical Pair Mechanism — Quantum Compass in Birds",
+      "category": "pattern",
+      "content": "Migratory birds navigate using Earth's magnetic field via the radical pair mechanism in cryptochrome proteins. Blue light creates a radical pair whose singlet-triplet interconversion rate depends on magnetic field orientation. The European robin's compass is disrupted by weak RF fields at the electron Larmor frequency, confirming quantum coherence involvement. Cryptochrome 4 in bird retinas shows magnetic sensitivity in vitro, and knockout studies impair navigation.",
+      "tags": ["radical-pair", "magnetoreception", "cryptochrome", "avian-navigation", "singlet-triplet"],
+      "confidence": 0.89,
+      "novelty": 0.86,
+      "source": "research"
+    },
+    {
+      "title": "Quantum Effects in Olfaction — Vibrational Theory of Smell",
+      "category": "pattern",
+      "content": "Luca Turin's vibrational theory proposes that olfactory receptors detect molecular vibrations via inelastic electron tunneling rather than shape alone. Deuterated odorants (same shape, different vibrations) smell different to Drosophila, supporting the theory. G-protein-coupled receptor activation may involve phonon-assisted tunneling. While controversial, the theory explains why molecules with similar shapes but different vibrational spectra have distinct odors.",
+      "tags": ["quantum-olfaction", "vibrational-theory", "electron-tunneling", "Turin", "odorant-receptors"],
+      "confidence": 0.70,
+      "novelty": 0.88,
+      "source": "research"
+    },
+    {
+      "title": "Proton Tunneling in DNA Mutations — Löwdin's Hypothesis",
+      "category": "pattern",
+      "content": "Per-Olov Löwdin proposed that proton tunneling between DNA base pairs creates tautomeric forms that cause spontaneous point mutations. Quantum chemical calculations show that proton transfer along hydrogen bonds in G-C and A-T pairs has finite tunneling probability. Recent computational studies using path integral molecular dynamics reveal that nuclear quantum effects significantly affect base pair hydrogen bond strengths and increase the population of rare tautomers at biological temperatures.",
+      "tags": ["proton-tunneling", "DNA-mutations", "tautomers", "Lowdin", "spontaneous-mutation"],
+      "confidence": 0.78,
+      "novelty": 0.87,
+      "source": "research"
+    },
+    {
+      "title": "Quantum Biology of Mitochondrial Electron Transport",
+      "category": "pattern",
+      "content": "Electron transfer in the mitochondrial respiratory chain involves quantum tunneling across protein barriers between redox cofactors. Marcus theory describes the rate dependence on driving force and reorganization energy, with tunneling corrections for distances beyond 14 Angstroms. Superexchange and hopping mechanisms compete depending on bridge energetics. Recent evidence suggests quantum coherence may survive long enough to influence electron transfer pathway selection in Complex I.",
+      "tags": ["electron-transport", "mitochondria", "Marcus-theory", "superexchange", "respiratory-chain"],
+      "confidence": 0.82,
+      "novelty": 0.80,
+      "source": "research"
+    },
+    {
+      "title": "Biophotons — Ultra-Weak Photon Emission from Living Cells",
+      "category": "pattern",
+      "content": "All living cells emit ultra-weak bioluminescence (1-1000 photons/sec/cm²) distinct from bioluminescence. These biophotons arise from oxidative metabolic processes and exhibit non-classical photon statistics. Some researchers propose biophotons mediate cell-to-cell communication, with neural biophotons potentially carrying quantum information through myelinated axons acting as optical waveguides. While speculative, biophoton coherence measurements show non-trivial quantum correlations.",
+      "tags": ["biophotons", "ultra-weak-emission", "cell-communication", "photon-statistics", "oxidative-metabolism"],
+      "confidence": 0.68,
+      "novelty": 0.90,
+      "source": "research"
+    },
+    {
+      "title": "Quantum Entanglement in Biological Systems",
+      "category": "pattern",
+      "content": "Whether quantum entanglement plays functional roles in biology remains hotly debated. Theoretical models suggest radical pair reactions involve transient entanglement. Photosynthetic energy transfer may exploit entanglement between chromophores. Fisher's hypothesis proposes that Posner molecules (calcium phosphate clusters) could maintain entangled nuclear spins for hours, potentially influencing neural processes. Experimental verification remains challenging due to decoherence timescales.",
+      "tags": ["quantum-entanglement", "biological-entanglement", "Posner-molecules", "Fisher-hypothesis", "decoherence"],
+      "confidence": 0.65,
+      "novelty": 0.92,
+      "source": "research"
+    },
+    {
+      "title": "Quantum Evolution — Mutation Rate Enhancement",
+      "category": "pattern",
+      "content": "Quantum effects may accelerate evolution beyond classical mutation rates. Proton tunneling in DNA creates tautomeric mismatches during replication. Quantum delocalization of hydrogen atoms in base pairs increases the probability of aberrant tautomer formation. Adaptive mutation studies in bacteria show mutation rates that respond to selective pressure, potentially involving quantum-enhanced exploration of sequence space. The quantum Zeno effect might stabilize beneficial mutations.",
+      "tags": ["quantum-evolution", "mutation-rate", "adaptive-mutation", "quantum-Zeno", "tautomeric-mismatch"],
+      "confidence": 0.70,
+      "novelty": 0.89,
+      "source": "research"
+    },
+    {
+      "title": "Quantum Effects in Collagen and Structural Biology",
+      "category": "pattern",
+      "content": "Proton tunneling along hydrogen bond networks in collagen triple helices may influence structural stability and mechanical properties. Nuclear quantum effects alter hydrogen bond geometries by up to 0.03 Angstroms, significant for closely packed structural proteins. Path integral simulations reveal that quantum delocalization of shared protons in strong hydrogen bonds affects enzyme-substrate interactions and protein folding energy landscapes.",
+      "tags": ["collagen", "hydrogen-bonds", "nuclear-quantum-effects", "protein-folding", "path-integral"],
+      "confidence": 0.75,
+      "novelty": 0.83,
+      "source": "research"
+    },
+    {
+      "title": "Quantum Neuroscience — Beyond Orch-OR",
+      "category": "architecture",
+      "content": "Beyond Penrose-Hameroff's Orch-OR, several quantum neuroscience models exist. Fisher's neural qubit hypothesis proposes phosphorus nuclear spins in Posner clusters maintain coherence for hours. Quantum ion channels could amplify quantum effects to cellular scales. Stapp's quantum mind model uses von Neumann's Process 1 for attention-directed collapse. While mainstream neuroscience remains skeptical, advances in quantum sensing (NV centers) may soon enable direct measurement of quantum coherence in neural tissue.",
+      "tags": ["quantum-neuroscience", "neural-qubits", "Posner-clusters", "quantum-sensing", "NV-centers"],
+      "confidence": 0.62,
+      "novelty": 0.93,
+      "source": "research"
+    },
+    {
+      "title": "Quantum Photobiology — Vision and Photoreception",
+      "category": "pattern",
+      "content": "Rod cells detect single photons with remarkable efficiency, and the 11-cis to all-trans retinal isomerization that initiates vision involves quantum coherent dynamics. Femtosecond spectroscopy reveals that the isomerization occurs in 200 fs via a conical intersection, with quantum coherence guiding the wavepacket through the photochemical funnel. This ultrafast quantum process achieves 67% quantum yield, far exceeding thermal isomerization efficiency.",
+      "tags": ["quantum-vision", "retinal-isomerization", "conical-intersection", "photoreception", "femtosecond-dynamics"],
+      "confidence": 0.87,
+      "novelty": 0.81,
+      "source": "research"
+    },
+    {
+      "title": "Quantum Coherence in Warm Biological Systems — Decoherence Protection",
+      "category": "pattern",
+      "content": "The central puzzle of quantum biology is how quantum coherence survives in warm, wet, noisy biological environments. Proposed protection mechanisms include: environment-assisted quantum transport (noise helps, not hinders), vibrational dressing of electronic states, protein scaffolding that creates noise-free subspaces, and non-Markovian bath effects that partially reverse decoherence. The emerging picture is that biology exploits rather than fights thermal noise for quantum advantage.",
+      "tags": ["decoherence-protection", "environment-assisted", "noise-free-subspace", "non-Markovian", "quantum-advantage"],
+      "confidence": 0.84,
+      "novelty": 0.86,
+      "source": "research"
+    },
+    {
+      "title": "Quantum Information in Genetic Code",
+      "category": "pattern",
+      "content": "Information-theoretic analysis of the genetic code reveals non-classical features. The degeneracy of the codon table (64 codons mapping to 20 amino acids + stop) has error-correcting properties analogous to quantum error correction codes. Some theorists propose that the genetic code evolved to exploit quantum information processing in tRNA-ribosome interactions. While speculative, the mathematical structure of codon assignments shows symmetries consistent with quantum algebraic frameworks.",
+      "tags": ["quantum-genetic-code", "codon-degeneracy", "error-correction", "quantum-algebra", "genetic-information"],
+      "confidence": 0.60,
+      "novelty": 0.91,
+      "source": "research"
+    },
+    {
+      "title": "Quantum Metabolism — Tunneling in Metabolic Networks",
+      "category": "pattern",
+      "content": "Hydrogen and hydride tunneling accelerate key metabolic reactions including glycolysis (triose phosphate isomerase), citric acid cycle (malate dehydrogenase), and fatty acid oxidation. Computational kinetic models incorporating tunneling corrections predict metabolic flux rates that better match experimental data than classical models. The tunneling-ready conformation concept explains how protein dynamics create transient geometries optimal for nuclear quantum tunneling in metabolic enzymes.",
+      "tags": ["quantum-metabolism", "hydride-tunneling", "metabolic-flux", "tunneling-ready", "enzyme-dynamics"],
+      "confidence": 0.80,
+      "novelty": 0.82,
+      "source": "research"
+    },
+    {
+      "title": "Quantum Effects in Anesthesia — The Quantum Mind Debate",
+      "category": "pattern",
+      "content": "General anesthetics act through poorly understood mechanisms despite 175 years of use. Turin proposes that anesthetics work by disrupting electron currents in neural proteins via quantum interference. The Meyer-Overton correlation between anesthetic potency and lipid solubility may reflect quantum effects in hydrophobic protein pockets. Xenon (an anesthetic noble gas) affects only electronic, not vibrational, degrees of freedom, supporting an electronic rather than structural mechanism.",
+      "tags": ["quantum-anesthesia", "electron-currents", "Meyer-Overton", "xenon-anesthesia", "consciousness-disruption"],
+      "confidence": 0.70,
+      "novelty": 0.85,
+      "source": "research"
+    },
+    {
+      "title": "Experimental Techniques in Quantum Biology",
+      "category": "solution",
+      "content": "Key experimental methods include: 2D electronic spectroscopy (femtosecond coherence dynamics), kinetic isotope effects (tunneling contribution), magnetic field effects on radical pairs, single-molecule fluorescence (quantum jumps in proteins), nitrogen-vacancy center magnetometry (nanoscale magnetic sensing in living cells), and ultrafast X-ray crystallography at XFELs (quantum dynamics in enzyme intermediates). Cryo-EM and AlphaFold complement by providing structural context.",
+      "tags": ["experimental-methods", "2D-spectroscopy", "NV-magnetometry", "XFEL", "single-molecule"],
+      "confidence": 0.90,
+      "novelty": 0.78,
+      "source": "research"
+    },
+    {
+      "title": "Quantum Biology and Origin of Life",
+      "category": "pattern",
+      "content": "Quantum effects may have been crucial in life's origin. Quantum tunneling accelerates prebiotic chemistry on mineral surfaces. Quantum coherence in primordial light-harvesting pigments could bootstrap early energy metabolism. The quantum Darwinism framework suggests that classical information emerges from quantum substrate through environmental decoherence — biology may represent the most sophisticated example of quantum-to-classical transition in nature.",
+      "tags": ["origin-of-life", "prebiotic-chemistry", "quantum-Darwinism", "primordial-pigments", "abiogenesis"],
+      "confidence": 0.65,
+      "novelty": 0.90,
+      "source": "research"
+    },
+    {
+      "title": "Quantum Coherence Timescales in Biology vs Silicon",
+      "category": "pattern",
+      "content": "Biological quantum coherence operates on dramatically different timescales than quantum computers. Photosynthetic coherence: 100-700 fs at 300K. Radical pair spin coherence: 1-100 microseconds. Posner molecule nuclear spins: potentially hours-days. Silicon qubits: microseconds to milliseconds at millikelvin. Biology achieves functional quantum effects through tolerance of decoherence rather than suppressing it, using many short-lived coherent processes rather than few long-lived ones.",
+      "tags": ["coherence-timescales", "decoherence-tolerance", "biological-vs-silicon", "functional-coherence", "timescale-comparison"],
+      "confidence": 0.85,
+      "novelty": 0.80,
+      "source": "research"
+    },
+    {
+      "title": "Quantum Sensing in Biological Navigation",
+      "category": "pattern",
+      "content": "Beyond avian magnetoreception, quantum sensing appears in multiple biological navigation systems. Sea turtles, salmon, and monarch butterflies show magnetic sensitivity consistent with radical pair or magnetite-based quantum mechanisms. Quantum-enhanced signal amplification in magnetosomes may explain navigation precision beyond classical limits. Biogenic quantum sensors could inspire room-temperature quantum sensing technology for medical imaging and mineral exploration.",
+      "tags": ["quantum-sensing", "biological-navigation", "magnetosomes", "biomimetic-sensors", "quantum-precision"],
+      "confidence": 0.80,
+      "novelty": 0.84,
+      "source": "research"
+    }
+  ]
+}

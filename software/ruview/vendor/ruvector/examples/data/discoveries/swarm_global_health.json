@@ -1,0 +1,9 @@
+[
+  {
+    "title": "WHO Life Expectancy Data (Unavailable)",
+    "content": "WHO Global Health Observatory API (ghoapi.azurewebsites.net) was unreachable due to network/DNS restrictions. Indicator: WHOSIS_000001 (life expectancy at birth).",
+    "timestamp": "2026-03-15T23:58:59.543342Z",
+    "source": "WHO GHO API - API unavailable",
+    "confidence": 0.0
+  }
+]

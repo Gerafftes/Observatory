@@ -1,0 +1,295 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release (e.g., 1.0.0)'
+        required: true
+        type: string
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+# Required for softprops/action-gh-release to POST to the GitHub
+# Releases API. Without `contents: write` the action 403s with
+# "Resource not accessible by integration" and the entire downstream
+# pipeline (build-release, publish-crates, update-docs) is skipped.
+# Repro: v0.2.1 tag push 2026-05-13 — release was created but
+# nothing published. Adding workflow-level permissions here so every
+# job inherits the minimum it needs; jobs that don't touch the API
+# (build-release, publish-crates) cost nothing extra.
+permissions:
+  contents: write
+
+jobs:
+  # Create GitHub release
+  create-release:
+    name: Create Release
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      upload_url: ${{ steps.create_release.outputs.upload_url }}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Get version
+        id: version
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            VERSION="${{ github.event.inputs.version }}"
+          else
+            VERSION=${GITHUB_REF#refs/tags/v}
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Version: $VERSION"
+
+      - name: Generate changelog
+        id: changelog
+        run: |
+          # Install git-cliff if needed
+          if ! command -v git-cliff &> /dev/null; then
+            cargo install git-cliff
+          fi
+
+          # Generate changelog
+          git-cliff --latest --strip all > CHANGELOG.md
+
+          echo "Generated changelog:"
+          cat CHANGELOG.md
+
+      # `actions/create-release@v1` is archived (since 2021). Replaced
+      # with the maintained `softprops/action-gh-release@v2`, which
+      # also handles asset upload below so `actions/upload-release-asset@v1`
+      # (also archived) is no longer needed.
+      - name: Create GitHub release
+        id: create_release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.version.outputs.version }}
+          name: Release v${{ steps.version.outputs.version }}
+          body_path: CHANGELOG.md
+          draft: false
+          prerelease: false
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+  # Build release binaries
+  build-release:
+    name: Build Release (${{ matrix.target }})
+    needs: create-release
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            artifact_name: midstream-linux-x86_64
+          - os: ubuntu-latest
+            target: aarch64-unknown-linux-gnu
+            artifact_name: midstream-linux-aarch64
+          - os: macos-latest
+            target: x86_64-apple-darwin
+            artifact_name: midstream-macos-x86_64
+          - os: macos-latest
+            target: aarch64-apple-darwin
+            artifact_name: midstream-macos-aarch64
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            artifact_name: midstream-windows-x86_64
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Setup cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: "release-${{ matrix.target }}"
+
+      - name: Install cross-compilation tools (Linux ARM)
+        if: matrix.target == 'aarch64-unknown-linux-gnu'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-aarch64-linux-gnu
+
+      - name: Build release binary
+        # No `--all-features` here: the midstream binary's
+        # `src/lean_agentic/` facade has 27 unresolved-import errors
+        # when its off-by-default `lean-agentic` feature is enabled
+        # (ADR-0005 deprecates the module; rust-ci.yml's clippy/test/
+        # docs/coverage jobs already exclude midstream for the same
+        # reason). Ship the default-feature binary; opt-in features
+        # can be re-enabled when the facade is retired.
+        run: cargo build --release --target ${{ matrix.target }}
+
+      - name: Package binary (Unix)
+        if: matrix.os != 'windows-latest'
+        run: |
+          cd target/${{ matrix.target }}/release
+          tar czf ${{ matrix.artifact_name }}.tar.gz midstream
+          mv ${{ matrix.artifact_name }}.tar.gz ../../../
+
+      - name: Package binary (Windows)
+        if: matrix.os == 'windows-latest'
+        run: |
+          cd target/${{ matrix.target }}/release
+          7z a ${{ matrix.artifact_name }}.zip midstream.exe
+          move ${{ matrix.artifact_name }}.zip ../../../
+
+      # softprops/action-gh-release uploads files matched by the `files`
+      # glob to the release identified by `tag_name`. No `upload_url`
+      # plumbing needed.
+      - name: Upload release asset
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ needs.create-release.outputs.version }}
+          files: ./${{ matrix.artifact_name }}.${{ matrix.os == 'windows-latest' && 'zip' || 'tar.gz' }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+  # Publish crates to crates.io
+  publish-crates:
+    name: Publish to crates.io
+    needs: create-release
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Setup cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: "publish"
+
+      # Use `cargo set-version` (from cargo-edit) rather than `sed -i`
+      # so the bump validates against the manifest and updates dependent
+      # version specs (path deps with `version = ...`) atomically.
+      - name: Install cargo-edit
+        run: cargo install cargo-edit --locked
+
+      - name: Update crate versions
+        run: |
+          VERSION="${{ needs.create-release.outputs.version }}"
+          cargo set-version --workspace "$VERSION"
+
+      - name: Verify build after version update
+        # Exclude `midstream` and `hyprstream` for the same reason
+        # rust-ci.yml::msrv does: the `midstream` binary's
+        # `src/lean_agentic/` facade currently has unresolved imports
+        # under `--all-features` (gated by the off-by-default
+        # `lean-agentic` feature). Once that's fixed in a follow-up
+        # PR, drop these excludes. The 6 published `midstreamer-*`
+        # libs are what we're about to publish, and they all build
+        # cleanly here.
+        run: cargo build --workspace --exclude midstream --exclude hyprstream --all-features
+
+      # Crate names: every workspace crate uses the `midstreamer-*`
+      # prefix per the rename tracked by ADR-0024. The previous
+      # `cargo publish -p temporal-compare` form (etc.) targeted
+      # crate names that don't exist; the workflow would have failed
+      # at runtime.
+      #
+      # `--no-verify` skips re-running tests inside the publish dry
+      # run (CI has already exercised them); the `cargo publish`
+      # built-in wait replaces the `sleep 10` hack: it polls
+      # crates.io until the freshly-uploaded version is resolvable
+      # before returning. `--allow-dirty` is kept because the
+      # `cargo set-version` step modifies the working tree.
+      - name: Publish crates in dependency order
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+        run: |
+          # Leaves first (no internal deps).
+          cargo publish -p midstreamer-temporal-compare    --allow-dirty
+          cargo publish -p midstreamer-scheduler           --allow-dirty
+          cargo publish -p midstreamer-quic                --allow-dirty
+
+          # Mid-tier (depend on the leaves above).
+          cargo publish -p midstreamer-attractor           --allow-dirty
+          cargo publish -p midstreamer-neural-solver       --allow-dirty
+
+          # Apex of the workspace DAG.
+          cargo publish -p midstreamer-strange-loop        --allow-dirty
+
+          # Top-level binary crate. Skipped while `--all-features`
+          # is broken on `midstream` (see Verify-build comment above).
+          # The libs publish independently of the binary.
+          # cargo publish -p midstream                     --allow-dirty
+
+  # Update documentation
+  update-docs:
+    name: Update Documentation
+    needs: [create-release, publish-crates]
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Setup cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: "docs-release"
+
+      - name: Build documentation
+        # Same midstream/hyprstream exclusion as rust-ci.yml's docs +
+        # release.yml's verify step: `--all-features` enables the
+        # off-by-default `lean-agentic` feature, which hits 27 errors
+        # in src/lean_agentic/. ADR-0005 deprecates that module.
+        run: cargo doc --workspace --exclude midstream --exclude hyprstream --all-features --no-deps
+
+      - name: Add version badge to docs
+        run: |
+          VERSION="${{ needs.create-release.outputs.version }}"
+          echo "<div style='padding: 1em; background: #4CAF50; color: white;'>Version: $VERSION</div>" \
+            > target/doc/version.html
+
+      - name: Deploy documentation
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./target/doc
+          destination_dir: docs/v${{ needs.create-release.outputs.version }}
+
+      - name: Update latest docs symlink
+        run: |
+          git checkout gh-pages
+          ln -sfn v${{ needs.create-release.outputs.version }} docs/latest
+          git add docs/latest
+          git commit -m "Update latest docs to v${{ needs.create-release.outputs.version }}"
+          git push
+
+  # Notify on completion
+  release-complete:
+    name: Release Complete
+    needs: [create-release, build-release, publish-crates, update-docs]
+    runs-on: ubuntu-latest
+    if: always()
+
+    steps:
+      - name: Check release status
+        run: |
+          if [[ "${{ contains(needs.*.result, 'failure') }}" == "true" ]]; then
+            echo "❌ Release process encountered errors"
+            exit 1
+          fi
+          echo "✅ Release v${{ needs.create-release.outputs.version }} completed successfully!"
+          echo "📦 Crates published to crates.io"
+          echo "📚 Documentation updated"
+          echo "🎉 Binaries available on GitHub Releases"

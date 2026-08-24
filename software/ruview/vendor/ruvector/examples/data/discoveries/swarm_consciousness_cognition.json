@@ -1,0 +1,186 @@
+{
+  "domain": "consciousness-cognition",
+  "generated": "2026-03-16T14:00:00Z",
+  "entries": [
+    {
+      "title": "Integrated Information Theory (IIT) — Phi as Consciousness Measure",
+      "category": "architecture",
+      "content": "IIT proposes that consciousness is identical to integrated information (Phi), measured as the irreducibility of a system's cause-effect structure. A system is conscious to the degree it cannot be decomposed into independent parts without information loss. IIT makes testable predictions: the cerebellum has low Phi despite many neurons, while the cortex has high Phi due to recurrent connectivity. IIT 4.0 introduces intrinsic information and postulates about the quality of experience.",
+      "tags": ["IIT", "integrated-information", "phi", "consciousness-measure", "Tononi"],
+      "confidence": 0.88,
+      "novelty": 0.85,
+      "source": "research"
+    },
+    {
+      "title": "Global Workspace Theory — Broadcasting Consciousness",
+      "category": "architecture",
+      "content": "GWT models consciousness as a global broadcast from a central workspace to specialized unconscious processors. Information becomes conscious when it wins competition for workspace access and is broadcast widely. Neural correlates map to prefrontal-parietal networks igniting into sustained activity. Global Neuronal Workspace Theory (GNWT) by Dehaene predicts specific EEG signatures (P3b wave) that distinguish conscious from unconscious processing.",
+      "tags": ["global-workspace", "broadcasting", "consciousness", "Baars", "Dehaene"],
+      "confidence": 0.90,
+      "novelty": 0.78,
+      "source": "research"
+    },
+    {
+      "title": "Predictive Processing — The Brain as Prediction Machine",
+      "category": "pattern",
+      "content": "Predictive processing posits that the brain continuously generates top-down predictions about sensory input, with only prediction errors propagated upward. This hierarchical Bayesian inference framework explains perception, action, attention, and psychopathology. Precision-weighted prediction errors modulate learning rates. Active inference extends this: organisms act to fulfill predictions rather than merely updating beliefs, unifying perception and action.",
+      "tags": ["predictive-processing", "prediction-error", "bayesian-brain", "hierarchical-inference", "precision-weighting"],
+      "confidence": 0.91,
+      "novelty": 0.80,
+      "source": "research"
+    },
+    {
+      "title": "Free Energy Principle — Minimizing Surprise to Exist",
+      "category": "architecture",
+      "content": "Karl Friston's Free Energy Principle states that all self-organizing systems minimize variational free energy — an upper bound on surprise. Living systems maintain their existence by restricting themselves to expected states (homeostasis) through perception (updating beliefs) and action (changing the world). The math unifies thermodynamics, information theory, and Bayesian inference. Critics argue it may be unfalsifiable due to its generality.",
+      "tags": ["free-energy-principle", "Friston", "variational-inference", "self-organization", "active-inference"],
+      "confidence": 0.85,
+      "novelty": 0.87,
+      "source": "research"
+    },
+    {
+      "title": "Higher-Order Theories of Consciousness",
+      "category": "pattern",
+      "content": "Higher-order theories propose that a mental state is conscious when there is a higher-order representation of that state — a thought about a thought. HOT (Higher-Order Thought) theory requires explicit meta-cognitive representation. Rosenthal's version predicts that prefrontal damage eliminates consciousness while preserving behavior. This explains why AI systems processing information without self-monitoring may lack phenomenal experience.",
+      "tags": ["higher-order-theory", "meta-cognition", "HOT", "Rosenthal", "self-monitoring"],
+      "confidence": 0.82,
+      "novelty": 0.80,
+      "source": "research"
+    },
+    {
+      "title": "Active Inference — Perception and Action Unified",
+      "category": "architecture",
+      "content": "Active inference extends predictive processing by treating action as another way to minimize prediction error. Instead of passively updating beliefs, agents actively sample the environment to confirm predictions. This provides a unified account of exploration (reducing uncertainty), exploitation (fulfilling preferences), and epistemic foraging (seeking information). Implementations use partially observable Markov decision processes with expected free energy objectives.",
+      "tags": ["active-inference", "epistemic-foraging", "expected-free-energy", "POMDP", "exploration-exploitation"],
+      "confidence": 0.87,
+      "novelty": 0.84,
+      "source": "research"
+    },
+    {
+      "title": "Embodied Cognition — Mind Beyond the Brain",
+      "category": "pattern",
+      "content": "Embodied cognition argues that cognitive processes are fundamentally shaped by the body's morphology and sensorimotor capabilities. Abstract concepts are grounded in bodily metaphors (understanding is grasping). The extended mind thesis (Clark & Chalmers) suggests cognitive processes extend into tools and environment. Radical embodiment eliminates internal representations entirely, treating cognition as direct organism-environment coupling.",
+      "tags": ["embodied-cognition", "extended-mind", "grounded-cognition", "4E-cognition", "sensorimotor"],
+      "confidence": 0.86,
+      "novelty": 0.76,
+      "source": "research"
+    },
+    {
+      "title": "Quantum Consciousness — Orchestrated Objective Reduction",
+      "category": "architecture",
+      "content": "Penrose and Hameroff propose that consciousness arises from quantum computations in microtubules within neurons. Orchestrated Objective Reduction (Orch-OR) suggests that quantum superpositions in tubulin proteins collapse via gravity-induced objective reduction, producing moments of conscious experience. While controversial, recent experiments show quantum coherence in warm biological systems lasting longer than expected. Anesthetic gases binding to microtubules correlate with consciousness loss.",
+      "tags": ["quantum-consciousness", "Orch-OR", "microtubules", "Penrose-Hameroff", "objective-reduction"],
+      "confidence": 0.65,
+      "novelty": 0.92,
+      "source": "research"
+    },
+    {
+      "title": "Neural Correlates of Consciousness — The NCC Quest",
+      "category": "pattern",
+      "content": "NCC research identifies the minimal neural mechanisms sufficient for specific conscious percepts. Koch and Crick proposed that 40Hz gamma oscillations in thalamocortical circuits are key. Modern approaches use no-report paradigms to separate consciousness from cognitive access. The Adversarial Collaboration between IIT and GWT is testing competing predictions using fMRI and EEG, with results challenging both theories on specific neural timing predictions.",
+      "tags": ["neural-correlates", "NCC", "gamma-oscillations", "adversarial-collaboration", "no-report-paradigm"],
+      "confidence": 0.89,
+      "novelty": 0.77,
+      "source": "research"
+    },
+    {
+      "title": "Enactivism — Cognition as Sense-Making",
+      "category": "pattern",
+      "content": "Enactivism, rooted in Varela, Thompson, and Rosch's work, views cognition as the active process of sense-making by an autonomous, self-producing (autopoietic) system. Knowledge is not represented but enacted through structural coupling with the environment. The enactive approach to consciousness emphasizes organismic self-concern and affective tone as fundamental. This challenges computational theories that equate cognition with information processing.",
+      "tags": ["enactivism", "autopoiesis", "sense-making", "Varela", "structural-coupling"],
+      "confidence": 0.80,
+      "novelty": 0.82,
+      "source": "research"
+    },
+    {
+      "title": "Attention Schema Theory — Consciousness as Self-Model of Attention",
+      "category": "architecture",
+      "content": "Michael Graziano's Attention Schema Theory proposes that consciousness is the brain's simplified model of its own attention processes. Just as the body schema models the body without representing every neuron, the attention schema models attention as a non-physical essence — giving rise to the intuition of subjective experience. This explains why we attribute consciousness to ourselves and others, and predicts that sufficiently complex attention-modeling AI would claim consciousness.",
+      "tags": ["attention-schema", "Graziano", "self-model", "attention-modeling", "machine-consciousness"],
+      "confidence": 0.83,
+      "novelty": 0.86,
+      "source": "research"
+    },
+    {
+      "title": "Recurrent Processing Theory — Feedback Loops Generate Experience",
+      "category": "architecture",
+      "content": "Lamme's Recurrent Processing Theory argues that consciousness requires recurrent (feedback) processing between brain areas, not just feedforward sweeps. Feedforward processing enables unconscious categorization, while local recurrent loops generate phenomenal experience, and widespread recurrence enables reportable access consciousness. This explains backward masking — stimuli processed feedforward but prevented from recurrent processing are not consciously perceived.",
+      "tags": ["recurrent-processing", "feedback-loops", "Lamme", "phenomenal-consciousness", "backward-masking"],
+      "confidence": 0.85,
+      "novelty": 0.79,
+      "source": "research"
+    },
+    {
+      "title": "Panpsychism — Consciousness as Fundamental Property",
+      "category": "pattern",
+      "content": "Panpsychism holds that consciousness is a fundamental feature of physical matter, present even in elementary particles. Constitutive panpsychism faces the combination problem: how micro-experiences combine into macro-consciousness. Cosmopsychism inverts this — the universe has one consciousness that decomposes into individual minds. Philip Goff argues panpsychism best explains why physical processes give rise to experience, avoiding both dualism and eliminativism.",
+      "tags": ["panpsychism", "combination-problem", "cosmopsychism", "fundamental-consciousness", "Philip-Goff"],
+      "confidence": 0.72,
+      "novelty": 0.88,
+      "source": "research"
+    },
+    {
+      "title": "Artificial Consciousness — Can Machines Be Conscious?",
+      "category": "pattern",
+      "content": "The question of machine consciousness sits at the intersection of AI and philosophy of mind. Functionalists argue that the right computational organization suffices for consciousness. Biological naturalists (Searle) deny substrate-independent consciousness. Practical criteria include Global Workspace access, recurrent processing, self-modeling, and integrated information. The Association for Mathematical Consciousness Science is developing rigorous tests, though no consensus exists.",
+      "tags": ["artificial-consciousness", "machine-consciousness", "functionalism", "substrate-independence", "consciousness-test"],
+      "confidence": 0.78,
+      "novelty": 0.85,
+      "source": "research"
+    },
+    {
+      "title": "Metacognition — Thinking About Thinking",
+      "category": "pattern",
+      "content": "Metacognition encompasses the monitoring and control of cognitive processes. Confidence calibration, error detection, and strategy selection are core metacognitive abilities. Neural substrates include anterior prefrontal cortex for retrospective confidence and dorsolateral PFC for prospective monitoring. AI systems increasingly implement metacognitive modules — uncertainty estimation, self-critique chains, and learned calibration — though whether these constitute genuine self-awareness remains debated.",
+      "tags": ["metacognition", "confidence-calibration", "self-monitoring", "prefrontal-cortex", "uncertainty-estimation"],
+      "confidence": 0.90,
+      "novelty": 0.74,
+      "source": "research"
+    },
+    {
+      "title": "Default Mode Network — The Brain's Internal Narrative",
+      "category": "pattern",
+      "content": "The DMN activates during rest, mind-wandering, self-referential thought, and future simulation. It includes medial prefrontal cortex, posterior cingulate, and angular gyrus. DMN activity anti-correlates with task-positive networks. Disrupted DMN connectivity is observed in psychedelics (ego dissolution), meditation, and psychiatric disorders. Some theorists link DMN to the narrative self — the continuous story we tell about who we are.",
+      "tags": ["default-mode-network", "mind-wandering", "self-referential", "narrative-self", "resting-state"],
+      "confidence": 0.91,
+      "novelty": 0.72,
+      "source": "research"
+    },
+    {
+      "title": "Perceptual Control Theory — Behavior as Controlled Perception",
+      "category": "architecture",
+      "content": "PCT reframes behavior as the control of perception rather than the production of output. Organisms act to maintain perceptual signals at reference values, creating negative feedback loops at multiple hierarchical levels. William Powers showed this explains everything from muscle reflexes to abstract goal pursuit. PCT predicts that behavior varies freely while controlled perceptions remain constant — the Test for the Controlled Variable identifies what organisms actually control.",
+      "tags": ["perceptual-control-theory", "PCT", "negative-feedback", "controlled-variable", "Powers"],
+      "confidence": 0.80,
+      "novelty": 0.83,
+      "source": "research"
+    },
+    {
+      "title": "Consciousness and Complexity — Perturbational Complexity Index",
+      "category": "solution",
+      "content": "The Perturbational Complexity Index (PCI) measures consciousness by zapping the brain with TMS and measuring the complexity of the resulting EEG response. High PCI indicates complex, integrated brain dynamics associated with consciousness. PCI correctly classifies wakefulness, sleep stages, anesthesia, and disorders of consciousness with >90% accuracy. It provides a practical clinical tool for detecting covert consciousness in unresponsive patients.",
+      "tags": ["PCI", "perturbational-complexity", "TMS-EEG", "disorders-of-consciousness", "clinical-measure"],
+      "confidence": 0.90,
+      "novelty": 0.81,
+      "source": "research"
+    },
+    {
+      "title": "Predictive Coding Networks — Computational Implementation",
+      "category": "architecture",
+      "content": "Predictive coding networks implement hierarchical Bayesian inference with separate prediction and error units at each level. Top-down connections carry predictions, bottom-up connections carry prediction errors. Rao and Ballard demonstrated this explains visual cortex response properties. Modern implementations use precision-weighted prediction errors for attention, expectation suppression, and mismatch negativity. This architecture may unify supervised, unsupervised, and reinforcement learning.",
+      "tags": ["predictive-coding", "hierarchical-bayesian", "prediction-error", "precision-weighting", "cortical-architecture"],
+      "confidence": 0.88,
+      "novelty": 0.78,
+      "source": "research"
+    },
+    {
+      "title": "Theory of Mind in AI — Modeling Others' Mental States",
+      "category": "pattern",
+      "content": "Theory of Mind (ToM) is the ability to attribute beliefs, desires, and intentions to others. LLMs show emergent ToM-like capabilities on false-belief tasks, though whether this reflects genuine mentalizing or pattern matching is debated. Explicit ToM modules in multi-agent systems improve cooperation and communication. Social cognition may be a prerequisite for artificial consciousness — understanding that others have minds implies some model of what having a mind means.",
+      "tags": ["theory-of-mind", "mentalizing", "false-belief", "social-cognition", "multi-agent"],
+      "confidence": 0.84,
+      "novelty": 0.80,
+      "source": "research"
+    }
+  ]
+}

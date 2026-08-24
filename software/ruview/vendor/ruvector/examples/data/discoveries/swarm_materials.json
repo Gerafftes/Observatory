@@ -1,0 +1,82 @@
+[
+  {
+    "title": "Material: methane",
+    "content": "methane. Formula: C. MW: 12.011",
+    "category": "pattern",
+    "tags": [
+      "materials",
+      "chemistry",
+      "pubchem",
+      "gap-fill"
+    ],
+    "domain": "materials-physics",
+    "source_api": "PubChem",
+    "timestamp": "2026-03-15T21:59:51Z",
+    "confidence": 0.85,
+    "data_points": 1
+  },
+  {
+    "title": "Material: calcium dioxido(oxo)titanium",
+    "content": "calcium dioxido(oxo)titanium. Formula: CaO3Ti. MW: 135.94",
+    "category": "pattern",
+    "tags": [
+      "materials",
+      "chemistry",
+      "pubchem",
+      "gap-fill"
+    ],
+    "domain": "materials-physics",
+    "source_api": "PubChem",
+    "timestamp": "2026-03-15T21:59:51Z",
+    "confidence": 0.85,
+    "data_points": 1
+  },
+  {
+    "title": "Material: dioxotitanium",
+    "content": "dioxotitanium. Formula: O2Ti. MW: 79.866",
+    "category": "pattern",
+    "tags": [
+      "materials",
+      "chemistry",
+      "pubchem",
+      "gap-fill"
+    ],
+    "domain": "materials-physics",
+    "source_api": "PubChem",
+    "timestamp": "2026-03-15T21:59:51Z",
+    "confidence": 0.85,
+    "data_points": 1
+  },
+  {
+    "title": "Material: methanidylidynesilanylium",
+    "content": "methanidylidynesilanylium. Formula: CSi. MW: 40.096",
+    "category": "pattern",
+    "tags": [
+      "materials",
+      "chemistry",
+      "pubchem",
+      "gap-fill"
+    ],
+    "domain": "materials-physics",
+    "source_api": "PubChem",
+    "timestamp": "2026-03-15T21:59:51Z",
+    "confidence": 0.85,
+    "data_points": 1
+  },
+  {
+    "title": "Material: lithium oxido(oxo)cobalt",
+    "content": "lithium oxido(oxo)cobalt. Formula: CoLiO2. MW: 97.9",
+    "category": "pattern",
+    "tags": [
+      "materials",
+      "chemistry",
+      "pubchem",
+      "gap-fill"
+    ],
+    "domain": "materials-physics",
+    "source_api": "PubChem",
+    "timestamp": "2026-03-15T21:59:51Z",
+    "confidence": 0.85,
+    "data_points": 1
+  }
+]

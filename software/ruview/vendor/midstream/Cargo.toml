@@ -1,0 +1,168 @@
+[workspace]
+members = [
+    "crates/quic-multistream",
+    "crates/temporal-compare",
+    "crates/nanosecond-scheduler",
+    "crates/temporal-attractor-studio",
+    "crates/temporal-neural-solver",
+    "crates/strange-loop",
+    "xtask",
+]
+# `xtask` is excluded from default-members so `cargo check / build`
+# without an explicit `-p` flag doesn't compile it (it's a chore
+# runner, not a published crate). Invoke via the alias in
+# `.cargo/config.toml`: `cargo xtask <cmd>`.
+default-members = [
+    "crates/quic-multistream",
+    "crates/temporal-compare",
+    "crates/nanosecond-scheduler",
+    "crates/temporal-attractor-studio",
+    "crates/temporal-neural-solver",
+    "crates/strange-loop",
+]
+exclude = ["npm-wasm", "fuzz"]
+
+# Per ADR-0034. Second-phase rollout: now that the workspace passes
+# `cargo clippy -- -D warnings` clean (PR #48 cleared the four
+# pre-existing `clippy::all` hits), the previously-`warn` foot-gun
+# lints get promoted to `deny`. Higher-impact lints
+# (clippy::pedantic, unwrap_used, expect_used, panic, missing_docs,
+# broken_intra_doc_links) are still deferred — each requires its
+# own targeted cleanup PR before we can flip it without breaking
+# `-D warnings` CI.
+#
+# Per-crate `[lints] workspace = true` inherits this table.
+[workspace.lints.rust]
+# Verified zero `unsafe ` blocks in workspace code (security review,
+# 2026-05-13). `deny` lets specific crates opt in later via `#[allow]`
+# plus a doc-comment justification; `forbid` would be stricter still
+# but blocks even the opt-in path.
+unsafe_code = "deny"
+# Catches `let _ = … ;` on Results / Futures / iterators that the
+# author meant to handle. Real-bug class; no false positives expected.
+unused_must_use = "deny"
+
+[workspace.lints.clippy]
+# Footgun macros. Verified zero hits across `crates/*/src/` and
+# `src/` (PR #15 audit) — promoted from warn -> deny so any future
+# regression fails CI.
+dbg_macro = "deny"
+todo = "deny"
+unimplemented = "deny"
+# Calls `std::mem::forget` on something that owns resources -
+# almost always a bug. Verified zero hits in workspace code.
+mem_forget = "deny"
+
+[package]
+name = "midstream"
+version = "0.2.1"
+edition = "2021"
+rust-version = "1.81"
+description = "Real-time LLM streaming with inflight analysis"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/ruvnet/midstream"
+
+# Per ADR-0005, the in-tree `src/lean_agentic/` subsystem duplicates
+# (and silently diverges from) the published `midstreamer-*` workspace
+# crates. It also currently fails to compile (~27 errors across
+# knowledge.rs / optimized.rs / strange_loop.rs / temporal_neural.rs
+# / etc.). The full clean-up is a major refactor; in the meantime we
+# expose it behind an off-by-default feature so the core `midstream`
+# binary + library compile against the published API contract.
+[features]
+default = []
+lean-agentic = []
+
+[dependencies]
+# `hyprstream`, `arrow`, and `arrow-flight` were declared here but never
+# imported by any first-party code (verified via grep). They were
+# dragging in duckdb (bundled), tonic 0.12, and a dual rustls / hyper
+# graph at zero benefit. Removed per ADR-0002 (un-vendor hyprstream)
+# and ADR-0010 (drop unused arrow-flight). If we ever need Arrow-style
+# IPC again, re-add the specific module behind a feature flag.
+tokio = { version = "1.42.0", features = ["full"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+async-trait = "0.1"
+futures = "0.3.31"
+tracing = "0.1"
+# Config loader: `figment` replaces `config = "0.13"` per ADR-0019.
+# Closes the `yaml-rust` advisory in deny.toml — `config 0.13`
+# pulled in unmaintained `yaml-rust 0.4` transitively even when the
+# `yaml` feature was off. figment uses serde-native parsers
+# throughout and is on the cargo-deny `licenses` allowlist.
+figment = { version = "0.10", features = ["toml", "env"] }
+chrono = "0.4"
+reqwest = { version = "0.12", features = ["json", "stream"] }
+eventsource-stream = "0.2"
+tokio-stream = "0.1"
+# dotenv 0.15 is unmaintained (RUSTSEC-2021-0141). dotenvy is the
+# actively-maintained fork with an identical API (drop-in).
+dotenvy = "0.15"
+async-stream = "0.3"
+# Zero-copy buffers on the streaming hot path (ADR-0006).
+bytes = "1"
+# Lean Agentic dependencies
+thiserror = "2.0"
+dashmap = "6.1"
+lru = "0.12"
+
+# Phase 1: Temporal and Scheduling integrations (local workspace crates)
+midstreamer-temporal-compare = { version = "0.2.1", path = "crates/temporal-compare" }
+midstreamer-scheduler = { version = "0.2.1", path = "crates/nanosecond-scheduler" }
+
+# Phase 2: Dynamical systems and temporal logic (local workspace crates)
+midstreamer-attractor = { version = "0.2.1", path = "crates/temporal-attractor-studio" }
+midstreamer-neural-solver = { version = "0.2.1", path = "crates/temporal-neural-solver" }
+
+# Phase 3: Meta-learning and self-reference (local workspace crates)
+midstreamer-strange-loop = { version = "0.2.1", path = "crates/strange-loop" }
+
+# QUIC multi-stream support (local workspace crate)
+midstreamer-quic = { version = "0.3.0", path = "crates/quic-multistream" }
+
+# Additional dependencies for advanced integrations
+nalgebra = "0.33" # For linear algebra in attractor analysis
+ndarray = "0.16" # For multi-dimensional arrays
+
+[dev-dependencies]
+mockall = "0.11"
+tokio = "1.42.0"
+tokio-test = "0.4"
+criterion = { version = "0.5", features = ["async_tokio", "html_reports"] }
+
+[[bench]]
+name = "lean_agentic_bench"
+harness = false
+
+[[bench]]
+name = "temporal_bench"
+harness = false
+
+[[bench]]
+name = "scheduler_bench"
+harness = false
+
+[[bench]]
+name = "attractor_bench"
+harness = false
+
+[[bench]]
+name = "solver_bench"
+harness = false
+
+[[bench]]
+name = "meta_bench"
+harness = false
+
+[[bench]]
+name = "quic_bench"
+harness = false
+
+[[example]]
+name = "openrouter"
+path = "examples/openrouter.rs"
+
+[[example]]
+name = "lean_agentic_streaming"
+path = "examples/lean_agentic_streaming.rs"

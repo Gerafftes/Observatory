@@ -1,0 +1,82 @@
+[Unit]
+Description=ruvector RuView CSI bridge — ADR-018 UDP → cluster embed RPC (ADR-171, iter 123)
+Documentation=https://github.com/ruvnet/ruvector
+# Bridge depends on the cluster's worker fleet being reachable. Same
+# weak-Wants pattern as the mmwave-bridge: prefer Tailscale up since
+# most prod deploys point --workers at tailnet IPs.
+Wants=network-online.target tailscaled.service
+After=network-online.target tailscaled.service
+# Iter 205 — bound the restart-on-failure loop. Mirrors the worker's
+# StartLimitBurst hardening: parks the unit in `failed` state after
+# 5 failed starts in 60 s instead of cycling forever (e.g., UDP bind
+# conflict, malformed worker manifest).
+StartLimitBurst=5
+StartLimitIntervalSec=60
+
+[Service]
+Type=simple
+# Dedicated unprivileged system user — same iter-106 drop-root pattern
+# as the worker + mmwave-bridge. Created by install-ruview-csi-bridge.sh.
+User=ruvector-csi
+Group=ruvector-csi
+DynamicUser=no
+
+StateDirectory=ruvector-csi
+StateDirectoryMode=0750
+RuntimeDirectory=ruvector-csi
+RuntimeDirectoryMode=0750
+WorkingDirectory=/var/lib/ruvector-csi
+
+EnvironmentFile=-/etc/ruvector-csi-bridge.env
+
+# Bridge invocation. The env file provides:
+#   RUVECTOR_CSI_LISTEN        (UDP bind addr, default 0.0.0.0:5005)
+#   RUVECTOR_CSI_WORKERS       (csv of cluster worker host:port endpoints)
+#   RUVECTOR_CSI_FINGERPRINT   (hex fp of cluster's HEF/vocab)
+# Plus optional EXTRA_ARGS for --tls-* / --quiet / etc.
+ExecStart=/usr/local/bin/ruview-csi-bridge \
+    --listen ${RUVECTOR_CSI_LISTEN} \
+    --workers ${RUVECTOR_CSI_WORKERS} \
+    --fingerprint ${RUVECTOR_CSI_FINGERPRINT} \
+    $RUVECTOR_CSI_EXTRA_ARGS
+
+Restart=on-failure
+RestartSec=3
+
+# Resource bounds — bridge is lightweight (~5 MB RSS in practice).
+LimitNOFILE=4096
+MemoryMax=128M
+
+# Hardening — same shape as iter-119's mmwave-bridge unit, minus the
+# DeviceAllow for tty nodes (CSI bridge listens on UDP, doesn't touch
+# /dev/tty*). AmbientCapabilities=CAP_NET_BIND_SERVICE is intentionally
+# NOT set — RuView's stock 5005 isn't privileged (>1024).
+NoNewPrivileges=yes
+CapabilityBoundingSet=
+AmbientCapabilities=
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectControlGroups=yes
+ProtectKernelModules=yes
+ProtectKernelTunables=yes
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+SystemCallFilter=~@privileged @resources @mount @swap @reboot
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+ProtectClock=yes
+ProtectHostname=yes
+ProtectKernelLogs=yes
+ProtectProc=invisible
+
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

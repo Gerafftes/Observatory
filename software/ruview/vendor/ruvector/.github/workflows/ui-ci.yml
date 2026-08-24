@@ -1,0 +1,93 @@
+name: UI CI (RuVocal)
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "ui/ruvocal/**"
+      - ".github/workflows/ui-ci.yml"
+  pull_request:
+    paths:
+      - "ui/ruvocal/**"
+      - ".github/workflows/ui-ci.yml"
+
+defaults:
+  run:
+    working-directory: ui/ruvocal
+
+jobs:
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: ""
+
+      - name: Install dependencies
+        run: npm install --no-audit
+
+      - name: Build
+        run: npm run build
+
+  check:
+    name: Svelte check
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: ""
+
+      - name: Install dependencies
+        run: npm install --no-audit
+
+      - name: TypeScript / Svelte check
+        run: npm run check
+
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: ""
+
+      - name: Install dependencies
+        run: npm install --no-audit
+
+      - name: Lint
+        run: npm run lint
+
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: ""
+
+      - name: Install dependencies
+        run: npm install --no-audit
+
+      - name: Run tests
+        run: npm run test -- --run

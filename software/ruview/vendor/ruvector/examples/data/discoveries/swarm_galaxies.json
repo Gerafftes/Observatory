@@ -1,0 +1,9 @@
+[
+  {
+    "title": "SDSS Large Galaxy Query (Unavailable)",
+    "content": "SDSS SkyServer API (skyserver.sdss.org) was unreachable due to network/DNS restrictions. Query: SELECT TOP 10 large galaxies (type=3, petroRad_r>10) from PhotoObj ordered by Petrosian radius.",
+    "timestamp": "2026-03-15T23:58:59.543342Z",
+    "source": "SDSS DR18 (skyserver.sdss.org) - API unavailable",
+    "confidence": 0.0
+  }
+]
