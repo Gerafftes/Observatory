@@ -13,7 +13,7 @@ wurden.
 
 Motivation:
 
-- Die RX-Knoten mussten mehrfach neu provisioniert werden, weil sich die Mac-IP im `csi-test`-Netz geändert hatte.
+- Die RX-Knoten mussten mehrfach neu provisioniert werden, weil sich die Mac-IP im `CSI_SSID`-Netz geändert hatte.
 - OTA-Status war über WLAN erreichbar, der OTA-Upload war aber ohne PSK gesperrt (`403 Forbidden`).
 - Ziel war, spätere Änderungen wie `target_ip`, `node_id`, `edge_tier` oder `csi_channel` ohne USB per WLAN setzen zu können.
 
@@ -22,7 +22,7 @@ Vorbereitete lokale Änderung:
 - `config_server.c`
 - `config_server.h`
 - Registrierung in `main.c` auf dem bestehenden HTTP-/OTA-Server
-- Beispiel-Endpoint: `POST /config?target_ip=192.168.4.50&reboot=1`
+- Beispiel-Endpoint: `POST /config?target_ip=CSI_HOST_IP&reboot=1`
 
 Status:
 
