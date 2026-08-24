@@ -58,6 +58,7 @@ The three most important entry points are:
 1. [Current D6/mmWave status](08-aktueller-arbeitsstand-d6-und-position.md)
 2. [Result reports](results/)
 3. [PCB-01 manufacturing files](hardware/pcb-01/)
+4. [PCB-02 manufacturing files and KiCad sources](hardware/pcb-02/)
 
 The RX firmware and sensing server are based on the separate upstream project
 [ruvnet/RuView](https://github.com/ruvnet/RuView). The local project changes
@@ -222,6 +223,10 @@ manufacturing preview shows the board revision used by the project:
 
 The [PCB-01 Gerber and drill files](hardware/pcb-01/) are available in this
 repository with a SHA-256 checksum and manufacturing note.
+
+The revised [PCB-02 with KiCad sources, validation reports, and ordering archive](hardware/pcb-02/)
+restores the SMD capacitors, uses standard pin-header pads for the ESP32-C3,
+and keeps the PCB-01 outer dimensions and mounting-hole positions.
 
 The external MakerWorld model
 [*ESP32 S3 Wroom Case*](https://makerworld.com/de/models/1456361-esp32-s3-wroom-case#profileId-1517915)
