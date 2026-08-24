@@ -6,12 +6,21 @@
 - the Rust workspace and sensing backend under `v2/`
 - the ESP32 CSI and mmWave firmware under `firmware/`
 - the historical Python backend under `archive/v1/`
-- scripts, tests, architecture documents and D4/D5/D6 implementation paths
+- scripts, tests and D4/D5/D6 implementation paths
 - all eight upstream submodule source trees as ordinary vendored files
 
 A clone of Observatory therefore does not need a second checkout from
 `ruvnet/RuView`. Cargo, npm, Python and ESP-IDF may still download normal
 package dependencies when they are not already cached.
+
+## Repository layout
+
+Project-level Observatory material has one canonical copy at the repository
+root: `images/`, `hardware/`, `results/`, `skizzen/`, the numbered reports,
+templates and the root `scripts/` directory. `software/ruview/` contains the
+complete software snapshot only; it does not mirror those project folders.
+Its own `scripts/`, `docs/`, `archive/`, `v2/`, `ui/`, `firmware/` and vendored
+trees are software-specific and remain part of the standalone source bundle.
 
 ## Provenance
 

@@ -3,9 +3,10 @@ set -eu
 
 repo_dir=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 source_dir="$repo_dir/software/ruview"
-expected_source_entries=15855
+expected_source_entries=15801
 
-required_paths='README.md
+required_paths='CHANGELOG.md
+PROOF.md
 LICENSE
 ui/index.html
 ui/components/ObservatoryControlCenter.js

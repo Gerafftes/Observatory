@@ -54,7 +54,7 @@ Noch nicht geprüft ist, ob das SoftAP-WLAN sichtbar ist und ob die AP-MAC-Adres
 
 **Konsequenz für den nächsten Schritt**
 
-Seriellen Monitor öffnen, TX-Startausgabe prüfen, AP-MAC notieren und Laptop mit dem `csi-test`-WLAN verbinden.
+Seriellen Monitor öffnen, TX-Startausgabe prüfen, AP-MAC notieren und Laptop mit dem `CSI_SSID`-WLAN verbinden.
 
 **Relevanz für den Bericht**
 
@@ -130,8 +130,8 @@ Zuerst wurde ein Minimal-Sketch ohne WiFi getestet. Dieser lief stabil. Danach w
 
 Der Minimal-Sketch gab wiederholt `alive` aus. Der SoftAP-Start funktionierte mit anderem Kabel:
 
-- AP IP: `192.168.4.1`
-- AP MAC: redigiert (gerätebezogene Kennung)
+- AP IP: `CSI_AP_IP`
+- AP MAC: `TX_MAC_REDACTED`
 
 **Erfolg**
 
@@ -276,7 +276,7 @@ Der RuView-Sensing-Server wurde mit `RUST_LOG=debug` gestartet, um akzeptierte E
 
 **Beobachtung**
 
-Der Server meldete `ESP32 frame from 192.168.4.3:54714: node=1, subs=64, seq=0`.
+Der Server meldete `ESP32 frame from CSI_NODE_IP_3:54714: node=1, subs=64, seq=0`.
 
 **Erfolg**
 
@@ -332,7 +332,7 @@ Der API-`tick` blieb nach wenigen gültigen CSI-Frames stehen, obwohl der RX-Kno
 
 **Durchführung / Änderung**
 
-Mit `sudo ping -i 0.1 192.168.4.3` wurde aktiver Datenverkehr erzeugt. Anschließend wurden UDP-Pakete auf Port `5005` per `tcpdump -X` betrachtet.
+Mit `sudo ping -i 0.1 CSI_NODE_IP_3` wurde aktiver Datenverkehr erzeugt. Anschließend wurden UDP-Pakete auf Port `5005` per `tcpdump -X` betrachtet.
 
 **Beobachtung**
 
@@ -362,7 +362,7 @@ Der RX-Knoten sendete kontinuierlich Feature-State-Pakete, aber nur sporadisch R
 
 **Durchführung / Änderung**
 
-RX1 wurde ohne `--filter-mac` neu provisioniert. Danach wurde durch Ping-Verkehr zu `192.168.4.3` zusätzlicher WLAN-Datenverkehr erzeugt.
+RX1 wurde ohne `--filter-mac` neu provisioniert. Danach wurde durch Ping-Verkehr zu `CSI_NODE_IP_3` zusätzlicher WLAN-Datenverkehr erzeugt.
 
 **Beobachtung**
 
@@ -388,14 +388,14 @@ Der Aufbau zeigt eine wichtige praktische Grenze: Eine zu starke Filterung verbe
 
 **Ausgangslage**
 
-Nach dem 2RX-Lauf fehlte im RuView-Server weiterhin ein dritter Knoten. Der Server hatte nur Frames von `node=1` (`192.168.4.2`) und `node=2` (`192.168.4.5`) gesehen. Der Mac war im Testnetz zuvor `192.168.4.4`; im normalen Internet-WLAN hatte er dagegen `192.168.178.123`.
+Nach dem 2RX-Lauf fehlte im RuView-Server weiterhin ein dritter Knoten. Der Server hatte nur Frames von `node=1` (`CSI_NODE_IP_2`) und `node=2` (`CSI_NODE_IP_5`) gesehen. Der Mac war im Testnetz zuvor `CSI_NODE_IP_4`; im normalen Internet-WLAN hatte er dagegen `HOME_LAN_IP`.
 
 **Durchführung / Änderung**
 
 RX3 wurde ueber USB erneut provisioniert. Der Port enumerierte zuerst als `/dev/cu.usbmodem5C4C0893221` und spaeter als `/dev/cu.usbmodem101`. Die NVS-Konfiguration wurde mit `--reset` neu geschrieben:
 
-- SSID: `csi-test`
-- Target: `192.168.4.4:5005`
+- SSID: `CSI_SSID`
+- Target: `CSI_NODE_IP_4:5005`
 - Node ID: `3`
 - Edge Tier: `0`
 - Channel: `6`
@@ -404,7 +404,7 @@ Anschliessend wurde der serielle Bootlog geprueft.
 
 **Beobachtung**
 
-Die NVS-Werte wurden korrekt geladen: `node_id=3`, `edge_tier=0`, `csi_channel=6`, `target_ip=192.168.4.4`, `target_port=5005`. Beim ersten Check trat beim WiFi-/PHY-Start ein Brownout auf. Nach Wechsel bzw. Stabilisierung der Stromversorgung bootete RX3 ohne Brownout, verband sich mit `csi-test`, initialisierte CSI und meldete `CSI streaming active -> 192.168.4.4:5005`.
+Die NVS-Werte wurden korrekt geladen: `node_id=3`, `edge_tier=0`, `csi_channel=6`, `target_ip=CSI_NODE_IP_4`, `target_port=5005`. Beim ersten Check trat beim WiFi-/PHY-Start ein Brownout auf. Nach Wechsel bzw. Stabilisierung der Stromversorgung bootete RX3 ohne Brownout, verband sich mit `CSI_SSID`, initialisierte CSI und meldete `CSI streaming active -> CSI_NODE_IP_4:5005`.
 
 **Erfolg**
 
@@ -412,11 +412,11 @@ RX3 ist firmwareseitig und NVS-seitig korrekt als `node_id=3` eingerichtet. Der 
 
 **Problem / Fehlschlag**
 
-Der 3RX-Live-Test im RuView-Server ist noch nicht nachgewiesen. Solange der Mac im normalen WLAN bleibt, besitzt er nicht die Zieladresse `192.168.4.4`. Beim seriellen Check bekam RX3 selbst die IP `192.168.4.4`; dadurch wuerde RX3 seine UDP-Pakete an sich selbst statt an den Mac senden.
+Der 3RX-Live-Test im RuView-Server ist noch nicht nachgewiesen. Solange der Mac im normalen WLAN bleibt, besitzt er nicht die Zieladresse `CSI_NODE_IP_4`. Beim seriellen Check bekam RX3 selbst die IP `CSI_NODE_IP_4`; dadurch wuerde RX3 seine UDP-Pakete an sich selbst statt an den Mac senden.
 
 **Konsequenz für den nächsten Schritt**
 
-Fuer den 3RX-Test muss der Mac wieder in das `csi-test`-Netz und eine stabile Ziel-IP bekommen. Robuster als DHCP ist eine feste Mac-IP im Testnetz, z. B. `192.168.4.50`, und danach erneutes Provisionieren von RX1, RX2 und RX3 auf `target_ip=192.168.4.50`. Erst danach ist `/api/v1/nodes` mit `total=3` bzw. Server-Logs mit `node=1`, `node=2` und `node=3` der eigentliche 3RX-Nachweis.
+Fuer den 3RX-Test muss der Mac wieder in das `CSI_SSID`-Netz und eine stabile Ziel-IP bekommen. Robuster als DHCP ist eine feste Mac-IP im Testnetz, z. B. `CSI_HOST_IP`, und danach erneutes Provisionieren von RX1, RX2 und RX3 auf `target_ip=CSI_HOST_IP`. Erst danach ist `/api/v1/nodes` mit `total=3` bzw. Server-Logs mit `node=1`, `node=2` und `node=3` der eigentliche 3RX-Nachweis.
 
 **Relevanz für den Bericht**
 
@@ -426,20 +426,20 @@ Der Befund trennt drei Ursachen sauber: Provisionierung ist korrekt, Stromversor
 
 **Ausgangslage**
 
-Der vierte ESP32-S3 ist angekommen und wurde als RX4 eingerichtet. Im `csi-test`-Netz hatte der Mac die IP `192.168.4.5`.
+Der vierte ESP32-S3 ist angekommen und wurde als RX4 eingerichtet. Im `CSI_SSID`-Netz hatte der Mac die IP `CSI_NODE_IP_5`.
 
 **Durchführung / Änderung**
 
-RX1 bis RX4 wurden auf die aktuelle Mac-Zieladresse `192.168.4.5:5005` provisioniert bzw. erneut provisioniert. Anschließend wurde für alle sichtbaren RX-IP-Adressen Ping-Verkehr erzeugt.
+RX1 bis RX4 wurden auf die aktuelle Mac-Zieladresse `CSI_NODE_IP_5:5005` provisioniert bzw. erneut provisioniert. Anschließend wurde für alle sichtbaren RX-IP-Adressen Ping-Verkehr erzeugt.
 
 **Beobachtung**
 
 Der RuView-Server empfing Raw-CSI-Frames von vier Nodes:
 
-- `node=1` von `192.168.4.2`
-- `node=2` von `192.168.4.3`
-- `node=3` von `192.168.4.4`
-- `node=4` von `192.168.4.6`
+- `node=1` von `CSI_NODE_IP_2`
+- `node=2` von `CSI_NODE_IP_3`
+- `node=3` von `CSI_NODE_IP_4`
+- `node=4` von `CSI_NODE_IP_6`
 
 Alle gemeldeten Frames hatten `subs=64`.
 
@@ -463,15 +463,15 @@ Dies ist der erste erfolgreiche 4RX-Meilenstein. Gleichzeitig zeigt er eine zent
 
 **Ausgangslage**
 
-Nach dem 4RX-Aufbau wurde erneut geprüft, welche Geräte im `csi-test`-Netz erreichbar sind. Der Mac bekam per DHCP wechselnde Adressen; gleichzeitig waren ESPs auf `192.168.4.2` bis `192.168.4.5` erreichbar.
+Nach dem 4RX-Aufbau wurde erneut geprüft, welche Geräte im `CSI_SSID`-Netz erreichbar sind. Der Mac bekam per DHCP wechselnde Adressen; gleichzeitig waren ESPs auf `CSI_NODE_IP_2` bis `CSI_NODE_IP_5` erreichbar.
 
 **Durchführung / Änderung**
 
-Die OTA-Status-Endpunkte der RX-Knoten wurden über WLAN geprüft. `192.168.4.2`, `.3`, `.4` und `.5` antworteten auf `GET /ota/status`.
+Die OTA-Status-Endpunkte der RX-Knoten wurden über WLAN geprüft. `CSI_NODE_IP_2`, `.3`, `.4` und `.5` antworteten auf `GET /ota/status`.
 
 **Beobachtung**
 
-`192.168.4.5` ist aktuell ein ESP32-Knoten und darf deshalb nicht als feste Mac-Ziel-IP verwendet werden. Andernfalls senden RX-Knoten ihre UDP-/CSI-Daten an einen anderen ESP statt an den RuView-Server.
+`CSI_NODE_IP_5` ist aktuell ein ESP32-Knoten und darf deshalb nicht als feste Mac-Ziel-IP verwendet werden. Andernfalls senden RX-Knoten ihre UDP-/CSI-Daten an einen anderen ESP statt an den RuView-Server.
 
 **Erfolg**
 
@@ -483,7 +483,7 @@ Die bisherige Strategie „Mac-Ziel-IP = aktuelle DHCP-IP“ ist bei mehreren ES
 
 **Konsequenz für den nächsten Schritt**
 
-Als stabile Host-Adresse sollte eine freie Adresse außerhalb der bisherigen DHCP-Vergabe genutzt werden, z. B. `192.168.4.50`. Zusätzlich wird eine Firmware-Erweiterung vorbereitet, damit ausgewählte NVS-Werte künftig per HTTP `/config` über WLAN geändert werden können.
+Als stabile Host-Adresse sollte eine freie Adresse außerhalb der bisherigen DHCP-Vergabe genutzt werden, z. B. `CSI_HOST_IP`. Zusätzlich wird eine Firmware-Erweiterung vorbereitet, damit ausgewählte NVS-Werte künftig per HTTP `/config` über WLAN geändert werden können.
 
 **Relevanz für den Bericht**
 
@@ -641,7 +641,7 @@ Ausführliche Diagnose und Bildnachweis: [results/2026-07-18_fester-raum_live-vi
 
 **Ausgangslage**
 
-Nach der Diagnose vom 18. Juli wurden alle vier RX auf den kontrollierten TX mit einer redigierten Gerätekennung gefiltert. Vor weiteren Personenversuchen sollte zuerst geprüft werden, ob der leere Raum mit dem bereinigten Paketstrom und der D4-Bewegungsmetrik ruhig bleibt.
+Nach der Diagnose vom 18. Juli wurden alle vier RX auf den kontrollierten TX mit der MAC-Adresse `TX_MAC_REDACTED` gefiltert. Vor weiteren Personenversuchen sollte zuerst geprüft werden, ob der leere Raum mit dem bereinigten Paketstrom und der D4-Bewegungsmetrik ruhig bleibt.
 
 **Durchführung / Änderung**
 
@@ -1215,7 +1215,7 @@ Partitionstabelle, OTA-Auswahl und App wurden geschrieben und jeweils per Hash
 verifiziert. Der NVS-Bereich ab `0x9000` wurde nicht überschrieben.
 
 Der Bootlog bestätigte Node-ID 1, Kanal 6, Edge-Tier 0, aktiven TX-MAC-Filter,
-Zielserver `192.168.4.50:5005` und den korrekten Headless-Pfad des Boards. Das
+Zielserver `CSI_HOST_IP:5005` und den korrekten Headless-Pfad des Boards. Das
 Image meldet Projekt `esp32-csi-node`, Version 0.7.0 und ESP-IDF v5.4. WLAN und
 CSI konnten noch nicht geprüft werden, weil nur RX1 eingeschaltet und der
 CSI-AP beziehungsweise TX nicht aktiv war.
@@ -1241,7 +1241,7 @@ RX2 wurde als ESP32-S3 Revision 0.2 mit 16 MB Flash und 8 MB PSRAM erkannt.
 Wie RX1 erhielt es ohne NVS-Löschung die verifizierte Firmware 0.7.0 mit dem
 8-MB-Layout; alle geschriebenen Bereiche bestanden die Hashprüfung. Der
 Bootlog bestätigte Node-ID 2, Kanal 6, Edge-Tier 0, aktiven TX-MAC-Filter,
-Headless-Betrieb und Zielserver `192.168.4.50:5005`. WLAN/CSI blieb bei
+Headless-Betrieb und Zielserver `CSI_HOST_IP:5005`. WLAN/CSI blieb bei
 ausgeschaltetem TX beziehungsweise CSI-AP erwartbar inaktiv. Auch RX2 betreibt
 OTA ohne Security-Namespace fail-closed; es wurde kein Schlüsselwert
 protokolliert.
@@ -1255,7 +1255,7 @@ RX3 wurde als ESP32-S3 Revision 0.2 mit 16 MB Flash und 8 MB PSRAM erkannt.
 Das verifizierte 8-MB-Image der Firmware 0.7.0 wurde ohne NVS-Löschung
 geschrieben; alle Bereiche bestanden die Hashprüfung. Der Bootlog bestätigte
 Node-ID 3, Kanal 6, Edge-Tier 0, aktiven TX-MAC-Filter, Headless-Betrieb und
-Zielserver `192.168.4.50:5005`. Der WLAN-Ausfall war bei inaktivem TX/CSI-AP
+Zielserver `CSI_HOST_IP:5005`. Der WLAN-Ausfall war bei inaktivem TX/CSI-AP
 erwartbar. OTA bleibt ohne Security-Namespace fail-closed.
 
 Nächster Board-Schritt: RX4 allein per USB anschließen, inventarisieren,
@@ -1267,7 +1267,7 @@ RX4 wurde als ESP32-S3 Revision 0.2 mit 16 MB Flash und 8 MB PSRAM erkannt.
 Das verifizierte 8-MB-Image der Firmware 0.7.0 wurde ohne NVS-Löschung
 geschrieben und vollständig per Hash geprüft. Der Bootlog bestätigte Node-ID 4,
 Kanal 6, Edge-Tier 0, aktiven TX-MAC-Filter, Headless-Betrieb und Zielserver
-`192.168.4.50:5005`. Der WLAN-Ausfall war ohne aktiven TX/CSI-AP erwartbar.
+`CSI_HOST_IP:5005`. Der WLAN-Ausfall war ohne aktiven TX/CSI-AP erwartbar.
 OTA bleibt ohne Security-Namespace fail-closed.
 
 Damit haben RX1 bis RX4 den Einzelboard-Flash- und Boottest bestanden. Vor
@@ -1296,7 +1296,7 @@ erhaltene Senderbuild verwendet.
 Der TX wurde ohne BOOT-Taste und ohne Schreibzugriff per USB geprüft. `flash_id`
 bestätigte einen ESP32-S3 Revision 0.2 mit 16 MB Flash und 8 MB PSRAM. Danach
 wurde der normale Start seriell beobachtet. Die vorhandene Senderfirmware
-bootete erfolgreich, startete den SoftAP auf `192.168.4.1` und blieb in einer
+bootete erfolgreich, startete den SoftAP auf `CSI_AP_IP` und blieb in einer
 zusätzlichen Beobachtungsphase ohne Brownout- oder Reset-Schleife stabil.
 
 Es wurde nichts geflasht oder konfiguriert. Die rohe AP-MAC wurde nur lokal
@@ -1307,15 +1307,15 @@ werden als Nächstes mit eingeschaltetem Gesamtaufbau geprüft.
 ### 2026-08-01 — TX-Netzpfad und feste Serveradresse geprüft
 
 Der Mac verband sich bei weiterhin ausgeschalteten RX1 bis RX4 allein mit dem
-TX-SoftAP. DHCP vergab `192.168.4.2`; das Gateway `192.168.4.1` antwortete in
+TX-SoftAP. DHCP vergab `CSI_NODE_IP_2`; das Gateway `CSI_AP_IP` antwortete in
 beiden Pingserien ohne Paketverlust. Ein unprivilegierter UDP-Empfänger zählte
 im stabileren 10-Sekunden-Lauf 457 Pakete beziehungsweise `45,5 Hz`; alle
 Pakete waren exakt 32 Byte groß. Die Ankünfte waren gebündelt, lagen insgesamt
 aber nahe am 50-Hz-Soll und deutlich über dem späteren 5-Hz-Mindestgate je RX.
 
-Da RX1 bis RX4 weiterhin fest an `192.168.4.50:5005` senden, wurde ausschließlich
-das CSI-WLAN-Interface des Macs von der DHCP-Adresse auf `192.168.4.50/24` mit
-Gateway `192.168.4.1` gesetzt und erfolgreich erneut geprüft. Hotspot und Kabel
+Da RX1 bis RX4 weiterhin fest an `CSI_HOST_IP:5005` senden, wurde ausschließlich
+das CSI-WLAN-Interface des Macs von der DHCP-Adresse auf `CSI_HOST_IP/24` mit
+Gateway `CSI_AP_IP` gesetzt und erfolgreich erneut geprüft. Hotspot und Kabel
 blieben unberührt. Der Kanal ließ sich über die macOS-API nicht auslesen; Kanal
 6 ist im Senderbuild festgelegt und wird im gemeinsamen RX-Lauf nochmals als
 Laufzeiteigenschaft geprüft.
@@ -1365,9 +1365,9 @@ neues Artifact, Setup und eine neue Serie auslösen.
 ### 2026-08-09 — Gemeinsamer Liveempfang und Gridfehler gefunden
 
 Der Mac stand an seiner normalen Betriebsposition, TX und RX1 bis RX4 waren
-eingeschaltet und das CSI-WLAN verbunden. Da DHCP zunächst `192.168.4.6`
+eingeschaltet und das CSI-WLAN verbunden. Da DHCP zunächst `CSI_NODE_IP_6`
 vergeben hatte, wurde das WLAN-Interface erneut auf die von allen RX erwartete
-Empfangsadresse `192.168.4.50/24` mit Gateway `192.168.4.1` gesetzt. Der TX war
+Empfangsadresse `CSI_HOST_IP/24` mit Gateway `CSI_AP_IP` gesetzt. Der TX war
 ohne Paketverlust erreichbar; alle vier RX erschienen anschließend frisch im
 Server.
 
@@ -1429,7 +1429,7 @@ wegführenden Linie. In der ursprünglichen Notation
 `(0,94 m, 0,00 m, 0,87 m)`; für RuView ergibt sich
 `[4.02, 0.87, 2.50]`. Die Tür ist geschlossen und bleibt für Preflight,
 Kalibrierung und Aufnahmen in diesem Zustand. Das CSI-WLAN ist verbunden und
-der Mac verwendet wie vorgesehen `192.168.4.50/24`.
+der Mac verwendet wie vorgesehen `CSI_HOST_IP/24`.
 
 Dieser Mac-Standort ist nicht der historische Aufbau „Mac mittig“ vom
 2026-07-26. Frühere Leerraumreferenzen sind deshalb nicht auf die neue Serie
