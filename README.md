@@ -6,7 +6,7 @@
 [![Status](https://img.shields.io/badge/status-experimental-orange)](#aktueller-validierungsstand)
 [![License: PolyForm Noncommercial 1.0.0](https://img.shields.io/badge/License-PolyForm%20Noncommercial%201.0.0-blue.svg)](LICENSE.md)
 [![Projektgröße](https://img.shields.io/github/repo-size/Gerafftes/Observatory?style=flat-square&label=Projektgr%C3%B6%C3%9Fe)](https://github.com/Gerafftes/Observatory)
-[![Zeilen und SLOC](https://api.octocounts.com/badge/Gerafftes/Observatory/branch/main)](https://octocounts.com/github/Gerafftes/Observatory/tree/main)
+[![Zeilen](https://api.octocounts.com/badge/Gerafftes/Observatory/branch/main?type=lines&v=3)](https://octocounts.com/github/Gerafftes/Observatory/tree/main)
 
 
 Ein experimentelles 1TX-/4RX-WLAN-CSI-System, das Präsenz, Bewegung und neun
