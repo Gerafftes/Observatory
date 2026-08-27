@@ -5,6 +5,8 @@
 [![ESP32](https://img.shields.io/badge/ESP32-E7352C?style=flat-square&logo=espressif&logoColor=white)](https://www.espressif.com/en/products/socs/esp32)
 [![Status](https://img.shields.io/badge/status-experimental-orange)](#current-validation-status)
 [![License: PolyForm Noncommercial 1.0.0](https://img.shields.io/badge/License-PolyForm%20Noncommercial%201.0.0-blue.svg)](LICENSE.md)
+[![Project size](https://img.shields.io/github/repo-size/Gerafftes/Observatory?style=flat-square&label=project%20size)](https://github.com/Gerafftes/Observatory)
+[![Lines and SLOC](https://api.octocounts.com/badge/Gerafftes/Observatory/branch/main)](https://octocounts.com/github/Gerafftes/Observatory/tree/main)
 
 
 An experimental 1TX/4RX WiFi CSI system investigating presence, movement, and
