@@ -1,12 +1,9 @@
-# Observatory
-[**Deutsch**](README.md) · [English](README.en.md)
-
-[![Hack Club Stardance](https://img.shields.io/badge/Hack%20Club-Stardance-ec3750?style=flat-square&logo=hackclub&logoColor=white)](https://stardance.hackclub.com/projects/25673)
-[![ESP32](https://img.shields.io/badge/ESP32-E7352C?style=flat-square&logo=espressif&logoColor=white)](https://www.espressif.com/en/products/socs/esp32)
-[![Status](https://img.shields.io/badge/status-experimental-orange)](#aktueller-validierungsstand)
+# Observatory [![Status](https://img.shields.io/badge/status-experimental-orange)](#aktueller-validierungsstand)
 [![License: PolyForm Noncommercial 1.0.0](https://img.shields.io/badge/License-PolyForm%20Noncommercial%201.0.0-blue.svg)](LICENSE.md)
 [![Projektgröße](https://img.shields.io/github/repo-size/Gerafftes/Observatory?style=flat-square&label=Projektgr%C3%B6%C3%9Fe)](https://github.com/Gerafftes/Observatory)
 [![Zeilen](https://api.octocounts.com/badge/Gerafftes/Observatory/branch/main?type=lines&v=3)](https://octocounts.com/github/Gerafftes/Observatory/tree/main)
+
+[**Deutsch**](README.md) · [English](README.en.md)
 
 
 Ein experimentelles 1TX-/4RX-WLAN-CSI-System, das Präsenz, Bewegung und neun
@@ -15,7 +12,7 @@ Referenz verwendet.
 
 <img src="images/esp32-s3-boards.jpeg" alt="Die fünf beschrifteten ESP32-S3-Boards des Observatory-Aufbaus: RX1 bis RX4 und TX" width="420">
 
-## Projekt ansehen
+## Projekt ansehen [![Hack Club Stardance](https://img.shields.io/badge/Hack%20Club-Stardance-ec3750?style=flat-square&logo=hackclub&logoColor=white)](https://stardance.hackclub.com/projects/25673)
 
 **[Observatory auf Stardance ansehen](https://stardance.hackclub.com/projects/25673)**
 
