@@ -41,6 +41,23 @@ folgt.
 *Nach dem Intro der Serie
 [*Person of Interest*](https://en.wikipedia.org/wiki/Person_of_Interest_(TV_series)).*
 
+## Inhaltsverzeichnis
+
+- [Projekt ansehen](#projekt-ansehen)
+- [Schnelleinstieg](#schnelleinstieg)
+- [Was Observatory kann](#was-observatory-kann)
+- [Lokale Checks](#lokale-checks)
+- [Forschungsfrage](#forschungsfrage)
+- [Aktueller Validierungsstand](#aktueller-validierungsstand)
+- [Benutzeroberfläche](software/experiment-cockpit.md)
+- [Wie es funktioniert](architecture.md)
+- [Belastbare Ergebnisse](results/README.md)
+- [Hardware](hardware/README.md)
+- [Dokumentation](#dokumentation)
+- [Lizenz](#lizenz)
+- [Credits](#credits)
+- [Dokumentationsregeln](#dokumentationsregeln)
+
 ## Schnelleinstieg
 
 Dieses Repository enthält Dokumentation, Hardwaredateien und den vollständigen
@@ -62,8 +79,10 @@ cargo run -p wifi-densepose-sensing-server --no-default-features -- \
 ```
 
 Danach ist die Sensing-UI unter
-`http://127.0.0.1:3002/ui/index.html#sensing` erreichbar. Simulation bleibt
-`SOFTWARE-ONLY / UNVALIDATED` und ersetzt kein Hardware-Gate.
+`http://127.0.0.1:3002/ui/index.html#sensing` erreichbar.
+
+> [!NOTE]
+> Der Lauf mit `--source simulate` prüft UI und Workflow ohne Hardware. Er bleibt ausdrücklich `SOFTWARE-ONLY / UNVALIDATED` und ersetzt kein Hardware-Gate.
 
 Die wichtigsten Einstiegspunkte sind:
 
@@ -105,8 +124,8 @@ cargo check --manifest-path software/ruview/v2/Cargo.toml \
 python3 -m unittest scripts/tests/test_evaluate_d5_replay.py
 ```
 
-Der Check verarbeitet keine neuen Sensorsignale und beweist keine Live-
-Hardwarequalität.
+> [!WARNING]
+> Die Checks verarbeiten keine neuen Sensorsignale. Ein bestandener Softwaretest, Flashvorgang oder Transportnachweis beweist keine Live-Hardware- oder Positionsgenauigkeit.
 
 ## Forschungsfrage
 
@@ -133,149 +152,44 @@ Positionsgenauigkeit.
 
 ## Benutzeroberfläche
 
-### mmWave-Kalibrierungsassistent
+Das Observatory-UI enthält den mmWave-Kalibrierungsassistenten und das
+Experiment-Cockpit für Setup-Profil, WiFi-Workflow, Blindaufnahmen und
+Evaluation. Die Screenshots und die vollständige Kurzanleitung stehen auf der
+[separaten Cockpit-Seite](software/experiment-cockpit.md).
 
-Der Assistent führt durch Verbindung, Ausrichtung, Abdeckung, Zonen, Training,
-Blindtest und Ergebnis. Der Screenshot zeigt den geprüften Fehlerzustand
-`Server nicht erreichbar` mit HTTP 502, nicht eine verbundene Radaraufnahme.
+<a href="software/experiment-cockpit.md"><img src="images/ui/experiment-cockpit-setup.png" alt="Experiment-Cockpit mit Setup-Profil, Statusübersicht und simuliertem Hardwarezustand" width="760"></a>
 
-<img src="images/ui/mmwave-calibration-server-unreachable.png" alt="Siebenstufiger mmWave-Kalibrierungsassistent mit nicht erreichbarem Server und HTTP-502-Status" width="900">
-
-### Experiment-Cockpit
-
-Das neue Cockpit hält Setup-Profil, WiFi-Workflow, Aufnahmen und die getrennte
-mmWave-Referenz in einer Ansicht. Die Aufnahmen unten stammen aus einem
-simulierten Lauf ohne angeschlossene Sensoren.
-
-<img src="images/ui/experiment-cockpit-setup.png" alt="Experiment-Cockpit mit Setup-Profil, Statusübersicht und simuliertem Hardwarezustand" width="900">
-
-<img src="images/ui/experiment-cockpit-guide.png" alt="Experiment-Cockpit mit Raum-, TX- und RX-Positionen sowie wartender mmWave-Referenz" width="900">
-
-<img src="images/ui/experiment-cockpit-workflow-guide.png" alt="Experiment-Cockpit mit Workflow-Guide und zehn gesperrten beziehungsweise freigeschalteten Phasen" width="900">
-
-#### Kurzanleitung
-
-1. **Setup-Profil öffnen:** Raummaße (Länge/Höhe/Breite), TX-Position und
-   RX1–RX4-Positionen eintragen, danach **Neue Profilversion speichern**.
-2. **Experiment-Run anlegen:** Versuchsname und gespeichertes Profil wählen,
-   dann **WiFi-Experiment anlegen**.
-3. **Setup versiegeln:** Der Guide speichert Profil und Hash für diesen Run.
-   Das ist nur ein Software-Schritt.
-4. **Leere WiFi-Baseline:** Raum leer halten, Leerkalibrierung starten und
-   abschließen. Ohne CSI-Nodes stoppt der Ablauf bei **zu wenigen
-   RX-Fingerprints**.
-5. **mmWave-Kalibrierung:** Der Radar liefert separat Positionspakete,
-   Abdeckung und CSI-Zeitbezug. Ohne Sensor bleibt der Status **Wartet auf
-   mmWave**.
-6. **Blindtest:** Eine reproduzierbare Reihenfolge erzeugen und neue CSI-
-   Aufnahmen ohne Ground Truth sammeln. Ohne RX-Nodes gibt es keine gültigen
-   Aufnahmen; der Software-Demo-Run bleibt nur eine Ansicht.
-7. **Prediction und Truth trennen:** Zuerst nur die WiFi-Prediction
-   registrieren, danach die getrennte Radar-/Positionswahrheit aufdecken.
-8. **Evaluation und Report:** Accuracy, Coverage, Fehlerdistanz,
-   Confusion Matrix und Qualitätsgates auswerten und anschließend den Report
-   schreiben. Ohne Hardware bleibt er ausdrücklich
-   **SOFTWARE-ONLY / UNVALIDATED** und beweist keine echte Messqualität.
+> [!NOTE]
+> Die UI-Abbildungen und der Demo-Ablauf zeigen Softwarezustände ohne angeschlossene Sensoren. Sie sind kein Nachweis realer CSI-, Radar- oder Positionsdaten.
 
 ## Wie es funktioniert
 
-WLAN-Signale verändern sich durch Reflexion, Abschattung und Multipath. Ein
-TX-Board erzeugt den kontrollierten Funkverkehr; RX1 bis RX4 messen die
-komplexen CSI-Werte aus verschiedenen Raumpositionen. Observatory vergleicht
-diese Messungen mit einer aufbaugebundenen Leerraumreferenz.
-
-Die Positionsbestimmung ist absichtlich diskret. Statt zwischen ungemessenen
-Koordinaten zu interpolieren, lernt D6 Fingerprints für neun markierte
-Bodenpunkte. Reicht die Evidenz nicht aus oder passen mehrere Punkte ähnlich
-gut, muss das System `unknown` oder `ambiguous` ausgeben.
-
-Der mmWave-Sensor dient nur als unabhängige Referenz für Kalibrierung und
-Blindbewertung. Dadurch wird verhindert, dass der WLAN-CSI-Prädiktor während
-des Tests indirekt die richtige Antwort erhält.
-
-```text
-physischer Aufbau
-→ Setup-Siegel
-→ 25-s-Preflight
-→ 65-s-Leerraumkalibrierung
-→ P01–P09-Training
-→ Positionsindex
-→ Blindtests
-→ gemeinsame Qualitätsgates
-→ Live-Anzeige
-```
+WLAN-CSI wird mit einer aufbaugebundenen Leerraumreferenz und diskreten
+Positions-Fingerprints ausgewertet; mmWave bleibt eine unabhängige Referenz.
+Die [Architektur- und Datenflussseite](architecture.md) erklärt den Ablauf und
+die Trennung der Evidenzstufen ausführlicher.
 
 ## Belastbare Ergebnisse
 
-- Die technische Discovery vom 9. August lieferte `2.612` Frames von RX1 bis
-  RX4 bei `0` Drops. Das belegt Transport, Bindung und Rasterstabilität, nicht
-  die Erkennungs- oder Positionsgüte.
-- Zwei historische versiegelte D6-Preflights bestanden mit `2.545`
-  beziehungsweise `2.701` Frames und jeweils `0` Drops.
-- Eine 65-Sekunden-Leerraumkalibrierung schrieb `6.102` Frames bei `0` Drops
-  und bestand die strikte Offline-Inspektion.
-- Der erste reale D5-Still-Livetest erreichte `0 %` Still-Recall. D5 bleibt
-  deshalb deaktiviert und experimentell.
-- Durch die spätere Ergänzung von ESP32-C3, PCB und mmWave-Hardware ist der
-  aktuelle physische Aufbau verändert und noch nicht als Setup v2 versiegelt.
+Die [Ergebnisübersicht](results/README.md) enthält die vier geprüften Diagramme,
+ihre kurzen Erklärungen, die Nachweisdateien und die vollständige Auswertung.
 
-### D4/D5/D6-Ergebnisdiagramme
-
-Der [technische D4/D5/D6-Ergebnisbericht](results/2026-08-23_D4-D5-D6_technischer-ergebnisbericht.md)
-ist mit der [Laufübersicht über 25 Aufnahmen](results/2026-08-23_D4-D5-D6_laufuebersicht.csv),
-der [D4-RX-Diagnostik](results/2026-08-23_D4_RX_diagnostik.csv) und dem
-[Diagrammvertrag inklusive QA](results/2026-08-23_D4-D5-D6_chart-map.md)
-verknüpft. Die vier geprüften Diagramme sind hier direkt sichtbar:
-
-<table>
-<tr>
-<td><a href="results/2026-08-23_D4-D5-D6_figures/01_globaler_vergleich.png"><img src="results/2026-08-23_D4-D5-D6_figures/01_globaler_vergleich.png" alt="Globaler Vergleich von D4 und D5-abs für Leerraum-Fehlpräsenz und Still-Recall" width="480"></a><br><strong>Globaler Vergleich</strong><br>D5-abs entfernt die Leerraum-Fehlpräsenz, verliert dabei aber den Still-Recall. Deshalb ist die Variante insgesamt nicht bestanden.</td>
-<td><a href="results/2026-08-23_D4-D5-D6_figures/02_D4_RX_leerraum_heatmap.png"><img src="results/2026-08-23_D4-D5-D6_figures/02_D4_RX_leerraum_heatmap.png" alt="D4-Leerraumstimmen als RX-Heatmap" width="480"></a><br><strong>D4-RX-Leerraum-Heatmap</strong><br>Die Fehlpräsenz entsteht lokal und wechselt zwischen den RX-Pfaden. Ein einzelner stabiler Verursacher ist nicht erkennbar.</td>
-</tr>
-<tr>
-<td><a href="results/2026-08-23_D4-D5-D6_figures/03_D5_live_RX_linkwechsel.png"><img src="results/2026-08-23_D4-D5-D6_figures/03_D5_live_RX_linkwechsel.png" alt="D5-Livetest mit RX-Linkwechseln" width="480"></a><br><strong>D5-Live-Linkwechsel</strong><br>Die Präsenzstimmen wechseln zwischen RX3 und RX4. Das Zwei-RX-Quorum bleibt dadurch aus, und die stille Person wird nicht erkannt.</td>
-<td><a href="results/2026-08-23_D4-D5-D6_figures/04_D6_RX_frameraten.png"><img src="results/2026-08-23_D4-D5-D6_figures/04_D6_RX_frameraten.png" alt="D6-RX-Frameraten über fünf Aufnahmen" width="480"></a><br><strong>D6-RX-Frameraten</strong><br>Alle vier RX sind in den fünf technischen Aufnahmen vertreten. Das belegt Erfassung und Transport, aber keine Positionsgenauigkeit.</td>
-</tr>
-</table>
-
-D5-abs senkt die globale Leerraum-Fehlpräsenz von D4s `75,2 %` auf `0 %`,
-senkt aber zugleich den Still-Recall von `88,4 %` auf `0 %` und ist deshalb
-insgesamt **nicht bestanden**. D6 ist technisch vollständig und
-setupgebunden; daraus folgt keine Aussage über Erkennungs- oder
-Positionsgenauigkeit.
-
-Wichtige Nachweise:
-
-- [D5: Offline-Replay und experimentelle Präsenzkalibrierung](results/2026-07-26_D5_offline-replay-und-experimentelle-praesenzkalibrierung.md)
-- [D5: realer Still-Livetest](results/2026-07-26_D5_realer-still-livetest.md)
-- [D6: Setupaufnahme und TX-Firmwareidentität](results/2026-08-09_D6_setupaufnahme-und-TX-firmwareidentitaet.md)
-- [D6: Setup-Siegel und Preflight](results/2026-08-09_D6_setup-siegel-und-preflight.md)
-- [D6: Sidecar-Fix, Neusiegelung und Leerraumkalibrierung](results/2026-08-09_D6_sidecar-fix-neusiegelung-und-preflight.md)
+> [!IMPORTANT]
+> D5-abs senkt die globale Leerraum-Fehlpräsenz von D4s `75,2 %` auf `0 %`, senkt aber zugleich den Still-Recall von `88,4 %` auf `0 %` und ist insgesamt **nicht bestanden**. D6 ist technisch vollständig und setupgebunden; daraus folgt keine Aussage über Erkennungs- oder Positionsgenauigkeit.
 
 ## Hardware
 
-Der WLAN-CSI-Aufbau besteht aus fünf ESP32-S3-Boards. Ein separates ESP32-C3-
-Board bindet den HLK-LD2450 später als unabhängigen Referenzsensor an.
+Der Aufbau besteht aus fünf ESP32-S3-Boards, einem ESP32-C3 und dem
+HLK-LD2450 als unabhängiger mmWave-Referenz. Die vollständige
+[Hardware-Dokumentation](hardware/README.md) bündelt Platinen, Breadboard-CAD,
+Befestigungs- und mmWave-Bauteile, Bilder und Gehäusehinweise.
 
-<img src="images/hlk-ld2450-mmwave-sensor.jpeg" alt="HLK-LD2450 24G mmWave-Referenzsensor" width="460">
+> [!IMPORTANT]
+> Für den aktuellen Aufbau ist ausdrücklich **PCB-02** zu verwenden. PCB-01 bleibt als frühere Fertigungsvorschau dokumentiert.
 
-PCB-01 verbindet den ESP32-C3 mit dem mmWave-Referenzpfad. Die folgende
-Fertigungsvorschau zeigt den verwendeten Platinenstand:
-
-<img src="images/pcb-01-preview.webp" alt="Fertigungsvorschau von PCB-01 mit ESP32-C3-Footprint, C1, C2 und Anschluss U2" width="460">
-
-Die [Gerber- und Bohrdaten von PCB-01](hardware/pcb-01/) liegen mit SHA-256 und
-Fertigungshinweis im Repository.
-
-Die überarbeitete [PCB-02 mit KiCad-Quellen, Prüfberichten und Bestellarchiv](hardware/pcb-02/)
-verwendet wieder SMD-Kondensatoren, Standard-Pinheader-Pads für den ESP32-C3
-und dieselben Außenmaße sowie Montagebohrungen wie PCB-01.
-
-Als Gehäuse für die ESP32-S3-Boards ist das externe MakerWorld-Modell
-[*ESP32 S3 Wroom Case*](https://makerworld.com/de/models/1456361-esp32-s3-wroom-case#profileId-1517915)
-vorgesehen. Wegen seiner MakerWorld Standard Digital File License wird die
-STL nicht erneut im Repository bereitgestellt. Weitere Hinweise stehen unter
-[`hardware/esp32-s3-case/`](hardware/esp32-s3-case/).
+- [PCB-01 Gerber- und Bohrdaten](hardware/pcb-01/)
+- [PCB-02 KiCad-Quellen, Prüfberichte und Bestellarchiv](hardware/pcb-02/)
+- [Breadboard-CAD (`Breadboard-Body.stl`)](hardware/breadboard/Breadboard-Body.stl)
 
 ## Dokumentation
 
@@ -290,6 +204,9 @@ STL nicht erneut im Repository bereitgestellt. Weitere Hinweise stehen unter
 | [`06-ruview-anpassungen.md`](06-ruview-anpassungen.md) | Lokale Änderungen an RuView |
 | [`07-screenshot-nachweise.md`](07-screenshot-nachweise.md) | Visuelle Nachweise und Fehlerbilder |
 | [`08-aktueller-arbeitsstand-d6-und-position.md`](08-aktueller-arbeitsstand-d6-und-position.md) | Verbindlicher D6-/mmWave-Wiedereinstieg |
+| [`architecture.md`](architecture.md) | Architektur, Datenfluss und Evidenztrennung |
+| [`hardware/README.md`](hardware/README.md) | Hardwareübersicht, Platinen, Breadboard-CAD und Befestigungsteile |
+| [`software/experiment-cockpit.md`](software/experiment-cockpit.md) | UI-Screenshots und Experiment-Workflow |
 | [`software/`](software/README.md) | Vollständiger UI-, Backend- und Firmware-Quellstand mit Herkunftsnachweis |
 | [`results/`](results/) | Ausführliche Ergebnisberichte |
 | [`templates/messblatt.md`](templates/messblatt.md) | Vorlage für neue Messungen |
