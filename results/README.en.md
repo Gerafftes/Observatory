@@ -28,15 +28,19 @@ The [technical D4/D5/D6 report](2026-08-23_D4-D5-D6_technischer-ergebnisbericht.
 is linked to the [25-capture run overview](2026-08-23_D4-D5-D6_laufuebersicht.csv),
 [D4 RX diagnostics](2026-08-23_D4_RX_diagnostik.csv), and the
 [figure contract and QA record](2026-08-23_D4-D5-D6_chart-map.md).
+The current figures were rendered on 27 August 2026 with the official Bklit UI
+charts; the [Bklit render specification](2026-08-27_D4-D5-D6_bklit-render-spec.md)
+documents the data source, component choices, and QA. The original figures
+remain available for [archived comparison](2026-08-23_D4-D5-D6_figures/).
 
 <table>
 <tr>
-<td><a href="2026-08-23_D4-D5-D6_figures/01_globaler_vergleich.png"><img src="2026-08-23_D4-D5-D6_figures/01_globaler_vergleich.png" alt="Global comparison of D4 and D5-abs empty-room false presence and still recall" width="480"></a><br><strong>Global comparison</strong><br>D5-abs removes empty-room false presence but loses still recall, so the variant fails overall.</td>
-<td><a href="2026-08-23_D4-D5-D6_figures/02_D4_RX_leerraum_heatmap.png"><img src="2026-08-23_D4-D5-D6_figures/02_D4_RX_leerraum_heatmap.png" alt="D4 empty-room votes shown as an RX heatmap" width="480"></a><br><strong>D4 RX empty-room heatmap</strong><br>False presence is local and shifts between RX paths; no single stable source is visible.</td>
+<td><a href="2026-08-27_D4-D5-D6_bklit_figures/01_globaler_vergleich.png"><img src="2026-08-27_D4-D5-D6_bklit_figures/01_globaler_vergleich.png" alt="Global comparison of D4 and D5-abs empty-room false presence and still recall" width="480"></a><br><strong>Global comparison</strong><br>D5-abs removes empty-room false presence but loses still recall, so the variant fails overall.</td>
+<td><a href="2026-08-27_D4-D5-D6_bklit_figures/02_D4_RX_leerraum_heatmap.png"><img src="2026-08-27_D4-D5-D6_bklit_figures/02_D4_RX_leerraum_heatmap.png" alt="D4 empty-room votes shown as an RX heatmap" width="480"></a><br><strong>D4 RX empty-room heatmap</strong><br>False presence is local and shifts between RX paths; no single stable source is visible.</td>
 </tr>
 <tr>
-<td><a href="2026-08-23_D4-D5-D6_figures/03_D5_live_RX_linkwechsel.png"><img src="2026-08-23_D4-D5-D6_figures/03_D5_live_RX_linkwechsel.png" alt="D5 live test with RX link changes" width="480"></a><br><strong>D5 live link changes</strong><br>Presence votes switch between RX3 and RX4, so the two-RX quorum is never reached and the still person is missed.</td>
-<td><a href="2026-08-23_D4-D5-D6_figures/04_D6_RX_frameraten.png"><img src="2026-08-23_D4-D5-D6_figures/04_D6_RX_frameraten.png" alt="D6 RX frame rates across five captures" width="480"></a><br><strong>D6 RX frame rates</strong><br>All four RX paths appear in the five technical captures. This verifies capture and transport, not positioning accuracy.</td>
+<td><a href="2026-08-27_D4-D5-D6_bklit_figures/03_D5_live_RX_linkwechsel.png"><img src="2026-08-27_D4-D5-D6_bklit_figures/03_D5_live_RX_linkwechsel.png" alt="D5 live test with RX link changes" width="480"></a><br><strong>D5 live link changes</strong><br>Presence votes switch between RX3 and RX4, so the two-RX quorum is never reached and the still person is missed.</td>
+<td><a href="2026-08-27_D4-D5-D6_bklit_figures/04_D6_RX_frameraten.png"><img src="2026-08-27_D4-D5-D6_bklit_figures/04_D6_RX_frameraten.png" alt="D6 RX frame rates across five captures" width="480"></a><br><strong>D6 RX frame rates</strong><br>All four RX paths appear in the five technical captures. This verifies capture and transport, not positioning accuracy.</td>
 </tr>
 </table>
 
