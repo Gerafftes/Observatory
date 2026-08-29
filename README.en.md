@@ -1,9 +1,9 @@
 <h1 align="center">Observatory</h1>
 
 <p align="center">
-  An experimental 1TX/4RX WiFi CSI system investigating presence, movement, and
-  nine fixed room positions without cameras, while using mmWave as an
-  independent reference.
+  An experimental 1TX/4RX WiFi CSI system investigating presence, movement,
+  experimental breathing and heart-rate signals, and camera-free position
+  estimation, with mmWave as an independent reference.
 </p>
 
 <p align="center">
@@ -127,8 +127,11 @@ documented in [`06-ruview-anpassungen.md`](06-ruview-anpassungen.md).
 - Check packet source, RX identity, subcarrier grid, data rate, and drops
   before a measurement.
 - Treat movement, still presence, and position as separate evidence stages.
-- Output only P01 through P09, `unknown`, or `ambiguous` for position instead
-  of inventing a falsely precise continuous heatmap.
+- Output a discrete, setup-bound position estimate with `unknown` or `ambiguous`
+  instead of inventing a falsely precise continuous heatmap.
+- Explore breathing and heart-rate signals as experimental CSI indicators;
+  without an independent reference measurement they are not validated
+  physiological measurements.
 - Keep training, blind prediction, and ground truth separate through distinct
   files and cryptographic hashes.
 - Use an HLK-LD2450 as a calibration and reference sensor without feeding its
@@ -151,8 +154,9 @@ python3 -m unittest scripts/tests/test_evaluate_d5_replay.py
 
 ## Research question
 
-How reliably can an ESP32-based WiFi CSI system detect movement and breathing
-patterns in a room, and which physical limitations affect the results?
+How reliably can an ESP32-based WiFi CSI system detect movement, breathing, and
+heart-rate signals in a room, and which physical limitations affect the
+results?
 
 ## Current validation status
 
@@ -163,7 +167,8 @@ patterns in a room, and which physical limitations affect the results?
 | 1 TX / 4 RX | Transport verified | All four receivers delivered source-bound Raw CSI using the same subcarrier grid. |
 | D4 movement | Experimental | Coarse movement false alarms were reduced; still-presence detection remains unreliable. |
 | D5 still presence | Live test failed | With a motionless person present, 350 out of 350 samples remained `ABSENT`. |
-| D6 position | Software prepared | Captures, nine positions, and blind tests are implemented; a real index passing blind evaluation is still missing. |
+| D6 position | Software prepared | Captures, discrete position estimation, and blind tests are implemented; a real position index passing blind evaluation is still missing. |
+| Breathing/heart rate | Experimental | CSI-based signal indicators are explored, but are not physiologically validated without an independent reference. |
 | mmWave reference | Partially operational | ESP32-C3, CSI WiFi, and the status service are verified; the real LD2450 data path has not yet been fully validated. |
 | Overall system | Not validated | There is no joint real-world PASS for classification, position, and mmWave. |
 
