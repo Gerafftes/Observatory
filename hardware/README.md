@@ -38,26 +38,12 @@ vorläufigen Breadboard-Aufbau:
 </tr>
 </table>
 
-Die [Breadboard-CAD-Datei (`Breadboard-Body.stl`)](breadboard/Breadboard-Body.stl)
-liegt im Repository. Druckorientierung, Material und Passprobe sind noch nicht
-validiert; weitere Breadboard-Unterlagen folgen, sobald sie vorliegen.
+Alle Dateien und Bezugsangaben stehen auf der separaten
+[Breadboard-Seite](breadboard/README.md): STL, Montagefoto, Heat-Set-Insert,
+Installation Tip, Holzschrauben und die beiden mmWave-Kondensatoren.
 
-### Verwendete Befestigungsteile
-
-- Heat-Set-Insert `M1.6 × 2.5`
-- Installation Tip `M1.6 × 1`
-- QUARKZMAN-Holzschrauben `M1.6 × 8 mm`, Schlitz-Rundkopf, Messing,
-  selbstschneidend (`40 Stück`)
-
-Diese Angaben dokumentieren die verwendete Hardware dieses Modells. Druck-
-parameter, Einpress-Temperatur und Passprobe sind noch nicht validiert.
-
-### Breadboard-mmWave-Bauteile
-
-| Bauteil | Menge | Preis |
-|---|---:|---:|
-| **X7R-2,5 100N MUR**<br>Vielschicht-Kerko 100 nF, 50 V, X7R, 10 %, RM 2,5, Ammo | 1 | 0,10 € |
-| **FC-A 10U 50**<br>Elko, radial, 10 µF, 50 V, RM 2,5, 105 °C, 1000 h, 20 % | 1 | 0,15 € |
+Die Seite dokumentiert außerdem die verwendeten Mengen und die noch offenen
+Validierungen zu Druck, Einpress-Temperatur und Passprobe.
 
 ## ESP32-S3-Gehäuse
 
