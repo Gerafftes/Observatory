@@ -1,9 +1,9 @@
 <h1 align="center">Observatory</h1>
 
 <p align="center">
-  Ein experimentelles 1TX-/4RX-WLAN-CSI-System, das Präsenz, Bewegung und neun
-  feste Raumpositionen ohne Kamera untersucht und mmWave als unabhängige
-  Referenz nutzt.
+  Ein experimentelles 1TX-/4RX-WLAN-CSI-System zur Untersuchung von Präsenz,
+  Bewegung, experimentellen Atem- und Herzfrequenzsignalen sowie kamerafreier
+  Positionsschätzung; mmWave dient als unabhängige Referenz.
 </p>
 
 <p align="center">
@@ -129,8 +129,12 @@ im Repository enthalten. Herkunft und festgeschriebene Quellstände stehen in
 - Paketquelle, RX-Identität, Subcarrier-Raster, Datenrate und Drops vor einer
   Messung prüfen.
 - Bewegung, Still-Präsenz und Position als getrennte Evidenzstufen behandeln.
-- Position ausschließlich als P01 bis P09, `unknown` oder `ambiguous`
-  ausgeben, statt eine scheinpräzise kontinuierliche Heatmap zu erfinden.
+- Position als diskrete, setupgebundene Schätzung mit `unknown` oder
+  `ambiguous` ausgeben, statt eine scheinpräzise kontinuierliche Heatmap zu
+  erfinden.
+- Atem- und Herzfrequenzsignale als experimentelle CSI-Indikatoren untersuchen;
+  ohne unabhängige Referenzmessung sind sie nicht als physiologische Messwerte
+  validiert.
 - Training, Blindvorhersage und Wahrheit durch getrennte Dateien und
   Hashbindungen voneinander isolieren.
 - Einen HLK-LD2450 als Kalibrierungs- und Referenzsensor verwenden, ohne seine
@@ -154,8 +158,8 @@ python3 -m unittest scripts/tests/test_evaluate_d5_replay.py
 ## Forschungsfrage
 
 Wie zuverlässig kann ein ESP32-basiertes WLAN-CSI-System Bewegungen und
-Atemrhythmen im Raum erfassen, und welche physikalischen Grenzen ergeben sich
-dabei?
+Atem- und Herzfrequenzsignale im Raum erfassen, und welche physikalischen
+Grenzen ergeben sich dabei?
 
 ## Aktueller Validierungsstand
 
@@ -166,7 +170,8 @@ dabei?
 | 1 TX / 4 RX | Transport nachgewiesen | Alle vier RX lieferten gebundene Raw-CSI-Daten im gemeinsamen Raster. |
 | D4 Bewegung | Experimentell | Grobe Bewegungsalarme wurden reduziert; Still-Präsenz bleibt unzuverlässig. |
 | D5 Still-Präsenz | Livetest nicht bestanden | Bei anwesender stiller Person blieben 350 von 350 Samples `ABSENT`. |
-| D6 Position | Software vorbereitet | Aufnahmen, neun Punkte und Blindtests sind implementiert; ein realer blind bestandener Index fehlt. |
+| D6 Position | Software vorbereitet | Aufnahmen, diskrete Positionsschätzung und Blindtests sind implementiert; ein realer blind bestandener Positionsindex fehlt. |
+| Atem-/Herzfrequenz | Experimentell | CSI-basierte Signalindikatoren sind untersucht, aber ohne unabhängige Referenz nicht physiologisch validiert. |
 | mmWave-Referenz | Teilweise in Betrieb | ESP32-C3, CSI-WLAN und Statusdienst sind nachgewiesen; der reale LD2450-Datenpfad ist noch nicht vollständig validiert. |
 | Gesamtsystem | Nicht validiert | Es gibt noch keinen gemeinsamen realen PASS für Classification, Position und mmWave. |
 
