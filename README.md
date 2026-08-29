@@ -1,18 +1,43 @@
-# Observatory [![Status](https://img.shields.io/badge/status-experimental-orange)](#aktueller-validierungsstand)
-[![License: PolyForm Noncommercial 1.0.0](https://img.shields.io/badge/License-PolyForm%20Noncommercial%201.0.0-blue.svg)](LICENSE.md)
-[![Projektgröße](https://img.shields.io/github/repo-size/Gerafftes/Observatory?style=flat-square&label=Projektgr%C3%B6%C3%9Fe)](https://github.com/Gerafftes/Observatory)
-[![Zeilen](https://api.octocounts.com/badge/Gerafftes/Observatory/branch/main?type=lines&v=3)](https://octocounts.com/github/Gerafftes/Observatory/tree/main)
+<h1 align="center">Observatory</h1>
 
-[**Deutsch**](README.md) · [English](README.en.md)
+<p align="center">
+  Ein experimentelles 1TX-/4RX-WLAN-CSI-System, das Präsenz, Bewegung und neun
+  feste Raumpositionen ohne Kamera untersucht und mmWave als unabhängige
+  Referenz nutzt.
+</p>
 
+<p align="center">
+  <a href="https://stardance.hackclub.com/projects/25673">Stardance</a> ·
+  <a href="#schnelleinstieg">Schnellstart</a> ·
+  <a href="#was-observatory-kann">Features</a> ·
+  <a href="results/README.md">Ergebnisse</a> ·
+  <a href="hardware/README.md">Hardware</a> ·
+  <a href="README.en.md">English</a>
+</p>
 
-Ein experimentelles 1TX-/4RX-WLAN-CSI-System, das Präsenz, Bewegung und neun
-feste Raumpositionen ohne Kamera untersucht und mmWave nur als unabhängige
-Referenz verwendet.
+<p align="center">
+  <a href="https://stardance.hackclub.com/projects/25673"><img src="https://img.shields.io/badge/Hack%20Club-Stardance-ec3750?style=flat-square&amp;logo=hackclub&amp;logoColor=white" alt="Hack Club Stardance"></a>
+  <a href="https://www.espressif.com/en/products/socs/esp32"><img src="https://img.shields.io/badge/ESP32-E7352C?style=flat-square&amp;logo=espressif&amp;logoColor=white" alt="ESP32"></a>
+  <a href="#aktueller-validierungsstand"><img src="https://img.shields.io/badge/status-experimental-orange" alt="Experimental status"></a>
+  <a href="LICENSE.md"><img src="https://img.shields.io/badge/License-PolyForm%20Noncommercial%201.0.0-blue.svg" alt="PolyForm Noncommercial 1.0.0 license"></a>
+  <a href="https://github.com/Gerafftes/Observatory"><img src="https://img.shields.io/github/repo-size/Gerafftes/Observatory?style=flat-square&amp;label=Projektgr%C3%B6%C3%9Fe" alt="Projektgröße"></a>
+  <a href="https://octocounts.com/github/Gerafftes/Observatory/tree/main"><img src="https://api.octocounts.com/badge/Gerafftes/Observatory/branch/main?type=lines&amp;v=3" alt="Zeilen"></a>
+</p>
 
-<img src="images/esp32-s3-boards.jpeg" alt="Die fünf beschrifteten ESP32-S3-Boards des Observatory-Aufbaus: RX1 bis RX4 und TX" width="420">
+<table>
+  <tr>
+    <td align="center" width="50%">
+      <a href="images/esp32-s3-boards.jpeg"><img src="images/esp32-s3-boards.jpeg" alt="Die fünf beschrifteten ESP32-S3-Boards des Observatory-Aufbaus: RX1 bis RX4 und TX" width="100%"></a><br>
+      <sub>ESP32-S3-Boards: RX1 bis RX4 und TX</sub>
+    </td>
+    <td align="center" width="50%">
+      <a href="images/mmwave-breadboard-setup.jpeg"><img src="images/mmwave-breadboard-setup-hero.jpeg" alt="Vorläufiger Breadboard-Aufbau mit HLK-LD2450 und ESP32-C3" width="100%"></a><br>
+      <sub>Vorläufiger mmWave-Breadboard-Aufbau</sub>
+    </td>
+  </tr>
+</table>
 
-## Projekt ansehen [![Hack Club Stardance](https://img.shields.io/badge/Hack%20Club-Stardance-ec3750?style=flat-square&logo=hackclub&logoColor=white)](https://stardance.hackclub.com/projects/25673)
+## Projekt ansehen
 
 **[Observatory auf Stardance ansehen](https://stardance.hackclub.com/projects/25673)**
 
@@ -188,7 +213,7 @@ Befestigungs- und mmWave-Bauteile, Bilder und Gehäusehinweise.
 
 - [PCB-01 Gerber- und Bohrdaten](hardware/pcb-01/)
 - [PCB-02 KiCad-Quellen, Prüfberichte und Bestellarchiv](hardware/pcb-02/)
-- [Breadboard-CAD (`Breadboard-Body.stl`)](hardware/breadboard/Breadboard-Body.stl)
+- [Breadboard-CAD, Befestigungsteile und mmWave-BOM](hardware/breadboard/README.md)
 
 ## Dokumentation
 

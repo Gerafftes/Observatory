@@ -1,19 +1,41 @@
-# Observatory
-[Deutsch](README.md) · [**English**](README.en.md)
+<h1 align="center">Observatory</h1>
 
-[![Hack Club Stardance](https://img.shields.io/badge/Hack%20Club-Stardance-ec3750?style=flat-square&logo=hackclub&logoColor=white)](https://stardance.hackclub.com/projects/25673)
-[![ESP32](https://img.shields.io/badge/ESP32-E7352C?style=flat-square&logo=espressif&logoColor=white)](https://www.espressif.com/en/products/socs/esp32)
-[![Status](https://img.shields.io/badge/status-experimental-orange)](#current-validation-status)
-[![License: PolyForm Noncommercial 1.0.0](https://img.shields.io/badge/License-PolyForm%20Noncommercial%201.0.0-blue.svg)](LICENSE.md)
-[![Project size](https://img.shields.io/github/repo-size/Gerafftes/Observatory?style=flat-square&label=project%20size)](https://github.com/Gerafftes/Observatory)
-[![Lines](https://api.octocounts.com/badge/Gerafftes/Observatory/branch/main?type=lines&v=3)](https://octocounts.com/github/Gerafftes/Observatory/tree/main)
+<p align="center">
+  An experimental 1TX/4RX WiFi CSI system investigating presence, movement, and
+  nine fixed room positions without cameras, while using mmWave as an
+  independent reference.
+</p>
 
+<p align="center">
+  <a href="https://stardance.hackclub.com/projects/25673">Stardance</a> ·
+  <a href="#quick-start">Quick start</a> ·
+  <a href="#what-observatory-can-do">Features</a> ·
+  <a href="results/README.en.md">Results</a> ·
+  <a href="hardware/README.en.md">Hardware</a> ·
+  <a href="README.md">Deutsch</a>
+</p>
 
-An experimental 1TX/4RX WiFi CSI system investigating presence, movement, and
-nine fixed room positions without cameras, while using mmWave only as an
-independent reference.
+<p align="center">
+  <a href="https://stardance.hackclub.com/projects/25673"><img src="https://img.shields.io/badge/Hack%20Club-Stardance-ec3750?style=flat-square&amp;logo=hackclub&amp;logoColor=white" alt="Hack Club Stardance"></a>
+  <a href="https://www.espressif.com/en/products/socs/esp32"><img src="https://img.shields.io/badge/ESP32-E7352C?style=flat-square&amp;logo=espressif&amp;logoColor=white" alt="ESP32"></a>
+  <a href="#current-validation-status"><img src="https://img.shields.io/badge/status-experimental-orange" alt="Experimental status"></a>
+  <a href="LICENSE.md"><img src="https://img.shields.io/badge/License-PolyForm%20Noncommercial%201.0.0-blue.svg" alt="PolyForm Noncommercial 1.0.0 license"></a>
+  <a href="https://github.com/Gerafftes/Observatory"><img src="https://img.shields.io/github/repo-size/Gerafftes/Observatory?style=flat-square&amp;label=project%20size" alt="Project size"></a>
+  <a href="https://octocounts.com/github/Gerafftes/Observatory/tree/main"><img src="https://api.octocounts.com/badge/Gerafftes/Observatory/branch/main?type=lines&amp;v=3" alt="Lines"></a>
+</p>
 
-<img src="images/esp32-s3-boards.jpeg" alt="The five labeled ESP32-S3 boards in the Observatory setup: RX1 through RX4 and TX" width="420">
+<table>
+  <tr>
+    <td align="center" width="50%">
+      <a href="images/esp32-s3-boards.jpeg"><img src="images/esp32-s3-boards.jpeg" alt="The five labeled ESP32-S3 boards in the Observatory setup: RX1 through RX4 and TX" width="100%"></a><br>
+      <sub>ESP32-S3 boards: RX1 through RX4 and TX</sub>
+    </td>
+    <td align="center" width="50%">
+      <a href="images/mmwave-breadboard-setup.jpeg"><img src="images/mmwave-breadboard-setup-hero.jpeg" alt="Provisional breadboard setup with HLK-LD2450 and ESP32-C3" width="100%"></a><br>
+      <sub>Provisional mmWave breadboard setup</sub>
+    </td>
+  </tr>
+</table>
 
 ## View the project
 
@@ -187,7 +209,7 @@ enclosure notes.
 
 - [PCB-01 Gerber and drill files](hardware/pcb-01/)
 - [PCB-02 KiCad sources, validation reports, and ordering archive](hardware/pcb-02/)
-- [Breadboard CAD (`Breadboard-Body.stl`)](hardware/breadboard/Breadboard-Body.stl)
+- [Breadboard CAD, fastening hardware, and mmWave BOM](hardware/breadboard/README.en.md)
 
 ## Documentation
 

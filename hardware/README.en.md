@@ -38,27 +38,12 @@ breadboard setup:
 </tr>
 </table>
 
-The [breadboard CAD file (`Breadboard-Body.stl`)](breadboard/Breadboard-Body.stl)
-is included in the repository. Print orientation, material, and fit have not
-yet been validated; additional breadboard documentation will follow when
-available.
+All files and sourcing references are collected on the separate
+[breadboard page](breadboard/README.en.md): STL, setup photo, heat-set insert,
+installation tip, wood screws, and both mmWave capacitors.
 
-### Fastening hardware used
-
-- Heat-set insert `M1.6 × 2.5`
-- Installation tip `M1.6 × 1`
-- QUARKZMAN wood screws, `M1.6 × 8 mm`, slotted round head, brass,
-  self-tapping (`40 pieces`)
-
-These details document the hardware used with this model. Print settings,
-insertion temperature, and fit have not yet been validated.
-
-### Breadboard mmWave components
-
-| Part | Quantity | Price |
-|---|---:|---:|
-| **X7R-2.5 100N MUR**<br>100 nF multilayer ceramic capacitor, 50 V, X7R, 10%, 2.5 mm pitch, ammo | 1 | €0.10 |
-| **FC-A 10U 50**<br>Radial electrolytic capacitor, 10 µF, 50 V, 2.5 mm pitch, 105 °C, 1000 h, 20% | 1 | €0.15 |
+The page also documents the used quantities and the still-open validation items
+for printing, insertion temperature, and fit.
 
 ## ESP32-S3 enclosure
 
