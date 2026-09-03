@@ -157,6 +157,9 @@ pub(crate) enum PositionFingerprintError {
         expected: usize,
         actual: usize,
     },
+    ReceiverIndex {
+        actual: usize,
+    },
     FeatureCount {
         receiver_index: usize,
         expected: usize,
@@ -240,6 +243,10 @@ impl fmt::Display for PositionFingerprintError {
             Self::ReceiverCount { expected, actual } => write!(
                 formatter,
                 "fingerprint requires exactly {expected} receivers, got {actual}"
+            ),
+            Self::ReceiverIndex { actual } => write!(
+                formatter,
+                "fingerprint receiver index must be in 0..{RECEIVER_COUNT}, got {actual}"
             ),
             Self::FeatureCount {
                 receiver_index,
@@ -541,6 +548,58 @@ impl PositionFingerprintModel {
         })
     }
 
+    /// Return the nearest stored position using one receiver only.
+    ///
+    /// This is a diagnostic ablation for RX1-RX4 blind-test reporting. It is
+    /// deliberately not an OOD-gated public prediction: the deployed decision
+    /// continues to use [`Self::predict`] and all four receivers equally.
+    pub(crate) fn nearest_position_for_receiver(
+        &self,
+        receiver_index: usize,
+        features: &[f64],
+    ) -> Result<FingerprintPosition, PositionFingerprintError> {
+        self.validate()?;
+        if receiver_index >= RECEIVER_COUNT {
+            return Err(PositionFingerprintError::ReceiverIndex {
+                actual: receiver_index,
+            });
+        }
+        if features.len() != FEATURES_PER_RECEIVER {
+            return Err(PositionFingerprintError::FeatureCount {
+                receiver_index,
+                expected: FEATURES_PER_RECEIVER,
+                actual: features.len(),
+            });
+        }
+        for (feature_index, feature) in features.iter().enumerate() {
+            if !feature.is_finite() {
+                return Err(PositionFingerprintError::NonFiniteFeature {
+                    receiver_index,
+                    feature_index,
+                });
+            }
+        }
+        self.prototypes
+            .iter()
+            .map(|prototype| {
+                (
+                    normalized_receiver_distance(
+                        features,
+                        &prototype.prototype[receiver_index],
+                        &self.shared_scale[receiver_index],
+                    ),
+                    &prototype.position,
+                )
+            })
+            .min_by(|left, right| {
+                left.0
+                    .total_cmp(&right.0)
+                    .then_with(|| left.1.id.cmp(&right.1.id))
+            })
+            .map(|(_, position)| position.clone())
+            .ok_or(PositionFingerprintError::EmptyTrainingSet)
+    }
+
     pub(crate) fn positions(&self) -> impl ExactSizeIterator<Item = &FingerprintPosition> {
         self.prototypes.iter().map(|prototype| &prototype.position)
     }
@@ -692,6 +751,24 @@ fn normalized_distance(
         })
         .sum::<f64>();
     (receiver_mean_squared_sum / RECEIVER_COUNT as f64).sqrt()
+}
+
+fn normalized_receiver_distance(
+    features: &[f64],
+    prototype: &[f64; FEATURES_PER_RECEIVER],
+    scale: &[f64; FEATURES_PER_RECEIVER],
+) -> f64 {
+    let mean_squared = features
+        .iter()
+        .zip(prototype)
+        .zip(scale)
+        .map(|((feature, prototype), scale)| {
+            let residual = (feature - prototype) / scale;
+            residual * residual
+        })
+        .sum::<f64>()
+        / FEATURES_PER_RECEIVER as f64;
+    mean_squared.sqrt()
 }
 
 fn relative_margin(nearest_distance: f64, other_distance: f64) -> f64 {

@@ -580,7 +580,7 @@ mod tests {
             HomeCore::new(),
             "Test",
             "test",
-            LongLivedTokenStore::allow_any_non_empty(),
+            LongLivedTokenStore::from_tokens(["dev"]),
         );
         GatewayState::new(
             shared,

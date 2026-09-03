@@ -40,17 +40,14 @@ at their pinned commits:
 | `v2/crates/ruview-swarm` | `267aba5be2288aa6cbe574492062b04fa8c8a6ce` |
 | `v2/crates/worldgraph` | `fdade422069d3162634292710d78cb9963c0f48d` |
 
-The snapshot also contains the current Observatory working-tree changes in:
+The snapshot also contains the current Observatory development changes across:
 
-- `ui/components/MmwaveCalibrationAssistant.js`
-- `ui/components/ObservatoryControlCenter.js`
-- `ui/components/RoomGeometryEditor.js`
-- `ui/components/SensingTab.js`
-- `ui/index.html`
-- `ui/style.css`
-- `ui/tests/`
-- `ui/utils/i18n.js`
-- `v2/crates/wifi-densepose-sensing-server/src/experiment.rs`
+- the experiment cockpit, room geometry, mmWave calibration and sensing UI
+- the Rust sensing server, calibration persistence, authentication and HomeCore services
+- the ESP32 CSI and mmWave firmware
+- the MCP, capture, audit and source-verification scripts
+- the matching unit, integration and security-boundary tests
+- the technical setup and operator documentation that accompanies those changes
 
 Git histories, build directories, dependency caches, recordings, logs,
 credentials and device-specific provisioning exports are intentionally not

@@ -6,10 +6,8 @@
 //! Token provisioning matches `homecore-server`: if `HOMECORE_TOKENS`
 //! is set (comma-separated bearer tokens) the API enforces that
 //! whitelist on both the REST and WS paths. If it is **unset**, the
-//! binary falls back to an explicitly-logged DEV mode (any non-empty
-//! bearer accepted) — before this fix the bin unconditionally used
-//! `allow_any_non_empty()` with no env path, so a provisioned operator
-//! had no way to lock it down.
+//! token store is locked and every bearer is rejected until tokens are
+//! provisioned.
 //!
 //! ## Bind address
 //!
@@ -38,23 +36,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let homecore = HomeCore::new();
 
-    // Token provisioning (HC-WS-08). Prefer the HOMECORE_TOKENS env
-    // whitelist; fall back to DEV mode (warn-logged) only when unset.
-    let tokens = if std::env::var("HOMECORE_TOKENS")
-        .map(|v| !v.trim().is_empty())
-        .unwrap_or(false)
-    {
-        let s = LongLivedTokenStore::from_env();
-        let n = s.len().await;
-        tracing::info!("LongLivedTokenStore provisioned with {n} bearer token(s) from HOMECORE_TOKENS");
-        s
-    } else {
+    // Token provisioning (HC-WS-08). An unset/empty env leaves the store
+    // locked; there is no wildcard development mode.
+    let tokens = LongLivedTokenStore::from_env();
+    let n = tokens.len().await;
+    if n == 0 {
         tracing::warn!(
-            "HOMECORE_TOKENS not set — token store in DEV mode (any non-empty bearer \
-             accepted). Set HOMECORE_TOKENS before exposing this binary to the network."
+            "HOMECORE_TOKENS is unset or empty — the API is locked and rejects all bearer tokens"
         );
-        LongLivedTokenStore::allow_any_non_empty()
-    };
+    } else {
+        tracing::info!(
+            "LongLivedTokenStore provisioned with {n} bearer token(s) from HOMECORE_TOKENS"
+        );
+    }
 
     let state = SharedState::with_tokens(homecore, "Home", env!("CARGO_PKG_VERSION"), tokens);
     let app = router(state);

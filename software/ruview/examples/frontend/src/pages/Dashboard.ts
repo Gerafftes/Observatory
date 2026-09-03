@@ -4,8 +4,8 @@
  *
  * Auth: reads bearer from `localStorage["homecore.token"]`, the
  * `?token=` query string, or `HOMECORE_TOKEN` `<meta>` tag — in that
- * order. Falls back to the literal "dev-token" in DEV-mode backends
- * (any non-empty bearer is accepted when HOMECORE_TOKENS is unset).
+ * order. There is no implicit development token; the backend must be
+ * provisioned with `HOMECORE_TOKENS` and the matching token supplied here.
  */
 
 import { LitElement, html, css } from 'lit';
@@ -27,7 +27,7 @@ function resolveToken(): string {
     if (qs) return qs;
     const meta = document.querySelector<HTMLMetaElement>('meta[name="homecore-token"]');
     if (meta?.content) return meta.content;
-    return 'dev-token';
+    return '';
 }
 
 @customElement('hc-dashboard')

@@ -54,9 +54,14 @@ All subsystems share the same `HomeCore` instance, so state changes flow through
 
 ```bash
 cargo build -p homecore-server
+export HOMECORE_TOKENS="$(openssl rand -hex 32)"
 ./target/debug/homecore-server
 # Listens on http://localhost:8123
 ```
+
+`HOMECORE_TOKENS` is a comma-separated allowlist and is required for API
+access. If it is unset or empty, the server still starts but rejects every
+bearer token; there is no wildcard development-token fallback.
 
 **With persistent SQLite**:
 
@@ -77,6 +82,7 @@ cargo build -p homecore-server --features ruvector,wasmtime --release
 
 ```bash
 docker run -p 8123:8123 \
+  -e HOMECORE_TOKENS="$(openssl rand -hex 32)" \
   -e HOMECORE_DB=sqlite:///data/home.db \
   -v ~/.homecore:/data \
   homecore-server:latest
@@ -85,23 +91,29 @@ docker run -p 8123:8123 \
 **Test the API**:
 
 ```bash
+# Use the same HOMECORE_TOKENS value that was provisioned before starting the server.
+
 # List all entities
-curl http://localhost:8123/api/states
+curl -H "Authorization: Bearer ${HOMECORE_TOKENS}" \
+  http://localhost:8123/api/states
 
 # Set a light to "on"
 curl -X POST \
+  -H "Authorization: Bearer ${HOMECORE_TOKENS}" \
   -H "Content-Type: application/json" \
   -d '{"state":"on","attributes":{"brightness":200}}' \
   http://localhost:8123/api/states/light.kitchen
 
 # WebSocket subscription (real-time state changes)
-wscat -c ws://localhost:8123/api/websocket
+wscat -H "Authorization: Bearer ${HOMECORE_TOKENS}" \
+  -c ws://localhost:8123/api/websocket
 ```
 
 **Configuration via env**:
 
 ```bash
 export HOMECORE_BIND="0.0.0.0:8123"
+export HOMECORE_TOKENS="$(openssl rand -hex 32)"
 export HOMECORE_DB="sqlite:~/.homecore/home.db"
 export HOMECORE_LOCATION="Living Room"
 export RUST_LOG="homecore=debug,homecore_api=info"

@@ -31,7 +31,9 @@ export function demoMode() {
 
 export const api = {
   base: '',
-  token: () => { try { return localStorage.getItem('homecore_token') || 'dev-token'; } catch { return 'dev-token'; } },
+  // There is no implicit development token: HOMECORE_TOKENS must be
+  // provisioned on the server and supplied in localStorage.
+  token: () => { try { return localStorage.getItem('homecore_token') || ''; } catch { return ''; } },
   isDemo: (key) => !!demoFlags[key],
   anyDemo: () => demoMode() && Object.keys(demoFlags).length > 0,
   demoMode,

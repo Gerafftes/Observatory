@@ -1,6 +1,6 @@
 # Observatory Control Center — Setup- und Experimentleitfaden
 
-Stand: 2026-08-18
+Stand: 2026-08-29
 
 Dieses Dokument beschreibt den vollständigen Ablauf im Experiment-Cockpit —
 zuerst ohne angeschlossene Hardware, danach mit ESP32-CSI-Nodes und LD2450-
@@ -24,7 +24,7 @@ Ohne ESP32-CSI-Nodes und ohne LD2450 können vollständig geprüft werden:
 
 - Raumprofil mit Länge, Höhe, Breite und Koordinaten
 - TX-/RX-Positionen und Profilversionen
-- Run-Erstellung und Software-Seal
+- Run-Erstellung und Profilversionierung
 - Guide-Navigation und Statusanzeigen
 - SQLite-Run-Historie
 - Fehler- und Offline-Zustände
@@ -69,12 +69,22 @@ Im Bereich Setup-Profil eintragen:
 - Raum: [Länge, Höhe, Breite] in Metern
 - TX: [x, y, z]
 - RX1 bis RX4: [x, y, z]
+- mmWave / HLK-LD2450: [x, y, z] des festen Montagepunkts
 
-Die Koordinaten müssen im gleichen Raumkoordinatensystem liegen. Danach:
+Die Koordinaten müssen im gleichen Raumkoordinatensystem liegen. Der mmWave-Marker ist im CAD-Plan anklickbar, ziehbar und über den Inspector editierbar. Im CAD-Inspector kann **„mmWave darf außerhalb des Raums montiert werden“** deaktiviert werden. Dann gilt für mmWave ausschließlich der Innenraum; TX/RX behalten unabhängig davon den eingestellten Außenradius. Ist die Option aktiv, dürfen X/Z – wie bei TX/RX – innerhalb des Außenradius liegen; Y bleibt immer innerhalb der Raumhöhe. Danach:
+
+Für den Abstand zwischen zwei Wänden im CAD-Inspector beide
+gegenüberliegenden Wände auswählen: **Wand links (X = 0) + Wand rechts (X = L)**
+setzt die **Raumlänge `L`**; **Wand oben (Z = 0) + Wand unten (Z = B)** setzt die
+**Raumbreite `B`**. Danach den angezeigten **Raumabstand** setzen. Benachbarte
+Wände bilden keinen eindeutigen Raumabstand; beim Verkleinern blockiert der
+Editor Werte, durch die ein TX-, RX- oder mmWave-Marker außerhalb von Raum
+beziehungsweise Außenradius läge.
 
 1. Profilnamen eintragen.
 2. Raum- und Node-Positionen prüfen.
-3. Setup-Profil speichern beziehungsweise Neue Profilversion speichern
+3. **mmWave-Position berechnen** klicken. Die Empfehlung wird in die mmWave-Felder und den CAD-Plan übernommen; bei aktivem Innenraum-only bleibt sie innerhalb des Raums.
+4. Setup-Profil speichern beziehungsweise Neue Profilversion speichern
    klicken.
 
 Das optionale P01–P09-Raster befindet sich absichtlich eingeklappt unter
@@ -89,29 +99,64 @@ Der Guide springt zu Experiment-Run anlegen.
 3. WiFi-Experiment anlegen klicken.
 
 Der Run erhält eine eigene ID und übernimmt den Profil-Hash.
+Jede echte Änderung erzeugt dabei eine unveränderliche Profilversion; ein
+identisches erneutes Speichern erzeugt keine zusätzliche Version.
 
-### Schritt 3 — Setup software-seitig versiegeln
+### Schritt 3 — Run mit dem aktiven Setup-v2 versiegeln
 
-Im Guide Setup versiegeln klicken.
+Nach dem Speichern des CAD-Profils übernimmt **Setup-v2-Entwurf laden** Raum,
+TX, RX1–RX4, mmWave-Montagepunkt, Kanal und Umgebungsrevisionen aus genau der
+gespeicherten Profilversion. Diese Werte müssen nicht ein zweites Mal
+eingetragen werden. Der Entwurf bleibt absichtlich nicht versiegelbar, bis die
+verifizierten Firmware-, Grid-, TX-Filter-, Recording-Host- und
+mmWave-Transform-Identitäten ergänzt wurden.
 
-Dadurch werden Profil und Hash für diesen Run festgehalten:
+Der Button bleibt gesperrt, solange der Server ohne `--position-setup` läuft.
+Für einen echten Lauf zuerst eine vollständige Setup-v2-Spezifikation mit den
+verifizierten Firmware-, Grid-, TX-Filter-, mmWave- und Server-Identitäten
+erzeugen, mit demselben Server-Binary versiegeln und den Server mit genau
+diesem Artefakt neu starten. Danach im Guide Setup versiegeln klicken.
+
+Der Server prüft dabei die gemeinsam vorhandenen Profilfelder gegen das aktive
+Runtime-Seal und hält anschließend fest:
 
 - Profil-ID
 - Profil-Hash
 - Run-ID
-- Dataset-/Firmware-Metadaten
+- Setup-ID
+- Setup-Hash
+- Seal-Typ `active_position_setup_v2`
 
-Das Seal beweist noch nicht, dass TX, RX, Raummaße oder Kabel physisch korrekt
-sind.
+Ein Profil-Hash allein kann die Phase nicht mehr als bestanden markieren. Das
+Runtime-Seal bindet die dokumentierte Identität, ersetzt aber weiterhin nicht
+die anschließenden Live-Gates für RX-Transport, Synchronisation und Radar.
 
 ### Schritt 4 — Leere WiFi-Baseline
 
 Für einen echten Lauf:
 
-1. Alle Personen verlassen den Raum.
-2. Leerkalibrierung starten klicken.
-3. Raum leer halten.
-4. Nach der vorgesehenen Dauer Leerkalibrierung abschließen klicken.
+1. **Leerkalibrierung vorbereiten** klicken.
+2. Messdauer festlegen (mindestens **60 Sekunden**) und den Vorlauf bis zum Start wählen.
+3. **Countdown starten** klicken und den Raum während des Countdowns verlassen.
+4. Raum während der gewählten Messdauer leer halten. Die Kalibrierung startet und endet automatisch.
+5. Nur wenn der automatische Abschluss nicht bestätigt werden kann, **Leerkalibrierung abschließen** klicken.
+
+Wenn für dieselbe Profilgeometrie und dasselbe versiegelte Setup bereits eine
+gespeicherte Baseline existiert, zeigt der Guide vorher **Gespeicherte Baseline
+verwenden** an. Diese Option lädt die geprüften D5/D6-Referenzen ohne neue
+Messung und protokolliert die Phase als `REUSED`. Änderungen an TX, RX, Raum,
+mmWave-Montage, Firmware, CSI-Grid oder TX-Filter machen die Baseline bewusst
+ungültig; reine Profil-/P01–P09-Benennungen oder Kontrollraster-Änderungen
+ändern den Baseline-Kontext nicht.
+
+Die Referenzen liegen als gehashte Calibration-Bundles unter
+`data/calibrations/`; die SQLite-Katalogdaten binden sie zusätzlich an
+Profilkontext und Setup-Seal.
+
+Die Anzeige nennt jederzeit die verbleibenden Sekunden bis zum Start beziehungsweise
+bis zum automatischen Ende sowie die absolute Uhrzeit **„Sicher zurück ab“**.
+Der Vorlauf ist bewusst getrennt von der Messdauer: Während des Vorlaufs werden
+noch keine CSI-Daten für die Baseline gesammelt.
 
 Ohne CSI-Nodes wird dieser Schritt erwartungsgemäß nicht bestanden. Typische
 Meldung:
@@ -242,6 +287,20 @@ Wenn der Sensor angeschlossen wird, in dieser Reihenfolge vorgehen:
 13. Danach Leerkalibrierung, mmWave-Kalibrierung, Blindtest und Evaluation
     durchführen.
 
+Wenn die RX-Firmware für dieselbe kontrollierte TX-Quelle mehrere gültige
+Symbolformen liefert, kann der Server vor dem Setup-Seal explizit auf das
+verifizierte Discovery-Grid begrenzt werden. Für den aktuellen Kanal-6-Aufbau
+lautet der Startparameter:
+
+    --csi-grid-pin 2437,1,64,0,0
+
+Der Pin bindet Frequenz, Antennenanzahl, Subcarrier-Anzahl, PPDU-Typ und
+Layout-Flags. Off-Grid-Frames halten die Source-Binding-Attestierung frisch,
+werden aber vor Preflight, Aufnahme, D5/D6 und Live-Position verworfen. Der Pin
+ist nur eine reversible Vorstufe und kann nicht zusammen mit
+`--position-setup` verwendet werden; danach sind ausschließlich die im
+Setup-v2 versiegelten RX-Grids maßgeblich.
+
 Ein erfolgreicher Flash oder ein erfolgreicher Parser-Test beweist weder
 WiFi-Transport noch Radar-Streaming oder Positionsgenauigkeit.
 
@@ -292,7 +351,7 @@ Das Cockpit enthält inzwischen:
 - erklärende Info-Symbole mit Hover- und Tastaturhinweisen
 
 Der Browser-Durchlauf wurde ohne angeschlossene Hardware mit einem simulierten
-Server geprüft. Die UI-Regressionstests liefen zuletzt mit 27 bestandenen
+Server geprüft. Die UI-Regressionstests liefen zuletzt mit 68 bestandenen
 Tests. Das bestätigt den Softwareablauf, nicht die Funk- oder Radarqualität.
 
 ## 10. Relevante Dateien und Tests
@@ -303,6 +362,7 @@ Tests. Das bestätigt den Softwareablauf, nicht die Funk- oder Radarqualität.
 | ui/components/MmwaveCalibrationAssistant.js | Radarstatus, Kalibrierungsreferenz und Transportdiagnose |
 | ui/services/experiment.service.js | Profile, Runs, Phasen und Artefakte |
 | v2/crates/wifi-densepose-sensing-server/src/mmwave_calibration.rs | mmWave-Status und Kalibrierungslogik |
+| v2/crates/wifi-densepose-sensing-server/src/calibration_persistence.rs | Gehashte, kontextgebundene D5/D6-Baselines |
 | v2/crates/wifi-densepose-sensing-server/src/experiment.rs | SQLite-Workflow und Phasenpersistenz |
 | ui/observatory/LIVE_DATA_CONTRACT.md | Vertrauensgrenzen für Live-Rendering |
 

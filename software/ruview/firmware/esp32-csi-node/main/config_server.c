@@ -21,6 +21,7 @@
 #include "freertos/task.h"
 #include "nvs.h"
 #include "nvs_config.h"
+#include "ota_update.h"
 
 static const char *TAG = "config_server";
 
@@ -100,6 +101,12 @@ static esp_err_t send_json(httpd_req_t *req, const char *json)
 
 static esp_err_t config_get_handler(httpd_req_t *req)
 {
+    if (!ota_check_auth(req)) {
+        httpd_resp_send_err(req, HTTPD_403_FORBIDDEN,
+                            "Authentication required. Use: Authorization: Bearer <psk>");
+        return ESP_FAIL;
+    }
+
     nvs_config_t cfg;
     nvs_config_load(&cfg);
 
@@ -129,6 +136,12 @@ static esp_err_t config_get_handler(httpd_req_t *req)
 
 static esp_err_t config_post_handler(httpd_req_t *req)
 {
+    if (!ota_check_auth(req)) {
+        httpd_resp_send_err(req, HTTPD_403_FORBIDDEN,
+                            "Authentication required. Use: Authorization: Bearer <psk>");
+        return ESP_FAIL;
+    }
+
     char query[256];
     esp_err_t err = httpd_req_get_url_query_str(req, query, sizeof(query));
     if (err != ESP_OK) {

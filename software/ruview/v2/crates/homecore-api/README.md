@@ -70,7 +70,7 @@ All routes return HA-compatible JSON and validate `Authorization: Bearer <token>
 ## Usage
 
 ```rust
-use homecore_api::{router, SharedState};
+use homecore_api::{router, LongLivedTokenStore, SharedState};
 use homecore::HomeCore;
 use axum::Server;
 use std::net::SocketAddr;
@@ -79,7 +79,8 @@ use std::net::SocketAddr;
 async fn main() {
     // Create the shared HOMECORE runtime
     let homecore = HomeCore::new();
-    let state = SharedState::new(homecore);
+    let tokens = LongLivedTokenStore::from_tokens(["replace-with-a-secret"]);
+    let state = SharedState::with_tokens(homecore, "Home", "0.1.0", tokens);
 
     // Build the Axum router
     let app = router(state);
@@ -96,6 +97,7 @@ async fn main() {
 Or run the standalone binary:
 
 ```bash
+export HOMECORE_TOKENS="$(openssl rand -hex 32)"
 cargo run -p homecore-api --bin homecore-api-server
 # Listens on http://localhost:8123
 ```
@@ -103,13 +105,15 @@ cargo run -p homecore-api --bin homecore-api-server
 Test it:
 
 ```bash
+# Use the same token that was provisioned in HOMECORE_TOKENS.
+
 # List states
-curl -H "Authorization: Bearer longlivedtoken" \
+curl -H "Authorization: Bearer ${HOMECORE_TOKENS}" \
   http://localhost:8123/api/states
 
 # Set a light to "on"
 curl -X POST \
-  -H "Authorization: Bearer longlivedtoken" \
+  -H "Authorization: Bearer ${HOMECORE_TOKENS}" \
   -H "Content-Type: application/json" \
   -d '{"state":"on","attributes":{"brightness":200}}' \
   http://localhost:8123/api/states/light.kitchen

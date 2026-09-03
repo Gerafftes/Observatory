@@ -17,6 +17,10 @@ from scripts import capture_position_run as capture  # noqa: E402
 
 SETUP_ID = "setup-0123456789abcdef"
 SETUP_SHA256 = "a" * 64
+PROFILE_ID = "profile-fixed-room"
+PROFILE_REVISION_ID = "profile-fixed-room-v2"
+CALIBRATION_ID = "calibration-1788060000000-1234-0"
+CALIBRATION_CONTEXT_SHA256 = "b" * 64
 
 
 def readiness(source: str = "esp32", active: bool = True):
@@ -94,7 +98,7 @@ def calibration_nodes(phase: str):
 
 def calibration_status(phase: str):
     ready = phase == "ready"
-    return {
+    payload = {
         "success": True,
         "phase": phase,
         "decision_status": "operational" if ready else "calibrating",
@@ -104,6 +108,31 @@ def calibration_status(phase: str):
         "operational": ready,
         "nodes": calibration_nodes(phase),
     }
+    if ready:
+        payload.update(
+            {
+                "calibration_id": CALIBRATION_ID,
+                "calibration_source": "captured",
+                "calibration_context_sha256": CALIBRATION_CONTEXT_SHA256,
+                "calibration": calibration_summary(source=True),
+            }
+        )
+    return payload
+
+
+def calibration_summary(*, source: bool = False):
+    summary = {
+        "calibration_id": CALIBRATION_ID,
+        "calibration_context_sha256": CALIBRATION_CONTEXT_SHA256,
+        "profile_id": PROFILE_ID,
+        "profile_revision_id": PROFILE_REVISION_ID,
+        "setup_id": SETUP_ID,
+        "setup_sha256": SETUP_SHA256,
+        "node_count": 4,
+    }
+    if source:
+        summary["source"] = "captured"
+    return summary
 
 
 def calibration_stop_response():
@@ -111,6 +140,11 @@ def calibration_stop_response():
         "success": True,
         "status": "ready",
         "ready_nodes": 4,
+        "elapsed_seconds": 65.0,
+        "calibration_id": CALIBRATION_ID,
+        "calibration_source": "captured",
+        "calibration_context_sha256": CALIBRATION_CONTEXT_SHA256,
+        "calibration": calibration_summary(),
         "nodes": [
             {
                 "node_id": rx_id,
@@ -225,8 +259,14 @@ class TestPreflight(unittest.TestCase):
 class TestEmptyRoomCalibration(unittest.TestCase):
     def test_collecting_stop_and_ready_require_exactly_rx1_through_rx4(self):
         capture.validate_calibration_collecting(calibration_status("collecting"))
-        capture.validate_calibration_stop(calibration_stop_response())
-        capture.validate_calibration_ready(calibration_status("ready"))
+        context = {
+            "profile_id": PROFILE_ID,
+            "profile_revision_id": PROFILE_REVISION_ID,
+            "setup_id": SETUP_ID,
+            "setup_sha256": SETUP_SHA256,
+        }
+        capture.validate_calibration_stop(calibration_stop_response(), **context)
+        capture.validate_calibration_ready(calibration_status("ready"), **context)
 
         invalid_payloads = []
         for payload in (
@@ -237,14 +277,14 @@ class TestEmptyRoomCalibration(unittest.TestCase):
             payload["nodes"] = payload["nodes"][:3]
             invalid_payloads.append(payload)
         validators = (
-            capture.validate_calibration_collecting,
-            capture.validate_calibration_stop,
-            capture.validate_calibration_ready,
+            (capture.validate_calibration_collecting, {}),
+            (capture.validate_calibration_stop, context),
+            (capture.validate_calibration_ready, context),
         )
-        for validator, payload in zip(validators, invalid_payloads, strict=True):
+        for (validator, kwargs), payload in zip(validators, invalid_payloads, strict=True):
             with self.subTest(validator=validator.__name__):
                 with self.assertRaises(capture.CaptureError):
-                    validator(payload)
+                    validator(payload, **kwargs)
 
     def test_ready_requires_fresh_d5_reference_and_d6_evidence_from_every_rx(self):
         cases = []
@@ -260,7 +300,13 @@ class TestEmptyRoomCalibration(unittest.TestCase):
         for payload in cases:
             with self.subTest(payload=payload):
                 with self.assertRaises(capture.CaptureError):
-                    capture.validate_calibration_ready(payload)
+                    capture.validate_calibration_ready(
+                        payload,
+                        profile_id=PROFILE_ID,
+                        profile_revision_id=PROFILE_REVISION_ID,
+                        setup_id=SETUP_ID,
+                        setup_sha256=SETUP_SHA256,
+                    )
 
     def test_lost_start_response_recovers_from_authoritative_collecting_status(self):
         responses = [
@@ -279,7 +325,16 @@ class TestEmptyRoomCalibration(unittest.TestCase):
             mock.patch.object(capture, "request_json", side_effect=request),
             mock.patch.object(capture.time, "monotonic", return_value=123.0),
         ):
-            self.assertEqual(capture.start_empty_room_calibration("http://server"), 123.0)
+            self.assertEqual(
+                capture.start_empty_room_calibration(
+                    "http://server",
+                    PROFILE_ID,
+                    PROFILE_REVISION_ID,
+                    SETUP_ID,
+                    SETUP_SHA256,
+                ),
+                123.0,
+            )
         self.assertEqual(responses, [])
 
     def test_lost_stop_response_uses_authoritative_ready_status(self):
@@ -298,10 +353,47 @@ class TestEmptyRoomCalibration(unittest.TestCase):
 
         with (
             mock.patch.object(capture, "request_json", side_effect=request),
-            mock.patch.object(capture.time, "monotonic", side_effect=[65.0, 65.0]),
+            mock.patch.object(
+                capture.time,
+                "monotonic",
+                side_effect=[65.0, 65.0, 65.0, 65.0],
+            ),
         ):
-            capture.finish_empty_room_calibration("http://server", 0.0)
+            capture.finish_empty_room_calibration(
+                "http://server",
+                0.0,
+                profile_id=PROFILE_ID,
+                profile_revision_id=PROFILE_REVISION_ID,
+                setup_id=SETUP_ID,
+                setup_sha256=SETUP_SHA256,
+            )
         self.assertEqual(responses, [])
+
+    def test_persisted_identity_duration_and_context_are_fail_closed(self):
+        context = {
+            "profile_id": PROFILE_ID,
+            "profile_revision_id": PROFILE_REVISION_ID,
+            "setup_id": SETUP_ID,
+            "setup_sha256": SETUP_SHA256,
+        }
+        cases = []
+        short = calibration_stop_response()
+        short["elapsed_seconds"] = 59.999
+        cases.append(short)
+        missing_id = calibration_stop_response()
+        missing_id["calibration_id"] = None
+        cases.append(missing_id)
+        wrong_setup = calibration_stop_response()
+        wrong_setup["calibration"]["setup_sha256"] = "c" * 64
+        cases.append(wrong_setup)
+        wrong_revision = calibration_stop_response()
+        wrong_revision["calibration"]["profile_revision_id"] = "other-revision"
+        cases.append(wrong_revision)
+
+        for payload in cases:
+            with self.subTest(payload=payload):
+                with self.assertRaises(capture.CaptureError):
+                    capture.validate_calibration_stop(payload, **context)
 
 
 class TestCompletion(unittest.TestCase):
@@ -392,6 +484,36 @@ class TestCompletion(unittest.TestCase):
 
 
 class TestEmptyRoomMainFlow(unittest.TestCase):
+    def test_empty_run_requires_profile_and_immutable_revision_before_network(self):
+        cases = [
+            (None, PROFILE_REVISION_ID),
+            (PROFILE_ID, None),
+            (None, None),
+        ]
+        for profile_id, profile_revision_id in cases:
+            with self.subTest(
+                profile_id=profile_id,
+                profile_revision_id=profile_revision_id,
+            ):
+                args = Namespace(
+                    server="http://server",
+                    kind="empty",
+                    recording_id="empty-neutral-01",
+                    confirm_empty_room=True,
+                    profile_id=profile_id,
+                    profile_revision_id=profile_revision_id,
+                )
+                with (
+                    mock.patch.object(capture, "parse_args", return_value=args),
+                    mock.patch.object(capture, "request_json") as request,
+                ):
+                    with self.assertRaisesRegex(
+                        capture.CaptureError,
+                        "requires --profile-id and --profile-revision-id",
+                    ):
+                        capture.main()
+                request.assert_not_called()
+
     def run_main_with_responses(self, responses, calls=None):
         calls = [] if calls is None else calls
 
@@ -408,6 +530,8 @@ class TestEmptyRoomMainFlow(unittest.TestCase):
             kind="empty",
             recording_id="empty-neutral-01",
             confirm_empty_room=True,
+            profile_id=PROFILE_ID,
+            profile_revision_id=PROFILE_REVISION_ID,
         )
         with (
             mock.patch.object(capture, "parse_args", return_value=args),
@@ -436,6 +560,9 @@ class TestEmptyRoomMainFlow(unittest.TestCase):
                     "success": True,
                     "status": "collecting",
                     "recommended_seconds": 60,
+                    "profile_id": PROFILE_ID,
+                    "profile_revision_id": PROFILE_REVISION_ID,
+                    "calibration_context_sha256": CALIBRATION_CONTEXT_SHA256,
                 },
             ),
             (capture.CALIBRATION_STATUS_PATH, calibration_status("collecting")),
@@ -482,6 +609,16 @@ class TestEmptyRoomMainFlow(unittest.TestCase):
                 "max_duration_seconds": duration + capture.WATCHDOG_GRACE_SECONDS,
             },
         )
+        calibration_start = next(
+            kwargs for path, kwargs in calls if path == capture.CALIBRATION_START_PATH
+        )
+        self.assertEqual(
+            calibration_start["body"],
+            {
+                "profile_id": PROFILE_ID,
+                "profile_revision_id": PROFILE_REVISION_ID,
+            },
+        )
 
     def test_recording_start_failure_still_finishes_active_calibration(self):
         duration = capture.PROTOCOLS["empty"].duration_seconds
@@ -496,6 +633,9 @@ class TestEmptyRoomMainFlow(unittest.TestCase):
                     "success": True,
                     "status": "collecting",
                     "recommended_seconds": 60,
+                    "profile_id": PROFILE_ID,
+                    "profile_revision_id": PROFILE_REVISION_ID,
+                    "calibration_context_sha256": CALIBRATION_CONTEXT_SHA256,
                 },
             ),
             (capture.CALIBRATION_STATUS_PATH, calibration_status("collecting")),
@@ -525,6 +665,9 @@ class TestEmptyRoomMainFlow(unittest.TestCase):
                     "success": True,
                     "status": "collecting",
                     "recommended_seconds": 60,
+                    "profile_id": PROFILE_ID,
+                    "profile_revision_id": PROFILE_REVISION_ID,
+                    "calibration_context_sha256": CALIBRATION_CONTEXT_SHA256,
                 },
             ),
             (capture.CALIBRATION_STATUS_PATH, calibration_status("collecting")),

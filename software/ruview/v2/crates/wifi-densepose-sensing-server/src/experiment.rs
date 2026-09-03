@@ -18,14 +18,18 @@ use std::{
 use tokio::fs;
 
 use crate::position_artifact::sha256_bytes;
+use crate::calibration_persistence::{
+    profile_context_sha256, CalibrationBundle, CalibrationSummary,
+};
 
-pub(crate) const SCHEMA_VERSION: i64 = 2;
+pub(crate) const SCHEMA_VERSION: i64 = 3;
 pub(crate) const SUPPORTED_FIXTURE_ID: &str = "mmwave-synthetic-pass-status-v1";
 pub(crate) const WORKFLOW_KIND: &str = "wifi_only_workflow";
 pub(crate) const WORKFLOW_SOURCE: &str = "wifi_csi";
 pub(crate) const PROFILE_SCHEMA_VERSION: u16 = 1;
 const DEFAULT_SENSOR_MOUNT_RADIUS_M: f64 = 0.5;
 const MAX_SENSOR_MOUNT_RADIUS_M: f64 = 5.0;
+const MMWAVE_SENSOR: &str = "HLK-LD2450";
 
 pub(crate) const WORKFLOW_PHASES: [&str; 10] = [
     "create_experiment",
@@ -80,7 +84,9 @@ pub(crate) struct SetupProfile {
     pub(crate) id: String,
     pub(crate) label: String,
     pub(crate) version: i64,
+    pub(crate) revision_id: String,
     pub(crate) profile_sha256: String,
+    pub(crate) profile_context_sha256: String,
     pub(crate) document: Value,
     pub(crate) created_at: String,
     pub(crate) updated_at: String,
@@ -98,10 +104,14 @@ pub(crate) struct WorkflowPhaseEvent {
 #[derive(Debug, Clone, Serialize)]
 pub(crate) struct ExperimentWorkflow {
     pub(crate) profile_id: String,
+    pub(crate) profile_revision_id: Option<String>,
     pub(crate) profile_sha256: String,
+    pub(crate) profile_context_sha256: Option<String>,
     pub(crate) dataset_version: String,
     pub(crate) firmware_version: String,
     pub(crate) calibration_id: Option<String>,
+    pub(crate) calibration_source: Option<String>,
+    pub(crate) calibration_context_sha256: Option<String>,
     pub(crate) blind_seed: u64,
     pub(crate) current_phase: String,
     pub(crate) current_status: String,
@@ -153,8 +163,12 @@ impl ExperimentStore {
 
     pub(crate) async fn list_profiles(&self) -> Result<Vec<SetupProfile>, String> {
         let rows = sqlx::query(
-            "SELECT id, label, version, profile_sha256, document_json, created_at, updated_at
-             FROM setup_profiles ORDER BY updated_at DESC, id DESC",
+            "SELECT p.id, p.label, p.version, p.profile_sha256, p.document_json,
+                    p.created_at, p.updated_at, r.revision_id, r.profile_context_sha256
+             FROM setup_profiles p
+             LEFT JOIN setup_profile_revisions r
+               ON r.profile_id = p.id AND r.version = p.version
+             ORDER BY p.updated_at DESC, p.id DESC",
         )
         .fetch_all(&self.pool)
         .await
@@ -165,8 +179,12 @@ impl ExperimentStore {
 
     pub(crate) async fn get_profile(&self, id: &str) -> Result<Option<SetupProfile>, String> {
         let row = sqlx::query(
-            "SELECT id, label, version, profile_sha256, document_json, created_at, updated_at
-             FROM setup_profiles WHERE id = ?",
+            "SELECT p.id, p.label, p.version, p.profile_sha256, p.document_json,
+                    p.created_at, p.updated_at, r.revision_id, r.profile_context_sha256
+             FROM setup_profiles p
+             LEFT JOIN setup_profile_revisions r
+               ON r.profile_id = p.id AND r.version = p.version
+             WHERE p.id = ?",
         )
         .bind(id)
         .fetch_optional(&self.pool)
@@ -174,6 +192,27 @@ impl ExperimentStore {
         .map_err(|error| format!("get setup profile: {error}"))?;
 
         row.as_ref().map(profile_from_row).transpose()
+    }
+
+    pub(crate) async fn get_profile_revision(
+        &self,
+        profile_id: &str,
+        revision_id: &str,
+    ) -> Result<Option<SetupProfile>, String> {
+        let row = sqlx::query(
+            "SELECT revision_id, profile_id, label, version, profile_sha256,
+                    profile_context_sha256, document_json, created_at,
+                    created_at AS updated_at
+             FROM setup_profile_revisions
+             WHERE profile_id = ? AND revision_id = ?",
+        )
+        .bind(profile_id)
+        .bind(revision_id)
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(|error| format!("get setup profile revision: {error}"))?;
+
+        row.as_ref().map(profile_revision_from_row).transpose()
     }
 
     pub(crate) async fn create_profile(
@@ -184,8 +223,17 @@ impl ExperimentStore {
         let label = validate_label(label, "profile label")?;
         let document = normalize_profile_document(document)?;
         let profile_sha256 = profile_hash(&document)?;
+        let profile_context_sha256 = profile_context_sha256(&document)?;
         let id = new_profile_id();
+        let revision_id = new_profile_revision_id(&id, 1);
         let now = timestamp();
+        let document_json = serde_json::to_string(&document)
+            .map_err(|error| format!("serialize setup profile document: {error}"))?;
+        let mut transaction = self
+            .pool
+            .begin()
+            .await
+            .map_err(|error| format!("begin setup profile creation: {error}"))?;
 
         sqlx::query(
             "INSERT INTO setup_profiles
@@ -195,14 +243,33 @@ impl ExperimentStore {
         .bind(&id)
         .bind(label)
         .bind(&profile_sha256)
-        .bind(serde_json::to_string(&document).map_err(|error| {
-            format!("serialize setup profile document: {error}")
-        })?)
+        .bind(&document_json)
         .bind(&now)
         .bind(&now)
-        .execute(&self.pool)
+        .execute(&mut *transaction)
         .await
         .map_err(|error| format!("create setup profile: {error}"))?;
+
+        sqlx::query(
+            "INSERT INTO setup_profile_revisions
+             (revision_id, profile_id, version, label, profile_sha256,
+              profile_context_sha256, document_json, created_at)
+             VALUES (?, ?, 1, ?, ?, ?, ?, ?)",
+        )
+        .bind(&revision_id)
+        .bind(&id)
+        .bind(label)
+        .bind(&profile_sha256)
+        .bind(&profile_context_sha256)
+        .bind(&document_json)
+        .bind(&now)
+        .execute(&mut *transaction)
+        .await
+        .map_err(|error| format!("create setup profile revision: {error}"))?;
+        transaction
+            .commit()
+            .await
+            .map_err(|error| format!("commit setup profile creation: {error}"))?;
 
         self.get_profile(&id)
             .await?
@@ -218,25 +285,88 @@ impl ExperimentStore {
         let label = validate_label(label, "profile label")?;
         let document = normalize_profile_document(document)?;
         let profile_sha256 = profile_hash(&document)?;
+        let profile_context_sha256 = profile_context_sha256(&document)?;
         let document_json = serde_json::to_string(&document)
             .map_err(|error| format!("serialize setup profile document: {error}"))?;
+        let current = self
+            .get_profile(id)
+            .await?
+            .ok_or_else(|| "setup profile not found".to_string())?;
+        if current.label == label && current.profile_sha256 == profile_sha256 {
+            return Ok(current);
+        }
+        let next_version = current.version + 1;
+        let revision_id = new_profile_revision_id(id, next_version);
+        let now = timestamp();
+        let mut transaction = self
+            .pool
+            .begin()
+            .await
+            .map_err(|error| format!("begin setup profile update: {error}"))?;
+
+        // Preserve the pre-v3 current row if a database was upgraded from an
+        // older build that had no revision snapshot yet.
+        sqlx::query(
+            "INSERT OR IGNORE INTO setup_profile_revisions
+             (revision_id, profile_id, version, label, profile_sha256,
+              profile_context_sha256, document_json, created_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+        )
+        .bind(&current.revision_id)
+        .bind(&current.id)
+        .bind(current.version)
+        .bind(&current.label)
+        .bind(&current.profile_sha256)
+        .bind(&current.profile_context_sha256)
+        .bind(serde_json::to_string(&current.document).map_err(|error| {
+            format!("serialize previous setup profile document: {error}")
+        })?)
+        .bind(&current.created_at)
+        .execute(&mut *transaction)
+        .await
+        .map_err(|error| format!("preserve setup profile revision: {error}"))?;
+
         let result = sqlx::query(
             "UPDATE setup_profiles
-             SET label = ?, version = version + 1, profile_sha256 = ?,
+             SET label = ?, version = ?, profile_sha256 = ?,
                  document_json = ?, updated_at = ?
              WHERE id = ?",
         )
         .bind(label)
+        .bind(next_version)
         .bind(&profile_sha256)
-        .bind(document_json)
-        .bind(timestamp())
+        .bind(&document_json)
+        .bind(&now)
         .bind(id)
-        .execute(&self.pool)
+        .execute(&mut *transaction)
         .await
         .map_err(|error| format!("update setup profile: {error}"))?;
         if result.rows_affected() != 1 {
+            transaction.rollback().await.ok();
             return Err("setup profile not found".to_string());
         }
+
+        sqlx::query(
+            "INSERT INTO setup_profile_revisions
+             (revision_id, profile_id, version, label, profile_sha256,
+              profile_context_sha256, document_json, created_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+        )
+        .bind(&revision_id)
+        .bind(id)
+        .bind(next_version)
+        .bind(label)
+        .bind(&profile_sha256)
+        .bind(&profile_context_sha256)
+        .bind(&document_json)
+        .bind(&now)
+        .execute(&mut *transaction)
+        .await
+        .map_err(|error| format!("create updated setup profile revision: {error}"))?;
+        transaction
+            .commit()
+            .await
+            .map_err(|error| format!("commit setup profile update: {error}"))?;
 
         self.get_profile(id)
             .await?
@@ -247,15 +377,22 @@ impl ExperimentStore {
         &self,
         label: &str,
         profile_id: &str,
+        profile_revision_id: Option<&str>,
         dataset_version: &str,
         firmware_version: &str,
         blind_seed: u64,
     ) -> Result<ExperimentRun, String> {
         let label = validate_label(label, "experiment label")?;
-        let profile = self
-            .get_profile(profile_id)
-            .await?
-            .ok_or_else(|| "setup profile not found".to_string())?;
+        let profile = match profile_revision_id {
+            Some(revision_id) => self
+                .get_profile_revision(profile_id, revision_id)
+                .await?
+                .ok_or_else(|| "setup profile revision not found".to_string())?,
+            None => self
+                .get_profile(profile_id)
+                .await?
+                .ok_or_else(|| "setup profile not found".to_string())?,
+        };
         let dataset_version = validate_short_identity(dataset_version, "dataset_version")?;
         let firmware_version = validate_short_identity(firmware_version, "firmware_version")?;
         let id = new_run_id();
@@ -284,13 +421,17 @@ impl ExperimentStore {
 
         sqlx::query(
             "INSERT INTO experiment_workflows
-             (run_id, profile_id, profile_sha256, dataset_version, firmware_version,
-              calibration_id, blind_seed, current_phase, current_status)
-             VALUES (?, ?, ?, ?, ?, NULL, ?, ?, 'READY')",
+             (run_id, profile_id, profile_revision_id, profile_sha256,
+              profile_context_sha256, dataset_version, firmware_version,
+              calibration_id, calibration_source, calibration_context_sha256,
+              blind_seed, current_phase, current_status)
+             VALUES (?, ?, ?, ?, ?, ?, ?, NULL, NULL, NULL, ?, ?, 'READY')",
         )
         .bind(&id)
         .bind(&profile.id)
+        .bind(&profile.revision_id)
         .bind(&profile.profile_sha256)
+        .bind(&profile.profile_context_sha256)
         .bind(dataset_version)
         .bind(firmware_version)
         .bind(i64::try_from(blind_seed).map_err(|_| "blind_seed is too large".to_string())?)
@@ -334,8 +475,34 @@ impl ExperimentStore {
                 WORKFLOW_PHASES[(current_index + 1).min(WORKFLOW_PHASES.len() - 1)]
             ));
         }
-        if workflow.current_status == "PASS" && requested_index == current_index {
+        if matches!(workflow.current_status.as_str(), "PASS" | "REUSED")
+            && requested_index == current_index
+        {
             return Err(format!("workflow phase {phase} is already complete"));
+        }
+
+        let calibration_id = payload
+            .get("calibration_id")
+            .and_then(Value::as_str)
+            .filter(|value| !value.trim().is_empty());
+        let calibration_source = payload
+            .get("calibration_source")
+            .and_then(Value::as_str)
+            .filter(|value| matches!(*value, "captured" | "reused"));
+        let calibration_context_sha256 = payload
+            .get("calibration_context_sha256")
+            .and_then(Value::as_str)
+            .filter(|value| !value.trim().is_empty());
+        if phase == "empty_calibration" && status == "REUSED" {
+            if calibration_id.is_none()
+                || calibration_source != Some("reused")
+                || calibration_context_sha256.is_none()
+            {
+                return Err(
+                    "reused empty calibration needs calibration_id, source=reused, and a context hash"
+                        .to_string(),
+                );
+            }
         }
 
         let (run_state, execution_status, finished_at) = if phase == "report" && status == "PASS" {
@@ -355,11 +522,17 @@ impl ExperimentStore {
             .map_err(|error| format!("begin workflow phase update: {error}"))?;
         let result = sqlx::query(
             "UPDATE experiment_workflows
-             SET current_phase = ?, current_status = ?
+             SET current_phase = ?, current_status = ?,
+                 calibration_id = COALESCE(?, calibration_id),
+                 calibration_source = COALESCE(?, calibration_source),
+                 calibration_context_sha256 = COALESCE(?, calibration_context_sha256)
              WHERE run_id = ?",
         )
         .bind(phase)
         .bind(status)
+        .bind(calibration_id)
+        .bind(calibration_source)
+        .bind(calibration_context_sha256)
         .bind(run_id)
         .execute(&mut *transaction)
         .await
@@ -424,10 +597,15 @@ impl ExperimentStore {
             "label": run.label,
             "source": WORKFLOW_SOURCE,
             "profile_id": workflow.profile_id,
+            "profile_revision_id": workflow.profile_revision_id,
             "profile_sha256": workflow.profile_sha256,
+            "profile_context_sha256": workflow.profile_context_sha256,
             "dataset_version": workflow.dataset_version,
             "firmware_version": workflow.firmware_version,
             "blind_seed": workflow.blind_seed,
+            "calibration_id": workflow.calibration_id,
+            "calibration_source": workflow.calibration_source,
+            "calibration_context_sha256": workflow.calibration_context_sha256,
             "artifacts": run.artifacts,
             "execution_status": "PASS",
             "validation_status": "UNVALIDATED",
@@ -604,6 +782,186 @@ impl ExperimentStore {
             .map_err(|error| format!("decode experiment report: {error}"))
     }
 
+    pub(crate) async fn persist_calibration_bundle(
+        &self,
+        bundle: &CalibrationBundle,
+    ) -> Result<CalibrationSummary, String> {
+        bundle.validate()?;
+        let data_root = self
+            .db_path
+            .parent()
+            .unwrap_or_else(|| Path::new("data"));
+        let calibration_dir = data_root.join("calibrations");
+        fs::create_dir_all(&calibration_dir)
+            .await
+            .map_err(|error| format!("create calibration directory: {error}"))?;
+        let bytes = serde_json::to_vec_pretty(bundle)
+            .map_err(|error| format!("serialize calibration bundle: {error}"))?;
+        let relative_path = format!("calibrations/{}.json", bundle.calibration_id);
+        let path = data_root.join(&relative_path);
+        let temporary_path = data_root.join(format!(".{}.tmp", bundle.calibration_id));
+        fs::write(&temporary_path, &bytes)
+            .await
+            .map_err(|error| format!("write temporary calibration bundle: {error}"))?;
+        if let Err(error) = fs::rename(&temporary_path, &path).await {
+            let _ = fs::remove_file(&temporary_path).await;
+            return Err(format!("commit calibration bundle: {error}"));
+        }
+
+        let sha256 = sha256_bytes(&bytes);
+        let mut transaction = self
+            .pool
+            .begin()
+            .await
+            .map_err(|error| format!("begin calibration registration: {error}"))?;
+        sqlx::query(
+            "INSERT INTO calibration_bundles
+             (calibration_id, profile_id, profile_revision_id, profile_sha256,
+              profile_context_sha256, setup_id, setup_sha256,
+              calibration_context_sha256, algorithm_version, relative_path,
+              sha256, captured_at, status)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'READY')",
+        )
+        .bind(&bundle.calibration_id)
+        .bind(&bundle.profile_id)
+        .bind(&bundle.profile_revision_id)
+        .bind(&bundle.profile_sha256)
+        .bind(&bundle.profile_context_sha256)
+        .bind(&bundle.setup_id)
+        .bind(&bundle.setup_sha256)
+        .bind(&bundle.calibration_context_sha256)
+        .bind(&bundle.algorithm_version)
+        .bind(&relative_path)
+        .bind(&sha256)
+        .bind(&bundle.captured_at)
+        .execute(&mut *transaction)
+        .await
+        .map_err(|error| format!("register calibration bundle: {error}"))?;
+        transaction
+            .commit()
+            .await
+            .map_err(|error| format!("commit calibration registration: {error}"))?;
+        Ok(bundle.summary())
+    }
+
+    pub(crate) async fn find_compatible_calibration(
+        &self,
+        profile_id: &str,
+        profile_context_sha256: &str,
+        setup_id: &str,
+        setup_sha256: &str,
+    ) -> Result<Option<CalibrationBundle>, String> {
+        let row = sqlx::query(
+            "SELECT calibration_id, profile_id, profile_revision_id,
+                    profile_sha256, profile_context_sha256, setup_id,
+                    setup_sha256, calibration_context_sha256,
+                    algorithm_version, relative_path, sha256, captured_at, status
+             FROM calibration_bundles
+             WHERE profile_id = ? AND profile_context_sha256 = ?
+               AND setup_id = ? AND setup_sha256 = ? AND status = 'READY'
+             ORDER BY captured_at DESC, calibration_id DESC
+             LIMIT 1",
+        )
+        .bind(profile_id)
+        .bind(profile_context_sha256)
+        .bind(setup_id)
+        .bind(setup_sha256)
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(|error| format!("find compatible calibration: {error}"))?;
+
+        let Some(row) = row else {
+            return Ok(None);
+        };
+        self.load_calibration_row(&row).await.map(Some)
+    }
+
+    pub(crate) async fn latest_calibration_for_setup(
+        &self,
+        setup_id: &str,
+        setup_sha256: &str,
+    ) -> Result<Option<CalibrationBundle>, String> {
+        let row = sqlx::query(
+            "SELECT calibration_id, profile_id, profile_revision_id,
+                    profile_sha256, profile_context_sha256, setup_id,
+                    setup_sha256, calibration_context_sha256,
+                    algorithm_version, relative_path, sha256, captured_at, status
+             FROM calibration_bundles
+             WHERE setup_id = ? AND setup_sha256 = ? AND status = 'READY'
+             ORDER BY captured_at DESC, calibration_id DESC
+             LIMIT 1",
+        )
+        .bind(setup_id)
+        .bind(setup_sha256)
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(|error| format!("find latest setup calibration: {error}"))?;
+
+        let Some(row) = row else {
+            return Ok(None);
+        };
+        self.load_calibration_row(&row).await.map(Some)
+    }
+
+    async fn load_calibration_row(
+        &self,
+        row: &sqlx::sqlite::SqliteRow,
+    ) -> Result<CalibrationBundle, String> {
+        let relative_path: String = row.get("relative_path");
+        let relative_path = validate_relative_artifact_path(&relative_path)?;
+        let data_root = self
+            .db_path
+            .parent()
+            .unwrap_or_else(|| Path::new("data"));
+        let root = fs::canonicalize(data_root)
+            .await
+            .map_err(|error| format!("resolve calibration data directory: {error}"))?;
+        let path = data_root.join(&relative_path);
+        let canonical_path = fs::canonicalize(&path)
+            .await
+            .map_err(|error| format!("calibration bundle is not readable: {error}"))?;
+        if !canonical_path.starts_with(&root) {
+            return Err("calibration bundle path must stay inside the data directory".to_string());
+        }
+        let metadata = fs::metadata(&canonical_path)
+            .await
+            .map_err(|error| format!("inspect calibration bundle: {error}"))?;
+        if !metadata.is_file() {
+            return Err("calibration bundle must be a regular file".to_string());
+        }
+        let bytes = fs::read(&canonical_path)
+            .await
+            .map_err(|error| format!("read calibration bundle: {error}"))?;
+        let expected_sha256: String = row.get("sha256");
+        let actual_sha256 = sha256_bytes(&bytes);
+        if actual_sha256 != expected_sha256 {
+            return Err(format!(
+                "calibration bundle hash mismatch: expected {expected_sha256}, got {actual_sha256}"
+            ));
+        }
+        let bundle: CalibrationBundle = serde_json::from_slice(&bytes)
+            .map_err(|error| format!("decode calibration bundle: {error}"))?;
+        bundle.validate()?;
+        for (column, actual) in [
+            ("calibration_id", &bundle.calibration_id),
+            ("profile_id", &bundle.profile_id),
+            ("profile_revision_id", &bundle.profile_revision_id),
+            ("profile_sha256", &bundle.profile_sha256),
+            ("profile_context_sha256", &bundle.profile_context_sha256),
+            ("setup_id", &bundle.setup_id),
+            ("setup_sha256", &bundle.setup_sha256),
+            ("calibration_context_sha256", &bundle.calibration_context_sha256),
+            ("algorithm_version", &bundle.algorithm_version),
+            ("captured_at", &bundle.captured_at),
+        ] {
+            let expected: String = row.get(column);
+            if expected != *actual {
+                return Err(format!("calibration metadata mismatch in {column}"));
+            }
+        }
+        Ok(bundle)
+    }
+
     pub(crate) async fn create_run(
         &self,
         label: &str,
@@ -688,8 +1046,10 @@ impl ExperimentStore {
 
     async fn load_workflow(&self, run_id: &str) -> Result<Option<ExperimentWorkflow>, String> {
         let row = sqlx::query(
-            "SELECT profile_id, profile_sha256, dataset_version, firmware_version,
-                    calibration_id, blind_seed, current_phase, current_status
+            "SELECT profile_id, profile_revision_id, profile_sha256,
+                    profile_context_sha256, dataset_version, firmware_version,
+                    calibration_id, calibration_source, calibration_context_sha256,
+                    blind_seed, current_phase, current_status
              FROM experiment_workflows WHERE run_id = ?",
         )
         .bind(run_id)
@@ -722,10 +1082,16 @@ impl ExperimentStore {
         }
         Ok(Some(ExperimentWorkflow {
             profile_id: row.get("profile_id"),
+            profile_revision_id: row.try_get("profile_revision_id").unwrap_or(None),
             profile_sha256: row.get("profile_sha256"),
+            profile_context_sha256: row.try_get("profile_context_sha256").unwrap_or(None),
             dataset_version: row.get("dataset_version"),
             firmware_version: row.get("firmware_version"),
-            calibration_id: row.get("calibration_id"),
+            calibration_id: row.try_get("calibration_id").unwrap_or(None),
+            calibration_source: row.try_get("calibration_source").unwrap_or(None),
+            calibration_context_sha256: row
+                .try_get("calibration_context_sha256")
+                .unwrap_or(None),
             blind_seed: u64::try_from(row.get::<i64, _>("blind_seed")).unwrap_or(0),
             current_phase: row.get("current_phase"),
             current_status: row.get("current_status"),
@@ -999,11 +1365,41 @@ fn profile_from_row(row: &sqlx::sqlite::SqliteRow) -> Result<SetupProfile, Strin
     let document_json: String = row.get("document_json");
     let document = serde_json::from_str(&document_json)
         .map_err(|error| format!("decode setup profile document: {error}"))?;
+    let id: String = row.get("id");
+    let version: i64 = row.get("version");
+    let revision_id = row
+        .try_get::<Option<String>, _>("revision_id")
+        .unwrap_or(None)
+        .unwrap_or_else(|| new_profile_revision_id(&id, version));
+    let profile_context_sha256 = row
+        .try_get::<Option<String>, _>("profile_context_sha256")
+        .unwrap_or(None)
+        .filter(|value| !value.is_empty())
+        .unwrap_or(profile_context_sha256(&document)?);
     Ok(SetupProfile {
-        id: row.get("id"),
+        id,
+        label: row.get("label"),
+        version,
+        revision_id,
+        profile_sha256: row.get("profile_sha256"),
+        profile_context_sha256,
+        document,
+        created_at: row.get("created_at"),
+        updated_at: row.get("updated_at"),
+    })
+}
+
+fn profile_revision_from_row(row: &sqlx::sqlite::SqliteRow) -> Result<SetupProfile, String> {
+    let document_json: String = row.get("document_json");
+    let document = serde_json::from_str(&document_json)
+        .map_err(|error| format!("decode setup profile revision document: {error}"))?;
+    Ok(SetupProfile {
+        id: row.get("profile_id"),
         label: row.get("label"),
         version: row.get("version"),
+        revision_id: row.get("revision_id"),
         profile_sha256: row.get("profile_sha256"),
+        profile_context_sha256: row.get("profile_context_sha256"),
         document,
         created_at: row.get("created_at"),
         updated_at: row.get("updated_at"),
@@ -1092,6 +1488,45 @@ fn normalize_profile_document(document: &Value) -> Result<Value, String> {
             return Err(format!("{expected_id}.position_m must be inside room_dimensions_m or sensor_mount_radius_m"));
         }
     }
+
+    if let Some(value) = object.get("mmwave") {
+        let mmwave = value
+            .as_object()
+            .ok_or_else(|| "mmwave must be an object".to_string())?;
+        let sensor = mmwave
+            .get("sensor")
+            .and_then(Value::as_str)
+            .unwrap_or(MMWAVE_SENSOR);
+        if sensor != MMWAVE_SENSOR {
+            return Err(format!("mmwave.sensor must be {MMWAVE_SENSOR:?}"));
+        }
+        let mounting_position = finite_triplet(
+            mmwave.get("mounting_position_m"),
+            "mmwave.mounting_position_m",
+        )?;
+        if !within_sensor_bounds(mounting_position, dimensions, sensor_mount_radius) {
+            return Err(
+                "mmwave.mounting_position_m must be inside room_dimensions_m or sensor_mount_radius_m"
+                    .to_string(),
+            );
+        }
+        let allow_exterior = match mmwave.get("allow_exterior") {
+            None => true,
+            Some(value) => value
+                .as_bool()
+                .ok_or_else(|| "mmwave.allow_exterior must be a boolean".to_string())?,
+        };
+        if !allow_exterior && !within_sensor_bounds(mounting_position, dimensions, 0.0) {
+            return Err(
+                "mmwave.mounting_position_m must be inside room_dimensions_m when mmwave.allow_exterior is false"
+                    .to_string(),
+            );
+        }
+        if let Some(revision) = mmwave.get("mounting_revision").and_then(Value::as_str) {
+            validate_short_identity(revision, "mmwave.mounting_revision")?;
+        }
+    }
+
     let points = object
         .get("points")
         .and_then(Value::as_array)
@@ -1176,6 +1611,10 @@ fn new_profile_id() -> String {
     )
 }
 
+fn new_profile_revision_id(profile_id: &str, version: i64) -> String {
+    format!("{profile_id}-v{version}")
+}
+
 fn phase_index(phase: &str) -> Option<usize> {
     WORKFLOW_PHASES.iter().position(|candidate| *candidate == phase)
 }
@@ -1190,7 +1629,7 @@ fn validate_workflow_phase(phase: &str) -> Result<(), String> {
 
 fn validate_phase_status(status: &str) -> Result<(), String> {
     match status {
-        "READY" | "RUNNING" | "PASS" | "BLOCKED" | "ERROR" => Ok(()),
+        "READY" | "RUNNING" | "PASS" | "REUSED" | "BLOCKED" | "ERROR" => Ok(()),
         _ => Err(format!("unsupported workflow phase status: {status}")),
     }
 }
@@ -1413,6 +1852,157 @@ async fn migrate(pool: &SqlitePool) -> Result<(), String> {
             .map_err(|error| format!("commit control center schema migration: {error}"))?;
     }
 
+    if version < 3 {
+        // Snapshot the pre-v3 current profile before adding the revision
+        // table. Existing databases only have the mutable current row, so
+        // this is the one historical version that can be recovered safely.
+        let legacy_rows = sqlx::query(
+            "SELECT id, label, version, profile_sha256, document_json, created_at
+             FROM setup_profiles",
+        )
+        .fetch_all(pool)
+        .await
+        .map_err(|error| format!("read legacy setup profiles: {error}"))?;
+        let mut legacy_snapshots = Vec::with_capacity(legacy_rows.len());
+        for row in legacy_rows {
+            let document_json: String = row.get("document_json");
+            let document: Value = serde_json::from_str(&document_json)
+                .map_err(|error| format!("decode legacy setup profile: {error}"))?;
+            let profile_id: String = row.get("id");
+            let version: i64 = row.get("version");
+            legacy_snapshots.push((
+                profile_id.clone(),
+                version,
+                new_profile_revision_id(&profile_id, version),
+                row.get::<String, _>("label"),
+                row.get::<String, _>("profile_sha256"),
+                profile_context_sha256(&document)?,
+                document_json,
+                row.get::<String, _>("created_at"),
+            ));
+        }
+
+        let mut transaction = pool
+            .begin()
+            .await
+            .map_err(|error| format!("begin calibration persistence migration: {error}"))?;
+        sqlx::query(
+            "CREATE TABLE IF NOT EXISTS setup_profile_revisions (
+                 revision_id TEXT PRIMARY KEY,
+                 profile_id TEXT NOT NULL REFERENCES setup_profiles(id) ON DELETE CASCADE,
+                 version INTEGER NOT NULL,
+                 label TEXT NOT NULL,
+                 profile_sha256 TEXT NOT NULL,
+                 profile_context_sha256 TEXT NOT NULL,
+                 document_json TEXT NOT NULL,
+                 created_at TEXT NOT NULL,
+                 UNIQUE(profile_id, version)
+             )",
+        )
+        .execute(&mut *transaction)
+        .await
+        .map_err(|error| format!("create setup profile revisions table: {error}"))?;
+        sqlx::query(
+            "CREATE INDEX IF NOT EXISTS setup_profile_revisions_profile_idx
+             ON setup_profile_revisions(profile_id, version)",
+        )
+        .execute(&mut *transaction)
+        .await
+        .map_err(|error| format!("create setup profile revisions index: {error}"))?;
+
+        // SQLite permits adding nullable columns to the existing workflow
+        // table. New runs always populate them; old runs remain readable.
+        for statement in [
+            "ALTER TABLE experiment_workflows ADD COLUMN profile_revision_id TEXT",
+            "ALTER TABLE experiment_workflows ADD COLUMN profile_context_sha256 TEXT",
+            "ALTER TABLE experiment_workflows ADD COLUMN calibration_source TEXT",
+            "ALTER TABLE experiment_workflows ADD COLUMN calibration_context_sha256 TEXT",
+        ] {
+            sqlx::query(statement)
+                .execute(&mut *transaction)
+                .await
+                .map_err(|error| format!("extend experiment workflow metadata: {error}"))?;
+        }
+        sqlx::query(
+            "CREATE TABLE IF NOT EXISTS calibration_bundles (
+                 calibration_id TEXT PRIMARY KEY,
+                 profile_id TEXT NOT NULL REFERENCES setup_profiles(id),
+                 profile_revision_id TEXT NOT NULL,
+                 profile_sha256 TEXT NOT NULL,
+                 profile_context_sha256 TEXT NOT NULL,
+                 setup_id TEXT NOT NULL,
+                 setup_sha256 TEXT NOT NULL,
+                 calibration_context_sha256 TEXT NOT NULL,
+                 algorithm_version TEXT NOT NULL,
+                 relative_path TEXT NOT NULL UNIQUE,
+                 sha256 TEXT NOT NULL,
+                 captured_at TEXT NOT NULL,
+                 status TEXT NOT NULL
+             )",
+        )
+        .execute(&mut *transaction)
+        .await
+        .map_err(|error| format!("create calibration bundles table: {error}"))?;
+        sqlx::query(
+            "CREATE INDEX IF NOT EXISTS calibration_bundles_context_idx
+             ON calibration_bundles(profile_id, profile_context_sha256, setup_id, setup_sha256, captured_at)",
+        )
+        .execute(&mut *transaction)
+        .await
+        .map_err(|error| format!("create calibration bundles index: {error}"))?;
+
+        for (
+            profile_id,
+            version,
+            revision_id,
+            label,
+            profile_sha256,
+            profile_context_sha256,
+            document_json,
+            created_at,
+        ) in legacy_snapshots
+        {
+            sqlx::query(
+                "INSERT OR IGNORE INTO setup_profile_revisions
+                 (revision_id, profile_id, version, label, profile_sha256,
+                  profile_context_sha256, document_json, created_at)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            )
+            .bind(&revision_id)
+            .bind(&profile_id)
+            .bind(version)
+            .bind(label)
+            .bind(profile_sha256)
+            .bind(&profile_context_sha256)
+            .bind(document_json)
+            .bind(created_at)
+            .execute(&mut *transaction)
+            .await
+            .map_err(|error| format!("backfill setup profile revision: {error}"))?;
+            sqlx::query(
+                "UPDATE experiment_workflows
+                 SET profile_revision_id = ?, profile_context_sha256 = ?
+                 WHERE profile_id = ? AND profile_revision_id IS NULL",
+            )
+            .bind(&revision_id)
+            .bind(&profile_context_sha256)
+            .bind(&profile_id)
+            .execute(&mut *transaction)
+            .await
+            .map_err(|error| format!("backfill workflow profile context: {error}"))?;
+        }
+
+        sqlx::query("INSERT INTO schema_migrations(version, applied_at) VALUES (3, ?)")
+            .bind(timestamp())
+            .execute(&mut *transaction)
+            .await
+            .map_err(|error| format!("record calibration persistence migration: {error}"))?;
+        transaction
+            .commit()
+            .await
+            .map_err(|error| format!("commit calibration persistence migration: {error}"))?;
+    }
+
     Ok(())
 }
 
@@ -1433,6 +2023,58 @@ fn timestamp() -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn test_calibration_bundle(
+        profile: &SetupProfile,
+        setup_id: &str,
+        setup_sha256: &str,
+    ) -> CalibrationBundle {
+        let context_sha256 = crate::calibration_persistence::calibration_context_sha256(
+            &profile.profile_context_sha256,
+            setup_id,
+            setup_sha256,
+        )
+        .expect("test calibration context hash");
+        let context = crate::calibration_persistence::CalibrationContext {
+            profile_id: profile.id.clone(),
+            profile_revision_id: profile.revision_id.clone(),
+            profile_sha256: profile.profile_sha256.clone(),
+            profile_context_sha256: profile.profile_context_sha256.clone(),
+            setup_id: setup_id.to_string(),
+            setup_sha256: setup_sha256.to_string(),
+            calibration_context_sha256: context_sha256,
+        };
+
+        let mut fingerprint = crate::d6_fingerprint::NodeFingerprintState::default();
+        fingerprint
+            .install_reference_for_test(&[1.0, 2.0, 1.0, 2.0])
+            .expect("test D6 reference");
+        let d6_reference = fingerprint
+            .reference_for_test()
+            .expect("test D6 reference installed");
+        let d5_reference = crate::d5_presence::PresenceReference {
+            median: 0.02,
+            mad: 0.0,
+            scale: crate::d5_presence::ROBUST_SCALE_FLOOR,
+            block_count: crate::d5_presence::MIN_CALIBRATION_BLOCKS,
+            sample_count: crate::d5_presence::MIN_CALIBRATION_BLOCKS
+                * crate::d5_presence::MIN_CALIBRATION_SAMPLES_PER_BLOCK,
+        };
+        let nodes = (1..=3)
+            .map(|node_id| crate::calibration_persistence::CalibrationNodeBundle {
+                node_id,
+                d5: Some(d5_reference),
+                d6: Some(d6_reference.clone()),
+            })
+            .collect();
+        CalibrationBundle::new(
+            "calibration-test-1".to_string(),
+            &context,
+            "2026-08-28T12:00:00Z".to_string(),
+            nodes,
+        )
+        .expect("valid test calibration bundle")
+    }
 
     fn valid_profile() -> Value {
         json!({
@@ -1542,6 +2184,7 @@ mod tests {
             .create_workflow_run(
                 "WiFi position run",
                 &updated.id,
+                Some(&updated.revision_id),
                 "dataset-v1",
                 "firmware-v1",
                 42,
@@ -1652,5 +2295,457 @@ mod tests {
             .await
             .expect("nodes inside configured exterior radius must pass");
         assert_eq!(profile.document["sensor_mount_radius_m"], 0.5);
+    }
+
+    #[tokio::test]
+    async fn setup_profile_persists_mmwave_mounting_position_and_hashes_it() {
+        let directory = tempfile::tempdir().expect("temporary experiment directory");
+        let store = ExperimentStore::open(directory.path())
+            .await
+            .expect("open experiment store");
+        let mut document = valid_profile();
+        document["mmwave"] = json!({
+            "sensor": "HLK-LD2450",
+            "mounting_position_m": [-0.25, 1.2, 1.72],
+            "mounting_revision": "breadboard-v1"
+        });
+
+        let profile = store
+            .create_profile("mmWave mount", &document)
+            .await
+            .expect("mmWave mounting position must be accepted");
+        assert_eq!(profile.document["mmwave"]["sensor"], "HLK-LD2450");
+        assert_eq!(profile.document["mmwave"]["mounting_position_m"][0], -0.25);
+        assert_eq!(profile.document["mmwave"]["mounting_revision"], "breadboard-v1");
+        assert_eq!(profile.profile_sha256.len(), 64);
+
+        let mut changed = document;
+        changed["mmwave"]["mounting_position_m"][0] = json!(-0.20);
+        let updated = store
+            .update_profile(&profile.id, "mmWave mount v2", &changed)
+            .await
+            .expect("updated mmWave mounting position must be accepted");
+        assert_ne!(updated.profile_sha256, profile.profile_sha256);
+        assert_eq!(updated.document["mmwave"]["mounting_position_m"][0], -0.20);
+    }
+
+    #[tokio::test]
+    async fn setup_profile_rejects_mmwave_mount_outside_sensor_mount_radius() {
+        let directory = tempfile::tempdir().expect("temporary experiment directory");
+        let store = ExperimentStore::open(directory.path())
+            .await
+            .expect("open experiment store");
+        let mut document = valid_profile();
+        document["sensor_mount_radius_m"] = json!(0.5);
+        document["mmwave"] = json!({
+            "sensor": "HLK-LD2450",
+            "mounting_position_m": [-0.51, 1.2, 1.72]
+        });
+
+        let error = store
+            .create_profile("invalid mmWave mount", &document)
+            .await
+            .expect_err("mmWave mount outside the configured radius must fail");
+        assert!(error.contains("mmwave.mounting_position_m"));
+    }
+
+    #[tokio::test]
+    async fn setup_profile_rejects_mmwave_exterior_mount_when_interior_only() {
+        let directory = tempfile::tempdir().expect("temporary experiment directory");
+        let store = ExperimentStore::open(directory.path())
+            .await
+            .expect("open experiment store");
+        let mut document = valid_profile();
+        document["sensor_mount_radius_m"] = json!(2.0);
+        document["mmwave"] = json!({
+            "sensor": "HLK-LD2450",
+            "mounting_position_m": [-0.25, 1.2, 1.72],
+            "allow_exterior": false
+        });
+
+        let error = store
+            .create_profile("interior-only mmWave mount", &document)
+            .await
+            .expect_err("interior-only mmWave mount must reject exterior coordinates");
+        assert!(error.contains("mmwave.allow_exterior is false"));
+    }
+
+    #[tokio::test]
+    async fn setup_profile_accepts_interior_mmwave_mount_when_interior_only() {
+        let directory = tempfile::tempdir().expect("temporary experiment directory");
+        let store = ExperimentStore::open(directory.path())
+            .await
+            .expect("open experiment store");
+        let mut document = valid_profile();
+        document["transmitter"]["position_m"][0] = json!(-0.25);
+        document["mmwave"] = json!({
+            "sensor": "HLK-LD2450",
+            "mounting_position_m": [0.0, 1.2, 1.72],
+            "allow_exterior": false
+        });
+
+        let profile = store
+            .create_profile("interior-only mmWave mount", &document)
+            .await
+            .expect("interior mmWave mount must pass");
+        assert_eq!(profile.document["mmwave"]["allow_exterior"], false);
+    }
+
+    #[tokio::test]
+    async fn setup_profile_revisions_are_immutable_and_context_bound() {
+        let directory = tempfile::tempdir().expect("temporary experiment directory");
+        let store = ExperimentStore::open(directory.path())
+            .await
+            .expect("open experiment store");
+        let profile = store
+            .create_profile("Fixed room", &valid_profile())
+            .await
+            .expect("create setup profile");
+        let original_revision = store
+            .get_profile_revision(&profile.id, &profile.revision_id)
+            .await
+            .expect("load original profile revision")
+            .expect("original profile revision exists");
+
+        let mut point_edit = profile.document.clone();
+        point_edit["points"][0]["coordinates_m"][0] = json!(1.10);
+        let updated = store
+            .update_profile(&profile.id, "Fixed room with updated labels", &point_edit)
+            .await
+            .expect("save new profile version");
+        assert_eq!(updated.version, 2);
+        assert_ne!(updated.revision_id, profile.revision_id);
+        assert_ne!(updated.profile_sha256, profile.profile_sha256);
+        assert_eq!(updated.profile_context_sha256, profile.profile_context_sha256);
+        assert_eq!(original_revision.version, 1);
+        assert_eq!(original_revision.document, profile.document);
+
+        let no_op = store
+            .update_profile(&updated.id, &updated.label, &updated.document)
+            .await
+            .expect("repeat identical profile save");
+        assert_eq!(no_op.version, updated.version);
+        assert_eq!(no_op.revision_id, updated.revision_id);
+
+        let mut moved_receiver = updated.document.clone();
+        moved_receiver["receivers"][0]["position_m"][0] = json!(0.20);
+        let moved = store
+            .update_profile(&updated.id, "Fixed room with moved RX1", &moved_receiver)
+            .await
+            .expect("save moved receiver profile version");
+        assert_eq!(moved.version, 3);
+        assert_ne!(moved.profile_context_sha256, updated.profile_context_sha256);
+        assert_eq!(
+            store
+                .get_profile_revision(&updated.id, &updated.revision_id)
+                .await
+                .expect("load version 2")
+                .expect("version 2 exists")
+                .document,
+            updated.document
+        );
+    }
+
+    #[tokio::test]
+    async fn v2_catalog_migration_preserves_profile_and_workflow_binding() {
+        let directory = tempfile::tempdir().expect("temporary experiment directory");
+        let db_path = directory.path().join("observatory-experiments.sqlite3");
+        let options = SqliteConnectOptions::new()
+            .filename(&db_path)
+            .create_if_missing(true);
+        let pool = SqlitePoolOptions::new()
+            .max_connections(1)
+            .connect_with(options)
+            .await
+            .expect("create legacy SQLite catalog");
+
+        sqlx::query(
+            "CREATE TABLE schema_migrations (
+                 version INTEGER PRIMARY KEY,
+                 applied_at TEXT NOT NULL
+             )",
+        )
+        .execute(&pool)
+        .await
+        .expect("create legacy migration table");
+        sqlx::query(
+            "CREATE TABLE experiment_runs (
+                 id TEXT PRIMARY KEY,
+                 label TEXT NOT NULL,
+                 kind TEXT NOT NULL,
+                 source TEXT NOT NULL,
+                 fixture_id TEXT NOT NULL,
+                 state TEXT NOT NULL,
+                 phase TEXT NOT NULL,
+                 execution_status TEXT NOT NULL,
+                 validation_status TEXT NOT NULL,
+                 created_at TEXT NOT NULL,
+                 started_at TEXT,
+                 finished_at TEXT,
+                 error_code TEXT,
+                 error_message TEXT
+             )",
+        )
+        .execute(&pool)
+        .await
+        .expect("create legacy runs table");
+        sqlx::query(
+            "CREATE TABLE experiment_artifacts (
+                 id INTEGER PRIMARY KEY AUTOINCREMENT,
+                 run_id TEXT NOT NULL,
+                 kind TEXT NOT NULL,
+                 relative_path TEXT NOT NULL,
+                 sha256 TEXT NOT NULL,
+                 created_at TEXT NOT NULL
+             )",
+        )
+        .execute(&pool)
+        .await
+        .expect("create legacy artifacts table");
+        sqlx::query(
+            "CREATE TABLE setup_profiles (
+                 id TEXT PRIMARY KEY,
+                 label TEXT NOT NULL,
+                 version INTEGER NOT NULL,
+                 profile_sha256 TEXT NOT NULL,
+                 document_json TEXT NOT NULL,
+                 created_at TEXT NOT NULL,
+                 updated_at TEXT NOT NULL
+             )",
+        )
+        .execute(&pool)
+        .await
+        .expect("create legacy profiles table");
+        sqlx::query(
+            "CREATE TABLE experiment_workflows (
+                 run_id TEXT PRIMARY KEY,
+                 profile_id TEXT NOT NULL,
+                 profile_sha256 TEXT NOT NULL,
+                 dataset_version TEXT NOT NULL,
+                 firmware_version TEXT NOT NULL,
+                 calibration_id TEXT,
+                 blind_seed INTEGER NOT NULL,
+                 current_phase TEXT NOT NULL,
+                 current_status TEXT NOT NULL
+             )",
+        )
+        .execute(&pool)
+        .await
+        .expect("create legacy workflows table");
+        sqlx::query(
+            "CREATE TABLE experiment_phase_events (
+                 id INTEGER PRIMARY KEY AUTOINCREMENT,
+                 run_id TEXT NOT NULL,
+                 phase TEXT NOT NULL,
+                 status TEXT NOT NULL,
+                 payload_json TEXT NOT NULL,
+                 created_at TEXT NOT NULL
+             )",
+        )
+        .execute(&pool)
+        .await
+        .expect("create legacy phase events table");
+
+        let document = valid_profile();
+        let document_json = serde_json::to_string(&document).expect("serialize legacy profile");
+        let profile_sha256 = profile_hash(&document).expect("hash legacy profile");
+        sqlx::query(
+            "INSERT INTO setup_profiles
+             (id, label, version, profile_sha256, document_json, created_at, updated_at)
+             VALUES ('profile-legacy', 'Legacy room', 4, ?, ?, '2026-08-01T00:00:00Z', '2026-08-02T00:00:00Z')",
+        )
+        .bind(&profile_sha256)
+        .bind(&document_json)
+        .execute(&pool)
+        .await
+        .expect("insert legacy profile");
+        sqlx::query(
+            "INSERT INTO experiment_runs
+             (id, label, kind, source, fixture_id, state, phase,
+              execution_status, validation_status, created_at)
+             VALUES ('run-legacy', 'Legacy run', ?, ?, 'none', 'running',
+                     'seal_setup', 'RUNNING', 'UNVALIDATED', '2026-08-02T00:00:00Z')",
+        )
+        .bind(WORKFLOW_KIND)
+        .bind(WORKFLOW_SOURCE)
+        .execute(&pool)
+        .await
+        .expect("insert legacy run");
+        sqlx::query(
+            "INSERT INTO experiment_workflows
+             (run_id, profile_id, profile_sha256, dataset_version,
+              firmware_version, calibration_id, blind_seed, current_phase, current_status)
+             VALUES ('run-legacy', 'profile-legacy', ?, 'dataset-v1',
+                     'firmware-v1', NULL, 5, 'seal_setup', 'PASS')",
+        )
+        .bind(&profile_sha256)
+        .execute(&pool)
+        .await
+        .expect("insert legacy workflow");
+        sqlx::query(
+            "INSERT INTO schema_migrations(version, applied_at)
+             VALUES (1, '2026-08-01T00:00:00Z'), (2, '2026-08-01T00:00:00Z')",
+        )
+        .execute(&pool)
+        .await
+        .expect("mark legacy schema versions");
+        pool.close().await;
+
+        let store = ExperimentStore::open(directory.path())
+            .await
+            .expect("migrate legacy SQLite catalog");
+        let profile = store
+            .get_profile("profile-legacy")
+            .await
+            .expect("load migrated profile")
+            .expect("migrated profile exists");
+        assert_eq!(profile.version, 4);
+        assert_eq!(profile.revision_id, "profile-legacy-v4");
+        assert_eq!(profile.document, document);
+        assert_eq!(profile.profile_sha256, profile_sha256);
+
+        let run = store
+            .get_run("run-legacy")
+            .await
+            .expect("load migrated run")
+            .expect("migrated run exists");
+        let workflow = run.workflow.expect("migrated workflow metadata");
+        assert_eq!(workflow.profile_revision_id.as_deref(), Some("profile-legacy-v4"));
+        assert_eq!(
+            workflow.profile_context_sha256.as_deref(),
+            Some(profile.profile_context_sha256.as_str())
+        );
+
+        let version: i64 = sqlx::query_scalar(
+            "SELECT MAX(version) FROM schema_migrations",
+        )
+        .fetch_one(&store.pool)
+        .await
+        .expect("read migrated schema version");
+        assert_eq!(version, SCHEMA_VERSION);
+    }
+
+    #[tokio::test]
+    async fn stored_calibration_reuses_unchanged_geometry_and_rejects_moved_receiver() {
+        let directory = tempfile::tempdir().expect("temporary experiment directory");
+        let store = ExperimentStore::open(directory.path())
+            .await
+            .expect("open experiment store");
+        let profile = store
+            .create_profile("Fixed room", &valid_profile())
+            .await
+            .expect("create setup profile");
+        let setup_id = "setup-test-1";
+        let setup_sha256 = "a".repeat(64);
+        let bundle = test_calibration_bundle(&profile, setup_id, &setup_sha256);
+        let summary = store
+            .persist_calibration_bundle(&bundle)
+            .await
+            .expect("persist calibration bundle");
+        assert_eq!(summary.calibration_id, bundle.calibration_id);
+        assert!(directory
+            .path()
+            .join("calibrations/calibration-test-1.json")
+            .is_file());
+
+        let compatible = store
+            .find_compatible_calibration(
+                &profile.id,
+                &profile.profile_context_sha256,
+                setup_id,
+                setup_sha256.as_str(),
+            )
+            .await
+            .expect("find compatible calibration")
+            .expect("compatible calibration exists");
+        assert_eq!(compatible.calibration_id, bundle.calibration_id);
+
+        let mut point_edit = profile.document.clone();
+        point_edit["points"][0]["coordinates_m"][0] = json!(1.10);
+        let cosmetic_update = store
+            .update_profile(&profile.id, "Fixed room with point labels", &point_edit)
+            .await
+            .expect("save non-baseline profile edit");
+        assert_eq!(
+            cosmetic_update.profile_context_sha256,
+            profile.profile_context_sha256
+        );
+        assert!(store
+            .find_compatible_calibration(
+                &cosmetic_update.id,
+                &cosmetic_update.profile_context_sha256,
+                setup_id,
+                setup_sha256.as_str(),
+            )
+            .await
+            .expect("find calibration after non-baseline edit")
+            .is_some());
+
+        let mut moved_receiver = cosmetic_update.document.clone();
+        moved_receiver["receivers"][0]["position_m"][0] = json!(0.20);
+        let moved = store
+            .update_profile(&cosmetic_update.id, "Fixed room with moved RX1", &moved_receiver)
+            .await
+            .expect("save moved receiver version");
+        assert_ne!(moved.profile_context_sha256, cosmetic_update.profile_context_sha256);
+        assert!(store
+            .find_compatible_calibration(
+                &moved.id,
+                &moved.profile_context_sha256,
+                setup_id,
+                setup_sha256.as_str(),
+            )
+            .await
+            .expect("find calibration after moved receiver")
+            .is_none());
+    }
+
+    #[tokio::test]
+    async fn reused_calibration_is_a_valid_terminal_workflow_phase() {
+        let directory = tempfile::tempdir().expect("temporary experiment directory");
+        let store = ExperimentStore::open(directory.path())
+            .await
+            .expect("open experiment store");
+        let profile = store
+            .create_profile("Fixed room", &valid_profile())
+            .await
+            .expect("create setup profile");
+        let run = store
+            .create_workflow_run(
+                "Reuse calibration run",
+                &profile.id,
+                Some(&profile.revision_id),
+                "dataset-v1",
+                "firmware-v1",
+                7,
+            )
+            .await
+            .expect("create workflow");
+        let run = store
+            .advance_workflow(&run.id, "create_experiment", "PASS", &json!({}))
+            .await
+            .expect("complete create phase");
+        let run = store
+            .advance_workflow(&run.id, "seal_setup", "PASS", &json!({}))
+            .await
+            .expect("complete seal phase");
+        let run = store
+            .advance_workflow(
+                &run.id,
+                "empty_calibration",
+                "REUSED",
+                &json!({
+                    "calibration_id": "calibration-test-1",
+                    "calibration_source": "reused",
+                    "calibration_context_sha256": "b".repeat(64),
+                }),
+            )
+            .await
+            .expect("mark empty calibration reused");
+        let workflow = run.workflow.as_ref().expect("workflow");
+        assert_eq!(workflow.current_phase, "empty_calibration");
+        assert_eq!(workflow.current_status, "REUSED");
+        assert_eq!(workflow.calibration_source.as_deref(), Some("reused"));
+        assert_eq!(workflow.calibration_id.as_deref(), Some("calibration-test-1"));
     }
 }

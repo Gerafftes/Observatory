@@ -30,7 +30,7 @@ static const char *TAG = "ota_update";
 /** Maximum PSK length (hex-encoded SHA-256). */
 #define OTA_PSK_MAX_LEN   65
 
-/** Cached PSK loaded from NVS at init time. Empty = auth disabled. */
+/** Cached PSK loaded from NVS at init time. Empty = reject all protected calls. */
 static char s_ota_psk[OTA_PSK_MAX_LEN] = {0};
 
 /**
@@ -42,7 +42,7 @@ static char s_ota_psk[OTA_PSK_MAX_LEN] = {0};
  * a reflash, but the upload endpoint will reject every request until
  * the PSK is set.
  */
-static bool ota_check_auth(httpd_req_t *req)
+bool ota_check_auth(httpd_req_t *req)
 {
     if (s_ota_psk[0] == '\0') {
         /* No PSK provisioned — fail closed. Previously this returned

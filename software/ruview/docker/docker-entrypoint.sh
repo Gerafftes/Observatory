@@ -32,12 +32,12 @@ set -e
 # untrusted LANs, accidentally-port-forwarded hosts, or any reverse-proxied
 # deployment. Refuse to start with this combination.
 #
-# Escape hatches (operator must opt in explicitly):
-#   * Set RUVIEW_API_TOKEN to a strong secret → auth enabled on /api/v1/*.
-#   * Set RUVIEW_ALLOW_UNAUTHENTICATED=1 → preserves the pre-fix behaviour;
-#     only safe on an isolated trust boundary.
-#   * Set RUVIEW_BIND_ADDR to a loopback / private interface → unauth is fine
-#     when the socket isn't reachable. The auto-bind nudges toward 127.0.0.1.
+# Required configuration:
+#   * Set RUVIEW_API_TOKEN to a strong secret for the default routable bind.
+#   * Set RUVIEW_BIND_ADDR to a loopback address only when deliberately running
+#     without API bearer auth.
+#   * Set WDP_RUFIELD_SIGNING_SEED to a deployment-specific 32-byte seed; the
+#     live RuField surface never falls back to a public development key.
 #
 # This check runs only for the default sensing-server path (no args + flag-only
 # args). The `cog-ha-matter` / `homecore` routes below are excluded because
@@ -45,10 +45,15 @@ set -e
 case "${1:-}" in
     cog-ha-matter|ha-matter|homecore|homecore-server) ;;
     *)
-        if [ -z "${RUVIEW_API_TOKEN:-}" ] && [ "${RUVIEW_ALLOW_UNAUTHENTICATED:-}" != "1" ]; then
+        if [ -z "${WDP_RUFIELD_SIGNING_SEED:-}" ]; then
+            echo "[entrypoint] ERROR: WDP_RUFIELD_SIGNING_SEED is required" >&2
+            echo "[entrypoint]        generate one with: openssl rand -hex 32" >&2
+            exit 78
+        fi
+        if [ -z "${RUVIEW_API_TOKEN:-}" ]; then
             # If the operator hasn't overridden the bind, refuse outright on
             # the default 0.0.0.0. If they've nailed it to loopback (or a
-            # specific private address they trust), let it run.
+            # loopback address they trust), let it run.
             __bind_default="${RUVIEW_BIND_ADDR:-0.0.0.0}"
             case "$__bind_default" in
                 127.*|localhost|::1)
@@ -61,7 +66,6 @@ case "${1:-}" in
                     echo "[entrypoint]        can reach this host. Pick one:" >&2
                     echo "[entrypoint]          docker run -e RUVIEW_API_TOKEN=\$(openssl rand -hex 32) ..." >&2
                     echo "[entrypoint]          docker run -e RUVIEW_BIND_ADDR=127.0.0.1 ..." >&2
-                    echo "[entrypoint]          docker run -e RUVIEW_ALLOW_UNAUTHENTICATED=1 ...   # only on trusted network" >&2
                     echo "[entrypoint]        See https://github.com/ruvnet/RuView/issues/864" >&2
                     exit 64
                     ;;

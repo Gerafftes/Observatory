@@ -23,7 +23,7 @@ function envOrDefault(key: string, fallback: string): string {
  *
  * Environment variables:
  *   RUVIEW_SENSING_SERVER_URL   — base URL of the sensing-server  (default: http://localhost:3000)
- *   RUVIEW_API_TOKEN            — Bearer token for /api/v1/* routes (no default; auth disabled when absent)
+ *   RUVIEW_API_TOKEN            — Bearer token for /api/v1/* routes (optional only when the Rust server is loopback-bound)
  *   RUVIEW_POSE_COG_BINARY      — path to cog-pose-estimation binary
  *   RUVIEW_COUNT_COG_BINARY     — path to cog-person-count binary
  *   RUVIEW_JOBS_DIR             — directory for job logs (default: ~/.ruview/jobs)

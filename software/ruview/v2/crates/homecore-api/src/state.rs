@@ -28,15 +28,13 @@ impl SharedState {
         location_name: impl Into<String>,
         homecore_version: impl Into<String>,
     ) -> Self {
-        // P2 default: dev-mode token store (accepts any non-empty
-        // bearer) so existing smoke tests still work; the
-        // `homecore-server` binary uses with_tokens() to provision a
-        // real store at boot.
+        // Safe library default: no bearer is accepted until the caller
+        // provisions explicit tokens through `with_tokens()`.
         Self::with_tokens(
             homecore,
             location_name,
             homecore_version,
-            LongLivedTokenStore::allow_any_non_empty(),
+            LongLivedTokenStore::empty(),
         )
     }
 

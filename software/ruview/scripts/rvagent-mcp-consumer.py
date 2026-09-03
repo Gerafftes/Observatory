@@ -24,6 +24,7 @@ Run on ruv-mac-mini (or any host with Node ≥ 20 + the running
 ruview-sensing-server.py on :3000):
 
     RVAGENT_SENSING_URL=http://localhost:3000 \
+    RUVIEW_API_TOKEN=<token-used-by-ruview-sensing-server> \
       python3 rvagent-mcp-consumer.py
 """
 from __future__ import annotations

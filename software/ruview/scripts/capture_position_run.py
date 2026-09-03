@@ -27,6 +27,8 @@ CALIBRATION_READY_TIMEOUT_SECONDS = 12
 CALIBRATION_STATUS_POLL_SECONDS = 0.25
 SHA256_PATTERN = re.compile(r"^[0-9a-f]{64}$")
 SETUP_ID_PATTERN = re.compile(r"^setup-[0-9a-f]{16}$")
+CALIBRATION_ID_PATTERN = re.compile(r"^calibration-[0-9]+-[0-9]+-[0-9]+$")
+MINIMUM_CALIBRATION_SECONDS = 60.0
 
 CALIBRATION_START_PATH = "/api/v1/classification/calibration/start"
 CALIBRATION_STOP_PATH = "/api/v1/classification/calibration/stop"
@@ -66,6 +68,16 @@ PROTOCOLS = {
 
 class CaptureError(RuntimeError):
     """A fail-closed protocol or server response error."""
+
+
+@dataclass(frozen=True)
+class CalibrationEvidence:
+    calibration_id: str
+    calibration_context_sha256: str
+    profile_id: str
+    profile_revision_id: str
+    setup_id: str
+    setup_sha256: str
 
 
 def request_json(
@@ -218,7 +230,72 @@ def validate_calibration_collecting(payload: dict[str, Any]) -> None:
             )
 
 
-def validate_calibration_stop(payload: dict[str, Any]) -> None:
+def calibration_evidence(
+    payload: dict[str, Any],
+    *,
+    profile_id: str,
+    profile_revision_id: str,
+    setup_id: str,
+    setup_sha256: str,
+) -> CalibrationEvidence:
+    summary = payload.get("calibration")
+    if not isinstance(summary, dict):
+        raise CaptureError("D5/D6 calibration has no persisted bundle summary")
+
+    calibration_id = payload.get("calibration_id")
+    calibration_context_sha256 = payload.get("calibration_context_sha256")
+    source = payload.get("calibration_source", summary.get("source"))
+    if (
+        not isinstance(calibration_id, str)
+        or not CALIBRATION_ID_PATTERN.fullmatch(calibration_id)
+        or summary.get("calibration_id") != calibration_id
+    ):
+        raise CaptureError("D5/D6 calibration has no valid persisted calibration_id")
+    if (
+        not isinstance(calibration_context_sha256, str)
+        or not SHA256_PATTERN.fullmatch(calibration_context_sha256)
+        or summary.get("calibration_context_sha256") != calibration_context_sha256
+    ):
+        raise CaptureError(
+            "D5/D6 calibration has no valid calibration_context_sha256"
+        )
+    if source != "captured":
+        raise CaptureError("D5/D6 empty run did not persist a newly captured bundle")
+
+    expected = {
+        "profile_id": profile_id,
+        "profile_revision_id": profile_revision_id,
+        "setup_id": setup_id,
+        "setup_sha256": setup_sha256,
+    }
+    mismatched = [
+        field for field, value in expected.items() if summary.get(field) != value
+    ]
+    if mismatched:
+        raise CaptureError(
+            "D5/D6 calibration bundle context mismatch: " + ", ".join(mismatched)
+        )
+    if summary.get("node_count") != len(EXPECTED_RX_IDS):
+        raise CaptureError("D5/D6 calibration bundle is not bound to RX1-RX4")
+
+    return CalibrationEvidence(
+        calibration_id=calibration_id,
+        calibration_context_sha256=calibration_context_sha256,
+        profile_id=profile_id,
+        profile_revision_id=profile_revision_id,
+        setup_id=setup_id,
+        setup_sha256=setup_sha256,
+    )
+
+
+def validate_calibration_stop(
+    payload: dict[str, Any],
+    *,
+    profile_id: str,
+    profile_revision_id: str,
+    setup_id: str,
+    setup_sha256: str,
+) -> CalibrationEvidence:
     if payload.get("success") is not True or payload.get("status") != "ready":
         raise CaptureError(
             f"D5/D6 calibration stop failed: {payload.get('error')!r}"
@@ -238,9 +315,30 @@ def validate_calibration_stop(payload: dict[str, Any]) -> None:
             raise CaptureError(
                 f"RX{node['node_id']} has no complete D5/D6 calibration reference"
             )
+    elapsed_seconds = payload.get("elapsed_seconds")
+    if (
+        not isinstance(elapsed_seconds, (int, float))
+        or isinstance(elapsed_seconds, bool)
+        or elapsed_seconds < MINIMUM_CALIBRATION_SECONDS
+    ):
+        raise CaptureError("D5/D6 calibration covered less than 60 seconds")
+    return calibration_evidence(
+        payload,
+        profile_id=profile_id,
+        profile_revision_id=profile_revision_id,
+        setup_id=setup_id,
+        setup_sha256=setup_sha256,
+    )
 
 
-def validate_calibration_ready(payload: dict[str, Any]) -> None:
+def validate_calibration_ready(
+    payload: dict[str, Any],
+    *,
+    profile_id: str,
+    profile_revision_id: str,
+    setup_id: str,
+    setup_sha256: str,
+) -> CalibrationEvidence:
     if (
         payload.get("success") is not True
         or payload.get("phase") != "ready"
@@ -266,9 +364,22 @@ def validate_calibration_ready(payload: dict[str, Any]) -> None:
             raise CaptureError(
                 f"RX{node['node_id']} has no fresh operational D5/D6 evidence"
             )
+    return calibration_evidence(
+        payload,
+        profile_id=profile_id,
+        profile_revision_id=profile_revision_id,
+        setup_id=setup_id,
+        setup_sha256=setup_sha256,
+    )
 
 
-def start_empty_room_calibration(server: str) -> float:
+def start_empty_room_calibration(
+    server: str,
+    profile_id: str,
+    profile_revision_id: str,
+    setup_id: str,
+    setup_sha256: str,
+) -> float:
     initial = request_json(server, CALIBRATION_STATUS_PATH)
     if initial.get("phase") == "collecting":
         raise CaptureError(
@@ -277,7 +388,15 @@ def start_empty_room_calibration(server: str) -> float:
 
     started_at = time.monotonic()
     try:
-        response = request_json(server, CALIBRATION_START_PATH, method="POST", body={})
+        response = request_json(
+            server,
+            CALIBRATION_START_PATH,
+            method="POST",
+            body={
+                "profile_id": profile_id,
+                "profile_revision_id": profile_revision_id,
+            },
+        )
     except CaptureError:
         # A lost HTTP response does not prove that the server rejected the
         # request. Treat an authoritative collecting status as a successful,
@@ -292,6 +411,13 @@ def start_empty_room_calibration(server: str) -> float:
             raise CaptureError(
                 f"D5/D6 calibration start failed: {response.get('error')!r}"
             )
+        if (
+            response.get("profile_id") != profile_id
+            or response.get("profile_revision_id") != profile_revision_id
+            or not isinstance(response.get("calibration_context_sha256"), str)
+            or not SHA256_PATTERN.fullmatch(response["calibration_context_sha256"])
+        ):
+            raise CaptureError("D5/D6 calibration start returned the wrong setup context")
         recommended_seconds = response.get("recommended_seconds")
         if (
             not isinstance(recommended_seconds, int)
@@ -308,12 +434,26 @@ def start_empty_room_calibration(server: str) -> float:
     except BaseException:
         recovery_status = request_json(server, CALIBRATION_STATUS_PATH)
         if recovery_status.get("phase") == "collecting":
-            finish_empty_room_calibration(server, started_at)
+            finish_empty_room_calibration(
+                server,
+                started_at,
+                profile_id=profile_id,
+                profile_revision_id=profile_revision_id,
+                setup_id=setup_id,
+                setup_sha256=setup_sha256,
+            )
         raise
     return started_at
 
 
-def wait_until_calibration_ready(server: str) -> dict[str, Any]:
+def wait_until_calibration_ready(
+    server: str,
+    *,
+    profile_id: str,
+    profile_revision_id: str,
+    setup_id: str,
+    setup_sha256: str,
+) -> CalibrationEvidence:
     deadline = time.monotonic() + CALIBRATION_READY_TIMEOUT_SECONDS
     last_status: dict[str, Any] | None = None
     while True:
@@ -323,8 +463,13 @@ def wait_until_calibration_ready(server: str) -> dict[str, Any]:
             and last_status.get("operational") is True
             and last_status.get("usable_live_nodes") == len(EXPECTED_RX_IDS)
         ):
-            validate_calibration_ready(last_status)
-            return last_status
+            return validate_calibration_ready(
+                last_status,
+                profile_id=profile_id,
+                profile_revision_id=profile_revision_id,
+                setup_id=setup_id,
+                setup_sha256=setup_sha256,
+            )
         if time.monotonic() >= deadline:
             raise CaptureError(
                 "D5/D6 calibration references were installed, but exactly RX1-RX4 "
@@ -333,11 +478,26 @@ def wait_until_calibration_ready(server: str) -> dict[str, Any]:
         time.sleep(CALIBRATION_STATUS_POLL_SECONDS)
 
 
-def finish_empty_room_calibration(server: str, started_at: float) -> None:
+def finish_empty_room_calibration(
+    server: str,
+    started_at: float,
+    *,
+    profile_id: str,
+    profile_revision_id: str,
+    setup_id: str,
+    setup_sha256: str,
+) -> CalibrationEvidence:
     status = request_json(server, CALIBRATION_STATUS_PATH)
     if status.get("phase") == "ready":
-        wait_until_calibration_ready(server)
-        return
+        if time.monotonic() - started_at < MINIMUM_CALIBRATION_SECONDS:
+            raise CaptureError("D5/D6 calibration became ready before 60 seconds")
+        return wait_until_calibration_ready(
+            server,
+            profile_id=profile_id,
+            profile_revision_id=profile_revision_id,
+            setup_id=setup_id,
+            setup_sha256=setup_sha256,
+        )
     validate_calibration_collecting(status)
 
     remaining = PROTOCOLS["empty"].duration_seconds - (
@@ -359,15 +519,28 @@ def finish_empty_room_calibration(server: str, started_at: float) -> None:
             body={},
             timeout_seconds=60.0,
         )
-        validate_calibration_stop(response)
+        evidence = validate_calibration_stop(
+            response,
+            profile_id=profile_id,
+            profile_revision_id=profile_revision_id,
+            setup_id=setup_id,
+            setup_sha256=setup_sha256,
+        )
     except CaptureError as first_error:
         # A lost/malformed stop response is resolved from authoritative status.
         # If the server is still collecting, retry once; otherwise accept only a
         # fully validated ready state.
         recovery_status = request_json(server, CALIBRATION_STATUS_PATH)
         if recovery_status.get("phase") == "ready":
-            wait_until_calibration_ready(server)
-            return
+            if time.monotonic() - started_at < MINIMUM_CALIBRATION_SECONDS:
+                raise CaptureError("D5/D6 calibration became ready before 60 seconds")
+            return wait_until_calibration_ready(
+                server,
+                profile_id=profile_id,
+                profile_revision_id=profile_revision_id,
+                setup_id=setup_id,
+                setup_sha256=setup_sha256,
+            )
         if recovery_status.get("phase") != "collecting":
             raise first_error
         validate_calibration_collecting(recovery_status)
@@ -378,8 +551,23 @@ def finish_empty_room_calibration(server: str, started_at: float) -> None:
             body={},
             timeout_seconds=60.0,
         )
-        validate_calibration_stop(response)
-    wait_until_calibration_ready(server)
+        evidence = validate_calibration_stop(
+            response,
+            profile_id=profile_id,
+            profile_revision_id=profile_revision_id,
+            setup_id=setup_id,
+            setup_sha256=setup_sha256,
+        )
+    ready = wait_until_calibration_ready(
+        server,
+        profile_id=profile_id,
+        profile_revision_id=profile_revision_id,
+        setup_id=setup_id,
+        setup_sha256=setup_sha256,
+    )
+    if ready != evidence:
+        raise CaptureError("persisted calibration identity changed after installation")
+    return ready
 
 
 def validate_rx_summaries(
@@ -572,6 +760,14 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--kind", choices=sorted(PROTOCOLS), required=True)
     parser.add_argument("--recording-id", required=True)
     parser.add_argument(
+        "--profile-id",
+        help="exact Observatory setup profile required for --kind empty",
+    )
+    parser.add_argument(
+        "--profile-revision-id",
+        help="immutable Observatory profile revision required for --kind empty",
+    )
+    parser.add_argument(
         "--confirm-empty-room",
         action="store_true",
         help="required for --kind empty; confirms nobody will enter during capture",
@@ -585,6 +781,12 @@ def main() -> int:
     if args.kind == "empty" and not args.confirm_empty_room:
         raise CaptureError(
             "--kind empty requires --confirm-empty-room; any room entry invalidates the run"
+        )
+    if args.kind == "empty" and (
+        not args.profile_id or not args.profile_revision_id
+    ):
+        raise CaptureError(
+            "--kind empty requires --profile-id and --profile-revision-id"
         )
 
     print(f"Test: {protocol.description}")
@@ -607,8 +809,17 @@ def main() -> int:
         raise CaptureError("recording ID already exists; choose a new neutral ID")
 
     calibration_started_at = (
-        start_empty_room_calibration(args.server) if args.kind == "empty" else None
+        start_empty_room_calibration(
+            args.server,
+            args.profile_id,
+            args.profile_revision_id,
+            setup_id,
+            setup_sha256,
+        )
+        if args.kind == "empty"
+        else None
     )
+    calibration_result: CalibrationEvidence | None = None
     started = False
     stop: dict[str, Any] | None = None
     primary_error: BaseException | None = None
@@ -658,7 +869,14 @@ def main() -> int:
                 cleanup_errors.append(error)
         if calibration_started_at is not None:
             try:
-                finish_empty_room_calibration(args.server, calibration_started_at)
+                calibration_result = finish_empty_room_calibration(
+                    args.server,
+                    calibration_started_at,
+                    profile_id=args.profile_id,
+                    profile_revision_id=args.profile_revision_id,
+                    setup_id=setup_id,
+                    setup_sha256=setup_sha256,
+                )
             except CaptureError as error:
                 cleanup_errors.append(error)
 
@@ -691,6 +909,14 @@ def main() -> int:
         protocol.duration_seconds,
     )
     print(completion_message(args.kind, args.recording_id, frames))
+    if args.kind == "empty":
+        if calibration_result is None:
+            raise CaptureError("empty run finished without persisted calibration evidence")
+        print(f"calibration_id: {calibration_result.calibration_id}")
+        print(
+            "calibration_context_sha256: "
+            f"{calibration_result.calibration_context_sha256}"
+        )
     if args.kind == "discovery":
         for summary in summaries:
             print(f"RX{summary['rx_id']} grid: {json.dumps(summary['grid'], sort_keys=True)}")

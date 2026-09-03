@@ -13,6 +13,7 @@ import {
 } from './gaussian-splats.js';
 import { ObservatoryControlCenter } from './ObservatoryControlCenter.js';
 import { MmwaveCalibrationAssistant } from './MmwaveCalibrationAssistant.js';
+import { MmwaveDebugView, MMWAVE_STATUS_ENDPOINT } from './MmwaveDebugView.js';
 
 export class SensingTab {
   /** @param {HTMLElement} container - the #sensing section element */
@@ -30,6 +31,11 @@ export class SensingTab {
     this._serviceStarted = false;
     this.controlCenter = null;
     this.mmwaveAssistant = null;
+    this.mmwaveDebugView = null;
+    this._mmwaveStatusTimer = null;
+    this._mmwaveStatusPollInFlight = false;
+    this._mmwaveStatusPollGeneration = 0;
+    this._lastSensingDataReceivedAtMs = null;
   }
 
   init() {
@@ -58,7 +64,15 @@ export class SensingTab {
       return;
     }
     this._initSplatRenderer();
+    const debugContainer = this.container?.querySelector?.('#sensingMmwaveDebug');
+    if (debugContainer) {
+      this.mmwaveDebugView = new MmwaveDebugView(debugContainer, {
+        getSetupGeometry: () => this.controlCenter?.getCurrentGeometrySnapshot?.() || null,
+      });
+      this.mmwaveDebugView.mount();
+    }
     this._connectService();
+    this._startMmwaveStatusPolling(generation);
     this._setupResize();
     this._initialized = true;
   }
@@ -196,6 +210,9 @@ export class SensingTab {
           </div>
         </div>
       </div>
+
+      <!-- Explicit source-comparison view: mmWave reference stays separate from RX/CSI. -->
+      <div id="sensingMmwaveDebug"></div>
     `;
     this.controlCenter = new ObservatoryControlCenter(
       this.container.querySelector('#observatoryControlCenter'),
@@ -204,6 +221,7 @@ export class SensingTab {
 
     this.mmwaveAssistant = new MmwaveCalibrationAssistant(
       this.container.querySelector('#mmwaveCalibrationAssistant'),
+      () => this.controlCenter.calibrationContextRequest(),
     );
     this.mmwaveAssistant.mount();
   }
@@ -263,6 +281,8 @@ export class SensingTab {
   }
 
   _onSensingData(data) {
+    this._lastSensingDataReceivedAtMs = Date.now();
+
     // Update 3D view
     if (this.splatRenderer) {
       this.splatRenderer.update(data);
@@ -273,6 +293,12 @@ export class SensingTab {
 
     // Update per-node panels
     this._updateNodePanels(data);
+
+    this.mmwaveDebugView?.updateSensingFrame(
+      data,
+      this._lastSensingDataReceivedAtMs,
+      this._lastSensingDataReceivedAtMs,
+    );
   }
 
   _onStateChange(state) {
@@ -298,6 +324,7 @@ export class SensingTab {
       const bannerConfig = {
         'live':              { text: 'LIVE · ESP32',             cls: 'sensing-source-live' },
         'server-simulated':  { text: 'SIMULATION · SERVER',       cls: 'sensing-source-server-sim' },
+        'server-offline':    { text: 'OFFLINE · ESP32',           cls: 'sensing-source-offline' },
         'reconnecting':      { text: 'VERBINDE …',                cls: 'sensing-source-reconnecting' },
         'simulated':         { text: 'OFFLINE · SIMULATION',      cls: 'sensing-source-simulated' },
       };
@@ -309,6 +336,48 @@ export class SensingTab {
     if (['disconnected', 'connecting', 'reconnecting'].includes(state)) {
       this._invalidateLiveReadout();
     }
+    this.mmwaveDebugView?.setConnectionState(state);
+  }
+
+  // ---- mmWave status polling --------------------------------------------
+
+  _startMmwaveStatusPolling(generation = this._lifecycleGeneration) {
+    this._stopMmwaveStatusPolling();
+    const poll = async () => {
+      if (this._disposed || generation !== this._lifecycleGeneration) return;
+      if (!this._mmwaveStatusPollInFlight) {
+        this._mmwaveStatusPollInFlight = true;
+        try {
+          const response = await fetch(MMWAVE_STATUS_ENDPOINT, { cache: 'no-store' });
+          if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+          }
+          const status = await response.json();
+          if (!this._disposed && generation === this._lifecycleGeneration) {
+            this.mmwaveDebugView?.updateStatus(status, Date.now());
+          }
+        } catch (error) {
+          if (!this._disposed && generation === this._lifecycleGeneration) {
+            this.mmwaveDebugView?.setStatusError('mmWave-Status nicht erreichbar');
+          }
+        } finally {
+          this._mmwaveStatusPollInFlight = false;
+        }
+      }
+      if (!this._disposed && generation === this._lifecycleGeneration) {
+        this._mmwaveStatusTimer = setTimeout(poll, 500);
+      }
+    };
+    poll();
+  }
+
+  _stopMmwaveStatusPolling() {
+    if (this._mmwaveStatusTimer != null) {
+      clearTimeout(this._mmwaveStatusTimer);
+      this._mmwaveStatusTimer = null;
+    }
+    this._mmwaveStatusPollGeneration += 1;
+    this._mmwaveStatusPollInFlight = false;
   }
 
   // ---- HUD update --------------------------------------------------------
@@ -535,6 +604,7 @@ export class SensingTab {
     this._initialized = false;
     this._lifecycleGeneration += 1;
     this._initPromise = null;
+    this._stopMmwaveStatusPolling();
 
     if (this._unsubData) {
       this._unsubData();
@@ -555,6 +625,10 @@ export class SensingTab {
     if (this.mmwaveAssistant) {
       this.mmwaveAssistant.dispose();
       this.mmwaveAssistant = null;
+    }
+    if (this.mmwaveDebugView) {
+      this.mmwaveDebugView.dispose();
+      this.mmwaveDebugView = null;
     }
     if (this.controlCenter) {
       this.controlCenter.dispose();

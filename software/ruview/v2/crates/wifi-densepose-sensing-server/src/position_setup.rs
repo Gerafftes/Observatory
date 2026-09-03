@@ -29,6 +29,17 @@ const TX_FILTER_SCHEME: &str = TX_SOURCE_BINDING_SCHEME;
 const EXPECTED_RX_IDS: [u8; 4] = [1, 2, 3, 4];
 const POSITION_LAYOUT_FLAGS_MASK: u8 = !0x10;
 const SHA256_HEX_LEN: usize = 64;
+const OBSERVATORY_SETUP_DRAFT_KIND: &str = "ruview.position-setup-draft";
+const OBSERVATORY_SETUP_DRAFT_MISSING_SECTIONS: [&str; 8] = [
+    "transmitter.firmware",
+    "receivers[*].firmware",
+    "receivers[*].expected_grid",
+    "recording_host",
+    "radio.tx_filter_identity",
+    "mmwave.node_id",
+    "mmwave.firmware",
+    "mmwave.transform",
+];
 
 /// Strict input document consumed by `--position-create-setup`.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -153,6 +164,10 @@ impl MmwaveDefinition {
         &self.node_id
     }
 
+    pub(crate) fn mounting_position_m(&self) -> [f64; 3] {
+        millimetres_to_metres(self.mounting_position_mm)
+    }
+
     pub(crate) fn transform(&self) -> (i32, i32, i32, bool) {
         (
             self.transform.origin_x_mm,
@@ -210,6 +225,147 @@ impl SealedPositionSetup {
 
     pub(crate) fn mmwave(&self) -> Option<&MmwaveDefinition> {
         self.definition.mmwave.as_ref()
+    }
+
+    /// Require the overlapping measurement geometry and public deployment
+    /// metadata in an Observatory setup profile to match this runtime seal.
+    /// Firmware, grid, filter, transform, host, and server identities remain
+    /// exclusive to the stricter schema-v2 setup artifact.
+    pub(crate) fn validate_observatory_profile(
+        &self,
+        document: &serde_json::Value,
+    ) -> Result<(), String> {
+        let room = profile_triplet_mm(document.get("room_dimensions_m"), "room_dimensions_m")?;
+        if room != self.definition.room_dimensions_mm {
+            return Err(
+                "setup profile room dimensions do not match the active sealed setup".to_string(),
+            );
+        }
+
+        let transmitter = document
+            .get("transmitter")
+            .and_then(serde_json::Value::as_object)
+            .ok_or_else(|| "setup profile transmitter must be an object".to_string())?;
+        let transmitter_position = profile_triplet_mm(
+            transmitter.get("position_m"),
+            "transmitter.position_m",
+        )?;
+        if transmitter_position != self.definition.transmitter.position_mm {
+            return Err(
+                "setup profile transmitter position does not match the active sealed setup"
+                    .to_string(),
+            );
+        }
+
+        let receivers = document
+            .get("receivers")
+            .and_then(serde_json::Value::as_array)
+            .ok_or_else(|| "setup profile receivers must be an array".to_string())?;
+        if receivers.len() != self.definition.receivers.len() {
+            return Err(
+                "setup profile receiver count does not match the active sealed setup".to_string(),
+            );
+        }
+        for (index, (profile_receiver, sealed_receiver)) in receivers
+            .iter()
+            .zip(&self.definition.receivers)
+            .enumerate()
+        {
+            let expected_id = format!("RX{}", sealed_receiver.rx_id);
+            if profile_receiver.get("id").and_then(serde_json::Value::as_str)
+                != Some(expected_id.as_str())
+            {
+                return Err(format!(
+                    "setup profile receiver {} does not match {expected_id}",
+                    index + 1
+                ));
+            }
+            let field = format!("receivers[{index}].position_m");
+            if profile_triplet_mm(profile_receiver.get("position_m"), &field)?
+                != sealed_receiver.position_mm
+            {
+                return Err(format!(
+                    "setup profile {expected_id} position does not match the active sealed setup"
+                ));
+            }
+        }
+
+        let radio_channel = document
+            .pointer("/radio/channel")
+            .and_then(serde_json::Value::as_u64)
+            .and_then(|channel| u8::try_from(channel).ok())
+            .ok_or_else(|| "setup profile radio.channel must be an integer".to_string())?;
+        if radio_channel != self.definition.radio.channel {
+            return Err(
+                "setup profile radio channel does not match the active sealed setup".to_string(),
+            );
+        }
+
+        for (field, sealed_value) in [
+            (
+                "layout_revision",
+                self.definition.environment.layout_revision.as_str(),
+            ),
+            (
+                "furniture_revision",
+                self.definition.environment.furniture_revision.as_str(),
+            ),
+            (
+                "door_state_revision",
+                self.definition.environment.door_state_revision.as_str(),
+            ),
+        ] {
+            let pointer = format!("/environment/{field}");
+            if document.pointer(&pointer).and_then(serde_json::Value::as_str)
+                != Some(sealed_value)
+            {
+                return Err(format!(
+                    "setup profile environment.{field} does not match the active sealed setup"
+                ));
+            }
+        }
+
+        let profile_mmwave = document
+            .get("mmwave")
+            .and_then(serde_json::Value::as_object)
+            .ok_or_else(|| "setup profile mmwave must be an object".to_string())?;
+        let sealed_mmwave = self
+            .definition
+            .mmwave
+            .as_ref()
+            .ok_or_else(|| {
+                "active sealed setup is not schema v2 with mmWave identity".to_string()
+            })?;
+        if profile_mmwave
+            .get("sensor")
+            .and_then(serde_json::Value::as_str)
+            != Some(sealed_mmwave.sensor.as_str())
+        {
+            return Err(
+                "setup profile mmWave sensor does not match the active sealed setup".to_string(),
+            );
+        }
+        if profile_triplet_mm(
+            profile_mmwave.get("mounting_position_m"),
+            "mmwave.mounting_position_m",
+        )? != sealed_mmwave.mounting_position_mm
+        {
+            return Err(
+                "setup profile mmWave mounting position does not match the active sealed setup"
+                    .to_string(),
+            );
+        }
+        if profile_mmwave
+            .get("mounting_revision")
+            .and_then(serde_json::Value::as_str)
+            != Some(sealed_mmwave.mounting_revision.as_str())
+        {
+            return Err(
+                "setup profile mmWave mounting revision does not match the active sealed setup"
+                    .to_string(),
+            );
+        }
+        Ok(())
     }
 
     /// Require any explicitly repeated runtime geometry to be exactly the
@@ -380,6 +536,180 @@ impl SealedPositionSetup {
         }
         Ok(())
     }
+}
+
+/// Build a deliberately incomplete schema-v2 specification from the exact
+/// geometry and deployment metadata saved by the Observatory CAD editor.
+/// Hardware identities stay null so this draft cannot be mistaken for a
+/// sealable setup specification.
+pub(crate) fn observatory_profile_setup_draft(
+    document: &serde_json::Value,
+) -> Result<serde_json::Value, String> {
+    let room = profile_triplet_mm(document.get("room_dimensions_m"), "room_dimensions_m")?;
+    if room.contains(&0) {
+        return Err("setup profile room dimensions must all be greater than zero".to_string());
+    }
+
+    let transmitter = document
+        .get("transmitter")
+        .and_then(serde_json::Value::as_object)
+        .ok_or_else(|| "setup profile transmitter must be an object".to_string())?;
+    if transmitter.get("id").and_then(serde_json::Value::as_str) != Some("TX") {
+        return Err("setup profile transmitter must be named TX".to_string());
+    }
+    let transmitter_position = profile_triplet_mm(
+        transmitter.get("position_m"),
+        "transmitter.position_m",
+    )?;
+    validate_position("transmitter.position_mm", transmitter_position, room)?;
+
+    let receivers = document
+        .get("receivers")
+        .and_then(serde_json::Value::as_array)
+        .ok_or_else(|| "setup profile receivers must be an array".to_string())?;
+    if receivers.len() != EXPECTED_RX_IDS.len() {
+        return Err("setup profile must contain exactly RX1 through RX4".to_string());
+    }
+    let receiver_drafts = receivers
+        .iter()
+        .enumerate()
+        .map(|(index, receiver)| {
+            let rx_id = EXPECTED_RX_IDS[index];
+            let expected_id = format!("RX{rx_id}");
+            if receiver.get("id").and_then(serde_json::Value::as_str)
+                != Some(expected_id.as_str())
+            {
+                return Err(format!(
+                    "setup profile receiver {} must be named {expected_id}",
+                    index + 1
+                ));
+            }
+            let field = format!("receivers[{index}].position_m");
+            let position = profile_triplet_mm(receiver.get("position_m"), &field)?;
+            validate_position(&format!("{expected_id}.position_mm"), position, room)?;
+            Ok(serde_json::json!({
+                "rx_id": rx_id,
+                "position_mm": position,
+                "firmware": null,
+                "expected_grid": null,
+            }))
+        })
+        .collect::<Result<Vec<_>, String>>()?;
+
+    let radio_channel = document
+        .pointer("/radio/channel")
+        .and_then(serde_json::Value::as_u64)
+        .and_then(|channel| u8::try_from(channel).ok())
+        .filter(|channel| (1..=13).contains(channel))
+        .ok_or_else(|| {
+            "setup profile radio.channel must be a 2.4 GHz channel from 1 to 13".to_string()
+        })?;
+
+    let layout_revision = profile_public_identifier(
+        document.pointer("/environment/layout_revision"),
+        "environment.layout_revision",
+    )?;
+    let furniture_revision = profile_public_identifier(
+        document.pointer("/environment/furniture_revision"),
+        "environment.furniture_revision",
+    )?;
+    let door_state_revision = profile_public_identifier(
+        document.pointer("/environment/door_state_revision"),
+        "environment.door_state_revision",
+    )?;
+
+    let mmwave = document
+        .get("mmwave")
+        .and_then(serde_json::Value::as_object)
+        .ok_or_else(|| "setup profile mmwave must be an object".to_string())?;
+    if mmwave.get("sensor").and_then(serde_json::Value::as_str) != Some("HLK-LD2450") {
+        return Err("setup profile mmwave.sensor must be HLK-LD2450".to_string());
+    }
+    let mmwave_position = profile_triplet_mm(
+        mmwave.get("mounting_position_m"),
+        "mmwave.mounting_position_m",
+    )?;
+    validate_position("mmwave.mounting_position_mm", mmwave_position, room)?;
+    let mmwave_mounting_revision = profile_public_identifier(
+        mmwave.get("mounting_revision"),
+        "mmwave.mounting_revision",
+    )?;
+
+    Ok(serde_json::json!({
+        "draft_schema_version": 1,
+        "kind": OBSERVATORY_SETUP_DRAFT_KIND,
+        "ready_to_seal": false,
+        "missing_sections": OBSERVATORY_SETUP_DRAFT_MISSING_SECTIONS,
+        "spec": {
+            "schema_version": 2,
+            "coordinate_system": COORDINATE_SYSTEM,
+            "room_dimensions_mm": room,
+            "transmitter": {
+                "position_mm": transmitter_position,
+                "firmware": null,
+            },
+            "receivers": receiver_drafts,
+            "recording_host": null,
+            "radio": {
+                "channel": radio_channel,
+                "tx_filter_identity": null,
+            },
+            "environment": {
+                "layout_revision": layout_revision,
+                "furniture_revision": furniture_revision,
+                "door_state_revision": door_state_revision,
+            },
+            "mmwave": {
+                "node_id": null,
+                "sensor": "HLK-LD2450",
+                "firmware": null,
+                "mounting_position_mm": mmwave_position,
+                "mounting_revision": mmwave_mounting_revision,
+                "transform": null,
+            },
+        },
+    }))
+}
+
+fn profile_triplet_mm(
+    value: Option<&serde_json::Value>,
+    field: &str,
+) -> Result<[u32; 3], String> {
+    let coordinates = value
+        .and_then(serde_json::Value::as_array)
+        .ok_or_else(|| format!("setup profile {field} must be an array"))?;
+    if coordinates.len() != 3 {
+        return Err(format!(
+            "setup profile {field} must contain exactly three coordinates"
+        ));
+    }
+    let mut result = [0_u32; 3];
+    for (index, coordinate) in coordinates.iter().enumerate() {
+        let metres = coordinate
+            .as_f64()
+            .filter(|value| value.is_finite() && *value >= 0.0)
+            .ok_or_else(|| format!("setup profile {field}[{index}] must be non-negative"))?;
+        let millimetres = metres * 1_000.0;
+        let rounded = millimetres.round();
+        if (millimetres - rounded).abs() > 1e-6 || rounded > f64::from(u32::MAX) {
+            return Err(format!(
+                "setup profile {field}[{index}] must resolve to an exact whole millimetre"
+            ));
+        }
+        result[index] = rounded as u32;
+    }
+    Ok(result)
+}
+
+fn profile_public_identifier(
+    value: Option<&serde_json::Value>,
+    field: &str,
+) -> Result<String, String> {
+    let value = value
+        .and_then(serde_json::Value::as_str)
+        .ok_or_else(|| format!("setup profile {field} must be a string"))?;
+    validate_public_identifier(field, value)?;
+    Ok(value.to_string())
 }
 
 fn millimetres_to_metres(value: [u32; 3]) -> [f64; 3] {
@@ -1016,6 +1346,54 @@ mod tests {
             .unwrap()
     }
 
+    fn valid_v2_setup(directory: &TempDir) -> SealedPositionSetup {
+        let executable = executable_fixture(directory, b"test executable v2");
+        let mut value = valid_spec_value();
+        value["schema_version"] = json!(2);
+        value["mmwave"] = json!({
+            "node_id": "MMWAVE1",
+            "sensor": "HLK-LD2450",
+            "firmware": {
+                "target": "esp32c3",
+                "version": "mmwave-v1",
+                "artifact_sha256": hash('1')
+            },
+            "mounting_position_mm": [0, 1200, 1720],
+            "mounting_revision": "wall-center-v1",
+            "transform": {
+                "origin_x_mm": 0,
+                "origin_z_mm": 1720,
+                "yaw_mdeg": 0,
+                "raw_x_inverted": false
+            }
+        });
+        create_position_setup_with_executable(parse_spec(value).unwrap(), &executable).unwrap()
+    }
+
+    fn matching_observatory_profile() -> Value {
+        json!({
+            "room_dimensions_m": [4.02, 2.59, 3.44],
+            "transmitter": { "id": "TX", "position_m": [1.51, 1.19, 0.39] },
+            "receivers": [
+                { "id": "RX1", "position_m": [0.1, 0.5, 0.2] },
+                { "id": "RX2", "position_m": [0.2, 0.5, 0.4] },
+                { "id": "RX3", "position_m": [0.3, 0.5, 0.6] },
+                { "id": "RX4", "position_m": [0.4, 0.5, 0.8] }
+            ],
+            "radio": { "channel": 6 },
+            "environment": {
+                "layout_revision": "fixed-room-v1",
+                "furniture_revision": "normal-use-v1",
+                "door_state_revision": "closed-v1"
+            },
+            "mmwave": {
+                "sensor": "HLK-LD2450",
+                "mounting_position_m": [0, 1.2, 1.72],
+                "mounting_revision": "wall-center-v1"
+            }
+        })
+    }
+
     fn valid_source_binding() -> SourceBinding {
         SourceBinding {
             trailer_version: TX_SOURCE_BINDING_VERSION,
@@ -1069,6 +1447,81 @@ mod tests {
                 .unwrap();
         assert_ne!(first.setup_sha256, changed.setup_sha256);
         assert_ne!(first.setup_id, changed.setup_id);
+    }
+
+    #[test]
+    fn observatory_profile_must_match_the_active_v2_setup() {
+        let directory = TempDir::new().unwrap();
+        let setup = valid_v2_setup(&directory);
+        let profile = matching_observatory_profile();
+
+        setup.validate_observatory_profile(&profile).unwrap();
+
+        let mut wrong_receiver = profile.clone();
+        wrong_receiver["receivers"][1]["position_m"] = json!([0.201, 0.5, 0.4]);
+        assert!(setup
+            .validate_observatory_profile(&wrong_receiver)
+            .unwrap_err()
+            .contains("RX2 position"));
+
+        let mut wrong_environment = profile;
+        wrong_environment["environment"]["layout_revision"] = json!("changed-room-v2");
+        assert!(setup
+            .validate_observatory_profile(&wrong_environment)
+            .unwrap_err()
+            .contains("environment.layout_revision"));
+    }
+
+    #[test]
+    fn observatory_profile_coordinates_must_resolve_to_whole_millimetres() {
+        let directory = TempDir::new().unwrap();
+        let setup = valid_v2_setup(&directory);
+        let mut profile = matching_observatory_profile();
+        profile["mmwave"]["mounting_position_m"] = json!([0, 1.2005, 1.72]);
+
+        assert!(setup
+            .validate_observatory_profile(&profile)
+            .unwrap_err()
+            .contains("whole millimetre"));
+    }
+
+    #[test]
+    fn observatory_setup_draft_reuses_cad_geometry_but_cannot_be_sealed() {
+        let profile = matching_observatory_profile();
+
+        let draft = observatory_profile_setup_draft(&profile).unwrap();
+
+        assert_eq!(draft["kind"], OBSERVATORY_SETUP_DRAFT_KIND);
+        assert_eq!(draft["ready_to_seal"], false);
+        assert_eq!(draft["spec"]["room_dimensions_mm"], json!([4020, 2590, 3440]));
+        assert_eq!(
+            draft["spec"]["transmitter"]["position_mm"],
+            json!([1510, 1190, 390])
+        );
+        assert_eq!(
+            draft["spec"]["receivers"][1]["position_mm"],
+            json!([200, 500, 400])
+        );
+        assert_eq!(
+            draft["spec"]["mmwave"]["mounting_position_mm"],
+            json!([0, 1200, 1720])
+        );
+        assert_eq!(draft["spec"]["radio"]["channel"], 6);
+        assert_eq!(
+            draft["missing_sections"],
+            json!(OBSERVATORY_SETUP_DRAFT_MISSING_SECTIONS)
+        );
+        assert!(parse_spec(draft["spec"].clone()).is_err());
+    }
+
+    #[test]
+    fn observatory_setup_draft_rejects_geometry_outside_sealable_setup_bounds() {
+        let mut profile = matching_observatory_profile();
+        profile["mmwave"]["mounting_position_m"] = json!([-0.25, 1.2, 1.72]);
+
+        assert!(observatory_profile_setup_draft(&profile)
+            .unwrap_err()
+            .contains("non-negative"));
     }
 
     #[test]

@@ -13,6 +13,9 @@ npm run dev          # http://localhost:5173
 
 The Vite dev server proxies `/api` → `http://localhost:8123`, so you need a
 `homecore-api-server` (or the `wifi-densepose-sensing-server` crate) running on `:8123`.
+Provision `HOMECORE_TOKENS` on the backend and provide the matching token to
+the UI via its token input (or a local-only meta tag). Avoid putting real
+credentials in the URL; the frontend has no implicit dev token.
 
 ## Scripts
 

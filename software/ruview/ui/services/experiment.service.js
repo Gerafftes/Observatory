@@ -50,10 +50,11 @@ export class ExperimentService {
     );
   }
 
-  async createWorkflow({ label, profileId, datasetVersion = 'unassigned', firmwareVersion = 'unassigned', blindSeed }) {
+  async createWorkflow({ label, profileId, profileRevisionId, datasetVersion = 'unassigned', firmwareVersion = 'unassigned', blindSeed }) {
     return apiService.post(`${EXPERIMENTS_ENDPOINT}/workflows`, {
       label,
       profile_id: profileId,
+      ...(profileRevisionId ? { profile_revision_id: profileRevisionId } : {}),
       dataset_version: datasetVersion,
       firmware_version: firmwareVersion,
       ...(Number.isSafeInteger(blindSeed) ? { blind_seed: blindSeed } : {}),
@@ -92,6 +93,20 @@ export class ExperimentService {
 
   async getControlCenterStatus() {
     return apiService.get('/api/v1/control-center/status');
+  }
+
+  async getCalibrationAvailability({ profileId, profileRevisionId }) {
+    return apiService.get('/api/v1/classification/calibration/availability', {
+      profile_id: profileId,
+      ...(profileRevisionId ? { profile_revision_id: profileRevisionId } : {}),
+    });
+  }
+
+  async reuseCalibration({ profileId, profileRevisionId }) {
+    return apiService.post('/api/v1/classification/calibration/reuse', {
+      profile_id: profileId,
+      ...(profileRevisionId ? { profile_revision_id: profileRevisionId } : {}),
+    });
   }
 
   async getBenchmarkCatalog() {

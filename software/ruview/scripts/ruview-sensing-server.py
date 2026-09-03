@@ -26,11 +26,12 @@ by the watcher on every BFLD-gated feature_state packet. If absent
 or stale (> STALENESS_S seconds old), endpoints return 503 with a
 hint so the rvagent tool emits a graceful warn shape.
 
-Bearer-token auth is intentionally OFF in this dev surface — the
-Rust sensing-server adds it via the #443 middleware; that path is
-out of scope for the demo bridge.
+API routes require ``Authorization: Bearer <token>`` using the token from
+``RUVIEW_API_TOKEN``. ``GET /health`` remains anonymous for liveness probes;
+all telemetry and state-changing routes fail closed when the token is absent.
 """
 from __future__ import annotations
+import hmac
 import json
 import os
 import re
@@ -43,6 +44,24 @@ FEATURE_FILE = os.environ.get("RUVIEW_FEATURE_JSON",
                               "/tmp/ruview-last-feature.json")
 STALENESS_S = 10.0
 DEFAULT_PORT = int(os.environ.get("PORT", "3000"))
+API_TOKEN_ENV = "RUVIEW_API_TOKEN"
+
+
+def is_authorized(authorization: str | None,
+                  expected_token: str | None = None) -> bool:
+    """Return whether *authorization* carries the configured bearer token.
+
+    Keeping this check as a small pure function makes the fail-closed boundary
+    directly testable without starting a listening server or exposing secrets.
+    """
+    expected = (expected_token if expected_token is not None
+                else os.environ.get(API_TOKEN_ENV, "")).strip()
+    if not expected or not authorization:
+        return False
+    scheme, separator, token = authorization.strip().partition(" ")
+    if not separator or scheme.lower() != "bearer":
+        return False
+    return hmac.compare_digest(token.strip().encode(), expected.encode())
 
 
 def _load_feature() -> dict | None:
@@ -167,6 +186,15 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(payload)
 
+    def _require_auth(self) -> bool:
+        if is_authorized(self.headers.get("Authorization")):
+            return True
+        self.send_response(401)
+        self.send_header("WWW-Authenticate", 'Bearer realm="ruview-sensing"')
+        self.send_header("Content-Length", "0")
+        self.end_headers()
+        return False
+
     def do_GET(self) -> None:
         parsed = urlparse(self.path)
         path = parsed.path
@@ -179,6 +207,9 @@ class Handler(BaseHTTPRequestHandler):
                                   else round(time.time() - f["ts"], 2)),
                 "source": FEATURE_FILE,
             })
+            return
+
+        if not self._require_auth():
             return
 
         if path == "/api/v1/edge/registry":
@@ -246,6 +277,8 @@ class Handler(BaseHTTPRequestHandler):
         self._json(404, {"error": "not found", "path": path})
 
     def do_POST(self) -> None:
+        if not self._require_auth():
+            return
         parsed = urlparse(self.path)
         m = _PATH_BFLD_SUBSCRIBE.match(parsed.path)
         if m:
@@ -266,9 +299,16 @@ class Handler(BaseHTTPRequestHandler):
 def main() -> int:
     port = DEFAULT_PORT
     server = HTTPServer(("0.0.0.0", port), Handler)
+    auth_configured = bool(os.environ.get(API_TOKEN_ENV, "").strip())
     print(f"[sensing-server] listening on 0.0.0.0:{port}", flush=True)
     print(f"[sensing-server] feature source: {FEATURE_FILE}", flush=True)
     print(f"[sensing-server] staleness limit: {STALENESS_S} s", flush=True)
+    print(
+        "[sensing-server] API bearer auth: "
+        + ("configured" if auth_configured
+           else "NOT CONFIGURED — API requests will be rejected"),
+        flush=True,
+    )
     try:
         server.serve_forever()
     except KeyboardInterrupt:

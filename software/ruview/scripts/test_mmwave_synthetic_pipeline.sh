@@ -7,6 +7,9 @@ repo_dir=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
   mmwave_position_index::tests::synthetic_guided_training_round_trips_and_predicts_without_radar \
   --no-default-features)
 (cd "$repo_dir/v2" && cargo test -p wifi-densepose-sensing-server \
+  mmwave_calibration::tests::blind_visit_freezes_global_and_rx_predictions_before_radar_truth \
+  --no-default-features)
+(cd "$repo_dir/v2" && cargo test -p wifi-densepose-sensing-server \
   calibration_dataset::tests:: \
   --no-default-features)
 (cd "$repo_dir/v2" && cargo test -p wifi-densepose-sensing-server \

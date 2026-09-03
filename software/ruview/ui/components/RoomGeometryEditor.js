@@ -7,15 +7,21 @@ const VIEWBOX = Object.freeze({
 const DEFAULT_ROOM = [4.02, 2.59, 3.44];
 export const DEFAULT_SENSOR_MOUNT_RADIUS_M = 0.5;
 export const MAX_SENSOR_MOUNT_RADIUS_M = 5;
-const EDITABLE_IDS = ['TX', 'RX1', 'RX2', 'RX3', 'RX4'];
+export const MMWAVE_ID = 'MMWAVE';
+export const MMWAVE_SENSOR = 'HLK-LD2450';
+export const DEFAULT_MMWAVE_POSITION_M = Object.freeze([0.0, 1.2, 1.72]);
+export const MMWAVE_HORIZONTAL_FOV_DEG = 120;
+export const MMWAVE_MAX_RANGE_M = 6;
+const EDITABLE_IDS = ['TX', 'RX1', 'RX2', 'RX3', 'RX4', MMWAVE_ID];
 const WALL_IDS = ['WALL_X0', 'WALL_XMAX', 'WALL_Z0', 'WALL_ZMAX'];
 const SELECTABLE_IDS = [...EDITABLE_IDS, ...WALL_IDS];
+const PLACEMENT_EPSILON = 0.000001;
 
 const WALL_LABELS = Object.freeze({
-  WALL_X0: 'Wand X = 0',
-  WALL_XMAX: 'Wand X = L',
-  WALL_Z0: 'Wand Z = 0',
-  WALL_ZMAX: 'Wand Z = B',
+  WALL_X0: 'Wand links (X = 0)',
+  WALL_XMAX: 'Wand rechts (X = L)',
+  WALL_Z0: 'Wand oben (Z = 0)',
+  WALL_ZMAX: 'Wand unten (Z = B)',
 });
 
 function escapeHTML(value) {
@@ -47,11 +53,38 @@ function roomDimensions(document) {
   return room.map((value, index) => value > 0 ? value : DEFAULT_ROOM[index]);
 }
 
+function defaultMmwavePosition(document) {
+  const room = roomDimensions(document);
+  return [
+    DEFAULT_MMWAVE_POSITION_M[0],
+    Math.min(DEFAULT_MMWAVE_POSITION_M[1], room[1]),
+    Math.min(DEFAULT_MMWAVE_POSITION_M[2], room[2]),
+  ];
+}
+
+export function mmwaveMountingPosition(document) {
+  return vector3(document?.mmwave?.mounting_position_m, defaultMmwavePosition(document));
+}
+
 export function sensorMountRadius(document) {
   const value = Number(document?.sensor_mount_radius_m);
   return Number.isFinite(value) && value >= 0
     ? Math.min(value, MAX_SENSOR_MOUNT_RADIUS_M)
     : DEFAULT_SENSOR_MOUNT_RADIUS_M;
+}
+
+/**
+ * Keep the historical exterior-radius behavior unless a profile explicitly
+ * opts the mmWave mount into the room interior only.
+ */
+export function mmwaveExteriorAllowed(document) {
+  return document?.mmwave?.allow_exterior !== false;
+}
+
+function sensorMountRadiusForEntity(document, id) {
+  return id === MMWAVE_ID && !mmwaveExteriorAllowed(document)
+    ? 0
+    : sensorMountRadius(document);
 }
 
 export function sensorOutsideDistance(position, room) {
@@ -71,6 +104,7 @@ function sensorPositionWithinBounds(position, room, radius) {
 
 function entityPosition(document, id) {
   if (id === 'TX') return vector3(document?.transmitter?.position_m);
+  if (id === MMWAVE_ID) return mmwaveMountingPosition(document);
   return vector3(document?.receivers?.find((receiver) => receiver.id === id)?.position_m);
 }
 
@@ -80,6 +114,11 @@ function updateEntityPosition(document, id, position) {
     next.transmitter = {
       ...(next.transmitter || { id: 'TX' }),
       position_m: [...position],
+    };
+  } else if (id === MMWAVE_ID) {
+    next.mmwave = {
+      ...(next.mmwave || { sensor: MMWAVE_SENSOR, mounting_revision: 'draft' }),
+      mounting_position_m: [...position],
     };
   } else {
     next.receivers = (next.receivers || []).map((receiver) => receiver.id === id
@@ -100,6 +139,153 @@ export function planDistance(first, second) {
     numberValue(first?.[0]) - numberValue(second?.[0]),
     numberValue(first?.[2]) - numberValue(second?.[2]),
   );
+}
+
+function finitePosition(value) {
+  return Array.isArray(value)
+    && value.length === 3
+    && value.every((coordinate) => Number.isFinite(Number(coordinate)));
+}
+
+function roomCorners(room) {
+  return [
+    [0, 0],
+    [room[0], 0],
+    [room[0], room[2]],
+    [0, room[2]],
+  ];
+}
+
+function normalizeRadians(angle) {
+  const fullTurn = Math.PI * 2;
+  return ((angle % fullTurn) + fullTurn) % fullTurn;
+}
+
+function normalizeSignedDegrees(angle) {
+  return ((angle + 180) % 360 + 360) % 360 - 180;
+}
+
+function smallestViewingArc(origin, points) {
+  const angles = points
+    .filter((point) => Math.hypot(point[0] - origin[0], point[1] - origin[1]) > PLACEMENT_EPSILON)
+    .map((point) => normalizeRadians(Math.atan2(point[1] - origin[1], point[0] - origin[0])))
+    .sort((first, second) => first - second);
+  if (angles.length === 0) return { centerDegrees: 0, spanDegrees: 0 };
+  if (angles.length === 1) {
+    return { centerDegrees: normalizeSignedDegrees(angles[0] * 180 / Math.PI), spanDegrees: 0 };
+  }
+
+  let largestGap = -1;
+  let startIndex = 0;
+  for (let index = 0; index < angles.length; index += 1) {
+    const current = angles[index];
+    const next = index === angles.length - 1 ? angles[0] + Math.PI * 2 : angles[index + 1];
+    const gap = next - current;
+    if (gap > largestGap) {
+      largestGap = gap;
+      startIndex = (index + 1) % angles.length;
+    }
+  }
+  const span = Math.PI * 2 - largestGap;
+  const center = angles[startIndex] + span / 2;
+  return {
+    centerDegrees: normalizeSignedDegrees(center * 180 / Math.PI),
+    spanDegrees: span * 180 / Math.PI,
+  };
+}
+
+function pointVisibleFromPlacement(point, origin, yawDegrees) {
+  const deltaX = point[0] - origin[0];
+  const deltaZ = point[1] - origin[1];
+  const distance = Math.hypot(deltaX, deltaZ);
+  if (distance <= PLACEMENT_EPSILON) return true;
+  const bearing = Math.atan2(deltaZ, deltaX) * 180 / Math.PI;
+  const offset = Math.abs(normalizeSignedDegrees(bearing - yawDegrees));
+  return distance <= MMWAVE_MAX_RANGE_M + PLACEMENT_EPSILON
+    && offset <= MMWAVE_HORIZONTAL_FOV_DEG / 2 + PLACEMENT_EPSILON;
+}
+
+function mmwavePlacementCandidates(room, height, outsideRadius) {
+  const halfFovRadians = MMWAVE_HORIZONTAL_FOV_DEG * Math.PI / 360;
+  const xWallStandoff = room[2] / (2 * Math.tan(halfFovRadians));
+  const zWallStandoff = room[0] / (2 * Math.tan(halfFovRadians));
+  const candidates = [
+    { key: 'corner-x0-z0', label: 'Ecke X=0 / Z=0', positionM: [0, height, 0] },
+    { key: 'corner-xmax-z0', label: 'Ecke X=L / Z=0', positionM: [room[0], height, 0] },
+    { key: 'corner-xmax-zmax', label: 'Ecke X=L / Z=B', positionM: [room[0], height, room[2]] },
+    { key: 'corner-x0-zmax', label: 'Ecke X=0 / Z=B', positionM: [0, height, room[2]] },
+  ];
+  if (xWallStandoff <= outsideRadius + PLACEMENT_EPSILON) {
+    candidates.push(
+      { key: 'outside-x0', label: 'Außen vor Wand X=0', positionM: [-xWallStandoff, height, room[2] / 2] },
+      { key: 'outside-xmax', label: 'Außen vor Wand X=L', positionM: [room[0] + xWallStandoff, height, room[2] / 2] },
+    );
+  }
+  if (zWallStandoff <= outsideRadius + PLACEMENT_EPSILON) {
+    candidates.push(
+      { key: 'outside-z0', label: 'Außen vor Wand Z=0', positionM: [room[0] / 2, height, -zWallStandoff] },
+      { key: 'outside-zmax', label: 'Außen vor Wand Z=B', positionM: [room[0] / 2, height, room[2] + zWallStandoff] },
+    );
+  }
+  return candidates;
+}
+
+/**
+ * Find the shortest-range full-room placement for one LD2450 in a rectangular
+ * room. Room corners are the coverage constraint; TX/RX break equal solutions.
+ */
+export function calculateOptimalMmwavePlacement(document) {
+  const rawRoom = document?.room_dimensions_m;
+  if (!finitePosition(rawRoom) || rawRoom.some((dimension) => Number(dimension) <= 0)) {
+    return { ok: false, error: 'Für die Berechnung werden drei gültige Raummaße größer als 0 benötigt.' };
+  }
+  const room = rawRoom.map(Number);
+  const referenceValues = [document?.transmitter?.position_m]
+    .concat((document?.receivers || []).map((receiver) => receiver?.position_m));
+  if (referenceValues.some((position) => !finitePosition(position))) {
+    return { ok: false, error: 'Für die Berechnung werden gültige TX- und RX-Koordinaten benötigt.' };
+  }
+  const references = referenceValues.map((position) => [Number(position[0]), Number(position[2])]);
+  const currentHeight = Number(mmwaveMountingPosition(document)[1]);
+  const height = Math.min(room[1], Math.max(0, Number.isFinite(currentHeight) ? currentHeight : 0));
+  const corners = roomCorners(room);
+  const outsideRadius = mmwaveExteriorAllowed(document) ? sensorMountRadius(document) : 0;
+  const assessed = mmwavePlacementCandidates(room, height, outsideRadius).map((candidate) => {
+    const origin = [candidate.positionM[0], candidate.positionM[2]];
+    const viewingArc = smallestViewingArc(origin, corners);
+    const roomDistances = corners.map((corner) => Math.hypot(corner[0] - origin[0], corner[1] - origin[1]));
+    const referenceDistances = references.map((point) => Math.hypot(point[0] - origin[0], point[1] - origin[1]));
+    const referencePointsCovered = references.filter((point) => (
+      pointVisibleFromPlacement(point, origin, viewingArc.centerDegrees)
+    )).length;
+    return {
+      ...candidate,
+      yawMdeg: Math.round(viewingArc.centerDegrees * 1000),
+      coverageAngleDeg: viewingArc.spanDegrees,
+      maxRoomDistanceM: Math.max(...roomDistances),
+      maxReferenceDistanceM: referenceDistances.length ? Math.max(...referenceDistances) : 0,
+      outsideDistanceM: sensorOutsideDistance(candidate.positionM, room),
+      referencePointsCovered,
+      referencePointCount: references.length,
+      fullRoomCoverage: viewingArc.spanDegrees <= MMWAVE_HORIZONTAL_FOV_DEG + PLACEMENT_EPSILON
+        && Math.max(...roomDistances) <= MMWAVE_MAX_RANGE_M + PLACEMENT_EPSILON,
+    };
+  });
+  const valid = assessed.filter((candidate) => candidate.fullRoomCoverage);
+  if (valid.length === 0) {
+    return {
+      ok: false,
+      error: `Mit einem ${MMWAVE_HORIZONTAL_FOV_DEG}°-Sensor und ${formatNumber(MMWAVE_MAX_RANGE_M)} m Reichweite ist innerhalb des ${mmwaveExteriorAllowed(document) ? 'eingestellten Außenradius' : 'Innenraums'} keine vollständige Raumabdeckung möglich.`,
+    };
+  }
+  valid.sort((first, second) => (
+    first.maxRoomDistanceM - second.maxRoomDistanceM
+    || second.referencePointsCovered - first.referencePointsCovered
+    || first.maxReferenceDistanceM - second.maxReferenceDistanceM
+    || first.outsideDistanceM - second.outsideDistanceM
+    || first.key.localeCompare(second.key)
+  ));
+  return { ok: true, ...valid[0], roomCoveragePercent: 100 };
 }
 
 export function setPlanDistance(document, anchorId, movingId, requestedDistance) {
@@ -129,7 +315,7 @@ export function setPlanDistance(document, anchorId, movingId, requestedDistance)
     moving[1],
     anchor[2] + direction[1] * distance,
   ];
-  if (!sensorPositionWithinBounds(candidate, room, sensorMountRadius(document))) {
+  if (!sensorPositionWithinBounds(candidate, room, sensorMountRadiusForEntity(document, movingId))) {
     return {
       document: clone(document || {}),
       error: 'Der gewünschte Abstand passt in der aktuellen Richtung nicht in den Raum oder Außenradius.',
@@ -139,11 +325,12 @@ export function setPlanDistance(document, anchorId, movingId, requestedDistance)
 }
 
 export function geometryEntities(document) {
-  return EDITABLE_IDS.map((id) => ({
-    id,
-    role: id === 'TX' ? 'transmitter' : 'receiver',
-    position_m: entityPosition(document, id),
-  }));
+  return EDITABLE_IDS.map((id) => {
+    let role = 'receiver';
+    if (id === 'TX') role = 'transmitter';
+    else if (id === MMWAVE_ID) role = 'mmwave';
+    return { id, role, position_m: entityPosition(document, id) };
+  });
 }
 
 export function wallLabel(id) {
@@ -156,6 +343,59 @@ export function markerWallDistance(position, wallId, room) {
   if (wallId === 'WALL_Z0') return numberValue(position?.[2]);
   if (wallId === 'WALL_ZMAX') return room[2] - numberValue(position?.[2]);
   return NaN;
+}
+
+function wallPairAxis(firstWallId, secondWallId) {
+  const pair = new Set([firstWallId, secondWallId]);
+  if (pair.size !== 2) return null;
+  if (pair.has('WALL_X0') && pair.has('WALL_XMAX')) return 0;
+  if (pair.has('WALL_Z0') && pair.has('WALL_ZMAX')) return 2;
+  return null;
+}
+
+export function wallPairDistance(document, firstWallId, secondWallId) {
+  const axis = wallPairAxis(firstWallId, secondWallId);
+  if (axis == null) return null;
+  const room = vector3(document?.room_dimensions_m, [0, 0, 0]);
+  return room[axis];
+}
+
+export function setWallDistance(document, firstWallId, secondWallId, requestedDistance) {
+  const axis = wallPairAxis(firstWallId, secondWallId);
+  if (axis == null) {
+    return {
+      document: clone(document || {}),
+      error: 'Wähle zwei gegenüberliegende Wände: links + rechts oder oben + unten.',
+    };
+  }
+
+  const distance = Number(requestedDistance);
+  if (!Number.isFinite(distance) || distance < 0.1) {
+    return {
+      document: clone(document || {}),
+      error: 'Der Wandabstand muss ein endlicher Wert von mindestens 0,10 m sein.',
+    };
+  }
+
+  const room = vector3(document?.room_dimensions_m, [0, 0, 0]);
+  if (room.some((value) => !Number.isFinite(value) || value <= 0)) {
+    return {
+      document: clone(document || {}),
+      error: 'Der Wandabstand kann erst bei gültigen Raummaßen gesetzt werden.',
+    };
+  }
+
+  const next = clone(document || {});
+  next.room_dimensions_m = [...room];
+  next.room_dimensions_m[axis] = distance;
+  const validation = validateGeometryDraft(next);
+  if (!validation.valid) {
+    return {
+      document: clone(document || {}),
+      error: `Der Wandabstand würde die Geometrie ungültig machen: ${validation.errors.join(' ')}`,
+    };
+  }
+  return { document: next, error: '' };
 }
 
 function wallEntities() {
@@ -173,7 +413,7 @@ function selectableEntities(document) {
 export function setMarkerWallDistance(document, markerId, wallId, requestedDistance) {
   const distance = Number(requestedDistance);
   if (!EDITABLE_IDS.includes(markerId) || !WALL_IDS.includes(wallId)) {
-    return { document: clone(document || {}), error: 'Für diesen Abstand muss genau ein RX/TX und eine Wand ausgewählt sein.' };
+    return { document: clone(document || {}), error: 'Für diesen Abstand muss genau ein TX, RX oder mmWave und eine Wand ausgewählt sein.' };
   }
   if (!Number.isFinite(distance)) {
     return { document: clone(document || {}), error: 'Der Abstand muss ein endlicher Wert sein.' };
@@ -189,7 +429,7 @@ export function setMarkerWallDistance(document, markerId, wallId, requestedDista
   if (wallId === 'WALL_XMAX') candidate[0] = room[0] - distance;
   if (wallId === 'WALL_Z0') candidate[2] = distance;
   if (wallId === 'WALL_ZMAX') candidate[2] = room[2] - distance;
-  if (!sensorPositionWithinBounds(candidate, room, sensorMountRadius(document))) {
+  if (!sensorPositionWithinBounds(candidate, room, sensorMountRadiusForEntity(document, markerId))) {
     return {
       document: clone(document || {}),
       error: 'Der gewünschte Wandabstand passt nicht in den Raum oder Außenradius.',
@@ -213,6 +453,10 @@ export function validateGeometryDraft(document) {
   const radius = Number.isFinite(radiusValue) && radiusValue >= 0
     ? radiusValue
     : DEFAULT_SENSOR_MOUNT_RADIUS_M;
+  const rawMmwavePolicy = document?.mmwave?.allow_exterior;
+  if (rawMmwavePolicy != null && typeof rawMmwavePolicy !== 'boolean') {
+    errors.push('mmwave.allow_exterior muss ein boolescher Wert sein.');
+  }
 
   const entities = geometryEntities(document);
   const receiverIds = (document?.receivers || []).map((receiver) => receiver.id);
@@ -228,8 +472,13 @@ export function validateGeometryDraft(document) {
     if (room.every((value) => Number.isFinite(value) && value > 0)) {
       if (entity.position_m[1] < 0 || entity.position_m[1] > room[1]) {
         errors.push(`${entity.id}: Höhe liegt außerhalb des Raums.`);
-      } else if (sensorOutsideDistance(entity.position_m, room) > radius + 0.000001) {
-        errors.push(`${entity.id}: Außenradius von ${formatNumber(radius)} m überschritten.`);
+      } else {
+        const entityRadius = sensorMountRadiusForEntity(document, entity.id);
+        if (sensorOutsideDistance(entity.position_m, room) > entityRadius + 0.000001) {
+          errors.push(entity.role === 'mmwave' && !mmwaveExteriorAllowed(document)
+            ? 'MMWAVE: Montage ist auf den Innenraum beschränkt.'
+            : `${entity.id}: Außenradius von ${formatNumber(entityRadius)} m überschritten.`);
+        }
       }
     }
   }
@@ -285,15 +534,20 @@ function svgToWorld(x, y, room, radius = DEFAULT_SENSOR_MOUNT_RADIUS_M) {
 function markerMarkup(entity, room, selectedIds, radius) {
   const point = worldToSvg(entity.position_m, room, radius);
   const selected = selectedIds.includes(entity.id);
-  const kind = entity.role === 'transmitter' ? 'tx' : 'rx';
+  let kind = 'rx';
+  if (entity.role === 'transmitter') kind = 'tx';
+  else if (entity.role === 'mmwave') kind = 'mmwave';
   const colorClass = entity.id.toLowerCase();
+  let markerRadius = 7;
+  if (kind === 'tx') markerRadius = 9;
+  else if (kind === 'mmwave') markerRadius = 8;
   return `
     <g class="occ-cad-marker occ-cad-marker-${kind} occ-cad-marker-${colorClass} ${selected ? 'is-selected' : ''}"
        data-geometry-handle data-geometry-id="${escapeHTML(entity.id)}"
        tabindex="0" role="button" aria-label="${escapeHTML(`${entity.id} bei ${formatNumber(entity.position_m[0])} x ${formatNumber(entity.position_m[2])} m`)}"
        transform="translate(${point.x.toFixed(2)} ${point.y.toFixed(2)})">
       <circle class="occ-cad-marker-hit" r="18"></circle>
-      <circle class="occ-cad-marker-core" r="${kind === 'tx' ? 9 : 7}"></circle>
+      <circle class="occ-cad-marker-core" r="${markerRadius}"></circle>
       <text x="14" y="-10">${escapeHTML(entity.id)}</text>
     </g>`;
 }
@@ -309,10 +563,23 @@ function wallProjection(position, wallId, room) {
 
 function selectionConnectionPoints(selectedEntities, room, radius) {
   const markers = selectedEntities.filter((entity) => entity.role !== 'wall');
+  const walls = selectedEntities.filter((entity) => entity.role === 'wall');
   const wall = selectedEntities.find((entity) => entity.role === 'wall');
   if (markers.length === 2) {
     return [markers[0].position_m, markers[1].position_m]
       .map((position) => worldToSvg(position, room, radius));
+  }
+  if (walls.length === 2) {
+    const axis = wallPairAxis(walls[0].id, walls[1].id);
+    if (axis === 0) {
+      return [[0, 0, room[2] / 2], [room[0], 0, room[2] / 2]]
+        .map((position) => worldToSvg(position, room, radius));
+    }
+    if (axis === 2) {
+      return [[room[0] / 2, 0, 0], [room[0] / 2, 0, room[2]]]
+        .map((position) => worldToSvg(position, room, radius));
+    }
+    return null;
   }
   if (markers.length === 1 && wall) {
     const projection = wallProjection(markers[0].position_m, wall.id, room);
@@ -431,11 +698,13 @@ function inspectorInput(label, value, attributeName) {
 }
 
 export class RoomGeometryEditor {
-  constructor(container, { document, onChange, onSelect, selectedIds } = {}) {
+  constructor(container, { document, onChange, onSelect, onSave, saveDisabled = false, selectedIds } = {}) {
     this.container = container;
     this.document = clone(document || {});
     this.onChange = onChange;
     this.onSelect = onSelect;
+    this.onSave = onSave;
+    this.saveDisabled = saveDisabled || typeof onSave !== 'function';
     this.selectedIds = (Array.isArray(selectedIds) ? selectedIds : ['TX'])
       .filter((id) => SELECTABLE_IDS.includes(id))
       .slice(0, 2);
@@ -444,6 +713,8 @@ export class RoomGeometryEditor {
     this.drag = null;
     this.distanceDraft = null;
     this.distanceError = '';
+    this.placementRecommendation = null;
+    this.placementError = '';
     this._mounted = false;
     this._onClick = (event) => this._handleClick(event);
     this._onPointerDown = (event) => this._handlePointerDown(event);
@@ -481,6 +752,8 @@ export class RoomGeometryEditor {
 
   setDocument(document) {
     this.document = clone(document || {});
+    this.placementRecommendation = null;
+    this.placementError = '';
     if (this._mounted && !this.drag) this.render();
   }
 
@@ -521,6 +794,16 @@ export class RoomGeometryEditor {
 
   _handleClick(event) {
     const action = event.target.closest?.('[data-cad-action]')?.dataset.cadAction;
+    if (action === 'calculate-mmwave-placement') {
+      event.preventDefault();
+      this._applyOptimalMmwavePlacement();
+      return;
+    }
+    if (action === 'save-positions') {
+      event.preventDefault();
+      if (!this.saveDisabled && typeof this.onSave === 'function') this.onSave(clone(this.document));
+      return;
+    }
     if (action === 'toggle-snap') {
       this.snap = !this.snap;
       this._updateToolbar();
@@ -541,7 +824,9 @@ export class RoomGeometryEditor {
       this._select(wall.dataset.wallId, event.shiftKey);
       return;
     }
-    if (event.target.closest?.('[data-cad-svg]')) this._clearSelection();
+    const cadViewport = event.target.closest?.('[data-cad-viewport]')
+      || event.target.closest?.('[data-cad-svg]');
+    if (cadViewport) this._clearSelection();
   }
 
   _handlePointerDown(event) {
@@ -578,11 +863,22 @@ export class RoomGeometryEditor {
     const point = this._svgPoint(event);
     if (!point) return;
     const room = roomDimensions(this.document);
-    let position = svgToWorld(point.x, point.y, room, sensorMountRadius(this.document));
+    const radius = sensorMountRadius(this.document);
+    let position = svgToWorld(point.x, point.y, room, radius);
+    if (this.drag.id === MMWAVE_ID && !mmwaveExteriorAllowed(this.document)) {
+      position[0] = Math.min(room[0], Math.max(0, position[0]));
+      position[2] = Math.min(room[2], Math.max(0, position[2]));
+    }
     if (this.snap) {
       position[0] = Math.round(position[0] / 0.05) * 0.05;
       position[2] = Math.round(position[2] / 0.05) * 0.05;
     }
+    if (this.drag.id === MMWAVE_ID && !mmwaveExteriorAllowed(this.document)) {
+      position[0] = Math.min(room[0], Math.max(0, position[0]));
+      position[2] = Math.min(room[2], Math.max(0, position[2]));
+    }
+    this.placementRecommendation = null;
+    this.placementError = '';
     this.document = updateEntityPosition(this.document, this.drag.id, position);
     this._updateLiveMarker(this.drag.id);
     this._updateInspector();
@@ -613,9 +909,11 @@ export class RoomGeometryEditor {
     if (event.key === 'ArrowLeft') current[0] -= step;
     if (event.key === 'ArrowRight') current[0] += step;
     const room = roomDimensions(this.document);
-    const radius = sensorMountRadius(this.document);
+    const radius = sensorMountRadiusForEntity(this.document, id);
     current[0] = Math.min(room[0] + radius, Math.max(-radius, current[0]));
     current[2] = Math.min(room[2] + radius, Math.max(-radius, current[2]));
+    this.placementRecommendation = null;
+    this.placementError = '';
     this.document = updateEntityPosition(this.document, id, current);
     this.render();
     this._emitChange();
@@ -627,6 +925,23 @@ export class RoomGeometryEditor {
       this.distanceDraft = distanceInput.value;
       return;
     }
+    const mmwaveExteriorInput = event.target.closest?.('[data-cad-mmwave-exterior]');
+    if (mmwaveExteriorInput) {
+      this.document = {
+        ...this.document,
+        mmwave: {
+          ...(this.document.mmwave || { sensor: MMWAVE_SENSOR, mounting_revision: 'draft' }),
+          allow_exterior: Boolean(mmwaveExteriorInput.checked),
+        },
+      };
+      this.distanceDraft = null;
+      this.distanceError = '';
+      this.placementRecommendation = null;
+      this.placementError = '';
+      this._emitChange();
+      this.render();
+      return;
+    }
     const sensorRadius = event.target.closest?.('[data-cad-sensor-radius]');
     if (sensorRadius) {
       const raw = sensorRadius.value;
@@ -634,6 +949,10 @@ export class RoomGeometryEditor {
         ...this.document,
         sensor_mount_radius_m: raw === '' ? raw : numberValue(raw, sensorMountRadius(this.document)),
       };
+      this.distanceDraft = null;
+      this.distanceError = '';
+      this.placementRecommendation = null;
+      this.placementError = '';
       this._emitChange();
       this.render();
       return;
@@ -646,6 +965,10 @@ export class RoomGeometryEditor {
         const position = entityPosition(this.document, id);
         position[index] = numberValue(event.target.value, position[index]);
         this.document = updateEntityPosition(this.document, id, position);
+        this.distanceDraft = null;
+        this.distanceError = '';
+        this.placementRecommendation = null;
+        this.placementError = '';
         this._emitChange();
         this.render();
       }
@@ -658,6 +981,10 @@ export class RoomGeometryEditor {
         const dimensions = roomDimensions(this.document);
         dimensions[index] = numberValue(event.target.value, dimensions[index]);
         this.document = updateRoomDimensions(this.document, dimensions);
+        this.distanceDraft = null;
+        this.distanceError = '';
+        this.placementRecommendation = null;
+        this.placementError = '';
         this._emitChange();
         this.render();
       }
@@ -682,12 +1009,15 @@ export class RoomGeometryEditor {
     const input = this.container.querySelector('[data-cad-distance-input]');
     const raw = this.distanceDraft ?? input?.value ?? '';
     const marker = selected.find((entity) => entity.role !== 'wall');
-    const wall = selected.find((entity) => entity.role === 'wall');
-    const result = marker && wall
+    const walls = selected.filter((entity) => entity.role === 'wall');
+    const wall = walls[0];
+    const result = marker && walls.length === 1
       ? setMarkerWallDistance(this.document, marker.id, wall.id, raw)
       : marker
         ? setPlanDistance(this.document, selected[0].id, selected[1].id, raw)
-        : { document: clone(this.document), error: 'Wähle für den Abstand eine Wand und zusätzlich ein RX/TX aus.' };
+        : walls.length === 2
+          ? setWallDistance(this.document, walls[0].id, walls[1].id, raw)
+        : { document: clone(this.document), error: 'Wähle für den Abstand eine Wand und zusätzlich TX, RX oder mmWave aus.' };
     if (result.error) {
       this.distanceDraft = raw;
       this.distanceError = result.error;
@@ -697,8 +1027,39 @@ export class RoomGeometryEditor {
     this.document = result.document;
     this.distanceDraft = formatNumber(Number(raw));
     this.distanceError = '';
+    this.placementRecommendation = null;
+    this.placementError = '';
     this.render();
     this._emitChange();
+  }
+
+  _applyOptimalMmwavePlacement() {
+    const result = calculateOptimalMmwavePlacement(this.document);
+    if (!result.ok) {
+      this.placementRecommendation = null;
+      this.placementError = result.error;
+      this.render();
+      return result;
+    }
+    this.document = updateEntityPosition(this.document, MMWAVE_ID, result.positionM);
+    this.selectedIds = [MMWAVE_ID];
+    this.selectedId = MMWAVE_ID;
+    this.distanceDraft = null;
+    this.distanceError = '';
+    this.placementRecommendation = result;
+    this.placementError = '';
+    this.render();
+    this._emitChange();
+    return result;
+  }
+
+  /**
+   * Recalculate the mmWave mount from the current room and node geometry.
+   * This small public wrapper lets the surrounding setup form expose the same
+   * action without reaching into the editor's event handler.
+   */
+  calculateOptimalMmwavePlacement() {
+    return this._applyOptimalMmwavePlacement();
   }
 
   _updateLiveMarker(id) {
@@ -737,8 +1098,12 @@ export class RoomGeometryEditor {
     });
     const radiusInput = this.container.querySelector('[data-cad-sensor-radius]');
     if (radiusInput && ownerDocument?.activeElement !== radiusInput) radiusInput.value = formatNumber(sensorMountRadius(this.document));
+    const mmwaveExteriorInput = this.container.querySelector('[data-cad-mmwave-exterior]');
+    if (mmwaveExteriorInput && ownerDocument?.activeElement !== mmwaveExteriorInput) {
+      mmwaveExteriorInput.checked = mmwaveExteriorAllowed(this.document);
+    }
     const selection = this.container.querySelector('[data-cad-selection]');
-    if (selection) selection.textContent = this.selectedIds.join(' · ');
+    if (selection) selection.textContent = this.selectedIds.map((id) => wallLabel(id)).join(' · ');
     this._updateValidation();
   }
 
@@ -754,7 +1119,9 @@ export class RoomGeometryEditor {
       errors.className = `occ-cad-errors ${validation.valid ? 'is-valid' : 'is-invalid'}`;
       errors.innerHTML = validation.errors.length
         ? validation.errors.map((error) => `<li>${escapeHTML(error)}</li>`).join('')
-        : '<li>Marker liegen im Raum oder im Außenradius.</li>';
+        : mmwaveExteriorAllowed(this.document)
+          ? '<li>Marker liegen im Raum oder im Außenradius.</li>'
+          : '<li>mmWave liegt im Innenraum; TX/RX dürfen den Außenradius nutzen.</li>';
     }
   }
 
@@ -767,6 +1134,7 @@ export class RoomGeometryEditor {
     if (!this.container) return;
     const room = roomDimensions(this.document);
     const radius = sensorMountRadius(this.document);
+    const allowMmwaveExterior = mmwaveExteriorAllowed(this.document);
     const entities = geometryEntities(this.document);
     this.selectedIds = (Array.isArray(this.selectedIds) ? this.selectedIds : [])
       .filter((id) => SELECTABLE_IDS.includes(id))
@@ -783,9 +1151,18 @@ export class RoomGeometryEditor {
     const selectionLine = selectionLineMarkup(selectedEntities, room, radius);
     const pairMarker = selectedPair?.find((entity) => entity.role !== 'wall');
     const pairWall = selectedPair?.find((entity) => entity.role === 'wall');
+    const wallPair = selectedPair?.every((entity) => entity.role === 'wall') ? selectedPair : null;
+    const wallPairAxisIndex = wallPair ? wallPairAxis(wallPair[0].id, wallPair[1].id) : null;
+    const wallPairDimensionLabel = wallPairAxisIndex === 0
+      ? 'Raumlänge L'
+      : wallPairAxisIndex === 2
+        ? 'Raumbreite B'
+        : null;
     const pairDistance = pairMarker && pairWall
       ? markerWallDistance(pairMarker.position_m, pairWall.id, room)
-      : selectedPair && !pairWall
+      : wallPair
+        ? wallPairDistance(this.document, wallPair[0].id, wallPair[1].id)
+        : selectedPair && !pairWall
         ? planDistance(selectedPair[0].position_m, selectedPair[1].position_m)
         : null;
     const distanceValue = selectedPair
@@ -797,25 +1174,34 @@ export class RoomGeometryEditor {
       ? this.selectedIds.map((id) => wallLabel(id)).join(' · ')
       : 'Keine Auswahl';
     const pairLabel = selectedPair?.map((entity) => entity.role === 'wall' ? entity.label : entity.id).join(' · ');
-    const distanceBounds = pairWall
-      ? `min="${-radius}" max="${radius}"`
-      : 'min="0.01"';
+    const distanceBounds = wallPair
+      ? 'min="0.1"'
+      : pairWall
+        ? `min="${-radius}" max="${radius}"`
+        : 'min="0.01"';
     const pairDistanceMarkup = selectedPair
-      ? pairDistance == null
-        ? `<div class="occ-cad-distance-selection"><strong>${escapeHTML(pairLabel)}</strong><span>Wandabstand über Raummaße.</span></div>`
-        : `<div class="occ-cad-distance-selection"><strong>${escapeHTML(pairLabel)}</strong><span>aktuell ${formatNumber(pairDistance)} m</span></div><label class="occ-cad-input"><span>${pairWall ? 'Wandabstand (m)' : 'Abstand x/z (m)'}</span><input type="number" ${distanceBounds} step="0.01" data-cad-distance-input value="${escapeHTML(distanceValue)}"></label><button type="button" class="occ-button occ-button-primary" data-cad-action="set-distance">Setzen</button>${this.distanceError ? `<p class="occ-cad-distance-error" role="alert">${escapeHTML(this.distanceError)}</p>` : ''}<p class="occ-cad-helper">${pairWall ? `Senkrecht zu ${escapeHTML(pairWall.label)} · negativ = außen.` : 'Erstes Element bleibt der Anker.'}</p>`
+      ? wallPair && pairDistance == null
+        ? `<div class="occ-cad-distance-selection"><strong>${escapeHTML(pairLabel)}</strong><span>Für einen Raumabstand müssen die linke/rechte oder obere/untere Wand gemeinsam gewählt werden.</span>${this.distanceError ? `<p class="occ-cad-distance-error" role="alert">${escapeHTML(this.distanceError)}</p>` : ''}</div>`
+        : pairDistance == null
+        ? `<div class="occ-cad-distance-selection"><strong>${escapeHTML(pairLabel)}</strong><span>Für diesen Abstand sind zwei passende Elemente erforderlich.</span></div>`
+        : `<div class="occ-cad-distance-selection"><strong>${escapeHTML(pairLabel)}</strong><span>${wallPairDimensionLabel ? `Abstand = ${wallPairDimensionLabel}` : 'aktuell'} · ${formatNumber(pairDistance)} m</span></div><label class="occ-cad-input"><span>${wallPairDimensionLabel || (pairWall ? 'Wandabstand' : 'Abstand x/z')} (m)</span><input type="number" ${distanceBounds} step="0.01" data-cad-distance-input value="${escapeHTML(distanceValue)}"></label><button type="button" class="occ-button occ-button-primary" data-cad-action="set-distance">Setzen</button>${this.distanceError ? `<p class="occ-cad-distance-error" role="alert">${escapeHTML(this.distanceError)}</p>` : ''}<p class="occ-cad-helper">${wallPairDimensionLabel ? `Ändert ${wallPairDimensionLabel}; Marker bleiben unverändert.` : pairWall ? `Senkrecht zu ${escapeHTML(pairWall.label)} · negativ = außen.` : 'Erstes Element bleibt der Anker.'}</p>`
       : '';
     const coordinateMarkup = coordinateMarker
       ? `<div class="occ-cad-inspector-section"><span class="occ-cad-section-label">${escapeHTML(coordinateMarker.id)} [x / y / z] m</span><div class="occ-cad-dimension-grid">${inspectorInput('x', selectedPosition[0], `${coordinateMarker.id}.0`)}${inspectorInput('y', selectedPosition[1], `${coordinateMarker.id}.1`)}${inspectorInput('z', selectedPosition[2], `${coordinateMarker.id}.2`)}</div></div>`
-      : `<div class="occ-cad-inspector-section"><span class="occ-cad-section-label">${escapeHTML(selectionLabel)}</span><p class="occ-cad-helper">Shift: RX/TX + Wand für Abstand.</p></div>`;
+      : `<div class="occ-cad-inspector-section"><span class="occ-cad-section-label">${escapeHTML(selectionLabel)}</span><p class="occ-cad-helper">Shift: TX, RX oder mmWave + Wand für Abstand; oder zwei gegenüberliegende Wände für den Raumabstand.</p></div>`;
+    const placementMarkup = this.placementRecommendation
+      ? `<div class="occ-cad-inspector-section" data-cad-mmwave-placement role="status"><span class="occ-cad-section-label">BERECHNETE MMWAVE-POSITION</span><div class="occ-cad-distance-selection"><strong>100% geometrische 2D-Abdeckung</strong><span>${escapeHTML(this.placementRecommendation.label)} · yaw ${formatNumber(this.placementRecommendation.yawMdeg / 1000)}°</span></div><p class="occ-cad-helper">Max. Raumdistanz ${formatNumber(this.placementRecommendation.maxRoomDistanceM)} m · Sichtwinkel ${formatNumber(this.placementRecommendation.coverageAngleDeg)}° · TX/RX ${this.placementRecommendation.referencePointsCovered}/${this.placementRecommendation.referencePointCount} im Sichtfeld.</p><p class="occ-cad-helper">Idealmodell ohne Möbel, Abschattung und vertikale Einschränkungen. Position erst nach realer Prüfung speichern.</p></div>`
+      : this.placementError
+        ? `<p class="occ-cad-distance-error" data-cad-mmwave-placement-error role="alert">${escapeHTML(this.placementError)}</p>`
+        : '';
     this.container.innerHTML = `
       <div class="occ-cad-toolbar">
-          <div><span class="occ-cad-kicker">CAD / TOPPLAN</span><strong>Raum</strong><small>Klick: Auswahl · Leer: löschen · Shift: zweites Element · Drag: x/z · y: Höhe</small><div class="occ-cad-legend">${['TX', 'RX1', 'RX2', 'RX3', 'RX4'].map((id) => `<span class="occ-cad-legend-item"><i class="occ-cad-swatch occ-cad-swatch-${id.toLowerCase()}" aria-hidden="true"></i>${id}</span>`).join('')}</div></div>
-        <div class="occ-cad-toolbar-actions"><span data-cad-validation class="occ-cad-validation ${validation.valid ? 'is-valid' : 'is-invalid'}">${validation.valid ? 'GEOMETRIE GÜLTIG' : `${validation.errors.length} BLOCKER`}</span><button type="button" class="occ-button occ-button-quiet" data-cad-action="toggle-snap">Rasterfang ${this.snap ? 'AN' : 'AUS'}</button></div>
+          <div><span class="occ-cad-kicker">CAD / TOPPLAN</span><strong>Raum</strong><small>Klick: Auswahl · Leer: löschen · Shift: zweites Element · Drag: x/z · y: Höhe</small><div class="occ-cad-legend">${['TX', 'RX1', 'RX2', 'RX3', 'RX4', MMWAVE_ID].map((id) => `<span class="occ-cad-legend-item"><i class="occ-cad-swatch occ-cad-swatch-${id.toLowerCase()}" aria-hidden="true"></i>${id}</span>`).join('')}</div></div>
+        <div class="occ-cad-toolbar-actions"><span data-cad-validation class="occ-cad-validation ${validation.valid ? 'is-valid' : 'is-invalid'}">${validation.valid ? 'GEOMETRIE GÜLTIG' : `${validation.errors.length} BLOCKER`}</span><button type="button" class="occ-button occ-button-primary" data-cad-action="calculate-mmwave-placement">mmWave-Position berechnen</button><button type="button" class="occ-button occ-button-primary" data-cad-action="save-positions" ${this.saveDisabled ? 'disabled' : ''}>Positionen speichern</button><button type="button" class="occ-button occ-button-quiet" data-cad-action="toggle-snap">Rasterfang ${this.snap ? 'AN' : 'AUS'}</button></div>
       </div>
       <div class="occ-cad-layout">
-        <div class="occ-cad-viewport">
-          <svg data-cad-svg viewBox="0 0 ${VIEWBOX.width} ${VIEWBOX.height}" role="img" aria-label="CAD-Draufsicht des Raum-Setups. Klick in einen leeren Bereich hebt die Auswahl auf.">
+        <div class="occ-cad-viewport" data-cad-viewport>
+          <svg data-cad-svg viewBox="0 0 ${VIEWBOX.width} ${VIEWBOX.height}" role="img" aria-label="CAD-Draufsicht des Raum-Setups. Klick auf eine freie Fläche, auch außerhalb des Raums, hebt die Auswahl auf.">
             <defs><pattern id="occCadMinorGrid" width="20" height="20" patternUnits="userSpaceOnUse"><path d="M 20 0 L 0 0 0 20" fill="none" stroke="rgba(17,17,17,.08)" stroke-width="1" /></pattern></defs>
             <rect class="occ-cad-surface" x="0" y="0" width="${VIEWBOX.width}" height="${VIEWBOX.height}"></rect>
             ${sensorZoneMarkup(radius)}
@@ -834,11 +1220,12 @@ export class RoomGeometryEditor {
           <div class="occ-cad-inspector-kicker">INSPECTOR</div>
           <div class="occ-cad-selection-row"><span>Auswahl</span><strong data-cad-selection>${escapeHTML(selectionLabel)}</strong></div>
           <div class="occ-cad-inspector-section"><span class="occ-cad-section-label">Raum [L / H / B] m</span><div class="occ-cad-dimension-grid">${[0, 1, 2].map((index) => `<label class="occ-cad-input"><span>${['L', 'H', 'B'][index]}</span><input type="number" min="0.1" step="0.01" data-cad-dimension="${index}" value="${escapeHTML(formatNumber(room[index]))}"></label>`).join('')}</div></div>
-          <div class="occ-cad-inspector-section"><span class="occ-cad-section-label">Sensorzone</span><label class="occ-cad-input"><span>Außenradius (m)</span><input type="number" min="0" max="${MAX_SENSOR_MOUNT_RADIUS_M}" step="0.05" data-cad-sensor-radius value="${escapeHTML(formatNumber(radius))}"></label><p class="occ-cad-helper">X/Z außerhalb erlaubt; Y bleibt im Raum.</p></div>
-          ${selectedPair ? `<div class="occ-cad-inspector-section occ-cad-distance-section"><span class="occ-cad-section-label">${pairWall ? 'Abstand zur Wand' : 'Abstand in der Draufsicht'}</span>${pairDistanceMarkup}</div>` : ''}
+          <div class="occ-cad-inspector-section"><span class="occ-cad-section-label">Sensorzone</span><label class="occ-cad-input"><span>Außenradius (m)</span><input type="number" min="0" max="${MAX_SENSOR_MOUNT_RADIUS_M}" step="0.05" data-cad-sensor-radius value="${escapeHTML(formatNumber(radius))}"></label><label class="occ-cad-checkbox"><input type="checkbox" data-cad-mmwave-exterior ${allowMmwaveExterior ? 'checked' : ''}><span>mmWave darf außerhalb des Raums montiert werden</span></label><p class="occ-cad-helper">${allowMmwaveExterior ? 'TX, RX und mmWave dürfen den eingestellten Außenradius nutzen; Y bleibt im Raum.' : 'Innenraum-only: mmWave muss vollständig innerhalb der Raumgrenzen liegen. TX/RX behalten den Außenradius.'}</p></div>
+          ${selectedPair ? `<div class="occ-cad-inspector-section occ-cad-distance-section"><span class="occ-cad-section-label">${wallPair ? 'Abstand zwischen Wänden' : pairWall ? 'Abstand zur Wand' : 'Abstand in der Draufsicht'}</span>${pairDistanceMarkup}</div>` : ''}
           ${coordinateMarkup}
+          ${placementMarkup}
           <p class="occ-cad-helper">Ziehen/Pfeile. Raster 5 cm. Speichern übernimmt.</p>
-          <ul class="occ-cad-errors ${validation.valid ? 'is-valid' : 'is-invalid'}" data-cad-errors>${validation.errors.length ? validation.errors.map((error) => `<li>${escapeHTML(error)}</li>`).join('') : '<li>Marker liegen im Raum oder im Außenradius.</li>'}</ul>
+          <ul class="occ-cad-errors ${validation.valid ? 'is-valid' : 'is-invalid'}" data-cad-errors>${validation.errors.length ? validation.errors.map((error) => `<li>${escapeHTML(error)}</li>`).join('') : allowMmwaveExterior ? '<li>Marker liegen im Raum oder im Außenradius.</li>' : '<li>mmWave liegt im Innenraum; TX/RX dürfen den Außenradius nutzen.</li>'}</ul>
         </aside>
       </div>
     `;

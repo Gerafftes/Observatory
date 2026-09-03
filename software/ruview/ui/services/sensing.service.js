@@ -49,6 +49,7 @@ class SensingService {
     // Data-source label exposed to the UI:
     //   "live"              — real ESP32 hardware connected
     //   "server-simulated"  — server is running but using synthetic data (no hardware)
+    //   "server-offline"    — server is reachable, but no ESP32 frame is fresh
     //   "reconnecting"      — WebSocket disconnected, retrying
     //   "simulated"         — client-side fallback simulation (server unreachable)
     this._dataSource = 'reconnecting';
@@ -110,9 +111,10 @@ class SensingService {
 
   /**
    * Current data source label.
-   * "live"         — frames are arriving from the real ESP32 over WebSocket
+   * "live"         — fresh frames are arriving from the real ESP32 over WebSocket
    * "reconnecting" — WebSocket disconnected; actively retrying, no frames emitted
    * "simulated"    — max reconnect attempts exhausted; emitting synthetic frames
+   * "server-offline" — server is reachable but its ESP32 source has no fresh frame
    */
   get dataSource() {
     return this._dataSource;
@@ -291,16 +293,19 @@ class SensingService {
    */
   async _detectServerSource() {
     try {
-      const resp = await fetch('/api/v1/status');
+      const resp = await fetch('/api/v1/status', { cache: 'no-store' });
       if (resp.ok) {
         const json = await resp.json();
         this._applyServerSource(json.source);
       } else {
-        // Can't reach status endpoint — assume live until first frame tells us
-        this._setDataSource('live');
+        // An unknown status is never proof of a live ESP32. Keep the UI
+        // conservative until a frame explicitly identifies a fresh source.
+        this._setDataSource('server-offline');
       }
     } catch {
-      this._setDataSource('live');
+      // The WebSocket can be reachable while the HTTP source status is not;
+      // that still does not justify a LIVE hardware label.
+      this._setDataSource('server-offline');
     }
   }
 
@@ -311,6 +316,8 @@ class SensingService {
     this._serverSource = rawSource;
     if (rawSource === 'esp32' || rawSource === 'wifi' || rawSource === 'live') {
       this._setDataSource('live');
+    } else if (rawSource === 'esp32:offline' || rawSource === 'wifi:offline') {
+      this._setDataSource('server-offline');
     } else if (rawSource === 'simulated' || rawSource === 'simulate') {
       this._setDataSource('server-simulated');
     } else {
@@ -383,7 +390,7 @@ class SensingService {
   /**
    * Update the dataSource label and notify state listeners so the UI can
    * react without needing a separate subscription.
-   * @param {'live'|'server-simulated'|'reconnecting'|'simulated'} source
+   * @param {'live'|'server-simulated'|'server-offline'|'reconnecting'|'simulated'} source
    */
   _setDataSource(source) {
     if (source === this._dataSource) return;

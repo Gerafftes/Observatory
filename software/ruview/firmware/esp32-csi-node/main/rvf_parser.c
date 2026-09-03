@@ -11,6 +11,7 @@
 #include <string.h>
 #include "esp_log.h"
 #include "psa/crypto.h"
+#include "sodium.h"
 
 static const char *TAG = "rvf";
 
@@ -187,55 +188,20 @@ esp_err_t rvf_verify_signature(const rvf_parsed_t *parsed, const uint8_t *data,
     /* Signature covers: header + manifest + wasm payload. */
     uint32_t signed_len = RVF_HEADER_SIZE + RVF_MANIFEST_SIZE + parsed->wasm_len;
 
-    /*
-     * Ed25519 verification.
-     *
-     * Legacy mbedtls Ed25519 is optional.  We use a SHA-256 keyed digest:
-     *
-     *   expected = SHA-256(pubkey || signed_region)
-     *
-     * The first 32 bytes of the 64-byte signature field must match.
-     * This provides tamper detection and key-binding — a different
-     * pubkey produces a different expected hash, so unauthorized
-     * publishers cannot forge a valid signature.
-     *
-     * For full Ed25519, enable CONFIG_MBEDTLS_EDDSA_C or equivalent.
-     * The RVF builder should match this scheme.
-     */
-    uint8_t hash_input_prefix[32];
-    memcpy(hash_input_prefix, pubkey, 32);
-
-    /* Compute SHA-256(pubkey || header+manifest+wasm) via PSA Crypto. */
-    psa_hash_operation_t op = PSA_HASH_OPERATION_INIT;
-    psa_status_t st = psa_hash_setup(&op, PSA_ALG_SHA_256);
-    if (st != PSA_SUCCESS) {
+    /* Verify the complete 64-byte Ed25519 signature over the exact RVF prefix. */
+    if (sodium_init() < 0) {
+        ESP_LOGE(TAG, "libsodium initialization failed");
         return ESP_FAIL;
     }
-    st = psa_hash_update(&op, hash_input_prefix, 32);
-    if (st != PSA_SUCCESS) {
-        (void)psa_hash_abort(&op);
-        return ESP_FAIL;
-    }
-    st = psa_hash_update(&op, data, signed_len);
-    if (st != PSA_SUCCESS) {
-        (void)psa_hash_abort(&op);
-        return ESP_FAIL;
-    }
-
-    uint8_t expected[32];
-    size_t out_len = 0;
-    st = psa_hash_finish(&op, expected, sizeof(expected), &out_len);
-    if (st != PSA_SUCCESS || out_len != 32) {
-        (void)psa_hash_abort(&op);
-        return ESP_FAIL;
-    }
-
-    /* Compare first 32 bytes of signature against expected hash. */
-    if (memcmp(parsed->signature, expected, 32) != 0) {
-        ESP_LOGE(TAG, "Signature verification failed — key mismatch or tampered");
+    if (crypto_sign_ed25519_verify_detached(
+            parsed->signature,
+            data,
+            (unsigned long long)signed_len,
+            pubkey) != 0) {
+        ESP_LOGE(TAG, "Ed25519 signature verification failed — key mismatch or tampered");
         return ESP_ERR_INVALID_CRC;
     }
 
-    ESP_LOGI(TAG, "Signature verified (SHA-256-HMAC keyed integrity)");
+    ESP_LOGI(TAG, "Ed25519 signature verified");
     return ESP_OK;
 }

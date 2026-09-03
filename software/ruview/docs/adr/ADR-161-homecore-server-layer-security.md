@@ -57,9 +57,9 @@ service, subscribe to all events).
 
 **Real fix:** the handshake now calls
 `state.tokens().is_valid(&token).await` (the *same* store + method as REST).
-A wrong token receives `auth_invalid` and the socket closes. DEV (`allow_any`)
-mode still accepts any non-empty bearer with a warn, so smoke tests keep
-working; the empty token is rejected inside `is_valid`.
+A wrong token receives `auth_invalid` and the socket closes. An unset or empty
+store is locked, so there is no development wildcard that accepts arbitrary
+non-empty bearers.
 
 **Failing-on-old test** (`tests/ws_handshake.rs`):
 `wrong_token_is_rejected` — provisions a real (non-dev) store with one good
@@ -93,11 +93,11 @@ writer task ends cleanly.
 path (unlike `homecore-server`), so a provisioned operator had no way to lock
 it down.
 
-**Real fix:** the bin now mirrors `homecore-server`'s provisioning — prefer the
-`HOMECORE_TOKENS` whitelist (`LongLivedTokenStore::from_env()`), fall back to an
-**explicitly warn-logged** DEV mode only when unset. It also defaults the bind
-address to **`127.0.0.1`** (loopback) so a bare `cargo run` is not
-network-exposed, with `HOMECORE_BIND` to opt into LAN.
+**Real fix:** the bin now mirrors `homecore-server`'s provisioning — it reads
+the `HOMECORE_TOKENS` whitelist with `LongLivedTokenStore::from_env()` and
+keeps an unset/empty store locked. It also defaults the bind address to
+**`127.0.0.1`** (loopback) so a bare `cargo run` is not network-exposed, with
+`HOMECORE_BIND` to opt into LAN after explicit token provisioning.
 
 **Failing-on-old test** (`tests/server_bin_auth.rs`):
 `provisioned_bin_rejects_wrong_bearer` reproduces the bin's exact provisioning

@@ -78,6 +78,9 @@ per ADR-022 Phase 3.
 ## Quick Start
 
 ```bash
+# The live RuField surface requires a deployment-specific signing seed.
+export WDP_RUFIELD_SIGNING_SEED="$(openssl rand -hex 32)"
+
 # Build the server
 cargo build -p wifi-densepose-sensing-server
 
@@ -90,6 +93,25 @@ cargo run -p wifi-densepose-sensing-server -- \
     --udp-port 5005 \
     --static-dir ./ui
 ```
+
+The server refuses to start without `WDP_RUFIELD_SIGNING_SEED`; it never uses
+a built-in signing key. The default bind is loopback-only. For a routable
+`--bind-addr`, also set a strong `RUVIEW_API_TOKEN`; otherwise startup is
+rejected. Browser-origin checks protect live WebSockets and state-changing API
+requests, while the Host allowlist remains enabled by default. By default,
+only the exact local UI Origins on `--http-port` are accepted. If a browser UI
+is served from another port or host, configure it explicitly:
+
+```bash
+SENSING_ALLOWED_ORIGINS="http://localhost:3000" \
+  cargo run -p wifi-densepose-sensing-server -- --http-port 8080
+```
+
+Origins must be complete `http(s)://host[:port]` values without a resource path,
+wildcard, or host-only entry. `--allowed-origin` can be repeated; the
+comma-separated `SENSING_ALLOWED_ORIGINS` variable is equivalent. The
+dedicated WebSocket port remains compatible with a UI served from the allowed
+HTTP Origin, and non-browser clients without an `Origin` header remain usable.
 
 ### Experimental fixed-room position workflow
 
@@ -138,6 +160,8 @@ python3 scripts/capture_position_run.py \
 python3 scripts/capture_position_run.py \
     --kind empty \
     --recording-id empty-neutral-01 \
+    --profile-id profile-... \
+    --profile-revision-id profile-...-v2 \
     --confirm-empty-room
 
 python3 scripts/capture_position_run.py \
@@ -160,7 +184,33 @@ For `--kind empty`, the runner also starts D5/D6 calibration before recording,
 stops it after the lossless capture, verifies valid D5 and D6 references for
 exactly RX1-RX4, and waits for fresh operational D6 evidence. Recording and
 calibration cleanup remain independent, so a lost start/stop response cannot
-silently leave calibration collecting.
+silently leave calibration collecting. The profile ID and immutable revision
+are mandatory: the runner rejects a contextless start and reports success only
+after the persisted bundle returns matching setup/profile identities,
+`calibration_id`, `calibration_context_sha256`, and at least 60 seconds of
+collection.
+
+Audit the radar transform and transport window with status snapshots from the
+same server process. Both snapshots are mandatory because rejected packets
+(including `room_bounds`) are not written to the accepted session JSONL:
+
+```bash
+curl -fsS http://127.0.0.1:8080/api/v1/mmwave/status \
+    -o /tmp/mmwave-status-before.json
+# Run the 25-second preflight or the mmWave session here.
+curl -fsS http://127.0.0.1:8080/api/v1/mmwave/status \
+    -o /tmp/mmwave-status-after.json
+python3 scripts/audit_mmwave_runtime.py \
+    --recording data/mmwave/<SESSION>.mmwave.jsonl \
+    --setup /absolute/path/to/sealed-setup.json \
+    --status-before /tmp/mmwave-status-before.json \
+    --status-after /tmp/mmwave-status-after.json \
+    --output /tmp/mmwave-runtime-audit.json
+```
+
+The audit fails on a transform or node mismatch, recomputed coordinate error,
+accepted out-of-room target, radar reboot, sequence gap, clock discontinuity,
+or any server-side rejection/loss/reboot increment in the measured window.
 
 Inspect the setup-bound calibration capture and each unlabelled position
 capture:
@@ -196,6 +246,15 @@ sensing-server \
     --position-truth blind-truth.json \
     --position-output evaluation.json
 ```
+
+The mmWave-guided blind path additionally freezes four diagnostic WiFi-only
+receiver ablations (`RX1` through `RX4`) inside every prediction artifact
+before radar truth is attached. Its evaluation reports global fused metrics
+and per-RX nearest-prototype accuracy/error separately. Per-RX ablations are
+diagnostics only; the four-receiver fused decision remains the deployment gate.
+From the repository root, `bash scripts/test_mmwave_synthetic_pipeline.sh`
+replays this boundary through raw RX1-RX4 CSI ingestion, a persisted WiFi-only
+index, stable radar gating, prediction freeze, and the later truth attachment.
 
 Create Classification predictions without truth from the same 65-second
 calibration, three empty checks, and all 18 occupied blind captures:

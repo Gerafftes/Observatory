@@ -3,24 +3,37 @@ set -eu
 
 repo_dir=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 source_dir="$repo_dir/software/ruview"
-expected_source_entries=15801
+expected_source_entries=15814
 
-required_paths='CHANGELOG.md
+required_paths='README.md
+README.en.md
+08-aktueller-arbeitsstand-d6-und-position.md
+CHANGELOG.md
 PROOF.md
 LICENSE
 ui/index.html
 ui/components/ObservatoryControlCenter.js
 ui/components/RoomGeometryEditor.js
 ui/components/MmwaveCalibrationAssistant.js
+ui/components/MmwaveDebugView.js
+ui/tests/mmwave-debug-view.test.mjs
 v2/Cargo.toml
 v2/crates/wifi-densepose-sensing-server/Cargo.toml
+v2/crates/wifi-densepose-sensing-server/src/calibration_persistence.rs
 v2/crates/wifi-densepose-sensing-server/src/d5_presence.rs
 v2/crates/wifi-densepose-sensing-server/src/d6_fingerprint.rs
 v2/crates/wifi-densepose-sensing-server/src/mmwave_calibration.rs
 v2/crates/wifi-densepose-sensing-server/src/calibration_dataset.rs
 v2/crates/wifi-densepose-sensing-server/src/experiment.rs
 firmware/esp32-csi-node/CMakeLists.txt
+firmware/esp32-csi-node/tests/test_security_boundaries.py
 firmware/esp32-mmwave-node/CMakeLists.txt
+scripts/audit_csi_timestamp_fusion.py
+scripts/audit_mmwave_runtime.py
+scripts/build_d4_d5_d6_results.py
+scripts/tests/test_audit_csi_timestamp_fusion.py
+scripts/tests/test_audit_mmwave_runtime.py
+scripts/tests/test_ruview_sensing_server_auth.py
 archive/v1/src/sensing/ws_server.py
 vendor/midstream/Cargo.toml
 vendor/ruvector/Cargo.toml

@@ -246,11 +246,25 @@ Non-interactive:
 
 ## Quick Start
 
+The live Rust sensing-server requires a deployment-specific RuField signing
+seed. Set it once in the shell before any of the commands below; for a
+non-loopback bind, also set `RUVIEW_API_TOKEN`.
+
+```bash
+export WDP_RUFIELD_SIGNING_SEED="$(openssl rand -hex 32)"
+# Only needed when the server is exposed beyond loopback:
+export RUVIEW_API_TOKEN="$(openssl rand -hex 32)"
+```
+
 ### 30-Second Demo (Docker)
 
 ```bash
 # Pull and run
-docker run -p 3000:3000 -p 3001:3001 ruvnet/wifi-densepose:latest
+docker run \
+  -e RUVIEW_API_TOKEN \
+  -e WDP_RUFIELD_SIGNING_SEED \
+  -p 3000:3000 -p 3001:3001 \
+  ruvnet/wifi-densepose:latest
 
 # Open the UI in your browser
 # http://localhost:3000
@@ -272,16 +286,20 @@ curl http://localhost:3000/health
 # Expected: {"status":"ok","source":"simulated","clients":0}
 
 # Latest sensing frame
-curl http://localhost:3000/api/v1/sensing/latest
+curl -H "Authorization: Bearer ${RUVIEW_API_TOKEN}" \
+  http://localhost:3000/api/v1/sensing/latest
 
 # Vital signs
-curl http://localhost:3000/api/v1/vital-signs
+curl -H "Authorization: Bearer ${RUVIEW_API_TOKEN}" \
+  http://localhost:3000/api/v1/vital-signs
 
 # Pose estimation (17 COCO keypoints)
-curl http://localhost:3000/api/v1/pose/current
+curl -H "Authorization: Bearer ${RUVIEW_API_TOKEN}" \
+  http://localhost:3000/api/v1/pose/current
 
 # Server build info
-curl http://localhost:3000/api/v1/info
+curl -H "Authorization: Bearer ${RUVIEW_API_TOKEN}" \
+  http://localhost:3000/api/v1/info
 ```
 
 All endpoints return JSON. In simulated mode, data is generated from a deterministic reference signal.
@@ -522,7 +540,7 @@ Base URL: `http://localhost:3000` (Docker) or `http://localhost:8080` (binary de
 | `GET` | `/api/v1/mesh` | ADR-110 fleet-wide mesh sync map ([iter 29](adr/ADR-110-esp32-c6-firmware-extension.md)) | `{"nodes":{"9":{...},"12":{...}},"total":2}` |
 | `GET` | `/api/v1/nodes/:id/sync` | Single-node mesh sync snapshot (or 404) | `{"offset_us":1163565,"is_leader":false,...}` |
 | `GET` | `/api/v1/mesh/metrics` | ADR-110 mesh state in Prometheus exposition format ([iter 36](adr/ADR-110-esp32-c6-firmware-extension.md)) | `wifi_densepose_mesh_offset_us{node="9"} 1163565\n…` |
-| `GET` | `/api/field` | ADR-262 P3 — latest **signed RuField `FieldEvent`s** from the live sensing cycle, plus the signer pubkey + a `dev_signing_key` flag. Only egress-safe (P1/P2) events are surfaced; identity/biometric (P4/P5) and raw (P0) are held edge-local | `{"spec":"rufield","signer_pubkey_hex":"…","dev_signing_key":true,"events":[…]}` |
+| `GET` | `/api/field` | ADR-262 P3 — latest **signed RuField `FieldEvent`s** from the live sensing cycle, plus the signer pubkey + a `dev_signing_key` flag. Only egress-safe (P1/P2) events are surfaced; identity/biometric (P4/P5) and raw (P0) are held edge-local | `{"spec":"rufield","signer_pubkey_hex":"…","dev_signing_key":false,"events":[…]}` |
 
 ### RuField surface (ADR-262 P3)
 
@@ -538,7 +556,7 @@ python -c "import asyncio,websockets; asyncio.run((lambda: websockets.connect('w
 
 Privacy is fail-closed: only egress-safe **P1/P2** events leave the box — raw (P0) and identity/biometric/aggregate (P3–P5) cycles are held **edge-local** and never appear on these endpoints; a no-presence cycle emits **no event**.
 
-**Signing key:** the surface signs with a **dedicated dev/sensing key**, seeded from `WDP_RUFIELD_SIGNING_SEED` (a 64-char hex string or a ≥32-byte value); when unset it falls back to a deterministic dev default and logs a `WARN` (the `dev_signing_key` flag in `/api/field` reflects this). This is a standalone key pending the ADR-262 §8 Q1 key-ownership decision — set `WDP_RUFIELD_SIGNING_SEED` for any real deployment.
+**Signing key:** the surface signs with a dedicated sensing key from the required `WDP_RUFIELD_SIGNING_SEED` (a 64-char hex string or a ≥32-byte value). If the variable is missing or malformed, the server refuses to start; it never falls back to a publicly recoverable key. The `dev_signing_key` flag is `false` for the live environment constructor. This is a standalone key pending the ADR-262 §8 Q1 key-ownership decision.
 
 > **Honesty (ADR-262 §0/§6):** this is real plumbing on a live endpoint, **not an accuracy claim.** It is the single-link CSI sensing with its existing caveats (no validated room-coordinate accuracy — positions are the "strongest field peak", not calibrated triangulation).
 
@@ -653,6 +671,22 @@ Real-time sensing data is available via WebSocket.
 **URL:** `ws://localhost:3000/ws/sensing` (same port as HTTP — recommended) or `ws://localhost:3001/ws/sensing` (dedicated WS port).
 
 > **Note:** The `/ws/sensing` WebSocket endpoint is available on both the HTTP port (3000) and the dedicated WebSocket port (3001/8765). The web UI uses the HTTP port so only one port needs to be exposed. The dedicated WS port remains available for backward compatibility.
+
+Browser access is restricted to exact Origins. With the default configuration,
+the UI Origin is derived from the HTTP port (`http://localhost:3000`, for
+example); a page on an unrelated local port is rejected even when it targets
+the dedicated WebSocket port. For a separately served UI, add its complete
+Origin explicitly:
+
+```bash
+SENSING_ALLOWED_ORIGINS="http://localhost:8099" \
+  sensing-server --http-port 3000 --ws-port 3001
+```
+
+Use repeated `--allowed-origin` flags or the comma-separated
+`SENSING_ALLOWED_ORIGINS` variable. Host-only values, wildcards, resource paths, and
+`null` are rejected. Command-line clients without an `Origin` header remain
+supported.
 
 ### Python Example
 
@@ -1060,6 +1094,7 @@ The Rust sensing server binary accepts the following flags:
 | `--http-port` | `8080` | HTTP port for REST API and UI |
 | `--ws-port` | `8765` | WebSocket port |
 | `--udp-port` | `5005` | UDP port for ESP32 CSI frames |
+| `--allowed-origin` | local UI Origin | Exact browser Origin; repeatable. `SENSING_ALLOWED_ORIGINS` accepts comma-separated values. |
 | `--ui-path` | (none) | Path to UI static files directory |
 | `--tick-ms` | `50` | Simulated frame interval (milliseconds) |
 | `--benchmark` | off | Run vital sign benchmark (1000 frames) and exit |
