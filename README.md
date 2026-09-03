@@ -124,8 +124,8 @@ im Repository enthalten. Herkunft und festgeschriebene Quellstände stehen in
 
 ## Was Observatory kann
 
-- Raw-CSI von vier ESP32-S3-Empfängern verlustfrei und aufbaugebunden
-  erfassen.
+- Raw-CSI von vier ESP32-S3-Empfängern im gemeinsamen Raster erfassen und
+  gültige Aufnahmen an eine versiegelte Setup-Version binden.
 - Paketquelle, RX-Identität, Subcarrier-Raster, Datenrate und Drops vor einer
   Messung prüfen.
 - Bewegung, Still-Präsenz und Position als getrennte Evidenzstufen behandeln.
@@ -163,21 +163,22 @@ Grenzen ergeben sich dabei?
 
 ## Aktueller Validierungsstand
 
-**Stand: 14. August 2026**
+**Stand: 30. August 2026**
 
 | Bereich | Status | Was dieser Status belegt |
 |---|---|---|
-| 1 TX / 4 RX | Transport nachgewiesen | Alle vier RX lieferten gebundene Raw-CSI-Daten im gemeinsamen Raster. |
+| 1 TX / 4 RX | Erfassung technisch nachgewiesen | Alle vier RX lieferten Raw-CSI im gemeinsamen Raster; geprüfte D6-Aufnahmen waren recorderseitig vollständig und an das Setup gebunden. Verlustfreie Funkübertragung ist nicht nachgewiesen. |
 | D4 Bewegung | Experimentell | Grobe Bewegungsalarme wurden reduziert; Still-Präsenz bleibt unzuverlässig. |
 | D5 Still-Präsenz | Livetest nicht bestanden | Bei anwesender stiller Person blieben 350 von 350 Samples `ABSENT`. |
+| D5-abs | Insgesamt nicht bestanden | Leerraum-Fehlpräsenz 0/273 (0,0 %), Still-Recall 0/276 (0,0 %); Leerraumziel bestanden, Gesamtergebnis nicht bestanden. |
 | D6 Position | Software vorbereitet | Aufnahmen, diskrete Positionsschätzung und Blindtests sind implementiert; ein realer blind bestandener Positionsindex fehlt. |
 | Atem-/Herzfrequenz | Experimentell | CSI-basierte Signalindikatoren sind untersucht, aber ohne unabhängige Referenz nicht physiologisch validiert. |
-| mmWave-Referenz | Teilweise in Betrieb | ESP32-C3, CSI-WLAN und Statusdienst sind nachgewiesen; der reale LD2450-Datenpfad ist noch nicht vollständig validiert. |
+| mmWave-Referenz | Laufzeitprüfung nicht bestanden | Der geprüfte Lauf akzeptierte 179 Pakete, enthielt aber eine Sequenzlücke von 66 Paketen und eine Unterbrechung von 25,4 s; das Runtime-Fenster wurde deshalb als `FAIL` bewertet. |
 | Gesamtsystem | Nicht validiert | Es gibt noch keinen gemeinsamen realen PASS für Classification, Position und mmWave. |
 
-Softwaretests, ein erfolgreicher Flashvorgang oder eine verlustfreie
-Übertragung gelten hier ausdrücklich nicht als Nachweis realer Sensor- oder
-Positionsgenauigkeit.
+Softwaretests, ein erfolgreicher Flashvorgang oder `dropped_frames=0` gelten
+hier ausdrücklich weder als Nachweis verlustfreier Funkübertragung noch als
+Nachweis realer Sensor- oder Positionsgenauigkeit.
 
 ## Benutzeroberfläche
 
