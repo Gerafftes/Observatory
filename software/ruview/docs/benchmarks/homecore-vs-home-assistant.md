@@ -87,7 +87,8 @@ remains the broader platform.
 ## Reproduction & method
 
 - **HOMECORE:** `v2/target/release/homecore-server.exe` (`0.1.0-alpha.0`), bound to `127.0.0.1:8124`,
-  SQLite file recorder, dev-token auth (`Authorization: Bearer …`). Startup = `Popen` → first `200`
+  SQLite file recorder, historical dev-token auth (`Authorization: Bearer …`; this predates the
+  explicit-token hardening). Startup = `Popen` → first `200`
   on `/api/`. RSS/CPU via `psutil` after a 2 s settle. 300-sample sequential latency on `/api/states`.
 - **Home Assistant:** `ghcr.io/home-assistant/home-assistant:stable` in Docker, `-p 8125:8123`,
   fresh `/config`. Startup = container start → first `<500` on `/manifest.json`. RSS/CPU via

@@ -622,6 +622,7 @@
 .occ-cad-swatch-rx2 { color: #287a57; }
 .occ-cad-swatch-rx3 { color: #aa681f; }
 .occ-cad-swatch-rx4 { color: #6b7787; }
+.occ-cad-swatch-mmwave { color: #6f4c1e; }
 .occ-cad-kicker,
 .occ-cad-inspector-kicker,
 .occ-cad-section-label { color: var(--occ-muted); font: 650 9px/1.1 var(--font-family-mono); letter-spacing: .08em; text-transform: uppercase; }
@@ -661,6 +662,7 @@
 .occ-cad-marker-rx2 .occ-cad-marker-core { fill: #287a57; }
 .occ-cad-marker-rx3 .occ-cad-marker-core { fill: #aa681f; }
 .occ-cad-marker-rx4 .occ-cad-marker-core { fill: #6b7787; }
+.occ-cad-marker-mmwave .occ-cad-marker-core { fill: #6f4c1e; }
 .occ-cad-marker text { fill: var(--occ-ink); font: 650 10px var(--font-family-mono); paint-order: stroke; stroke: #f4f4f0; stroke-width: 4px; stroke-linejoin: round; }
 .occ-cad-marker.is-selected .occ-cad-marker-core { stroke: var(--occ-ink); stroke-width: 3; }
 .occ-cad-marker:focus-visible .occ-cad-marker-hit { fill: rgba(229, 28, 35, .12); stroke: var(--occ-signal); stroke-width: 2; vector-effect: non-scaling-stroke; }
@@ -676,6 +678,8 @@
 .occ-cad-input { display: grid; gap: 4px; min-width: 0; color: var(--occ-muted); font: 650 9px/1 var(--font-family-mono); }
 .occ-cad-input input { min-width: 0; width: 100%; min-height: 29px; padding: 6px 5px; border: 1px solid var(--occ-ink); border-radius: 0; background: var(--occ-paper); color: var(--occ-ink); font: 10px/1 var(--font-family-mono); }
 .occ-cad-input input:focus { outline: 2px solid var(--occ-signal); outline-offset: 1px; }
+.occ-cad-checkbox { display: flex; align-items: flex-start; gap: 7px; color: var(--occ-ink); font: 650 9px/1.35 var(--font-family-mono); cursor: pointer; }
+.occ-cad-checkbox input { flex: 0 0 auto; margin: 0; accent-color: var(--occ-signal); }
 .occ-cad-helper { margin: 0; color: var(--occ-muted); font: 9px/1.4 var(--font-family-mono); }
 .occ-cad-errors { display: grid; gap: 5px; margin: 0; padding: 9px 10px 9px 24px; border-left: 2px solid #1d5d4f; color: #1d5d4f; font: 9px/1.35 var(--font-family-mono); }
 .occ-cad-errors.is-invalid { border-left-color: var(--occ-signal); color: var(--occ-signal); }
@@ -685,6 +689,11 @@
 .occ-calibration-route h5 { margin: 0; color: var(--occ-ink); font: 650 14px/1.2 var(--font-family-mono); }
 .occ-calibration-route p { margin: 0; color: var(--occ-muted); font: 10px/1.45 var(--font-family-mono); }
 .occ-calibration-route .occ-button { justify-self: start; margin-top: 3px; }
+.occ-calibration-reuse { position: relative; display: grid; gap: 9px; margin-top: 14px; padding: 15px; border: 1px solid #1d5d4f; background: rgba(40, 122, 87, .07); }
+.occ-calibration-reuse::before { position: absolute; top: -1px; right: -1px; width: 42px; height: 4px; background: #1d5d4f; content: ''; }
+.occ-calibration-reuse h5 { margin: 0; color: var(--occ-ink); font: 650 14px/1.2 var(--font-family-mono); }
+.occ-calibration-reuse p { margin: 0; color: var(--occ-muted); font: 10px/1.45 var(--font-family-mono); }
+.occ-calibration-reuse .occ-button { margin-top: 3px; }
 .occ-route-kicker { color: var(--occ-muted); font: 650 9px/1 var(--font-family-mono); letter-spacing: .08em; }
 .occ-route-status { display: flex; align-items: center; gap: 7px; color: var(--occ-muted); font: 650 9px/1 var(--font-family-mono); text-transform: uppercase; }
 .occ-route-status > span { width: 7px; height: 7px; border: 1px solid currentColor; background: transparent; }
@@ -719,6 +728,7 @@
 .occ-point-row { display: grid; grid-template-columns: 34px minmax(0, 1fr); gap: 8px; align-items: center; }
 .occ-point-row strong { font: 650 10px/1 var(--font-family-mono); }
 .occ-inline-actions { gap: 7px; flex-wrap: wrap; margin-top: 14px; }
+.occ-mmwave-placement-button { min-width: 220px; }
 .occ-button { min-height: 33px; padding: 8px 11px; border-radius: 0; cursor: pointer; font: 650 10px/1 var(--font-family-mono); transition: transform 150ms ease-out, background-color 150ms ease-out, color 150ms ease-out, border-color 150ms ease-out; }
 .occ-button:active { transform: translateY(1px); }
 .occ-button:disabled { opacity: .42; cursor: not-allowed; }
@@ -771,12 +781,16 @@
 .occ-action-fieldset:disabled { opacity: .58; }
 .occ-artifact-form { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; align-items: end; margin-top: 9px; }
 .occ-artifact-form .occ-field { margin-top: 0; }
+.occ-empty-calibration-form { display: grid; gap: 10px; margin-top: 4px; }
+.occ-empty-calibration-form .occ-field { margin-top: 0; }
+.occ-empty-calibration-form .occ-inline-actions { margin-top: 2px; }
 .occ-instruction { display: grid; gap: 5px; margin-top: 12px; padding: 10px 11px; border: 1px solid var(--occ-ink); background: rgba(17, 17, 17, .04); }
 .occ-instruction span,
 .occ-instruction small { color: var(--occ-muted); font: 9px/1.3 var(--font-family-mono); }
 .occ-instruction .occ-info { color: var(--occ-muted); font: 700 10px/1 var(--font-family-mono); }
 .occ-instruction .occ-info-tooltip { color: var(--occ-ink); font: 9px/1.4 var(--font-family-mono); }
 .occ-instruction strong { color: var(--occ-signal); font: 700 18px/1 var(--font-family-mono); }
+.occ-instruction .occ-safe-return { color: #1d5d4f; font: 650 10px/1.25 var(--font-family-mono); }
 .occ-helper,
 .occ-lock-note { margin: 9px 0 0; color: var(--occ-muted); font: 10px/1.4 var(--font-family-mono); }
 .occ-lock-note { border-left: 2px solid var(--occ-signal); padding-left: 8px; color: var(--occ-signal); }
@@ -2844,6 +2858,60 @@ canvas {
   background: transparent;
   color: var(--mmwave-ink);
 }
+
+.mmwave-preparation {
+  display: grid;
+  gap: 10px;
+  max-width: 560px;
+}
+
+.mmwave-preparation h4,
+.mmwave-preparation p { margin: 0; }
+
+.mmwave-preparation-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.mmwave-preparation-form label {
+  display: grid;
+  gap: 6px;
+  color: var(--mmwave-muted);
+  font: 600 9px/1.3 var(--font-family-mono);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.mmwave-preparation-form input {
+  width: 100%;
+  min-height: 36px;
+  padding: 7px 9px;
+  border: 1px solid var(--mmwave-ink);
+  border-radius: 0;
+  background: var(--mmwave-paper);
+  color: var(--mmwave-ink);
+  font: 600 12px/1 var(--font-family-mono);
+}
+
+.mmwave-preparation-actions {
+  display: flex;
+  grid-column: 1 / -1;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.mmwave-preparation.is-countdown h4 {
+  color: var(--mmwave-signal);
+  font-size: clamp(18px, 2vw, 28px);
+}
+
+.mmwave-safe-return {
+  display: block;
+  color: var(--mmwave-ink);
+  font: 700 11px/1.4 var(--font-family-mono);
+}
+
 .mmwave-primary-button:active,
 .mmwave-secondary-button:active { transform: translateY(1px); }
 .mmwave-primary-button:disabled,
@@ -2851,6 +2919,7 @@ canvas {
 
 .mmwave-primary-button:focus-visible,
 .mmwave-secondary-button:focus-visible,
+.mmwave-preparation-form input:focus-visible,
 .mmwave-transform-panel summary:focus-visible,
 .mmwave-transform-form input:focus-visible {
   outline: 1px solid var(--mmwave-signal);
@@ -2868,6 +2937,28 @@ canvas {
   letter-spacing: 0.04em;
   text-transform: uppercase;
 }
+
+.mmwave-validity {
+  max-width: 560px;
+  margin: 12px 0;
+  padding: 10px 12px;
+  border: 1px solid var(--mmwave-ink);
+  border-left: 3px solid var(--mmwave-ink);
+  background: rgba(17, 17, 17, 0.04);
+  color: var(--mmwave-ink);
+  font: 600 10px/1.45 var(--font-family-mono);
+}
+
+.mmwave-validity.is-invalid {
+  border-color: var(--mmwave-signal);
+  border-left-color: var(--mmwave-signal);
+  color: var(--mmwave-signal);
+}
+
+.mmwave-validity strong { letter-spacing: 0.08em; }
+.mmwave-validity p { margin-top: 5px; }
+.mmwave-validity ul { margin: 7px 0 0 16px; padding: 0; }
+.mmwave-validity li { margin-top: 3px; }
 
 .mmwave-transform-panel { padding: 12px 18px 14px; }
 .mmwave-transform-panel summary {
@@ -2931,6 +3022,7 @@ canvas {
   .mmwave-assistant-grid { padding: 14px; }
   .mmwave-steps { grid-template-columns: 1fr 1fr; }
   .mmwave-zone-grid,
+  .mmwave-preparation-form,
   .mmwave-transform-form { grid-template-columns: 1fr; }
   .mmwave-zone { border-right: 0; }
   .mmwave-zone:nth-last-child(-n + 3) { border-bottom: 1px solid var(--mmwave-rule); }
@@ -2979,6 +3071,297 @@ canvas {
   font-size: var(--font-size-xs);
   letter-spacing: 0.03em;
   pointer-events: none;
+}
+
+/* Dedicated mmWave/RX comparison surface. It inherits the exact Samaritan
+   shell from .mmwave-assistant; only source-specific layout lives here. */
+.sensing-mmwave-debug {
+  --debug-bg: var(--mmwave-paper, #fafaf8);
+  --debug-rule: var(--mmwave-rule, #c8c8c3);
+  --debug-muted: var(--mmwave-muted, #666);
+  --debug-ink: var(--mmwave-ink, #111);
+  --debug-signal: var(--mmwave-signal, #e51c23);
+  --debug-radar: var(--mmwave-signal, #e51c23);
+  --debug-rx: var(--mmwave-ink, #111111);
+  --debug-rejected: var(--mmwave-signal, #e51c23);
+  --debug-room: #68737a;
+  position: relative;
+  margin: 18px 0 22px;
+  overflow: hidden;
+  border: 1px solid var(--debug-ink);
+  border-left: 4px solid var(--debug-signal);
+  border-radius: 0;
+  background: var(--debug-bg);
+  background-image:
+    linear-gradient(rgba(17, 17, 17, 0.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(17, 17, 17, 0.025) 1px, transparent 1px);
+  background-size: 40px 40px;
+  box-shadow: none;
+  color: var(--debug-ink);
+  font-family: var(--font-family-mono);
+}
+
+.sensing-mmwave-debug::before {
+  position: absolute;
+  top: 18px;
+  right: 18px;
+  width: 0;
+  height: 0;
+  border-top: 10px solid var(--debug-signal);
+  border-right: 6px solid transparent;
+  border-left: 6px solid transparent;
+  content: '';
+}
+
+.sensing-mmwave-debug-header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 24px;
+  padding: 18px 50px 16px 18px;
+  border-bottom: 1px solid var(--debug-ink);
+}
+
+.sensing-mmwave-debug-kicker {
+  color: var(--debug-signal);
+  font: 600 10px/1.2 var(--font-family-mono);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.sensing-mmwave-debug h3 {
+  margin: 6px 0 8px;
+  color: var(--debug-ink);
+  font: 650 20px/1.15 var(--font-family-mono);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.sensing-mmwave-debug-header p {
+  max-width: 68ch;
+  margin: 0;
+  color: var(--debug-muted);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.sensing-mmwave-debug-state {
+  min-width: 126px;
+  padding: 8px 10px;
+  border: 1px solid var(--debug-ink);
+  border-radius: 0;
+  background: transparent;
+  color: var(--debug-ink);
+  font: 650 10px/1 var(--font-family-mono);
+  letter-spacing: 0.08em;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.sensing-mmwave-debug-state[data-state='valid'],
+.sensing-mmwave-debug-state[data-state='no_target'] {
+  background: var(--debug-ink);
+  color: var(--debug-bg);
+}
+
+.sensing-mmwave-debug-state[data-state='offline'],
+.sensing-mmwave-debug-state[data-state='invalid'],
+.sensing-mmwave-debug-state[data-state='rejected'] {
+  border-color: var(--debug-rejected);
+  background: var(--debug-rejected);
+  color: var(--debug-bg);
+}
+
+.sensing-mmwave-debug-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1.25fr) minmax(280px, 0.75fr);
+  gap: 0;
+  border-bottom: 1px solid var(--debug-ink);
+}
+
+.sensing-mmwave-debug-viewport {
+  position: relative;
+  min-height: 410px;
+  overflow: hidden;
+  border-right: 1px solid var(--debug-rule);
+  background: #edede8;
+  cursor: grab;
+  touch-action: none;
+}
+
+.sensing-mmwave-debug-viewport.is-dragging { cursor: grabbing; }
+
+.sensing-mmwave-debug-viewport canvas {
+  display: block;
+  width: 100% !important;
+  height: 100% !important;
+}
+
+.sensing-mmwave-debug-viewport[data-rendering='fallback'] canvas { display: none; }
+
+.sensing-mmwave-debug-overlay {
+  position: absolute;
+  right: var(--space-12);
+  bottom: var(--space-12);
+  left: var(--space-12);
+  padding: 7px 9px;
+  border-left: 2px solid var(--debug-signal);
+  background: rgba(250, 250, 248, 0.94);
+  color: var(--debug-ink);
+  font: 600 10px/1.35 var(--font-family-mono);
+  letter-spacing: 0.04em;
+  pointer-events: none;
+  text-transform: uppercase;
+}
+
+.sensing-mmwave-debug-overlay[data-state='rejected'],
+.sensing-mmwave-debug-overlay[data-state='offline'] {
+  border-left-color: var(--debug-rejected);
+}
+
+.sensing-mmwave-debug-facts {
+  display: grid;
+  align-content: start;
+  gap: 0;
+  background: var(--debug-bg);
+}
+
+.sensing-mmwave-debug-fact {
+  display: grid;
+  gap: 5px;
+  min-height: 68px;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--debug-rule);
+  background: transparent;
+}
+
+.sensing-mmwave-debug-fact:last-child { border-bottom: 0; }
+
+.sensing-mmwave-debug-fact > span {
+  color: var(--debug-muted);
+  font: 650 9px/1.2 var(--font-family-mono);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.sensing-mmwave-debug-fact > strong {
+  color: var(--debug-ink);
+  font: 700 13px/1.15 var(--font-family-mono);
+  letter-spacing: 0.04em;
+}
+
+.sensing-mmwave-debug-fact > small {
+  overflow-wrap: anywhere;
+  color: var(--debug-muted);
+  font: 500 10px/1.3 var(--font-family-mono);
+}
+
+.sensing-mmwave-debug-fact-radar { border-left: 3px solid var(--debug-radar); }
+.sensing-mmwave-debug-fact-rx { border-left: 3px solid var(--debug-rx); }
+.sensing-mmwave-debug-fact-radar strong { color: var(--debug-radar); }
+.sensing-mmwave-debug-fact-rx strong { color: var(--debug-rx); }
+.sensing-mmwave-debug-fact strong[data-state='rejected'],
+.sensing-mmwave-debug-fact strong[data-state='offline'] { color: var(--debug-rejected); }
+
+.sensing-mmwave-debug-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-12);
+  padding: var(--space-12) var(--space-16);
+  border-top: 1px solid var(--debug-ink);
+  background: var(--debug-bg);
+}
+
+.sensing-mmwave-debug-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  color: var(--debug-muted);
+  font: 500 10px/1.3 var(--font-family-mono);
+}
+
+.sensing-mmwave-debug-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.sensing-mmwave-debug-swatch {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 0;
+  background: var(--debug-room);
+}
+
+.sensing-mmwave-debug-swatch.is-radar { background: var(--debug-radar); }
+.sensing-mmwave-debug-swatch.is-rx { background: var(--debug-rx); }
+.sensing-mmwave-debug-swatch.is-rejected { background: var(--debug-rejected); }
+
+.sensing-mmwave-debug-controls {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 5px;
+}
+
+.sensing-mmwave-debug-controls button {
+  min-height: 34px;
+  padding: 0 13px;
+  border: 1px solid var(--debug-ink);
+  border-radius: 0;
+  background: transparent;
+  color: var(--debug-ink);
+  cursor: pointer;
+  font: 650 10px/1 var(--font-family-mono);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  transition: background-color 100ms linear, border-color 100ms linear,
+    color 100ms linear, transform 100ms linear;
+}
+
+.sensing-mmwave-debug-controls button.is-active,
+.sensing-mmwave-debug-controls button.is-active:hover {
+  border-color: var(--debug-ink);
+  background: var(--debug-ink);
+  color: var(--debug-bg);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .sensing-mmwave-debug-controls button:hover:not(.is-active) {
+    border-color: var(--debug-rejected);
+    background: transparent;
+    color: var(--debug-rejected);
+  }
+}
+
+.sensing-mmwave-debug-controls button:active { transform: translateY(1px); }
+
+.sensing-mmwave-debug-controls button:focus-visible {
+  outline: 1px solid var(--debug-signal);
+  outline-offset: 2px;
+}
+
+@media (max-width: 900px) {
+  .sensing-mmwave-debug-body { grid-template-columns: 1fr; }
+  .sensing-mmwave-debug-facts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .sensing-mmwave-debug-fact { min-height: 62px; }
+}
+
+@media (max-width: 620px) {
+  .sensing-mmwave-debug-header,
+  .sensing-mmwave-debug-footer { align-items: flex-start; flex-direction: column; }
+  .sensing-mmwave-debug-header { display: flex; padding: 16px 42px 14px 14px; }
+  .sensing-mmwave-debug-state { min-width: 0; }
+  .sensing-mmwave-debug-viewport { min-height: 330px; }
+  .sensing-mmwave-debug-facts { grid-template-columns: 1fr; }
+  .sensing-mmwave-debug-legend { display: grid; grid-template-columns: 1fr 1fr; width: 100%; }
+  .sensing-mmwave-debug-legend span { white-space: normal; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sensing-mmwave-debug-controls button { transition: none; }
 }
 
 .sensing-loading {
@@ -3106,6 +3489,12 @@ canvas {
   background: rgba(255, 165, 0, 0.15);
   border: 1px solid #ffa500;
   color: #ffa500;
+}
+
+.sensing-source-offline {
+  background: rgba(229, 28, 35, 0.08);
+  border: 1px solid #e51c23;
+  color: #e51c23;
 }
 
 .sensing-source-simulated {

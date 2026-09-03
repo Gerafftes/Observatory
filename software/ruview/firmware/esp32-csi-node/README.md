@@ -88,9 +88,15 @@ Navigate to [http://localhost:3000](http://localhost:3000) in your browser.
 
 ### 6. (Optional) Upload a WASM sensing module
 
+The OTA, configuration, and WASM-management endpoints require the provisioned
+OTA PSK in a Bearer header. An unprovisioned node rejects every protected call.
+
 ```bash
-curl -X POST http://<ESP32_IP>:8032/wasm/upload --data-binary @gesture.rvf
-curl http://<ESP32_IP>:8032/wasm/list
+export OTA_PSK="<64-hex-characters-provisioned-in-NVS>"
+curl -H "Authorization: Bearer ${OTA_PSK}" \
+  -X POST http://<ESP32_IP>:8032/wasm/upload --data-binary @gesture.rvf
+curl -H "Authorization: Bearer ${OTA_PSK}" \
+  http://<ESP32_IP>:8032/wasm/list
 ```
 
 ---

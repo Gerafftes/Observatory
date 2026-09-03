@@ -9,12 +9,16 @@
 
 #include "esp_log.h"
 #include "esp_system.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
 #include "lwip/inet.h"
 #include "lwip/sockets.h"
 
 #include "coordinate_transform.h"
 
 static const char *TAG = "measurement_stream";
+#define UDP_REDUNDANT_COPIES 3
+#define UDP_COPY_DELAY_MS 5
 
 static bool append_json(char *buffer, size_t capacity, size_t *used,
                         const char *format, ...)
@@ -125,11 +129,22 @@ bool measurement_stream_send(measurement_stream_t *stream,
         return false;
     }
 
-    if (sendto(stream->socket_fd, json, used, 0,
-               (struct sockaddr *)&stream->destination,
-               sizeof(stream->destination)) < 0) {
-        ESP_LOGW(TAG, "UDP send failed");
-        return false;
+    // UDP success only confirms that lwIP accepted the datagram; it does not
+    // confirm delivery across the experiment WLAN. Send identical sequence
+    // numbers a few milliseconds apart. The server already deduplicates them
+    // before sequence validation, while temporal diversity prevents isolated
+    // WiFi loss from invalidating the 25-second calibration preflight.
+    bool sent = false;
+    for (unsigned copy = 0; copy < UDP_REDUNDANT_COPIES; ++copy) {
+        sent = sendto(stream->socket_fd, json, used, 0,
+                      (struct sockaddr *)&stream->destination,
+                      sizeof(stream->destination)) >= 0 || sent;
+        if (copy + 1 < UDP_REDUNDANT_COPIES) {
+            vTaskDelay(pdMS_TO_TICKS(UDP_COPY_DELAY_MS));
+        }
     }
-    return true;
+    if (!sent) {
+        ESP_LOGW(TAG, "All %u redundant UDP sends failed", UDP_REDUNDANT_COPIES);
+    }
+    return sent;
 }

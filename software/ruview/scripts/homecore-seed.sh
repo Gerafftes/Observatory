@@ -17,7 +17,7 @@
 #
 # Usage:
 #   bash scripts/homecore-seed.sh
-#   HOMECORE_URL=http://localhost:8123 HOMECORE_TOKEN=dev-token bash scripts/homecore-seed.sh
+#   HOMECORE_URL=http://localhost:8123 HOMECORE_TOKEN="$HOMECORE_TOKENS" bash scripts/homecore-seed.sh
 #   RUVIEW_URL=http://ruv-mac-mini:3000 bash scripts/homecore-seed.sh  # live numbers
 #
 # Idempotent: re-running just updates the values.
@@ -25,8 +25,18 @@
 set -euo pipefail
 
 URL="${HOMECORE_URL:-http://127.0.0.1:8123}"
-TOKEN="${HOMECORE_TOKEN:-dev-token}"
+if [[ -z "${HOMECORE_TOKEN:-}" ]]; then
+    echo "ERROR: HOMECORE_TOKEN must be set to a provisioned HOMECORE_TOKENS value" >&2
+    exit 64
+fi
+TOKEN="$HOMECORE_TOKEN"
 RUVIEW_URL="${RUVIEW_URL:-http://localhost:3000}"
+RUVIEW_TOKEN="${RUVIEW_API_TOKEN:-}"
+
+ruview_auth_args=()
+if [[ -n "$RUVIEW_TOKEN" ]]; then
+    ruview_auth_args=(-H "Authorization: Bearer $RUVIEW_TOKEN")
+fi
 
 post() {
     local entity_id="$1"; shift
@@ -39,7 +49,8 @@ post() {
 
 # Pull a live snapshot from the RuView sensing-server (optional).
 ruview_snapshot="{}"
-if curl -fsS --max-time 2 "$RUVIEW_URL/api/v1/vitals/12/latest" -o /tmp/ruview-vitals.json 2>/dev/null; then
+if curl -fsS --max-time 2 "${ruview_auth_args[@]}" \
+    "$RUVIEW_URL/api/v1/vitals/12/latest" -o /tmp/ruview-vitals.json 2>/dev/null; then
     ruview_snapshot=$(cat /tmp/ruview-vitals.json)
     echo "Pulled live RuView snapshot from $RUVIEW_URL"
 else

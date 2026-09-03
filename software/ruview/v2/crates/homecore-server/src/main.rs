@@ -191,19 +191,16 @@ async fn main() -> Result<()> {
     let _ = hap_bridge;
 
     // ── 7. REST + WS API ────────────────────────────────────────────
-    // Token provisioning closes audit findings HC-01/HC-02. If
-    // HOMECORE_TOKENS is set in the env, populate the store from
-    // its comma-separated list. Otherwise fall back to DEV mode
-    // (warn-on-each-request) so existing smoke tests still work.
-    let tokens = if std::env::var("HOMECORE_TOKENS").map(|v| !v.trim().is_empty()).unwrap_or(false) {
-        let s = LongLivedTokenStore::from_env();
-        let n = s.len().await;
-        info!("LongLivedTokenStore provisioned with {} bearer token(s) from HOMECORE_TOKENS", n);
-        s
+    // Token provisioning closes audit findings HC-01/HC-02. HOMECORE_TOKENS is
+    // the only bearer provisioning path; if it is unset/empty, the store stays
+    // locked and rejects every token.
+    let tokens = LongLivedTokenStore::from_env();
+    let n = tokens.len().await;
+    if n == 0 {
+        warn!("HOMECORE_TOKENS is unset or empty — the API is locked and rejects all bearer tokens");
     } else {
-        warn!("HOMECORE_TOKENS not set — token store in DEV mode (any non-empty bearer accepted). Provision real tokens before exposing to the network.");
-        LongLivedTokenStore::allow_any_non_empty()
-    };
+        info!("LongLivedTokenStore provisioned with {} bearer token(s) from HOMECORE_TOKENS", n);
+    }
     let api_state = SharedState::with_tokens(
         hc.clone(),
         cli.location_name,
@@ -399,7 +396,7 @@ mod ui_tests {
             HomeCore::new(),
             "Test".to_string(),
             "test",
-            LongLivedTokenStore::allow_any_non_empty(),
+            LongLivedTokenStore::from_tokens(["dev"]),
         )
     }
 

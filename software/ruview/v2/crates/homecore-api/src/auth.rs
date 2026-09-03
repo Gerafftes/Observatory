@@ -1,11 +1,10 @@
 //! Bearer-token auth helper. Validates against the
 //! [`LongLivedTokenStore`] on `SharedState` (audit fix HC-01/02).
 //!
-//! - P1 placeholder accepted any non-empty bearer
-//! - P2 (this commit) requires the token to be present in the store
-//! - DEV escape hatch: `LongLivedTokenStore::allow_any_non_empty()`
-//!   preserves the legacy behaviour for users mid-migration, with
-//!   a warn log on every check
+//! - P1 placeholder accepted any non-empty bearer (the vulnerability fixed here)
+//! - P2 requires the token to be present in the store
+//! - An unset or empty store is locked: every bearer is rejected until
+//!   an explicit token is provisioned.
 
 use axum::http::HeaderMap;
 use crate::error::ApiError;
@@ -102,15 +101,15 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn dev_mode_still_accepts_any_non_empty() {
-        let store = LongLivedTokenStore::allow_any_non_empty();
+    async fn empty_store_rejects_non_empty_bearer() {
+        let store = LongLivedTokenStore::empty();
         let h = mkheaders("Bearer literally-anything");
-        assert!(BearerAuth::from_headers(&h, &store).await.is_ok());
+        assert!(matches!(BearerAuth::from_headers(&h, &store).await, Err(ApiError::Unauthorized)));
     }
 
     #[tokio::test]
-    async fn dev_mode_still_rejects_empty() {
-        let store = LongLivedTokenStore::allow_any_non_empty();
+    async fn empty_store_rejects_empty_bearer() {
+        let store = LongLivedTokenStore::empty();
         let h = mkheaders("Bearer ");
         assert!(matches!(BearerAuth::from_headers(&h, &store).await, Err(ApiError::Unauthorized)));
     }

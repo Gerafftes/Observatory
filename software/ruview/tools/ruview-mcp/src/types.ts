@@ -150,7 +150,7 @@ export interface EdgeVitalsMessage {
 export interface RuviewConfig {
   /** Base URL of the local sensing-server (default: http://localhost:3000). */
   sensingServerUrl: string;
-  /** Bearer token for /api/v1/* endpoints. Set RUVIEW_API_TOKEN to enable. */
+  /** Bearer token for /api/v1/* endpoints. Required for routable servers. */
   apiToken: string | undefined;
   /** Absolute path to the cog-pose-estimation binary. */
   poseCogBinary: string;

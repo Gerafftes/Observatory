@@ -16,7 +16,7 @@ function resolveToken(): string {
         if (stored) return stored;
     }
     const qs = new URL(window.location.href).searchParams.get('token');
-    return qs ?? 'dev-token';
+    return qs ?? '';
 }
 
 @customElement('hc-services')

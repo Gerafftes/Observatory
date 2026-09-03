@@ -23,6 +23,10 @@ services:
       - "5005:5005/udp"
     environment:
       - RUST_LOG=info
+      # Required because the compose port publishing uses a routable bind.
+      - RUVIEW_API_TOKEN=${RUVIEW_API_TOKEN:?Set RUVIEW_API_TOKEN before docker compose up}
+      # Required by the live RuField signer; never use a repository default.
+      - WDP_RUFIELD_SIGNING_SEED=${WDP_RUFIELD_SIGNING_SEED:?Set WDP_RUFIELD_SIGNING_SEED before docker compose up}
       # CSI_SOURCE controls the data source for the sensing server.
       # Options: auto (default) — probe for ESP32 UDP then host WiFi; **fail
       #                           hard with exit 78 if neither is detected**.

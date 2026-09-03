@@ -38,9 +38,12 @@ use wifi_densepose_bfld::{PrivacyClass, PrivacyMode};
 use wifi_densepose_engine::{AdapterInfo, EngineError, StreamingEngine, TrustedOutput};
 use wifi_densepose_geo::types::GeoRegistration;
 use wifi_densepose_signal::ruvsense::fusion_quality::CalibrationId;
+use wifi_densepose_signal::ruvsense::multistatic::MultistaticConfig;
 use wifi_densepose_worldgraph::WorldId;
 
-use super::multistatic_bridge::node_frames_from_states;
+use super::multistatic_bridge::{
+    node_frames_from_states_with_basis, select_coherent_frames, FusionTimeBasis,
+};
 use super::NodeState;
 
 /// Minimum spacing between engine-error warn logs (errors are still counted
@@ -74,6 +77,24 @@ pub struct EngineBridge {
     engine_error_count: u64,
     /// Last time an engine error was actually logged (rate limiter).
     last_error_warn_at: Option<Instant>,
+    /// Clock domain and spread presented to the latest governed fusion cycle.
+    last_time_basis: Option<FusionTimeBasis>,
+    last_timestamp_spread_us: Option<u64>,
+    /// Diagnostic spreads for the host-coherent candidate before choosing one
+    /// clock basis. Mesh may legitimately exceed the guard while the same
+    /// quartet remains coherent on the common host clock.
+    last_host_candidate_spread_us: Option<u64>,
+    last_mesh_candidate_spread_us: Option<u64>,
+    /// Per-node host timestamp consumed by the most recent live selection.
+    /// This makes every governed live cycle use a new disjoint frame set.
+    consumed_host_monotonic_us: HashMap<u8, u64>,
+    /// Exact per-node timestamps selected for the latest governed live cycle.
+    /// These are diagnostics only; they make queue matching independently
+    /// observable without changing the selected clock basis or hard guard.
+    last_selected_host_monotonic_us: HashMap<u8, u64>,
+    last_selected_mesh_timestamp_us: HashMap<u8, Option<u64>>,
+    coherent_cycle_count: u64,
+    host_fallback_cycle_count: u64,
 }
 
 impl EngineBridge {
@@ -93,6 +114,15 @@ impl EngineBridge {
             demoted: false,
             engine_error_count: 0,
             last_error_warn_at: None,
+            last_time_basis: None,
+            last_timestamp_spread_us: None,
+            last_host_candidate_spread_us: None,
+            last_mesh_candidate_spread_us: None,
+            consumed_host_monotonic_us: HashMap::new(),
+            last_selected_host_monotonic_us: HashMap::new(),
+            last_selected_mesh_timestamp_us: HashMap::new(),
+            coherent_cycle_count: 0,
+            host_fallback_cycle_count: 0,
         }
     }
 
@@ -148,7 +178,40 @@ impl EngineBridge {
         node_states: &HashMap<u8, NodeState>,
         now_ms: i64,
     ) -> Option<Result<TrustedOutput, EngineError>> {
-        let frames = node_frames_from_states(node_states);
+        let has_live_timed_frames = node_states
+            .values()
+            .any(|state| !state.fusion_frame_history.is_empty());
+        let frames = if has_live_timed_frames {
+            let guard_interval_us = MultistaticConfig::default().guard_interval_us;
+            let selection = select_coherent_frames(
+                node_states,
+                &self.consumed_host_monotonic_us,
+                guard_interval_us,
+            )?;
+            self.last_time_basis = Some(selection.basis);
+            self.last_host_candidate_spread_us = Some(selection.host_spread_us);
+            self.last_mesh_candidate_spread_us = selection.mesh_spread_us;
+            self.last_selected_host_monotonic_us =
+                selection.selected_host_monotonic_us.clone();
+            self.last_selected_mesh_timestamp_us =
+                selection.selected_mesh_timestamp_us.clone();
+            self.consumed_host_monotonic_us
+                .extend(selection.selected_host_monotonic_us);
+            self.coherent_cycle_count = self.coherent_cycle_count.saturating_add(1);
+            if selection.basis == FusionTimeBasis::HostMonotonic {
+                self.host_fallback_cycle_count = self.host_fallback_cycle_count.saturating_add(1);
+            }
+            selection.frames
+        } else {
+            let (frames, time_basis) = node_frames_from_states_with_basis(node_states);
+            self.last_time_basis = time_basis;
+            self.last_host_candidate_spread_us = None;
+            self.last_mesh_candidate_spread_us = None;
+            self.last_selected_host_monotonic_us.clear();
+            self.last_selected_mesh_timestamp_us.clear();
+            frames
+        };
+        self.last_timestamp_spread_us = frame_timestamp_spread_us(&frames);
         if frames.is_empty() {
             return None;
         }
@@ -231,6 +294,38 @@ impl EngineBridge {
         self.engine_error_count
     }
 
+    pub fn last_time_basis(&self) -> Option<FusionTimeBasis> {
+        self.last_time_basis
+    }
+
+    pub fn last_timestamp_spread_us(&self) -> Option<u64> {
+        self.last_timestamp_spread_us
+    }
+
+    pub fn last_host_candidate_spread_us(&self) -> Option<u64> {
+        self.last_host_candidate_spread_us
+    }
+
+    pub fn last_mesh_candidate_spread_us(&self) -> Option<u64> {
+        self.last_mesh_candidate_spread_us
+    }
+
+    pub fn last_selected_host_monotonic_us(&self) -> &HashMap<u8, u64> {
+        &self.last_selected_host_monotonic_us
+    }
+
+    pub fn last_selected_mesh_timestamp_us(&self) -> &HashMap<u8, Option<u64>> {
+        &self.last_selected_mesh_timestamp_us
+    }
+
+    pub fn coherent_cycle_count(&self) -> u64 {
+        self.coherent_cycle_count
+    }
+
+    pub fn host_fallback_cycle_count(&self) -> u64 {
+        self.host_fallback_cycle_count
+    }
+
     /// ADR-141 output mapping for the live publish path (review finding 1c):
     /// at effective class [`PrivacyClass::Restricted`] the bfld privacy gate
     /// drops the amplitude + phase proxies; the live `SensingUpdate` applies
@@ -241,6 +336,14 @@ impl EngineBridge {
         self.effective_class
             .is_some_and(|c| c.as_u8() >= PrivacyClass::Restricted.as_u8())
     }
+}
+
+fn frame_timestamp_spread_us(
+    frames: &[wifi_densepose_signal::ruvsense::multiband::MultiBandCsiFrame],
+) -> Option<u64> {
+    let min = frames.iter().map(|frame| frame.timestamp_us).min()?;
+    let max = frames.iter().map(|frame| frame.timestamp_us).max()?;
+    Some(max.saturating_sub(min))
 }
 
 #[cfg(test)]
@@ -407,6 +510,77 @@ mod tests {
         // PrivateHome clean cycle → Anonymous → raw outputs NOT suppressed.
         assert_eq!(bridge.effective_class(), Some(PrivacyClass::Anonymous));
         assert!(!bridge.suppress_raw_outputs());
+    }
+
+    #[test]
+    fn stable_four_rx_window_does_not_accumulate_engine_errors() {
+        let mut bridge = EngineBridge::new(PrivacyMode::PrivateHome, 1, "r", "R");
+        let mut states = HashMap::new();
+        let base_host_ns = 1_000_000_000;
+        for (node_id, amplitude, offset_ms) in
+            [(1, 1.0, 0), (2, 1.02, 5), (3, 1.04, 11), (4, 1.06, 18)]
+        {
+            let mut state = node_state_with_history(amplitude, 56);
+            state.latest_host_monotonic_ns = Some(base_host_ns + offset_ms * 1_000_000);
+            states.insert(node_id, state);
+        }
+
+        for cycle in 0..200 {
+            assert!(bridge.observe_cycle(&states, 1_000 + cycle * 50).is_some());
+        }
+
+        assert_eq!(bridge.engine_error_count(), 0);
+        assert_eq!(
+            bridge.last_time_basis(),
+            Some(FusionTimeBasis::HostMonotonic)
+        );
+        assert_eq!(bridge.last_timestamp_spread_us(), Some(18_000));
+    }
+
+    #[test]
+    fn timed_mesh_divergence_uses_host_coherent_set_without_engine_error() {
+        let mut bridge = EngineBridge::new(PrivacyMode::PrivateHome, 1, "r", "R");
+        let host_base_us = 1_000_000;
+        let mesh_base_us = 8_000_000;
+        let mut states = HashMap::new();
+        for (node_id, amplitude, host_offset_us, mesh_offset_us) in [
+            (1, 1.0, 0, 0),
+            (2, 1.02, 5_000, 200_000),
+            (3, 1.04, 11_000, 400_000),
+            (4, 1.06, 18_000, 600_000),
+        ] {
+            let mut state = node_state_with_history(amplitude, 56);
+            state.latest_host_monotonic_ns = Some((host_base_us + host_offset_us) * 1_000);
+            state.latest_frame_mesh_time_us = Some(mesh_base_us + mesh_offset_us);
+            state
+                .fusion_frame_history
+                .push_back(super::super::FusionFrameSample {
+                    amplitude: state.frame_history.back().unwrap().clone(),
+                    host_monotonic_us: host_base_us + host_offset_us,
+                    mesh_timestamp_us: Some(mesh_base_us + mesh_offset_us),
+                });
+            states.insert(node_id, state);
+        }
+
+        assert!(bridge.observe_cycle(&states, 1_000).is_some());
+        assert_eq!(bridge.engine_error_count(), 0);
+        assert_eq!(
+            bridge.last_time_basis(),
+            Some(FusionTimeBasis::HostMonotonic)
+        );
+        assert_eq!(bridge.last_timestamp_spread_us(), Some(18_000));
+        assert_eq!(bridge.last_mesh_candidate_spread_us(), Some(600_000));
+        assert_eq!(
+            bridge.last_selected_host_monotonic_us()[&4],
+            host_base_us + 18_000
+        );
+        assert_eq!(
+            bridge.last_selected_mesh_timestamp_us()[&4],
+            Some(mesh_base_us + 600_000)
+        );
+
+        assert!(bridge.observe_cycle(&states, 1_050).is_none());
+        assert_eq!(bridge.engine_error_count(), 0);
     }
 
     /// Error wiring (review finding 1a): two live nodes with mismatched

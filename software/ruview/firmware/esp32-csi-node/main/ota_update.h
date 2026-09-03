@@ -10,6 +10,14 @@
 #define OTA_UPDATE_H
 
 #include "esp_err.h"
+#include "esp_http_server.h"
+
+/**
+ * Verify the provisioned OTA bearer token for a request handled by the OTA
+ * HTTP server. Returns false when no PSK is provisioned or the header is
+ * missing/invalid.
+ */
+bool ota_check_auth(httpd_req_t *req);
 
 /**
  * Initialize the OTA update HTTP server.

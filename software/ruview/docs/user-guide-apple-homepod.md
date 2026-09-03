@@ -114,10 +114,12 @@ Output: Writes presence events to `/tmp/ruview-state.json`.
 ```bash
 cd ~/ruview-hap
 source venv/bin/activate
+export RUVIEW_API_TOKEN="$(openssl rand -hex 32)"
 python ruview-sensing-server.py --port 3000
 ```
 
-Output: Listening on `http://127.0.0.1:3000/api/v1/...`.
+Output: Listening on `http://127.0.0.1:3000/api/v1/...`; API clients must send
+`Authorization: Bearer ${RUVIEW_API_TOKEN}`.
 
 **Terminal 3: Start the HAP bridge** (advertises HomeKit accessory on mDNS)
 

@@ -11,6 +11,7 @@
 
 mod adaptive_classifier;
 mod benchmark;
+mod calibration_persistence;
 mod calibration_dataset;
 mod classification_evaluation;
 pub mod cli;
@@ -72,7 +73,7 @@ use clap::{Parser, ValueEnum};
 use axum::http::HeaderValue;
 use serde::{Deserialize, Serialize};
 use tokio::net::UdpSocket;
-use tokio::sync::{broadcast, Mutex, RwLock};
+use tokio::sync::{broadcast, mpsc, Mutex, RwLock};
 use tower_http::services::ServeDir;
 use tower_http::set_header::SetResponseHeaderLayer;
 use tracing::{debug, error, info, warn};
@@ -144,6 +145,13 @@ struct Args {
     /// values are also accepted via the `SENSING_ALLOWED_HOSTS` env var.
     #[arg(long = "allowed-host", value_name = "HOST")]
     allowed_hosts: Vec<String>,
+
+    /// Explicit browser Origin (scheme://host[:port]) allowed to open live
+    /// WebSockets or submit state-changing API requests. Pass multiple times;
+    /// comma-separated values are also accepted via `SENSING_ALLOWED_ORIGINS`.
+    /// When omitted, only the local UI origins on `--http-port` are allowed.
+    #[arg(long = "allowed-origin", value_name = "ORIGIN")]
+    allowed_origins: Vec<String>,
 
     /// Disable Host-header validation entirely. Use only when the server sits
     /// behind a reverse proxy that already canonicalises `Host` (e.g. nginx
@@ -297,6 +305,17 @@ struct Args {
     #[arg(long, value_name = "SEALED_SETUP")]
     position_setup: Option<PathBuf>,
 
+    /// Pin the pre-setup sensing path to one exact CSI grid.
+    /// Format: center_frequency_mhz,antenna_count,subcarrier_count,ppdu_type,layout_flags.
+    /// This discovery aid is mutually exclusive with --position-setup, whose sealed grids
+    /// become authoritative instead.
+    #[arg(
+        long,
+        env = "SENSING_CSI_GRID_PIN",
+        value_name = "MHZ,ANTENNAS,SUBCARRIERS,PPDU,FLAGS"
+    )]
+    csi_grid_pin: Option<CsiGridPin>,
+
     /// Activate live fingerprint positioning with this validated position index.
     #[arg(long, value_name = "POSITION_INDEX")]
     position_index: Option<PathBuf>,
@@ -385,6 +404,76 @@ struct Esp32Frame {
 /// CSI fingerprint identity. Equal bin counts alone are not comparable across
 /// channels, antenna layouts, or PPDU training fields.
 type CsiGridKey = (u16, u8, u16, wifi_densepose_hardware::PpduType);
+
+/// Exact operator-selected grid used only before a sealed setup exists.
+/// The transient time-sync flag is ignored when matching live frames.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+struct CsiGridPin {
+    center_frequency_mhz: u32,
+    antenna_count: u8,
+    subcarrier_count: u16,
+    ppdu_type: u8,
+    layout_flags: u8,
+}
+
+impl CsiGridPin {
+    fn matches(self, frame: &raw_csi_recording::RawCsiFrame) -> bool {
+        frame.center_frequency_mhz == self.center_frequency_mhz
+            && frame.antenna_count == self.antenna_count
+            && frame.subcarrier_count == self.subcarrier_count
+            && frame.ppdu_type == self.ppdu_type
+            && frame.flags & !raw_csi_recording::TRANSIENT_SYNC_FLAG == self.layout_flags
+    }
+}
+
+impl std::str::FromStr for CsiGridPin {
+    type Err = String;
+
+    fn from_str(value: &str) -> Result<Self, Self::Err> {
+        let fields = value.split(',').map(str::trim).collect::<Vec<_>>();
+        if fields.len() != 5 {
+            return Err("CSI grid pin must be MHZ,ANTENNAS,SUBCARRIERS,PPDU,FLAGS".to_string());
+        }
+        let center_frequency_mhz = fields[0]
+            .parse::<u32>()
+            .map_err(|_| "CSI grid frequency must be an unsigned integer".to_string())?;
+        let antenna_count = fields[1]
+            .parse::<u8>()
+            .map_err(|_| "CSI grid antenna count must be an unsigned integer".to_string())?;
+        let subcarrier_count = fields[2]
+            .parse::<u16>()
+            .map_err(|_| "CSI grid subcarrier count must be an unsigned integer".to_string())?;
+        let ppdu_type = fields[3]
+            .parse::<u8>()
+            .map_err(|_| "CSI grid PPDU type must be an unsigned integer".to_string())?;
+        let layout_flags = fields[4]
+            .strip_prefix("0x")
+            .or_else(|| fields[4].strip_prefix("0X"))
+            .map(|hex| u8::from_str_radix(hex, 16))
+            .unwrap_or_else(|| fields[4].parse::<u8>())
+            .map_err(|_| "CSI grid flags must be a byte in decimal or 0xNN form".to_string())?;
+
+        if center_frequency_mhz == 0 || antenna_count == 0 || subcarrier_count == 0 {
+            return Err("CSI grid frequency and dimensions must be greater than zero".to_string());
+        }
+        if !matches!(ppdu_type, 0..=3 | 0xff) {
+            return Err(format!("CSI grid PPDU type {ppdu_type} is unsupported"));
+        }
+        if layout_flags & raw_csi_recording::TRANSIENT_SYNC_FLAG != 0 {
+            return Err(
+                "CSI grid flags must not contain transient time-sync flag 0x10".to_string(),
+            );
+        }
+
+        Ok(Self {
+            center_frequency_mhz,
+            antenna_count,
+            subcarrier_count,
+            ppdu_type,
+            layout_flags,
+        })
+    }
+}
 
 impl Esp32Frame {
     /// The `(frequency, antennas, subcarriers, PPDU)` identity of this frame.
@@ -733,11 +822,11 @@ struct NodeSyncSnapshot {
     /// Sync packet's sequence high-water — used by the host to pair CSI
     /// frames against this snapshot for §A0.12 mesh-time recovery.
     sequence: u32,
-    /// Per-node measured CSI frame rate (iter 18 EMA). 20.0 until the
-    /// EMA has at least 5 samples; the actually-observed rate after that.
+    /// Per-node CSI sequence-clock rate, derived from sequence/time deltas
+    /// between valid sync packets and smoothed with an EMA.
     csi_fps_ema: f64,
-    /// How many CSI frames have contributed to `csi_fps_ema`. Clients can
-    /// treat <5 as "not yet trustworthy" and fall back to 20 Hz.
+    /// How many valid sync-to-sync intervals have contributed to the FPS EMA.
+    /// Zero means mesh extrapolation is deliberately unavailable.
     csi_fps_samples: u32,
     /// ADR-110 iter 34 — milliseconds since the host last received a sync
     /// packet from this node. Lets UI dashboards render sync-age decay
@@ -747,6 +836,29 @@ struct NodeSyncSnapshot {
     /// modeled defensively.
     #[serde(skip_serializing_if = "Option::is_none")]
     staleness_ms: Option<u64>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+enum MeshTimeStatus {
+    NoSync,
+    AwaitingCsiFrame,
+    InvalidSync,
+    StaleSync,
+    FpsWarmingUp,
+    ImplausibleFps,
+    SequenceBeforeSync,
+    SequenceJump,
+    SequenceRegression,
+    NodeReboot,
+    Valid,
+}
+
+#[derive(Debug, Clone, Copy)]
+struct SyncRateAnchor {
+    sequence: u32,
+    local_us: u64,
+    observed_at: std::time::Instant,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -862,6 +974,13 @@ fn validated_complete_source_binding(
     Ok(observation)
 }
 
+#[derive(Debug, Clone)]
+pub(crate) struct FusionFrameSample {
+    pub(crate) amplitude: Vec<f64>,
+    pub(crate) host_monotonic_us: u64,
+    pub(crate) mesh_timestamp_us: Option<u64>,
+}
+
 struct NodeState {
     pub(crate) frame_history: VecDeque<Vec<f64>>,
     smoothed_person_score: f64,
@@ -914,16 +1033,33 @@ struct NodeState {
     latest_sync: Option<wifi_densepose_hardware::SyncPacket>,
     /// Last time a sync packet from this node was received (for staleness).
     latest_sync_at: Option<std::time::Instant>,
-    /// ADR-110 iter 18: EMA-tracked CSI frame rate for this node.
-    /// Replaces the hardcoded 20 Hz fallback in
-    /// `mesh_aligned_us_for_csi_frame` once `csi_fps_samples ≥ 5`.
+    /// Last valid sync packet used as the sequence/time anchor for the node's
+    /// CSI callback clock
+    /// estimation. This stays independent of `latest_sync`, because an invalid
+    /// sync packet must remain visible diagnostically without becoming a rate
+    /// anchor.
+    csi_fps_sync_anchor: Option<SyncRateAnchor>,
+    /// EMA-tracked node-local CSI sequence-clock rate. Firmware increments the
+    /// sequence before its UDP send gate, so this is not a shared transmitter
+    /// FPS. The input is `sync_sequence_delta / sync_host_receive_time_delta`,
+    /// making it insensitive to CSI datagrams dropped after serialization.
     csi_fps_ema: f64,
-    /// Number of inter-frame deltas observed (need ≥5 before trusting EMA).
+    /// Number of valid sync-to-sync rate samples observed.
     csi_fps_samples: u32,
     /// Latest accepted CSI sequence and diagnostic gap counters.
     latest_sequence: Option<u32>,
+    accepted_csi_frames: u64,
     inferred_lost_frames: u64,
     sequence_observations: u64,
+    /// Process-monotonic host arrival time for the latest accepted live frame.
+    /// Offline replay leaves this unset and continues to use `last_frame_time`.
+    latest_host_monotonic_ns: Option<u64>,
+    /// Bounded live-only queue used to select a time-coherent multistatic set.
+    /// A single latest frame per receiver is insufficient under packet loss:
+    /// it often combines four different transmitter events.
+    pub(crate) fusion_frame_history: VecDeque<FusionFrameSample>,
+    latest_mesh_time_status: MeshTimeStatus,
+    mesh_time_reset_count: u64,
     /// Latest extracted features for cross-node fusion.
     latest_features: Option<FeatureInfo>,
     // ── RuVector Phase 2: Temporal smoothing & coherence gating ──
@@ -966,64 +1102,61 @@ const NOVELTY_VECTOR_DIM: usize = 56;
 /// ADR-084 Pass 3 — number of past sketches retained per-node for
 /// novelty comparison. 64 frames ≈ 6.4 s at 10 Hz.
 const NOVELTY_HISTORY_CAPACITY: usize = 64;
+/// About 10-20 seconds at the measured per-RX rates, enough to bridge packet
+/// loss without allowing an unbounded live fusion backlog.
+const FUSION_FRAME_HISTORY_CAPACITY: usize = 128;
 /// ADR-084 Pass 3 — feature-vector schema version. Bump on changes to
 /// subcarrier ordering / normalisation so banks reject stale data.
 const NOVELTY_SKETCH_VERSION: u16 = 1;
 /// Consecutive frames required before switching a node to another CSI grid.
 const GRID_SWITCH_CONFIRMATIONS: u8 = 8;
 
-/// ADR-110 iter 18 — EMA update for per-node CSI fps tracking.
-///
-/// Returns the new EMA value, or `None` if the delta is implausible
-/// (≤ 0, or > 1 second — likely a connection gap, not a real frame
-/// rate sample). α = 1/8 fixed shift, ~8-sample effective window,
-/// matching the firmware-side ESP-NOW offset smoother in §A0.10.
-///
-/// Free function for testability — every transformation that doesn't
-/// touch the rest of `NodeState` lives outside the `impl` block.
-pub(crate) fn update_csi_fps_ema(prev_fps: f64, dt_sec: f64) -> Option<f64> {
-    if !(dt_sec > 0.0 && dt_sec < 1.0) {
+const MESH_SYNC_MAX_AGE: std::time::Duration = std::time::Duration::from_secs(9);
+const MIN_SYNC_RATE_INTERVAL_SECONDS: f64 = 0.5;
+const MIN_PLAUSIBLE_CSI_FPS: f64 = 1.0;
+const MAX_PLAUSIBLE_CSI_FPS: f64 = 25.0;
+const MESH_SEQUENCE_SLACK_FRAMES: u32 = 32;
+
+/// Convert one valid sync-to-sync interval into the node-local sequence rate.
+/// Sequence distance, rather than received CSI packet count, makes the sample
+/// robust to lost CSI datagrams. Very short intervals and rates outside the
+/// firmware's 20 Hz ceiling plus tolerance fail closed.
+pub(crate) fn sequence_rate_from_sync_interval(sequence_delta: u32, dt_sec: f64) -> Option<f64> {
+    if sequence_delta == 0 || !dt_sec.is_finite() || dt_sec < MIN_SYNC_RATE_INTERVAL_SECONDS {
         return None;
     }
-    let instantaneous = 1.0 / dt_sec;
-    // y[n] = y[n-1] + (x - y[n-1]) / 8
-    Some(prev_fps + (instantaneous - prev_fps) / 8.0)
+    let fps = f64::from(sequence_delta) / dt_sec;
+    (MIN_PLAUSIBLE_CSI_FPS..=MAX_PLAUSIBLE_CSI_FPS)
+        .contains(&fps)
+        .then_some(fps)
 }
 
 #[cfg(test)]
 mod fps_ema_tests {
-    use super::update_csi_fps_ema;
+    use super::sequence_rate_from_sync_interval;
 
     #[test]
-    fn steady_10hz_converges_toward_10() {
-        let mut fps = 20.0;
-        for _ in 0..40 {
-            fps = update_csi_fps_ema(fps, 0.100).unwrap();
-        }
-        assert!(
-            (fps - 10.0).abs() < 0.1,
-            "expected ~10 Hz after 40 samples at 100 ms intervals, got {fps}"
-        );
+    fn packet_loss_uses_sender_sequence_delta() {
+        let fps = sequence_rate_from_sync_interval(40, 2.0).unwrap();
+        assert!((fps - 20.0).abs() < f64::EPSILON);
     }
 
     #[test]
-    fn steady_20hz_stays_near_20() {
-        let mut fps = 20.0;
-        for _ in 0..20 {
-            fps = update_csi_fps_ema(fps, 0.050).unwrap();
-        }
-        assert!((fps - 20.0).abs() < 0.05, "expected ~20 Hz, got {fps}");
+    fn different_node_sequence_rates_remain_distinct() {
+        assert_eq!(sequence_rate_from_sync_interval(20, 2.0), Some(10.0));
+        assert_eq!(sequence_rate_from_sync_interval(40, 2.0), Some(20.0));
     }
 
     #[test]
-    fn nonpositive_dt_rejected() {
-        assert!(update_csi_fps_ema(15.0, 0.0).is_none());
-        assert!(update_csi_fps_ema(15.0, -0.1).is_none());
+    fn nonpositive_or_too_short_interval_is_rejected() {
+        assert!(sequence_rate_from_sync_interval(20, 0.0).is_none());
+        assert!(sequence_rate_from_sync_interval(20, -1.0).is_none());
+        assert!(sequence_rate_from_sync_interval(1, 0.01).is_none());
     }
 
     #[test]
-    fn long_gap_rejected_as_implausible() {
-        assert!(update_csi_fps_ema(20.0, 2.0).is_none());
+    fn implausible_sender_rate_is_rejected() {
+        assert!(sequence_rate_from_sync_interval(1000, 2.0).is_none());
     }
 }
 
@@ -1037,9 +1170,9 @@ impl NodeState {
     pub(crate) fn mesh_aligned_us(&self, local_at_frame_us: u64) -> Option<u64> {
         let sync = self.latest_sync.as_ref()?;
         let seen_at = self.latest_sync_at?;
-        // Drop stale syncs — firmware emits at ~0.5 Hz default, anything
-        // older than 9 s likely means the mesh transport dropped.
-        if seen_at.elapsed() > std::time::Duration::from_secs(9) {
+        if !sync.flags.is_valid
+            || std::time::Instant::now().saturating_duration_since(seen_at) > MESH_SYNC_MAX_AGE
+        {
             return None;
         }
         Some(sync.apply_to_local(local_at_frame_us))
@@ -1049,32 +1182,66 @@ impl NodeState {
     /// ADR-018 CSI frame. The frame carries no `local_us` (the wire
     /// format has no slot), but it carries a sequence number that the
     /// sync packet's `sequence` high-water can be paired against. Uses
-    /// 20 Hz as the default CSI rate (the firmware's
-    /// `CSI_MIN_SEND_INTERVAL_US`-implied ceiling). Returns `None` if
-    /// no fresh sync has been observed for this node.
+    /// Returns `None` until a valid sync-to-sync sequence-rate sample exists, or
+    /// whenever sync flags, sync age, or sequence direction are unsafe.
     pub(crate) fn mesh_aligned_us_for_csi_frame(&self, frame_sequence: u32) -> Option<u64> {
-        let sync = self.latest_sync.as_ref()?;
-        let seen_at = self.latest_sync_at?;
-        if seen_at.elapsed() > std::time::Duration::from_secs(9) {
-            return None;
-        }
-        // Iter 18: use the measured per-node fps once we have ≥5 inter-frame
-        // samples; until then fall back to the 20 Hz firmware ceiling. The
-        // §A0.12 capture showed real bench fps ≈ 10, so the measured value
-        // is significantly more accurate than the constant fallback.
-        let fps = if self.csi_fps_samples >= 5 {
-            self.csi_fps_ema
-        } else {
-            20.0
-        };
-        Some(sync.mesh_aligned_us_for_sequence(frame_sequence, fps))
+        self.mesh_time_decision(frame_sequence).0
     }
 
-    /// ADR-110 iter 18 — update the per-node observed-fps EMA from a fresh
-    /// CSI frame arrival. Call once per accepted CSI frame from
-    /// `udp_receiver_task`. Uses `last_frame_time` as the previous-frame
-    /// anchor; the first frame after init seeds the timer without producing
-    /// a sample (no prior dt to measure).
+    fn mesh_time_decision(&self, frame_sequence: u32) -> (Option<u64>, MeshTimeStatus) {
+        let Some(sync) = self.latest_sync.as_ref() else {
+            return (None, MeshTimeStatus::NoSync);
+        };
+        if !sync.flags.is_valid {
+            return (None, MeshTimeStatus::InvalidSync);
+        }
+        let Some(seen_at) = self.latest_sync_at else {
+            return (None, MeshTimeStatus::NoSync);
+        };
+        let sync_age = std::time::Instant::now().saturating_duration_since(seen_at);
+        if sync_age > MESH_SYNC_MAX_AGE {
+            return (None, MeshTimeStatus::StaleSync);
+        }
+        if self.csi_fps_samples == 0 {
+            return (None, MeshTimeStatus::FpsWarmingUp);
+        }
+        if !(MIN_PLAUSIBLE_CSI_FPS..=MAX_PLAUSIBLE_CSI_FPS).contains(&self.csi_fps_ema) {
+            return (None, MeshTimeStatus::ImplausibleFps);
+        }
+        if self.latest_sequence.is_some_and(|latest| {
+            frame_sequence.wrapping_sub(latest) >= 0x8000_0000
+        }) {
+            return (None, MeshTimeStatus::SequenceRegression);
+        }
+
+        let sequence_delta = frame_sequence.wrapping_sub(sync.sequence);
+        if sequence_delta >= 0x8000_0000 {
+            return (None, MeshTimeStatus::SequenceBeforeSync);
+        }
+        let age_frames = (sync_age.as_secs_f64() * MAX_PLAUSIBLE_CSI_FPS).ceil() as u32;
+        let max_forward_frames = age_frames.saturating_add(MESH_SEQUENCE_SLACK_FRAMES);
+        if sequence_delta > max_forward_frames {
+            return (None, MeshTimeStatus::SequenceJump);
+        }
+
+        (
+            Some(sync.mesh_aligned_us_for_sequence(frame_sequence, self.csi_fps_ema)),
+            MeshTimeStatus::Valid,
+        )
+    }
+
+    fn reset_mesh_rate(&mut self, status: MeshTimeStatus) {
+        self.csi_fps_ema = 0.0;
+        self.csi_fps_samples = 0;
+        self.latest_frame_mesh_time_us = None;
+        // A rate reset marks a discontinuity (reboot or an implausible
+        // sequence interval). Do not let pre-reset frames be paired with
+        // post-reset arrivals in the host-time synchronizer.
+        self.fusion_frame_history.clear();
+        self.latest_mesh_time_status = status;
+        self.mesh_time_reset_count = self.mesh_time_reset_count.saturating_add(1);
+    }
+
     /// ADR-110 iter 32 — apply a freshly-decoded sync packet to this node.
     /// Overwrites `latest_sync` with the new packet and stamps
     /// `latest_sync_at` so the staleness gate in `mesh_aligned_us_for_csi_frame`
@@ -1086,6 +1253,47 @@ impl NodeState {
         pkt: wifi_densepose_hardware::SyncPacket,
         now: std::time::Instant,
     ) {
+        self.latest_frame_mesh_time_us = None;
+        if pkt.flags.is_valid {
+            if let Some(anchor) = self.csi_fps_sync_anchor {
+                let sequence_delta = pkt.sequence.wrapping_sub(anchor.sequence);
+                let rebooted = pkt.local_us < anchor.local_us || sequence_delta >= 0x8000_0000;
+                if rebooted {
+                    self.reset_mesh_rate(MeshTimeStatus::NodeReboot);
+                    self.latest_sequence = None;
+                } else {
+                    let dt_sec = now
+                        .saturating_duration_since(anchor.observed_at)
+                        .as_secs_f64();
+                    match sequence_rate_from_sync_interval(sequence_delta, dt_sec) {
+                        Some(sample) => {
+                            self.csi_fps_ema = if self.csi_fps_samples == 0 {
+                                sample
+                            } else {
+                                self.csi_fps_ema + (sample - self.csi_fps_ema) / 8.0
+                            };
+                            self.csi_fps_samples = self.csi_fps_samples.saturating_add(1);
+                            self.latest_mesh_time_status = MeshTimeStatus::AwaitingCsiFrame;
+                        }
+                        None if dt_sec >= MIN_SYNC_RATE_INTERVAL_SECONDS => {
+                            self.reset_mesh_rate(MeshTimeStatus::ImplausibleFps);
+                        }
+                        None => {
+                            self.latest_mesh_time_status = MeshTimeStatus::FpsWarmingUp;
+                        }
+                    }
+                }
+            } else {
+                self.latest_mesh_time_status = MeshTimeStatus::FpsWarmingUp;
+            }
+            self.csi_fps_sync_anchor = Some(SyncRateAnchor {
+                sequence: pkt.sequence,
+                local_us: pkt.local_us,
+                observed_at: now,
+            });
+        } else {
+            self.latest_mesh_time_status = MeshTimeStatus::InvalidSync;
+        }
         self.latest_sync = Some(pkt);
         self.latest_sync_at = Some(now);
     }
@@ -1111,13 +1319,6 @@ impl NodeState {
     }
 
     pub(crate) fn observe_csi_frame_arrival(&mut self, now: std::time::Instant) {
-        if let Some(prev) = self.last_frame_time {
-            let dt = now.duration_since(prev).as_secs_f64();
-            if let Some(new_ema) = update_csi_fps_ema(self.csi_fps_ema, dt) {
-                self.csi_fps_ema = new_ema;
-                self.csi_fps_samples = self.csi_fps_samples.saturating_add(1);
-            }
-        }
         self.last_frame_time = Some(now);
     }
 
@@ -1126,6 +1327,8 @@ impl NodeState {
         frame_sequence: u32,
         now: std::time::Instant,
     ) {
+        self.accepted_csi_frames = self.accepted_csi_frames.saturating_add(1);
+        let mut sequence_regressed = false;
         if let Some(previous) = self.latest_sequence {
             let delta = frame_sequence.wrapping_sub(previous);
             if (1..0x8000_0000).contains(&delta) {
@@ -1133,11 +1336,47 @@ impl NodeState {
                     .inferred_lost_frames
                     .saturating_add(u64::from(delta.saturating_sub(1)));
                 self.sequence_observations = self.sequence_observations.saturating_add(1);
+            } else if delta >= 0x8000_0000 {
+                sequence_regressed = true;
             }
         }
-        self.latest_sequence = Some(frame_sequence);
+        if !sequence_regressed {
+            self.latest_sequence = Some(frame_sequence);
+        }
         self.observe_csi_frame_arrival(now);
-        self.latest_frame_mesh_time_us = self.mesh_aligned_us_for_csi_frame(frame_sequence);
+        if sequence_regressed {
+            self.latest_frame_mesh_time_us = None;
+            // The regressing frame is not a safe continuation of this node's
+            // timeline. Drop the queued pre-regression candidates so a later
+            // host-coherent quartet cannot bridge the discontinuity.
+            self.fusion_frame_history.clear();
+            self.latest_mesh_time_status = MeshTimeStatus::SequenceRegression;
+        } else {
+            let (timestamp, status) = self.mesh_time_decision(frame_sequence);
+            self.latest_frame_mesh_time_us = timestamp;
+            self.latest_mesh_time_status = status;
+        }
+    }
+
+    pub(crate) fn observe_live_fusion_frame(
+        &mut self,
+        amplitude: &[f64],
+        host_monotonic_ns: u64,
+    ) {
+        self.latest_host_monotonic_ns = Some(host_monotonic_ns);
+        if self.latest_mesh_time_status == MeshTimeStatus::SequenceRegression {
+            // Keep the frame available to per-node diagnostics/classification,
+            // but never admit the regressing sequence into the fusion queue.
+            return;
+        }
+        self.fusion_frame_history.push_back(FusionFrameSample {
+            amplitude: amplitude.to_vec(),
+            host_monotonic_us: host_monotonic_ns / 1_000,
+            mesh_timestamp_us: self.latest_frame_mesh_time_us,
+        });
+        if self.fusion_frame_history.len() > FUSION_FRAME_HISTORY_CAPACITY {
+            self.fusion_frame_history.pop_front();
+        }
     }
 
     fn observe_source_binding(&mut self, observation: Option<SourceBindingObservation>) {
@@ -1180,11 +1419,17 @@ impl NodeState {
             edge_vitals: None,
             latest_sync: None,
             latest_sync_at: None,
-            csi_fps_ema: 20.0,
+            csi_fps_sync_anchor: None,
+            csi_fps_ema: 0.0,
             csi_fps_samples: 0,
             latest_sequence: None,
+            accepted_csi_frames: 0,
             inferred_lost_frames: 0,
             sequence_observations: 0,
+            latest_host_monotonic_ns: None,
+            fusion_frame_history: VecDeque::with_capacity(FUSION_FRAME_HISTORY_CAPACITY),
+            latest_mesh_time_status: MeshTimeStatus::NoSync,
+            mesh_time_reset_count: 0,
             latest_features: None,
             prev_keypoints: None,
             motion_energy_history: VecDeque::with_capacity(COHERENCE_WINDOW),
@@ -1201,6 +1446,22 @@ impl NodeState {
             candidate_grid: None,
             candidate_grid_hits: 0,
         }
+    }
+
+    fn new_with_calibration(
+        node_id: u8,
+        bundle: Option<&calibration_persistence::CalibrationBundle>,
+    ) -> Self {
+        let mut state = Self::new();
+        if let Some(calibration) = bundle.and_then(|bundle| bundle.node(node_id)) {
+            if let Some(reference) = calibration.d5 {
+                state.d5_presence.install_reference(reference);
+            }
+            if let Some(reference) = &calibration.d6 {
+                state.d6_fingerprint.install_reference(reference.clone());
+            }
+        }
+        state
     }
 
     /// ADR-110 / issue #1005 grid gate: decide whether a frame on `grid`
@@ -1241,6 +1502,7 @@ impl NodeState {
                 self.candidate_grid = None;
                 self.candidate_grid_hits = 0;
                 self.frame_history.clear();
+                self.fusion_frame_history.clear();
                 self.smoothed_motion = 0.0;
                 self.latest_raw_motion = 0.0;
                 self.motion_confidence = 0.0;
@@ -1368,6 +1630,46 @@ mod grid_gate_tests {
             scheme: raw_csi_recording::TX_SOURCE_BINDING_SCHEME.to_string(),
             tx_filter_sha256: digest_character.to_string().repeat(64),
         }
+    }
+
+    fn raw_frame(subcarrier_count: u16, flags: u8) -> raw_csi_recording::RawCsiFrame {
+        raw_csi_recording::RawCsiFrame {
+            schema_version: raw_csi_recording::RAW_CSI_SCHEMA_VERSION,
+            host_timestamp_unix_ns: 1,
+            host_monotonic_ns: Some(1),
+            clock_epoch_id: Some("test-clock".to_string()),
+            session_id: None,
+            label: None,
+            ground_truth: None,
+            rx_id: 1,
+            antenna_count: 1,
+            subcarrier_count,
+            center_frequency_mhz: 2437,
+            sequence: 1,
+            rssi_dbm: -50,
+            noise_floor_dbm: -90,
+            ppdu_type: 0,
+            flags,
+            mesh_timestamp_us: None,
+            source_binding: None,
+            iq_pairs: Vec::new(),
+        }
+    }
+
+    #[test]
+    fn exact_grid_pin_filters_subcarrier_variants_but_ignores_sync_flag() {
+        let pin: CsiGridPin = "2437,1,64,0,0x00".parse().unwrap();
+
+        assert!(pin.matches(&raw_frame(64, 0)));
+        assert!(pin.matches(&raw_frame(64, raw_csi_recording::TRANSIENT_SYNC_FLAG)));
+        assert!(!pin.matches(&raw_frame(128, 0)));
+    }
+
+    #[test]
+    fn grid_pin_rejects_incomplete_or_transient_identities() {
+        assert!("2437,1,64,0".parse::<CsiGridPin>().is_err());
+        assert!("2437,1,64,9,0".parse::<CsiGridPin>().is_err());
+        assert!("2437,1,64,0,0x10".parse::<CsiGridPin>().is_err());
     }
 
     #[test]
@@ -1628,7 +1930,7 @@ fn build_node_features(
                 d6_fingerprint: ns.d6_fingerprint.snapshot(now),
                 rssi_dbm: ns.rssi_history.back().copied().unwrap_or(0.0),
                 last_seen_ms,
-                frame_rate_hz: if ns.csi_fps_samples >= 5 {
+                frame_rate_hz: if ns.csi_fps_samples > 0 {
                     ns.csi_fps_ema
                 } else {
                     0.0
@@ -1763,6 +2065,184 @@ enum RecordingLifecyclePhase {
     Finalizing,
 }
 
+const MMWAVE_NODE_DIAGNOSTICS_POLL_INTERVAL: Duration = Duration::from_secs(5);
+const MMWAVE_NODE_DIAGNOSTICS_MAX_AGE: Duration = Duration::from_secs(15);
+
+#[derive(Debug, Default)]
+struct MmwaveNodeDiagnosticsCache {
+    last_success: Option<(std::time::Instant, mmwave_calibration::NodeDiagnosticsWindow)>,
+    previous: Option<mmwave_calibration::NodeDiagnostics>,
+    last_error: Option<String>,
+    last_error_kind: Option<String>,
+}
+
+impl MmwaveNodeDiagnosticsCache {
+    fn record(&mut self, result: Result<mmwave_calibration::NodeDiagnostics, String>) {
+        match result {
+            Ok(diagnostics) => {
+                let window = mmwave_calibration::NodeDiagnosticsWindow {
+                    uart_bytes_delta: self
+                        .previous
+                        .as_ref()
+                        .map_or(0, |previous| {
+                            diagnostics.uart_bytes_received.saturating_sub(previous.uart_bytes_received)
+                        }),
+                    radar_frames_delta: self
+                        .previous
+                        .as_ref()
+                        .map_or(0, |previous| {
+                            diagnostics.radar_frames_valid.saturating_sub(previous.radar_frames_valid)
+                        }),
+                    udp_packets_sent_delta: self
+                        .previous
+                        .as_ref()
+                        .map_or(0, |previous| {
+                            diagnostics.udp_packets_sent.saturating_sub(previous.udp_packets_sent)
+                        }),
+                    udp_send_failures_delta: self
+                        .previous
+                        .as_ref()
+                        .map_or(0, |previous| {
+                            diagnostics.udp_send_failures.saturating_sub(previous.udp_send_failures)
+                        }),
+                    diagnostics: diagnostics.clone(),
+                };
+                self.previous = Some(diagnostics);
+                self.last_success = Some((std::time::Instant::now(), window));
+                self.last_error = None;
+                self.last_error_kind = None;
+            }
+            Err(error) => {
+                self.last_error_kind = Some(
+                    mmwave_calibration::classify_node_status_error(&error).to_string(),
+                );
+                self.last_error = Some(error);
+            }
+        }
+    }
+
+    fn status(
+        &self,
+        url_configured: bool,
+        token_configured: bool,
+    ) -> mmwave_calibration::NodeControlStatus {
+        let last_success_age_ms = self
+            .last_success
+            .as_ref()
+            .map(|(updated_at, _)| updated_at.elapsed().as_millis() as u64);
+        let reachable = last_success_age_ms
+            .map(|age| age <= MMWAVE_NODE_DIAGNOSTICS_MAX_AGE.as_millis() as u64)
+            .or_else(|| self.last_error.as_ref().map(|_| false));
+        mmwave_calibration::NodeControlStatus {
+            url_configured,
+            token_configured,
+            reachable,
+            last_success_age_ms,
+            last_error_kind: self.last_error_kind.clone(),
+            last_error: self.last_error.clone(),
+        }
+    }
+
+    fn snapshot(&self) -> Result<mmwave_calibration::NodeDiagnosticsWindow, String> {
+        if let Some((updated_at, diagnostics)) = &self.last_success {
+            if updated_at.elapsed() <= MMWAVE_NODE_DIAGNOSTICS_MAX_AGE {
+                return Ok(diagnostics.clone());
+            }
+        }
+        Err(self.last_error.clone().unwrap_or_else(|| {
+            "mmWave node diagnostics are not available yet".to_string()
+        }))
+    }
+}
+
+#[cfg(test)]
+mod mmwave_node_diagnostics_cache_tests {
+    use super::*;
+
+    fn diagnostics() -> mmwave_calibration::NodeDiagnostics {
+        mmwave_calibration::NodeDiagnostics {
+            uart_bytes_received: 1,
+            radar_frames_valid: 1,
+            udp_packets_sent: 1,
+            udp_send_failures: 0,
+        }
+    }
+
+    #[test]
+    fn recent_success_survives_one_transient_poll_failure() {
+        let mut cache = MmwaveNodeDiagnosticsCache::default();
+        cache.record(Ok(diagnostics()));
+        cache.record(Err("temporary timeout".to_string()));
+
+        assert_eq!(cache.snapshot().unwrap().diagnostics.udp_packets_sent, 1);
+    }
+
+    #[test]
+    fn cumulative_counters_are_evaluated_as_current_window_deltas() {
+        let mut cache = MmwaveNodeDiagnosticsCache::default();
+        cache.record(Ok(mmwave_calibration::NodeDiagnostics {
+            uart_bytes_received: 10,
+            radar_frames_valid: 10,
+            udp_packets_sent: 10,
+            udp_send_failures: 2_733,
+        }));
+        assert_eq!(cache.snapshot().unwrap().udp_send_failures_delta, 0);
+
+        cache.record(Ok(mmwave_calibration::NodeDiagnostics {
+            uart_bytes_received: 20,
+            radar_frames_valid: 20,
+            udp_packets_sent: 20,
+            udp_send_failures: 2_733,
+        }));
+        let window = cache.snapshot().unwrap();
+        assert_eq!(window.uart_bytes_delta, 10);
+        assert_eq!(window.radar_frames_delta, 10);
+        assert_eq!(window.udp_packets_sent_delta, 10);
+        assert_eq!(window.udp_send_failures_delta, 0);
+
+        cache.record(Ok(mmwave_calibration::NodeDiagnostics {
+            uart_bytes_received: 30,
+            radar_frames_valid: 30,
+            udp_packets_sent: 30,
+            udp_send_failures: 2_734,
+        }));
+        assert_eq!(cache.snapshot().unwrap().udp_send_failures_delta, 1);
+    }
+
+    #[test]
+    fn stale_success_fails_closed_with_the_latest_error() {
+        let mut cache = MmwaveNodeDiagnosticsCache::default();
+        cache.last_success = Some((
+            std::time::Instant::now()
+                - MMWAVE_NODE_DIAGNOSTICS_MAX_AGE
+                - Duration::from_secs(1),
+            mmwave_calibration::NodeDiagnosticsWindow {
+                diagnostics: diagnostics(),
+                uart_bytes_delta: 1,
+                radar_frames_delta: 1,
+                udp_packets_sent_delta: 1,
+                udp_send_failures_delta: 0,
+            },
+        ));
+        cache.record(Err("node unavailable".to_string()));
+
+        assert_eq!(cache.snapshot().unwrap_err(), "node unavailable");
+    }
+
+    #[test]
+    fn status_exposes_configuration_and_classified_poll_failure() {
+        let mut cache = MmwaveNodeDiagnosticsCache::default();
+        cache.record(Err("mmWave node status request returned HTTP 401".to_string()));
+
+        let status = cache.status(true, false);
+        assert!(status.url_configured);
+        assert!(!status.token_configured);
+        assert_eq!(status.reachable, Some(false));
+        assert_eq!(status.last_error_kind.as_deref(), Some("http_error"));
+        assert!(status.last_error.as_deref().unwrap().contains("HTTP 401"));
+    }
+}
+
 struct AppStateInner {
     latest_update: Option<SensingUpdate>,
     rssi_history: VecDeque<f64>,
@@ -1778,9 +2258,15 @@ struct AppStateInner {
     room_dimensions: Option<[f64; 3]>,
     /// Validated setup seal governing runtime geometry and raw recordings.
     position_setup: Option<Arc<position_setup::SealedPositionSetup>>,
+    /// Explicit pre-setup grid filter. A sealed setup supersedes this mechanism
+    /// and the CLI rejects configuring both at once.
+    csi_grid_pin: Option<CsiGridPin>,
     /// Independent mmWave teacher/reference state. It is never read by the
     /// WiFi position predictor.
     mmwave: mmwave_calibration::MmwaveManager,
+    /// Cached read-only ESP counters. Polling the ESP independently avoids
+    /// coupling the one-second UI refresh cadence to the shared experiment WLAN.
+    mmwave_node_diagnostics: MmwaveNodeDiagnosticsCache,
     /// Fail-closed discrete live-position inference and temporal consensus.
     live_position_tracker: position_live::LivePositionTracker,
     /// Instant of the last ESP32 UDP frame received (for offline detection).
@@ -1889,6 +2375,11 @@ struct AppStateInner {
     /// Experimental D5 calibration/fusion state. It remains uncalibrated until
     /// explicitly activated through the classification-calibration API.
     d5_presence: d5_presence::PresenceFusionState,
+    /// Active D5/D6 references. Keeping the bundle in memory also lets a node
+    /// that appears after startup receive the restored reference immediately.
+    active_calibration_bundle: Option<Arc<calibration_persistence::CalibrationBundle>>,
+    active_calibration_source: Option<String>,
+    calibration_context: Option<calibration_persistence::CalibrationContext>,
     // ── Accuracy sprint: Kalman tracker, multistatic fusion, eigenvalue counting ──
     /// Global Kalman-based pose tracker for stable person IDs and smoothed keypoints.
     pose_tracker: PoseTracker,
@@ -1976,10 +2467,12 @@ impl AppStateInner {
 
     fn effective_source(&self) -> String {
         if self.source == "esp32" {
-            if let Some(last) = self.last_esp32_frame {
-                if last.elapsed() > ESP32_OFFLINE_TIMEOUT {
-                    return "esp32:offline".to_string();
-                }
+            match self.last_esp32_frame {
+                Some(last) if last.elapsed() <= ESP32_OFFLINE_TIMEOUT => {}
+                // A configured ESP32 source is not evidence of a connected
+                // device. Until the first real frame arrives the server is
+                // explicitly offline, so the UI must not claim LIVE.
+                _ => return "esp32:offline".to_string(),
             }
         }
         self.source.clone()
@@ -5037,14 +5530,18 @@ mod issue_1004_source_plan_tests {
         assert_eq!(promote_view(&src, stale), "esp32:offline");
     }
 
+    #[test]
+    fn configured_esp32_without_a_frame_is_offline() {
+        assert_eq!(promote_view("esp32", None), "esp32:offline");
+    }
+
     /// Mirror of `AppStateInner::effective_source` over just (source, age) so the
     /// promotion/reversion logic is testable without constructing full state.
     fn promote_view(source: &str, last_frame_age: Option<std::time::Duration>) -> String {
         if source == "esp32" {
-            if let Some(age) = last_frame_age {
-                if age > ESP32_OFFLINE_TIMEOUT {
-                    return "esp32:offline".to_string();
-                }
+            match last_frame_age {
+                Some(age) if age <= ESP32_OFFLINE_TIMEOUT => {}
+                _ => return "esp32:offline".to_string(),
             }
         }
         source.to_string()
@@ -6427,6 +6924,14 @@ async fn health_ready(State(state): State<SharedState>) -> Json<serde_json::Valu
             "demoted": s.engine_bridge.demoted(),
             "recalibration_recommended": s.engine_bridge.recalibration_recommended(),
             "engine_error_count": s.engine_bridge.engine_error_count(),
+            "timestamp_basis": s.engine_bridge.last_time_basis().map(|basis| basis.as_str()),
+            "timestamp_spread_us": s.engine_bridge.last_timestamp_spread_us(),
+            "host_candidate_spread_us": s.engine_bridge.last_host_candidate_spread_us(),
+            "mesh_candidate_spread_us": s.engine_bridge.last_mesh_candidate_spread_us(),
+            "selected_host_monotonic_us_by_rx": s.engine_bridge.last_selected_host_monotonic_us(),
+            "selected_mesh_timestamp_us_by_rx": s.engine_bridge.last_selected_mesh_timestamp_us(),
+            "coherent_cycle_count": s.engine_bridge.coherent_cycle_count(),
+            "host_fallback_cycle_count": s.engine_bridge.host_fallback_cycle_count(),
             "raw_outputs_suppressed": s.engine_bridge.suppress_raw_outputs(),
         },
     }))
@@ -6601,9 +7106,18 @@ struct SetupProfileRequest {
 
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
+struct SetupProfileDraftQuery {
+    #[serde(default)]
+    revision_id: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
 struct CreateWorkflowRequest {
     label: String,
     profile_id: String,
+    #[serde(default)]
+    profile_revision_id: Option<String>,
     #[serde(default = "default_dataset_version")]
     dataset_version: String,
     #[serde(default = "default_firmware_version")]
@@ -6619,6 +7133,21 @@ struct WorkflowPhaseRequest {
     status: String,
     #[serde(default)]
     payload: serde_json::Value,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct CalibrationContextRequest {
+    profile_id: String,
+    #[serde(default)]
+    profile_revision_id: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+struct CalibrationAvailabilityQuery {
+    profile_id: String,
+    #[serde(default)]
+    profile_revision_id: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -6856,6 +7385,75 @@ async fn setup_profile_update(
     }
 }
 
+async fn setup_profile_v2_draft(
+    State(state): State<SharedState>,
+    Path(id): Path<String>,
+    Query(query): Query<SetupProfileDraftQuery>,
+) -> Response {
+    let store = state.read().await.experiment_store.clone();
+    let Some(store) = store else {
+        return experiment_api_error(
+            StatusCode::SERVICE_UNAVAILABLE,
+            "PERSISTENCE_UNAVAILABLE",
+            "SQLite persistence is unavailable; setup drafts cannot be generated.",
+        );
+    };
+    let profile = match query.revision_id.as_deref() {
+        Some(revision_id) => store.get_profile_revision(&id, revision_id).await,
+        None => store.get_profile(&id).await,
+    };
+    let profile = match profile {
+        Ok(Some(profile)) => profile,
+        Ok(None) => {
+            return experiment_api_error(
+                StatusCode::NOT_FOUND,
+                "PROFILE_NOT_FOUND",
+                "setup profile or requested revision not found",
+            )
+        }
+        Err(error) => {
+            return experiment_api_error(StatusCode::SERVICE_UNAVAILABLE, "DB_READ_FAILED", error)
+        }
+    };
+    let mut draft = match position_setup::observatory_profile_setup_draft(&profile.document) {
+        Ok(draft) => draft,
+        Err(error) => {
+            return experiment_api_error(
+                StatusCode::CONFLICT,
+                "PROFILE_NOT_SEALABLE",
+                error,
+            )
+        }
+    };
+    if let Some(object) = draft.as_object_mut() {
+        object.insert(
+            "source_profile".to_string(),
+            serde_json::json!({
+                "id": profile.id,
+                "revision_id": profile.revision_id,
+                "version": profile.version,
+                "profile_sha256": profile.profile_sha256,
+            }),
+        );
+    }
+    match serde_json::to_string_pretty(&draft) {
+        Ok(body) => (
+            StatusCode::OK,
+            [(
+                axum::http::header::CONTENT_TYPE,
+                "application/json; charset=utf-8",
+            )],
+            body,
+        )
+            .into_response(),
+        Err(error) => experiment_api_error(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "DRAFT_SERIALIZATION_FAILED",
+            error.to_string(),
+        ),
+    }
+}
+
 async fn workflow_create(
     State(state): State<SharedState>,
     Json(request): Json<CreateWorkflowRequest>,
@@ -6878,6 +7476,7 @@ async fn workflow_create(
         .create_workflow_run(
             &request.label,
             &request.profile_id,
+            request.profile_revision_id.as_deref(),
             &request.dataset_version,
             &request.firmware_version,
             seed,
@@ -6897,7 +7496,10 @@ async fn workflow_advance(
     Path(id): Path<String>,
     Json(request): Json<WorkflowPhaseRequest>,
 ) -> Response {
-    let store = state.read().await.experiment_store.clone();
+    let (store, position_setup) = {
+        let state = state.read().await;
+        (state.experiment_store.clone(), state.position_setup.clone())
+    };
     let Some(store) = store else {
         return experiment_api_error(
             StatusCode::SERVICE_UNAVAILABLE,
@@ -6905,8 +7507,148 @@ async fn workflow_advance(
             "SQLite persistence is unavailable; workflow phases cannot be recorded.",
         );
     };
+    let requested_phase_index = experiment::WORKFLOW_PHASES
+        .iter()
+        .position(|phase| *phase == request.phase);
+    if requested_phase_index.is_some_and(|index| index > 1) {
+        let Some(setup) = position_setup.as_deref() else {
+            return experiment_api_error(
+                StatusCode::CONFLICT,
+                "POSITION_SETUP_REQUIRED",
+                "Workflow bleibt gesperrt: Der Server läuft ohne aktives --position-setup.",
+            );
+        };
+        let run = match store.get_run(&id).await {
+            Ok(Some(run)) => run,
+            Ok(None) => {
+                return experiment_api_error(
+                    StatusCode::NOT_FOUND,
+                    "RUN_NOT_FOUND",
+                    "workflow run not found",
+                )
+            }
+            Err(error) => {
+                return experiment_api_error(
+                    StatusCode::SERVICE_UNAVAILABLE,
+                    "DB_READ_FAILED",
+                    error,
+                )
+            }
+        };
+        let Some(workflow) = run.workflow else {
+            return experiment_api_error(
+                StatusCode::CONFLICT,
+                "INVALID_PHASE",
+                "run is not a position workflow",
+            );
+        };
+        if let Err(error) = validate_workflow_runtime_seal(
+            &workflow,
+            setup.setup_id(),
+            setup.setup_sha256(),
+        ) {
+            return experiment_api_error(
+                StatusCode::CONFLICT,
+                "POSITION_SETUP_REQUIRED",
+                error,
+            );
+        }
+    }
+    let payload = if request.phase == "seal_setup" {
+        if request.status != "PASS" {
+            return experiment_api_error(
+                StatusCode::CONFLICT,
+                "POSITION_SETUP_REQUIRED",
+                "Die Setup-Phase darf nur mit einem validierten Runtime-Seal als PASS betreten werden.",
+            );
+        }
+        let Some(setup) = position_setup else {
+            return experiment_api_error(
+                StatusCode::CONFLICT,
+                "POSITION_SETUP_REQUIRED",
+                "Setup kann nicht versiegelt werden: Der Server läuft ohne aktives --position-setup.",
+            );
+        };
+        let run = match store.get_run(&id).await {
+            Ok(Some(run)) => run,
+            Ok(None) => {
+                return experiment_api_error(
+                    StatusCode::NOT_FOUND,
+                    "RUN_NOT_FOUND",
+                    "workflow run not found",
+                )
+            }
+            Err(error) => {
+                return experiment_api_error(
+                    StatusCode::SERVICE_UNAVAILABLE,
+                    "DB_READ_FAILED",
+                    error,
+                )
+            }
+        };
+        let Some(workflow) = run.workflow else {
+            return experiment_api_error(
+                StatusCode::CONFLICT,
+                "INVALID_PHASE",
+                "run is not a position workflow",
+            );
+        };
+        let profile = match workflow.profile_revision_id.as_deref() {
+            Some(revision_id) => store
+                .get_profile_revision(&workflow.profile_id, revision_id)
+                .await,
+            None => store.get_profile(&workflow.profile_id).await,
+        };
+        let profile = match profile {
+            Ok(Some(profile)) => profile,
+            Ok(None) => {
+                return experiment_api_error(
+                    StatusCode::CONFLICT,
+                    "PROFILE_REVISION_MISSING",
+                    "the profile revision bound to this run no longer exists",
+                )
+            }
+            Err(error) => {
+                return experiment_api_error(
+                    StatusCode::SERVICE_UNAVAILABLE,
+                    "DB_READ_FAILED",
+                    error,
+                )
+            }
+        };
+        if profile.profile_sha256 != workflow.profile_sha256 {
+            return experiment_api_error(
+                StatusCode::CONFLICT,
+                "PROFILE_REVISION_MISMATCH",
+                "the profile revision no longer matches the hash bound to this run",
+            );
+        }
+        if let Err(error) = setup.validate_observatory_profile(&profile.document) {
+            return experiment_api_error(
+                StatusCode::CONFLICT,
+                "POSITION_SETUP_MISMATCH",
+                error,
+            );
+        }
+        match bind_runtime_position_setup(
+            &request.payload,
+            &workflow.profile_sha256,
+            setup.as_ref(),
+        ) {
+            Ok(payload) => payload,
+            Err(error) => {
+                return experiment_api_error(
+                    StatusCode::CONFLICT,
+                    "POSITION_SETUP_MISMATCH",
+                    error,
+                )
+            }
+        }
+    } else {
+        request.payload
+    };
     match store
-        .advance_workflow(&id, &request.phase, &request.status, &request.payload)
+        .advance_workflow(&id, &request.phase, &request.status, &payload)
         .await
     {
         Ok(run) => Json(serde_json::json!(run)).into_response(),
@@ -6915,6 +7657,148 @@ async fn workflow_advance(
         }
         Err(error) => experiment_api_error(StatusCode::CONFLICT, "INVALID_PHASE", error),
     }
+}
+
+fn validate_workflow_runtime_seal(
+    workflow: &experiment::ExperimentWorkflow,
+    setup_id: &str,
+    setup_sha256: &str,
+) -> Result<(), String> {
+    let valid = workflow.events.iter().any(|event| {
+        event.phase == "seal_setup"
+            && event.status == "PASS"
+            && event.payload.get("seal_kind").and_then(serde_json::Value::as_str)
+                == Some("active_position_setup_v2")
+            && event.payload.get("profile_sha256").and_then(serde_json::Value::as_str)
+                == Some(workflow.profile_sha256.as_str())
+            && event.payload.get("setup_id").and_then(serde_json::Value::as_str)
+                == Some(setup_id)
+            && event.payload.get("setup_sha256").and_then(serde_json::Value::as_str)
+                == Some(setup_sha256)
+    });
+    valid.then_some(()).ok_or_else(|| {
+        "Workflow bleibt gesperrt: Es fehlt ein zum aktiven Setup-v2 passendes Runtime-Seal. Bitte einen neuen Run anlegen."
+            .to_string()
+    })
+}
+
+#[cfg(test)]
+mod workflow_runtime_seal_tests {
+    use super::*;
+
+    fn workflow_with_seal(payload: serde_json::Value) -> experiment::ExperimentWorkflow {
+        experiment::ExperimentWorkflow {
+            profile_id: "profile-test".to_string(),
+            profile_revision_id: Some("profile-test-v1".to_string()),
+            profile_sha256: "a".repeat(64),
+            profile_context_sha256: Some("b".repeat(64)),
+            dataset_version: "dataset-test".to_string(),
+            firmware_version: "firmware-test".to_string(),
+            calibration_id: None,
+            calibration_source: None,
+            calibration_context_sha256: None,
+            blind_seed: 7,
+            current_phase: "seal_setup".to_string(),
+            current_status: "PASS".to_string(),
+            events: vec![experiment::WorkflowPhaseEvent {
+                id: 1,
+                phase: "seal_setup".to_string(),
+                status: "PASS".to_string(),
+                payload,
+                created_at: "2026-08-29T00:00:00Z".to_string(),
+            }],
+        }
+    }
+
+    #[test]
+    fn exact_runtime_seal_allows_later_workflow_phases() {
+        let workflow = workflow_with_seal(serde_json::json!({
+            "seal_kind": "active_position_setup_v2",
+            "profile_sha256": "a".repeat(64),
+            "setup_id": "setup-runtime-1",
+            "setup_sha256": "c".repeat(64),
+        }));
+
+        validate_workflow_runtime_seal(
+            &workflow,
+            "setup-runtime-1",
+            &"c".repeat(64),
+        )
+        .unwrap();
+    }
+
+    #[test]
+    fn legacy_or_changed_runtime_seal_blocks_later_workflow_phases() {
+        let legacy = workflow_with_seal(serde_json::json!({
+            "profile_sha256": "a".repeat(64),
+        }));
+        assert!(validate_workflow_runtime_seal(
+            &legacy,
+            "setup-runtime-1",
+            &"c".repeat(64),
+        )
+        .is_err());
+
+        let changed = workflow_with_seal(serde_json::json!({
+            "seal_kind": "active_position_setup_v2",
+            "profile_sha256": "a".repeat(64),
+            "setup_id": "setup-runtime-1",
+            "setup_sha256": "d".repeat(64),
+        }));
+        assert!(validate_workflow_runtime_seal(
+            &changed,
+            "setup-runtime-1",
+            &"c".repeat(64),
+        )
+        .is_err());
+    }
+}
+
+fn bind_runtime_position_setup(
+    payload: &serde_json::Value,
+    profile_sha256: &str,
+    setup: &position_setup::SealedPositionSetup,
+) -> Result<serde_json::Value, String> {
+    let mut payload = payload
+        .as_object()
+        .cloned()
+        .ok_or_else(|| "setup seal payload must be a JSON object".to_string())?;
+    for (field, expected) in [
+        ("setup_id", setup.setup_id()),
+        ("setup_sha256", setup.setup_sha256()),
+    ] {
+        if payload
+            .get(field)
+            .is_some_and(|actual| actual.as_str() != Some(expected))
+        {
+            return Err(format!(
+                "requested {field} does not match the active sealed setup"
+            ));
+        }
+    }
+    if payload
+        .get("profile_sha256")
+        .is_some_and(|actual| actual.as_str() != Some(profile_sha256))
+    {
+        return Err(
+            "requested profile_sha256 does not match the profile revision bound to this run"
+                .to_string(),
+        );
+    }
+    payload.insert(
+        "profile_sha256".to_string(),
+        serde_json::json!(profile_sha256),
+    );
+    payload.insert("setup_id".to_string(), serde_json::json!(setup.setup_id()));
+    payload.insert(
+        "setup_sha256".to_string(),
+        serde_json::json!(setup.setup_sha256()),
+    );
+    payload.insert(
+        "seal_kind".to_string(),
+        serde_json::json!("active_position_setup_v2"),
+    );
+    Ok(serde_json::Value::Object(payload))
 }
 
 async fn workflow_artifact_register(
@@ -7022,7 +7906,17 @@ async fn experiment_export(
 }
 
 async fn control_center_status(State(state): State<SharedState>) -> Json<serde_json::Value> {
-    let (nodes, recording, training, calibration, position_setup, active_model, intro, mmwave) = {
+    let (
+        nodes,
+        recording,
+        training,
+        calibration,
+        position_setup,
+        csi_grid_pin,
+        active_model,
+        intro,
+        mmwave,
+    ) = {
         let s = state.read().await;
         let now = std::time::Instant::now();
         let recording = s.recording_current_id.as_ref().map(|id| {
@@ -7050,6 +7944,16 @@ async fn control_center_status(State(state): State<SharedState>) -> Json<serde_j
             serde_json::json!({
                 "phase": s.d5_presence.phase().as_str(),
                 "position_setup_active": s.position_setup.is_some(),
+                "calibration_id": s
+                    .active_calibration_bundle
+                    .as_ref()
+                    .map(|bundle| bundle.calibration_id.clone()),
+                "calibration_source": s.active_calibration_source.clone(),
+                "calibration_context_sha256": s
+                    .active_calibration_bundle
+                    .as_ref()
+                    .map(|bundle| bundle.calibration_context_sha256.clone()),
+                "reuse_available": s.active_calibration_bundle.is_some(),
             }),
             s.position_setup.as_ref().map(|setup| serde_json::json!({
                 "active": true,
@@ -7057,6 +7961,7 @@ async fn control_center_status(State(state): State<SharedState>) -> Json<serde_j
                 "setup_sha256": setup.setup_sha256(),
                 "room_dimensions_m": setup.room_dimensions_m(),
             })),
+            s.csi_grid_pin,
             s.active_model_id.clone(),
             serde_json::to_value(s.intro.snapshot()).unwrap_or_else(|_| serde_json::json!({})),
             serde_json::to_value(s.mmwave.status(server_clock::now().host_monotonic_ns))
@@ -7069,10 +7974,14 @@ async fn control_center_status(State(state): State<SharedState>) -> Json<serde_j
         "training": training,
         "classification_calibration": calibration,
         "position_setup": position_setup,
+        "csi_grid_pin": csi_grid_pin,
         "active_model_id": active_model,
         "signal_diagnostics": intro,
         "mmwave": mmwave,
-        "mmwave_control": "read_only_until_sensor_validation"
+        "mmwave_control": "read_only_until_sensor_validation",
+        "capabilities": {
+            "setup_v2_draft_export": true
+        }
     }))
 }
 
@@ -7092,9 +8001,227 @@ struct MmwaveSessionStartRequest {
     kind: mmwave_calibration::SessionKind,
     #[serde(default)]
     policy: Option<mmwave_calibration::CalibrationPolicy>,
+    #[serde(default)]
+    calibration_context: Option<CalibrationContextRequest>,
+}
+
+fn validate_mmwave_calibration_context(
+    kind: mmwave_calibration::SessionKind,
+    context: Option<CalibrationContextRequest>,
+) -> Result<Option<CalibrationContextRequest>, String> {
+    match (kind, context) {
+        (mmwave_calibration::SessionKind::Calibration, Some(context)) => Ok(Some(context)),
+        (mmwave_calibration::SessionKind::Calibration, None) => Err(
+            "calibration sessions require calibration_context with a persisted setup profile"
+                .to_string(),
+        ),
+        (mmwave_calibration::SessionKind::Blind, Some(_)) => {
+            Err("blind sessions must not provide calibration_context".to_string())
+        }
+        (mmwave_calibration::SessionKind::Blind, None) => Ok(None),
+    }
+}
+
+#[cfg(test)]
+mod mmwave_session_context_tests {
+    use super::{
+        mmwave_calibration, validate_mmwave_calibration_context, MmwaveSessionStartRequest,
+    };
+
+    #[test]
+    fn calibration_session_requires_a_persisted_profile_context() {
+        let request: MmwaveSessionStartRequest = serde_json::from_value(serde_json::json!({
+            "kind": "calibration"
+        }))
+        .expect("parse calibration request");
+
+        let error = validate_mmwave_calibration_context(request.kind, request.calibration_context)
+            .expect_err("contextless calibration must fail closed");
+
+        assert!(error.contains("require calibration_context"));
+    }
+
+    #[test]
+    fn calibration_session_preserves_exact_profile_identity() {
+        let request: MmwaveSessionStartRequest = serde_json::from_value(serde_json::json!({
+            "kind": "calibration",
+            "calibration_context": {
+                "profile_id": "profile-fixed-room",
+                "profile_revision_id": "profile-fixed-room-v7"
+            }
+        }))
+        .expect("parse calibration request");
+
+        let context =
+            validate_mmwave_calibration_context(request.kind, request.calibration_context)
+                .expect("context-bound calibration must be accepted")
+                .expect("calibration context must be returned");
+
+        assert_eq!(context.profile_id, "profile-fixed-room");
+        assert_eq!(
+            context.profile_revision_id.as_deref(),
+            Some("profile-fixed-room-v7")
+        );
+    }
+
+    #[test]
+    fn blind_session_rejects_a_calibration_context() {
+        let request: MmwaveSessionStartRequest = serde_json::from_value(serde_json::json!({
+            "kind": "blind",
+            "calibration_context": {
+                "profile_id": "profile-fixed-room"
+            }
+        }))
+        .expect("parse blind request");
+
+        let error = validate_mmwave_calibration_context(request.kind, request.calibration_context)
+            .expect_err("blind request must not accept calibration context");
+
+        assert!(error.contains("must not provide calibration_context"));
+        assert_eq!(request.kind, mmwave_calibration::SessionKind::Blind);
+    }
 }
 
 type MmwaveApiResult = Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)>;
+
+const MMWAVE_SESSION_START_SETTLE_TIMEOUT: Duration = Duration::from_secs(8);
+const MMWAVE_NODE_STREAM_ADVANCE_TIMEOUT: Duration = Duration::from_secs(2);
+const MMWAVE_NODE_STREAM_ADVANCE_POLL_INTERVAL: Duration = Duration::from_millis(100);
+const MMWAVE_SESSION_TICK_INTERVAL: Duration = Duration::from_millis(100);
+
+fn expected_mmwave_mode(kind: mmwave_calibration::SessionKind) -> mmwave_calibration::MeasurementMode {
+    match kind {
+        mmwave_calibration::SessionKind::Calibration => {
+            mmwave_calibration::MeasurementMode::Calibration
+        }
+        mmwave_calibration::SessionKind::Blind => mmwave_calibration::MeasurementMode::Reference,
+    }
+}
+
+fn node_diagnostics_show_streaming(
+    before: &mmwave_calibration::NodeDiagnostics,
+    after: &mmwave_calibration::NodeDiagnostics,
+) -> bool {
+    after.uart_bytes_received > 0
+        && after.radar_frames_valid > 0
+        && after.udp_packets_sent > 0
+        && after.udp_send_failures.saturating_sub(before.udp_send_failures) == 0
+        && (after.radar_frames_valid > before.radar_frames_valid
+            || after.udp_packets_sent > before.udp_packets_sent)
+}
+
+async fn wait_for_mmwave_node_stream_advance(
+    control: &mmwave_calibration::NodeControl,
+    before: &mmwave_calibration::NodeDiagnostics,
+) -> Result<mmwave_calibration::NodeDiagnostics, String> {
+    let deadline = std::time::Instant::now() + MMWAVE_NODE_STREAM_ADVANCE_TIMEOUT;
+    let mut latest = before.clone();
+
+    loop {
+        let diagnostics_control = control.clone();
+        let last_request_error = match tokio::task::spawn_blocking(move || {
+            mmwave_calibration::get_node_diagnostics(&diagnostics_control)
+        })
+        .await
+        {
+            Ok(Ok(diagnostics)) => {
+                latest = diagnostics;
+                if node_diagnostics_show_streaming(before, &latest) {
+                    return Ok(latest);
+                }
+                None
+            }
+            Ok(Err(error)) => Some(error),
+            Err(error) => Some(error.to_string()),
+        };
+
+        if std::time::Instant::now() >= deadline {
+            let request_error = last_request_error
+                .map(|error| format!(", last_status_error={error}"))
+                .unwrap_or_default();
+            return Err(format!(
+                "mmWave node diagnostics did not advance cleanly within {} ms (radar_frames {} -> {}, udp_sent {} -> {}, udp_failures {} -> {}{})",
+                MMWAVE_NODE_STREAM_ADVANCE_TIMEOUT.as_millis(),
+                before.radar_frames_valid,
+                latest.radar_frames_valid,
+                before.udp_packets_sent,
+                latest.udp_packets_sent,
+                before.udp_send_failures,
+                latest.udp_send_failures,
+                request_error,
+            ));
+        }
+
+        tokio::time::sleep(MMWAVE_NODE_STREAM_ADVANCE_POLL_INTERVAL).await;
+    }
+}
+
+#[cfg(test)]
+mod mmwave_node_stream_advance_tests {
+    use super::{mmwave_calibration, node_diagnostics_show_streaming};
+
+    fn diagnostics(
+        radar_frames: u64,
+        udp_sent: u64,
+        udp_failures: u64,
+    ) -> mmwave_calibration::NodeDiagnostics {
+        mmwave_calibration::NodeDiagnostics {
+            uart_bytes_received: 100,
+            radar_frames_valid: radar_frames,
+            udp_packets_sent: udp_sent,
+            udp_send_failures: udp_failures,
+        }
+    }
+
+    #[test]
+    fn unchanged_snapshot_is_not_stream_progress() {
+        let before = diagnostics(20, 10, 3);
+
+        assert!(!node_diagnostics_show_streaming(&before, &before));
+    }
+
+    #[test]
+    fn later_radar_frame_is_stream_progress() {
+        let before = diagnostics(20, 10, 3);
+        let after = diagnostics(21, 10, 3);
+
+        assert!(node_diagnostics_show_streaming(&before, &after));
+    }
+
+    #[test]
+    fn new_udp_failure_keeps_start_fail_closed() {
+        let before = diagnostics(20, 10, 3);
+        let after = diagnostics(21, 11, 4);
+
+        assert!(!node_diagnostics_show_streaming(&before, &after));
+    }
+}
+
+async fn wait_for_mmwave_mode_and_preflight(
+    state: &SharedState,
+    expected_mode: mmwave_calibration::MeasurementMode,
+) -> Result<(), String> {
+    let deadline = std::time::Instant::now() + MMWAVE_SESSION_START_SETTLE_TIMEOUT;
+    loop {
+        let status = {
+            let state = state.read().await;
+            state.mmwave.status(server_clock::now().host_monotonic_ns)
+        };
+        if status.mode == Some(expected_mode) && status.preflight_ready() {
+            return Ok(());
+        }
+        if std::time::Instant::now() >= deadline {
+            return Err(format!(
+                "mmWave start preflight did not recover within {} seconds (mode={:?}, expected={:?}, ready={})",
+                MMWAVE_SESSION_START_SETTLE_TIMEOUT.as_secs(),
+                status.mode,
+                expected_mode,
+                status.preflight_ready()
+            ));
+        }
+        tokio::time::sleep(Duration::from_millis(100)).await;
+    }
+}
 
 fn mmwave_api_error(
     status: StatusCode,
@@ -7104,21 +8231,66 @@ fn mmwave_api_error(
 }
 
 async fn mmwave_status_endpoint(State(state): State<SharedState>) -> Json<serde_json::Value> {
-    let (mut status, control) = {
+    let (mut status, diagnostics, node_control) = {
         let state = state.read().await;
+        let status = state.mmwave.status(server_clock::now().host_monotonic_ns);
+        let node_control = state.mmwave_node_diagnostics.status(
+            status.node_control.url_configured,
+            status.node_control.token_configured,
+        );
         (
-            state.mmwave.status(server_clock::now().host_monotonic_ns),
-            state.mmwave.control(),
+            status,
+            state
+                .mmwave
+                .control()
+                .map(|_| state.mmwave_node_diagnostics.snapshot()),
+            node_control,
         )
     };
-    if let Some(control) = control {
-        let diagnostics =
-            tokio::task::spawn_blocking(move || mmwave_calibration::get_node_diagnostics(&control))
-                .await
-                .unwrap_or_else(|error| Err(format!("mmWave node status task failed: {error}")));
-        status.attach_node_diagnostics(diagnostics);
+    if let Some(diagnostics) = diagnostics {
+        status.attach_node_diagnostics_window(diagnostics);
     }
+    status.node_control = node_control;
     Json(serde_json::to_value(status).expect("mmWave status is serializable"))
+}
+
+fn spawn_mmwave_node_diagnostics_poller(state: SharedState) {
+    tokio::spawn(async move {
+        let mut interval = tokio::time::interval(MMWAVE_NODE_DIAGNOSTICS_POLL_INTERVAL);
+        interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+        loop {
+            interval.tick().await;
+            let control = state.read().await.mmwave.control();
+            let Some(control) = control else {
+                continue;
+            };
+            let diagnostics = tokio::task::spawn_blocking(move || {
+                mmwave_calibration::get_node_diagnostics(&control)
+            })
+            .await
+            .unwrap_or_else(|error| Err(format!("mmWave node status task failed: {error}")));
+            state
+                .write()
+                .await
+                .mmwave_node_diagnostics
+                .record(diagnostics);
+        }
+    });
+}
+
+fn spawn_mmwave_session_ticker(state: SharedState) {
+    tokio::spawn(async move {
+        let mut interval = tokio::time::interval(MMWAVE_SESSION_TICK_INTERVAL);
+        interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+        loop {
+            interval.tick().await;
+            let now = server_clock::now();
+            let mut state = state.write().await;
+            if let Err(error) = state.mmwave.tick(now) {
+                debug!("mmWave session tick could not finalize the empty phase: {error}");
+            }
+        }
+    });
 }
 
 async fn mmwave_mode_endpoint(
@@ -7170,18 +8342,65 @@ async fn mmwave_session_start_endpoint(
     State(state): State<SharedState>,
     Json(request): Json<MmwaveSessionStartRequest>,
 ) -> MmwaveApiResult {
-    let request_time = server_clock::now();
-    let policy = request
-        .policy
+    let MmwaveSessionStartRequest {
+        kind,
+        policy,
+        calibration_context,
+    } = request;
+    let policy = policy
         .unwrap_or_default()
         .validate()
         .map_err(|error| mmwave_api_error(StatusCode::BAD_REQUEST, error))?;
+    let calibration_context_request =
+        validate_mmwave_calibration_context(kind, calibration_context)
+            .map_err(|error| mmwave_api_error(StatusCode::BAD_REQUEST, error))?;
+    let calibration_context = if let Some(request) = calibration_context_request.as_ref() {
+        let (store, setup_identity) = {
+            let state = state.read().await;
+            (
+                state.experiment_store.clone(),
+                state.position_setup.as_ref().map(|setup| {
+                    (
+                        setup.setup_id().to_string(),
+                        setup.setup_sha256().to_string(),
+                    )
+                }),
+            )
+        };
+        let store = store.ok_or_else(|| {
+            mmwave_api_error(
+                StatusCode::SERVICE_UNAVAILABLE,
+                "SQLite persistence is unavailable; calibration context cannot be resolved",
+            )
+        })?;
+        Some(
+            resolve_calibration_context(
+                &store,
+                setup_identity
+                    .as_ref()
+                    .map(|(setup_id, setup_sha256)| (setup_id.as_str(), setup_sha256.as_str())),
+                request,
+            )
+            .await
+            .map_err(|error| mmwave_api_error(StatusCode::BAD_REQUEST, error))?,
+        )
+    } else {
+        None
+    };
     let (control, data_dir) = {
         let state = state.read().await;
         state
             .mmwave
-            .validate_live_session_start(request.kind, request_time.host_monotonic_ns)
+            .validate_session_start(kind)
             .map_err(|error| mmwave_api_error(StatusCode::CONFLICT, error))?;
+        if kind == mmwave_calibration::SessionKind::Calibration
+            && state.d5_presence.phase() == d5_presence::CalibrationPhase::Collecting
+        {
+            return Err(mmwave_api_error(
+                StatusCode::CONFLICT,
+                "classification calibration is already collecting",
+            ));
+        }
         let control = state.mmwave.control().ok_or_else(|| {
             mmwave_api_error(
                 StatusCode::SERVICE_UNAVAILABLE,
@@ -7190,41 +8409,87 @@ async fn mmwave_session_start_endpoint(
         })?;
         (control, state.data_dir.clone())
     };
-    let expected_mode = match request.kind {
-        mmwave_calibration::SessionKind::Calibration => {
-            mmwave_calibration::MeasurementMode::Calibration
-        }
-        mmwave_calibration::SessionKind::Blind => mmwave_calibration::MeasurementMode::Reference,
-    };
+    let expected_mode = expected_mmwave_mode(kind);
     let diagnostics_control = control.clone();
-    let diagnostics = tokio::task::spawn_blocking(move || {
+    let diagnostics_before = tokio::task::spawn_blocking(move || {
         mmwave_calibration::get_node_diagnostics(&diagnostics_control)
     })
     .await
     .map_err(|error| mmwave_api_error(StatusCode::INTERNAL_SERVER_ERROR, error.to_string()))?
     .map_err(|error| mmwave_api_error(StatusCode::BAD_GATEWAY, error))?;
-    if diagnostics.uart_bytes_received == 0
-        || diagnostics.radar_frames_valid == 0
-        || diagnostics.udp_packets_sent == 0
-        || diagnostics.udp_send_failures != 0
+    if diagnostics_before.uart_bytes_received == 0
+        || diagnostics_before.radar_frames_valid == 0
+        || diagnostics_before.udp_packets_sent == 0
     {
         return Err(mmwave_api_error(
             StatusCode::CONFLICT,
-            "mmWave node diagnostics are not loss-free streaming",
+            "mmWave node diagnostics show no radar streaming yet",
         ));
     }
-    tokio::task::spawn_blocking(move || mmwave_calibration::set_node_mode(&control, expected_mode))
-        .await
-        .map_err(|error| mmwave_api_error(StatusCode::INTERNAL_SERVER_ERROR, error.to_string()))?
-        .map_err(|error| mmwave_api_error(StatusCode::BAD_GATEWAY, error))?;
+
+    {
+        let mut state = state.write().await;
+        state
+            .mmwave
+            .prepare_session_start(kind)
+            .map_err(|error| mmwave_api_error(StatusCode::CONFLICT, error))?;
+    }
+
+    let mode_control = control.clone();
+    let mode_join = tokio::task::spawn_blocking(move || {
+        mmwave_calibration::set_node_mode(&mode_control, expected_mode)
+    })
+    .await;
+    let mode_result = match mode_join {
+        Ok(result) => result.map_err(|error| mmwave_api_error(StatusCode::BAD_GATEWAY, error)),
+        Err(error) => {
+            state.write().await.mmwave.cancel_prepared_session_start();
+            return Err(mmwave_api_error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                error.to_string(),
+            ));
+        }
+    };
+    if let Err(error) = mode_result {
+        state.write().await.mmwave.cancel_prepared_session_start();
+        return Err(error);
+    }
+
+    if let Err(error) = wait_for_mmwave_mode_and_preflight(&state, expected_mode).await {
+        state.write().await.mmwave.cancel_prepared_session_start();
+        return Err(mmwave_api_error(StatusCode::CONFLICT, error));
+    }
+
+    if let Err(error) =
+        wait_for_mmwave_node_stream_advance(&control, &diagnostics_before).await
+    {
+        state.write().await.mmwave.cancel_prepared_session_start();
+        return Err(mmwave_api_error(StatusCode::CONFLICT, error));
+    }
 
     let now = server_clock::now();
     let mut state = state.write().await;
-    state
+    if let Some(context) = calibration_context.as_ref() {
+        if state
+            .position_setup
+            .as_ref()
+            .is_none_or(|setup| setup.setup_sha256() != context.setup_sha256)
+        {
+            state.mmwave.cancel_prepared_session_start();
+            return Err(mmwave_api_error(
+                StatusCode::CONFLICT,
+                "the sealed setup changed while calibration was being prepared",
+            ));
+        }
+    }
+    if let Err(error) = state
         .mmwave
-        .start_session(request.kind, &data_dir, now.clone(), policy)
-        .map_err(|error| mmwave_api_error(StatusCode::CONFLICT, error))?;
-    if request.kind == mmwave_calibration::SessionKind::Calibration {
+        .start_session(kind, &data_dir, now.clone(), policy)
+    {
+        state.mmwave.cancel_prepared_session_start();
+        return Err(mmwave_api_error(StatusCode::CONFLICT, error));
+    }
+    if kind == mmwave_calibration::SessionKind::Calibration {
         if let Err(error) = state
             .d5_presence
             .start_calibration(std::time::Instant::now())
@@ -7237,6 +8502,9 @@ async fn mmwave_session_start_endpoint(
             node.d6_fingerprint.reset_for_calibration();
             node.calibration_motion_rejected_frames = 0;
         }
+        state.active_calibration_bundle = None;
+        state.active_calibration_source = None;
+        state.calibration_context = calibration_context;
     }
     let status = state.mmwave.status(now.host_monotonic_ns);
     Ok(Json(
@@ -7256,6 +8524,106 @@ async fn mmwave_session_stop_endpoint(State(state): State<SharedState>) -> Mmwav
     ))
 }
 
+const MMWAVE_REORDER_HOLD: Duration = Duration::from_millis(200);
+
+#[derive(Debug, Clone, Copy, Deserialize)]
+struct MmwavePacketOrder {
+    boot_id: u32,
+    sequence: u32,
+}
+
+struct QueuedMmwaveDatagram {
+    bytes: Vec<u8>,
+    source: SocketAddr,
+    host_time: server_clock::HostTimestamp,
+    order: Option<MmwavePacketOrder>,
+}
+
+impl QueuedMmwaveDatagram {
+    fn new(
+        bytes: Vec<u8>,
+        source: SocketAddr,
+        host_time: server_clock::HostTimestamp,
+    ) -> Self {
+        let order = serde_json::from_slice(&bytes).ok();
+        Self {
+            bytes,
+            source,
+            host_time,
+            order,
+        }
+    }
+}
+
+fn compare_mmwave_sequence(left: u32, right: u32) -> std::cmp::Ordering {
+    if left == right {
+        std::cmp::Ordering::Equal
+    } else if right.wrapping_sub(left) < u32::MAX / 2 {
+        std::cmp::Ordering::Less
+    } else {
+        std::cmp::Ordering::Greater
+    }
+}
+
+fn mmwave_sequence_is_newer(candidate: u32, previous: u32) -> bool {
+    candidate != previous && candidate.wrapping_sub(previous) < u32::MAX / 2
+}
+
+fn sort_mmwave_datagram_batch(batch: &mut [QueuedMmwaveDatagram]) {
+    let Some(boot_id) = batch.first().and_then(|packet| packet.order).map(|order| order.boot_id)
+    else {
+        return;
+    };
+    if !batch
+        .iter()
+        .all(|packet| packet.order.is_some_and(|order| order.boot_id == boot_id))
+    {
+        // Preserve arrival order across malformed packets or a real node reboot
+        // so the fail-closed validation path can report them accurately.
+        return;
+    }
+    batch.sort_by(|left, right| {
+        compare_mmwave_sequence(
+            left.order.expect("single valid boot was checked").sequence,
+            right.order.expect("single valid boot was checked").sequence,
+        )
+    });
+}
+
+async fn process_mmwave_batch(
+    state: &SharedState,
+    transport_metrics: &mmwave_calibration::MmwaveTransportMetrics,
+    batch: &mut Vec<QueuedMmwaveDatagram>,
+    last_forwarded: &mut Option<MmwavePacketOrder>,
+) {
+    sort_mmwave_datagram_batch(batch);
+    for packet in batch.drain(..) {
+        transport_metrics.note_dequeued();
+        if let Some(order) = packet.order {
+            if last_forwarded.is_some_and(|previous| {
+                previous.boot_id == order.boot_id
+                    && !mmwave_sequence_is_newer(order.sequence, previous.sequence)
+            }) {
+                if last_forwarded.is_some_and(|previous| previous.sequence == order.sequence) {
+                    transport_metrics.note_duplicate();
+                } else {
+                    transport_metrics.note_sequence_discard();
+                }
+                continue;
+            }
+            *last_forwarded = Some(order);
+        }
+        process_mmwave_datagram(
+            state,
+            packet.bytes,
+            packet.source,
+            packet.host_time,
+            transport_metrics,
+        )
+        .await;
+    }
+}
+
 async fn mmwave_receiver_task(state: SharedState, port: u16) {
     let address = format!("0.0.0.0:{port}");
     let socket = match UdpSocket::bind(&address).await {
@@ -7266,45 +8634,145 @@ async fn mmwave_receiver_task(state: SharedState, port: u16) {
         }
     };
     info!("mmWave UDP receiver listening on {address}");
-    let mut buffer = [0_u8; 2048];
+    // Keep socket reads independent from the CSI processing lock. The four
+    // RX streams can hold `state` for a non-trivial amount of time; reading
+    // mmWave datagrams only after that lock was released allowed the kernel
+    // UDP queue to overflow and turned ordinary queue pressure into radar
+    // sequence gaps. An unbounded in-process queue preserves every received
+    // datagram and the order in which the socket delivered it.
+    let (packet_tx, mut packet_rx) = mpsc::unbounded_channel::<QueuedMmwaveDatagram>();
+    let transport_metrics = state.read().await.mmwave.transport_metrics();
+    let processor_state = state.clone();
+    let processor_metrics = transport_metrics.clone();
+    tokio::spawn(async move {
+        let mut batch = Vec::new();
+        let mut last_forwarded = None;
+        let mut flush_interval = tokio::time::interval(MMWAVE_REORDER_HOLD);
+        flush_interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+        flush_interval.tick().await;
+        loop {
+            tokio::select! {
+                packet = packet_rx.recv() => match packet {
+                    Some(packet) => {
+                        batch.push(packet);
+                    }
+                    None => {
+                        process_mmwave_batch(
+                            &processor_state,
+                            &processor_metrics,
+                            &mut batch,
+                            &mut last_forwarded,
+                        ).await;
+                        return;
+                    }
+                },
+                _ = flush_interval.tick() => {
+                    process_mmwave_batch(
+                        &processor_state,
+                        &processor_metrics,
+                        &mut batch,
+                        &mut last_forwarded,
+                    ).await;
+                }
+            }
+        }
+    });
+
+    let mut buffer = [0_u8; 4096];
     loop {
         match socket.recv_from(&mut buffer).await {
             Ok((length, source)) => {
-                let now = server_clock::now();
-                let mut state = state.write().await;
-                let wifi_prediction = state.live_position_tracker.current().clone();
-                state.mmwave.observe_wifi_prediction(&wifi_prediction);
-                if let Err(reason) = state.mmwave.ingest_json(&buffer[..length], now) {
-                    debug!("Rejected mmWave packet from {source}: {reason}");
-                }
-                if let Some((index_path, index_sha256)) = state.mmwave.take_pending_index() {
-                    let setup_identity = state.position_setup.as_ref().map(|setup| {
-                        (
-                            setup.setup_id().to_string(),
-                            setup.setup_sha256().to_string(),
-                        )
-                    });
-                    if let Some((setup_id, setup_sha256)) = setup_identity {
-                        match position_live::PositionIndexRuntime::load(
-                            &index_path,
-                            &setup_id,
-                            &setup_sha256,
-                            Some(&index_sha256),
-                        ) {
-                            Ok(runtime) => {
-                                state.live_position_tracker.install_runtime(Some(runtime));
-                                info!("Installed mmWave-gated position index {}", index_sha256);
-                            }
-                            Err(error) => error!(
-                                "Generated mmWave position index failed runtime validation: {error}"
-                            ),
-                        }
-                    }
+                let packet = QueuedMmwaveDatagram::new(
+                    buffer[..length].to_vec(),
+                    source,
+                    server_clock::now(),
+                );
+                transport_metrics.note_received();
+                if packet_tx
+                    .send(packet)
+                    .is_err()
+                {
+                    transport_metrics.note_dequeued();
+                    error!("mmWave processor stopped; UDP receiver is shutting down");
+                    return;
                 }
             }
             Err(error) => warn!("mmWave UDP receive failed: {error}"),
         }
     }
+}
+
+#[cfg(test)]
+mod mmwave_udp_order_tests {
+    use super::{compare_mmwave_sequence, mmwave_sequence_is_newer};
+
+    #[test]
+    fn sequence_order_repairs_short_udp_reordering() {
+        let mut sequences = vec![12, 10, 11, 13];
+        sequences.sort_by(|left, right| compare_mmwave_sequence(*left, *right));
+        assert_eq!(sequences, vec![10, 11, 12, 13]);
+    }
+
+    #[test]
+    fn sequence_order_handles_u32_wraparound() {
+        let mut sequences = vec![0, u32::MAX - 1, u32::MAX, 1];
+        sequences.sort_by(|left, right| compare_mmwave_sequence(*left, *right));
+        assert_eq!(sequences, vec![u32::MAX - 1, u32::MAX, 0, 1]);
+    }
+
+    #[test]
+    fn duplicate_and_late_sequences_are_not_newer() {
+        assert!(!mmwave_sequence_is_newer(42, 42));
+        assert!(!mmwave_sequence_is_newer(41, 42));
+        assert!(mmwave_sequence_is_newer(43, 42));
+        assert!(mmwave_sequence_is_newer(0, u32::MAX));
+    }
+}
+
+async fn process_mmwave_datagram(
+    state: &SharedState,
+    bytes: Vec<u8>,
+    source: SocketAddr,
+    host_time: server_clock::HostTimestamp,
+    transport_metrics: &mmwave_calibration::MmwaveTransportMetrics,
+) {
+    let started_at = std::time::Instant::now();
+    let received_at_monotonic_ns = host_time.host_monotonic_ns;
+    let mut state = state.write().await;
+    let wifi_prediction = state.live_position_tracker.current().clone();
+    state.mmwave.observe_wifi_prediction(&wifi_prediction);
+    if let Err(reason) = state.mmwave.ingest_json(&bytes, host_time) {
+        debug!("Rejected mmWave packet from {source}: {reason}");
+    }
+    if let Some((index_path, index_sha256)) = state.mmwave.take_pending_index() {
+        let setup_identity = state.position_setup.as_ref().map(|setup| {
+            (
+                setup.setup_id().to_string(),
+                setup.setup_sha256().to_string(),
+            )
+        });
+        if let Some((setup_id, setup_sha256)) = setup_identity {
+            match position_live::PositionIndexRuntime::load(
+                &index_path,
+                &setup_id,
+                &setup_sha256,
+                Some(&index_sha256),
+            ) {
+                Ok(runtime) => {
+                    state.live_position_tracker.install_runtime(Some(runtime));
+                    info!("Installed mmWave-gated position index {}", index_sha256);
+                }
+                Err(error) => error!(
+                    "Generated mmWave position index failed runtime validation: {error}"
+                ),
+            }
+        }
+    }
+    transport_metrics.note_processed(
+        received_at_monotonic_ns,
+        server_clock::now().host_monotonic_ns,
+        started_at.elapsed().as_millis() as u64,
+    );
 }
 
 // ── Model Management Endpoints ──────────────────────────────────────────────
@@ -9139,10 +10607,109 @@ async fn adaptive_unload(State(state): State<SharedState>) -> Json<serde_json::V
 
 // ── D5 classification calibration (multi-RX still presence) ─────────────────
 
+async fn resolve_calibration_context(
+    store: &experiment::ExperimentStore,
+    setup_identity: Option<(&str, &str)>,
+    request: &CalibrationContextRequest,
+) -> Result<calibration_persistence::CalibrationContext, String> {
+    let (setup_id, setup_sha256) = setup_identity
+        .ok_or_else(|| "an active sealed position setup is required for reusable calibration".to_string())?;
+    let profile = match request.profile_revision_id.as_deref() {
+        Some(revision_id) => store
+            .get_profile_revision(&request.profile_id, revision_id)
+            .await?
+            .ok_or_else(|| "setup profile revision not found".to_string())?,
+        None => store
+            .get_profile(&request.profile_id)
+            .await?
+            .ok_or_else(|| "setup profile not found".to_string())?,
+    };
+    let profile_context_sha256 = calibration_persistence::profile_context_sha256(&profile.document)?;
+    let calibration_context_sha256 = calibration_persistence::calibration_context_sha256(
+        &profile_context_sha256,
+        setup_id,
+        setup_sha256,
+    )?;
+    Ok(calibration_persistence::CalibrationContext {
+        profile_id: profile.id,
+        profile_revision_id: profile.revision_id,
+        profile_sha256: profile.profile_sha256,
+        profile_context_sha256,
+        setup_id: setup_id.to_string(),
+        setup_sha256: setup_sha256.to_string(),
+        calibration_context_sha256,
+    })
+}
+
+fn install_calibration_bundle(
+    node_states: &mut HashMap<u8, NodeState>,
+    bundle: &calibration_persistence::CalibrationBundle,
+) {
+    for node in node_states.values_mut() {
+        node.d5_presence.reset_for_calibration();
+        node.d6_fingerprint.reset_for_calibration();
+        node.calibration_motion_rejected_frames = 0;
+    }
+    for calibration_node in &bundle.nodes {
+        let Some(node) = node_states.get_mut(&calibration_node.node_id) else {
+            continue;
+        };
+        if let Some(reference) = calibration_node.d5 {
+            node.d5_presence.install_reference(reference);
+        }
+        if let Some(reference) = &calibration_node.d6 {
+            node.d6_fingerprint.install_reference(reference.clone());
+        }
+    }
+}
+
 async fn classification_calibration_start(
     State(state): State<SharedState>,
+    Json(request): Json<CalibrationContextRequest>,
 ) -> Json<serde_json::Value> {
+    let (store, setup_identity) = {
+        let s = state.read().await;
+        (
+            s.experiment_store.clone(),
+            s.position_setup.as_ref().map(|setup| {
+                (setup.setup_id().to_string(), setup.setup_sha256().to_string())
+            }),
+        )
+    };
+    let Some(store) = store else {
+        return Json(serde_json::json!({
+            "success": false,
+            "error": "SQLite persistence is unavailable; reusable calibration cannot be recorded.",
+        }));
+    };
+    let context = match resolve_calibration_context(
+        &store,
+        setup_identity
+            .as_ref()
+            .map(|(setup_id, setup_sha256)| (setup_id.as_str(), setup_sha256.as_str())),
+        &request,
+    )
+    .await
+    {
+        Ok(context) => context,
+        Err(error) => {
+            return Json(serde_json::json!({
+                "success": false,
+                "error": error,
+            }));
+        }
+    };
+
     let mut s = state.write().await;
+    if s.position_setup
+        .as_ref()
+        .is_none_or(|setup| setup.setup_sha256() != context.setup_sha256)
+    {
+        return Json(serde_json::json!({
+            "success": false,
+            "error": "the sealed setup changed while calibration was being prepared",
+        }));
+    }
     let now = std::time::Instant::now();
     if let Err(error) = s.d5_presence.start_calibration(now) {
         return Json(serde_json::json!({
@@ -9156,6 +10723,9 @@ async fn classification_calibration_start(
         node.d6_fingerprint.reset_for_calibration();
         node.calibration_motion_rejected_frames = 0;
     }
+    s.active_calibration_bundle = None;
+    s.active_calibration_source = None;
+    s.calibration_context = Some(context.clone());
 
     Json(serde_json::json!({
         "success": true,
@@ -9165,6 +10735,10 @@ async fn classification_calibration_start(
         "minimum_complete_blocks": d5_presence::MIN_CALIBRATION_BLOCKS,
         "minimum_samples_per_block": d5_presence::MIN_CALIBRATION_SAMPLES_PER_BLOCK,
         "block_seconds": d5_presence::CALIBRATION_BLOCK.as_secs(),
+        "profile_id": context.profile_id,
+        "profile_revision_id": context.profile_revision_id,
+        "profile_context_sha256": context.profile_context_sha256,
+        "calibration_context_sha256": context.calibration_context_sha256,
     }))
 }
 
@@ -9246,6 +10820,62 @@ async fn classification_calibration_stop(
         }));
     }
 
+    let Some(context) = s.calibration_context.clone() else {
+        return Json(serde_json::json!({
+            "success": false,
+            "status": "collecting",
+            "error": "calibration context is missing; start it from a selected sealed setup profile",
+            "nodes": node_results,
+        }));
+    };
+    let Some(store) = s.experiment_store.clone() else {
+        return Json(serde_json::json!({
+            "success": false,
+            "status": "collecting",
+            "error": "SQLite persistence is unavailable; calibration was not stored",
+            "nodes": node_results,
+        }));
+    };
+    let calibration_nodes = candidates
+        .iter()
+        .filter_map(|(node_id, d5_result, d6_result)| {
+            d6_result.as_ref().ok().map(|d6_reference| {
+                calibration_persistence::CalibrationNodeBundle {
+                    node_id: *node_id,
+                    d5: d5_result.as_ref().ok().cloned(),
+                    d6: Some(d6_reference.clone()),
+                }
+            })
+        })
+        .collect();
+    let bundle = match calibration_persistence::CalibrationBundle::new(
+        calibration_persistence::new_calibration_id(),
+        &context,
+        chrono::Utc::now().to_rfc3339(),
+        calibration_nodes,
+    ) {
+        Ok(bundle) => bundle,
+        Err(error) => {
+            return Json(serde_json::json!({
+                "success": false,
+                "status": "collecting",
+                "error": format!("calibration bundle is invalid: {error}"),
+                "nodes": node_results,
+            }));
+        }
+    };
+    let summary = match store.persist_calibration_bundle(&bundle).await {
+        Ok(summary) => summary,
+        Err(error) => {
+            return Json(serde_json::json!({
+                "success": false,
+                "status": "collecting",
+                "error": format!("calibration could not be persisted: {error}"),
+                "nodes": node_results,
+            }));
+        }
+    };
+
     for (node_id, d5_result, d6_result) in candidates {
         let node = s
             .node_states
@@ -9261,6 +10891,10 @@ async fn classification_calibration_stop(
         }
     }
     s.d5_presence.finish_calibration(now);
+    s.active_calibration_bundle = Some(Arc::new(bundle));
+    s.active_calibration_source = Some("captured".to_string());
+    let calibration_id = summary.calibration_id.clone();
+    let calibration_context_sha256 = summary.calibration_context_sha256.clone();
 
     Json(serde_json::json!({
         "success": true,
@@ -9271,6 +10905,10 @@ async fn classification_calibration_stop(
         "required_votes": d5_presence::REQUIRED_VOTES,
         "minimum_fresh_references": d5_presence::MIN_FRESH_REFERENCES,
         "minimum_frame_rate_hz": d5_presence::MIN_FRAME_RATE_HZ,
+        "calibration_source": "captured",
+        "calibration": summary,
+        "calibration_id": calibration_id,
+        "calibration_context_sha256": calibration_context_sha256,
         "nodes": node_results,
     }))
 }
@@ -9297,7 +10935,7 @@ async fn classification_calibration_status(
                 "node_id": node_id,
                 "fresh": fresh,
                 "last_seen_ms": last_seen_ms,
-                "frame_rate_hz": if node.csi_fps_samples >= 5 {
+                "frame_rate_hz": if node.csi_fps_samples > 0 {
                     node.csi_fps_ema
                 } else {
                     0.0
@@ -9335,6 +10973,20 @@ async fn classification_calibration_status(
         classification_decision_status(phase, s.position_setup.is_some(), usable_live_nodes);
     let operational = phase == d5_presence::CalibrationPhase::Ready
         && usable_live_nodes >= d5_presence::MIN_FRESH_REFERENCES;
+    let active_calibration = s.active_calibration_bundle.as_ref().map(|bundle| {
+        serde_json::json!({
+            "calibration_id": bundle.calibration_id.clone(),
+            "source": s.active_calibration_source.clone(),
+            "profile_id": bundle.profile_id.clone(),
+            "profile_revision_id": bundle.profile_revision_id.clone(),
+            "profile_context_sha256": bundle.profile_context_sha256.clone(),
+            "calibration_context_sha256": bundle.calibration_context_sha256.clone(),
+            "setup_id": bundle.setup_id.clone(),
+            "setup_sha256": bundle.setup_sha256.clone(),
+            "captured_at": bundle.captured_at.clone(),
+            "node_count": bundle.nodes.len(),
+        })
+    });
 
     Json(serde_json::json!({
         "success": true,
@@ -9358,8 +11010,184 @@ async fn classification_calibration_status(
         "minimum_fresh_references": d5_presence::MIN_FRESH_REFERENCES,
         "minimum_frame_rate_hz": d5_presence::MIN_FRAME_RATE_HZ,
         "operational": operational,
+        "calibration": active_calibration,
+        "calibration_id": s
+            .active_calibration_bundle
+            .as_ref()
+            .map(|bundle| bundle.calibration_id.clone()),
+        "calibration_source": s.active_calibration_source.clone(),
+        "calibration_context_sha256": s
+            .active_calibration_bundle
+            .as_ref()
+            .map(|bundle| bundle.calibration_context_sha256.clone()),
+        "reuse_available": s.active_calibration_bundle.is_some(),
         "nodes": nodes,
     }))
+}
+
+async fn classification_calibration_availability(
+    State(state): State<SharedState>,
+    Query(request): Query<CalibrationAvailabilityQuery>,
+) -> Json<serde_json::Value> {
+    let (store, setup_identity) = {
+        let s = state.read().await;
+        (
+            s.experiment_store.clone(),
+            s.position_setup.as_ref().map(|setup| {
+                (setup.setup_id().to_string(), setup.setup_sha256().to_string())
+            }),
+        )
+    };
+    let Some(store) = store else {
+        return Json(serde_json::json!({
+            "success": true,
+            "available": false,
+            "reason": "SQLite persistence is unavailable",
+        }));
+    };
+    let context_request = CalibrationContextRequest {
+        profile_id: request.profile_id,
+        profile_revision_id: request.profile_revision_id,
+    };
+    let context = match resolve_calibration_context(
+        &store,
+        setup_identity
+            .as_ref()
+            .map(|(setup_id, setup_sha256)| (setup_id.as_str(), setup_sha256.as_str())),
+        &context_request,
+    )
+    .await
+    {
+        Ok(context) => context,
+        Err(error) => {
+            return Json(serde_json::json!({
+                "success": true,
+                "available": false,
+                "reason": error,
+            }));
+        }
+    };
+    match store
+        .find_compatible_calibration(
+            &context.profile_id,
+            &context.profile_context_sha256,
+            &context.setup_id,
+            &context.setup_sha256,
+        )
+        .await
+    {
+        Ok(Some(bundle)) => Json(serde_json::json!({
+            "success": true,
+            "available": true,
+            "calibration": bundle.summary(),
+        })),
+        Ok(None) => Json(serde_json::json!({
+            "success": true,
+            "available": false,
+            "reason": "no compatible empty-room calibration exists for this profile and sealed setup",
+            "profile_context_sha256": context.profile_context_sha256,
+            "calibration_context_sha256": context.calibration_context_sha256,
+        })),
+        Err(error) => Json(serde_json::json!({
+            "success": true,
+            "available": false,
+            "reason": format!("stored calibration is unusable: {error}"),
+        })),
+    }
+}
+
+async fn classification_calibration_reuse(
+    State(state): State<SharedState>,
+    Json(request): Json<CalibrationContextRequest>,
+) -> Response {
+    let (store, setup_identity) = {
+        let s = state.read().await;
+        (
+            s.experiment_store.clone(),
+            s.position_setup.as_ref().map(|setup| {
+                (setup.setup_id().to_string(), setup.setup_sha256().to_string())
+            }),
+        )
+    };
+    let Some(store) = store else {
+        return experiment_api_error(
+            StatusCode::SERVICE_UNAVAILABLE,
+            "PERSISTENCE_UNAVAILABLE",
+            "SQLite persistence is unavailable; calibration reuse is unavailable.",
+        );
+    };
+    let context = match resolve_calibration_context(
+        &store,
+        setup_identity
+            .as_ref()
+            .map(|(setup_id, setup_sha256)| (setup_id.as_str(), setup_sha256.as_str())),
+        &request,
+    )
+    .await
+    {
+        Ok(context) => context,
+        Err(error) => return experiment_api_error(StatusCode::CONFLICT, "CALIBRATION_CONTEXT_INVALID", error),
+    };
+    let bundle = match store
+        .find_compatible_calibration(
+            &context.profile_id,
+            &context.profile_context_sha256,
+            &context.setup_id,
+            &context.setup_sha256,
+        )
+        .await
+    {
+        Ok(Some(bundle)) => bundle,
+        Ok(None) => {
+            return experiment_api_error(
+                StatusCode::CONFLICT,
+                "CALIBRATION_NOT_AVAILABLE",
+                "no compatible empty-room calibration exists for this profile and sealed setup",
+            )
+        }
+        Err(error) => {
+            return experiment_api_error(
+                StatusCode::CONFLICT,
+                "CALIBRATION_BUNDLE_INVALID",
+                error,
+            )
+        }
+    };
+
+    let mut s = state.write().await;
+    if s.d5_presence.phase() == d5_presence::CalibrationPhase::Collecting {
+        return experiment_api_error(
+            StatusCode::CONFLICT,
+            "CALIBRATION_RUNNING",
+            "finish or cancel the active empty-room calibration before reusing a stored one",
+        );
+    }
+    if s.position_setup.as_ref().is_none_or(|setup| {
+        setup.setup_id() != context.setup_id || setup.setup_sha256() != context.setup_sha256
+    }) {
+        return experiment_api_error(
+            StatusCode::CONFLICT,
+            "CALIBRATION_CONTEXT_CHANGED",
+            "the sealed setup changed while calibration reuse was being prepared",
+        );
+    }
+    install_calibration_bundle(&mut s.node_states, &bundle);
+    let now = std::time::Instant::now();
+    s.d5_presence.restore_ready(now);
+    s.active_calibration_bundle = Some(Arc::new(bundle.clone()));
+    s.active_calibration_source = Some("reused".to_string());
+    s.calibration_context = Some(context);
+
+    Json(serde_json::json!({
+        "success": true,
+        "status": "ready",
+        "calibration_source": "reused",
+        "calibration_id": bundle.calibration_id.clone(),
+        "calibration_context_sha256": bundle.calibration_context_sha256.clone(),
+        "calibration": bundle.summary(),
+        "message": "Stored D5/D6 empty-room references restored; no new empty-room measurement was required.",
+    }))
+    .into_response()
 }
 
 fn classification_decision_status(
@@ -9978,15 +11806,29 @@ fn public_node_summaries(
                 "status": status,
                 "last_seen_ms": elapsed_ms,
                 "rssi_dbm": rssi,
-                "frame_rate_hz": (ns.csi_fps_samples >= 5).then_some(ns.csi_fps_ema),
+                "frame_rate_hz": (ns.csi_fps_samples > 0).then_some(ns.csi_fps_ema),
                 "frame_rate_samples": ns.csi_fps_samples,
                 "latest_sequence": ns.latest_sequence,
+                "accepted_csi_frames": ns.accepted_csi_frames,
                 "inferred_lost_frames": ns.inferred_lost_frames,
                 "sequence_observations": ns.sequence_observations,
                 "packet_loss_percent": (sequence_total > 0).then_some(
                     (ns.inferred_lost_frames as f64 / sequence_total as f64) * 100.0,
                 ),
                 "sync": ns.sync_snapshot(),
+                "time_quality": {
+                    "host_arrival_monotonic_ns": ns.latest_host_monotonic_ns,
+                    "host_arrival_age_ms": elapsed_ms,
+                    "mesh_timestamp_us": ns.latest_frame_mesh_time_us,
+                    "mesh_status": ns.latest_mesh_time_status,
+                    "fusion_queue_depth": ns.fusion_frame_history.len(),
+                    "candidate_time_source": if ns.latest_frame_mesh_time_us.is_some() {
+                        "mesh"
+                    } else {
+                        "host_monotonic"
+                    },
+                    "mesh_time_reset_count": ns.mesh_time_reset_count,
+                },
                 "motion_level": motion_level,
                 "person_count": person_count,
                 "source_binding_attested": source_binding_attested,
@@ -10073,7 +11915,13 @@ async fn udp_receiver_task(state: SharedState, udp_port: u16) {
 
                     // ── Per-node state for edge vitals (issue #249) ──────
                     let node_id = vitals.node_id;
-                    let ns = s.node_states.entry(node_id).or_insert_with(NodeState::new);
+                    let calibration_bundle = s.active_calibration_bundle.clone();
+                    let ns = s.node_states.entry(node_id).or_insert_with(|| {
+                        NodeState::new_with_calibration(
+                            node_id,
+                            calibration_bundle.as_deref(),
+                        )
+                    });
                     ns.last_frame_time = Some(std::time::Instant::now());
                     ns.edge_vitals = Some(vitals.clone());
                     ns.rssi_history.push_back(vitals.rssi as f64);
@@ -10359,8 +12207,13 @@ async fn udp_receiver_task(state: SharedState, udp_port: u16) {
                                        sync.local_minus_epoch_us());
                                 let mut s = state.write().await;
                                 let node_id = sync.node_id;
-                                let ns =
-                                    s.node_states.entry(node_id).or_insert_with(NodeState::new);
+                                let calibration_bundle = s.active_calibration_bundle.clone();
+                                let ns = s.node_states.entry(node_id).or_insert_with(|| {
+                                    NodeState::new_with_calibration(
+                                        node_id,
+                                        calibration_bundle.as_deref(),
+                                    )
+                                });
                                 ns.apply_sync_packet(sync, std::time::Instant::now());
                                 continue;
                             }
@@ -10505,6 +12358,10 @@ async fn udp_receiver_task(state: SharedState, udp_port: u16) {
                     } else {
                         true
                     };
+                    let matches_pinned_grid = s
+                        .csi_grid_pin
+                        .is_none_or(|grid_pin| grid_pin.matches(&raw_frame));
+                    let matches_runtime_grid = matches_sealed_grid && matches_pinned_grid;
                     let source_binding_observation = match validated_complete_source_binding(
                         raw_frame.source_binding.as_ref(),
                         frame_now,
@@ -10524,19 +12381,25 @@ async fn udp_receiver_task(state: SharedState, udp_port: u16) {
                     // A valid controlled transmitter can emit multiple CSI
                     // symbol grids. Keep its binding fresh, but never mix an
                     // off-grid frame into D5/D6, recording, or live position.
+                    let calibration_bundle = s.active_calibration_bundle.clone();
                     let grid_accepted = s
                         .node_states
                         .entry(frame.node_id)
-                        .or_insert_with(NodeState::new)
+                        .or_insert_with(|| {
+                            NodeState::new_with_calibration(
+                                frame.node_id,
+                                calibration_bundle.as_deref(),
+                            )
+                        })
                         .observe_validated_grid(
                             source_binding_observation,
                             frame.grid(),
-                            matches_sealed_grid,
+                            matches_runtime_grid,
                         );
 
                     if !grid_accepted {
                         debug!(
-                            "node {}: filtering {}-subcarrier {:?} frame (active grid {:?}, sealed grid match {})",
+                            "node {}: filtering {}-subcarrier {:?} frame (active grid {:?}, sealed grid match {}, pinned grid match {})",
                             frame.node_id,
                             frame.n_subcarriers,
                             frame.ppdu_type,
@@ -10544,6 +12407,7 @@ async fn udp_receiver_task(state: SharedState, udp_port: u16) {
                                 .get(&frame.node_id)
                                 .and_then(|ns| ns.active_grid),
                             matches_sealed_grid,
+                            matches_pinned_grid,
                         );
                         continue;
                     }
@@ -10625,10 +12489,20 @@ async fn udp_receiver_task(state: SharedState, udp_port: u16) {
                     // to avoid unsafe raw pointer (review finding #2).
                     let adaptive_model_clone = s.adaptive_model.clone();
                     let d5_phase = s.d5_presence.phase();
+                    let calibration_bundle = s.active_calibration_bundle.clone();
 
-                    let ns = s.node_states.entry(node_id).or_insert_with(NodeState::new);
+                    let ns = s.node_states.entry(node_id).or_insert_with(|| {
+                        NodeState::new_with_calibration(
+                            node_id,
+                            calibration_bundle.as_deref(),
+                        )
+                    });
                     let (features, mut classification) =
                         observe_frame_for_presence(ns, &frame, frame_now, d5_phase);
+                    ns.observe_live_fusion_frame(
+                        &frame.amplitudes,
+                        host_time.host_monotonic_ns,
+                    );
 
                     // Adaptive override using cloned model (safe, no raw pointers).
                     if let Some(ref model) = adaptive_model_clone {
@@ -11833,6 +13707,12 @@ fn validate_position_setup_server_mode(args: &Args) -> Result<(), String> {
     if args.position_setup.is_none() {
         return Ok(());
     }
+    if args.csi_grid_pin.is_some() {
+        return Err(
+            "--csi-grid-pin cannot be combined with --position-setup; the sealed receiver grids are authoritative"
+                .to_string(),
+        );
+    }
     let conflicts_with_normal_server = args.replay_calibration.is_some()
         || !args.replay_measurement.is_empty()
         || args.replay_report.is_some()
@@ -12026,6 +13906,15 @@ mod position_offline_cli_tests {
             "empty.raw-csi.v1.jsonl",
         ]);
         assert!(validate_position_setup_server_mode(&replay).is_err());
+
+        let duplicate_grid_authority = parse(&[
+            "sensing-server",
+            "--position-setup",
+            "sealed-setup.json",
+            "--csi-grid-pin",
+            "2437,1,64,0,0",
+        ]);
+        assert!(validate_position_setup_server_mode(&duplicate_grid_authority).is_err());
     }
 
     #[test]
@@ -12336,6 +14225,16 @@ async fn main() {
     if let Err(error) = validate_position_setup_server_mode(&args) {
         eprintln!("Position setup usage error: {error}");
         std::process::exit(2);
+    }
+    if let Some(grid_pin) = args.csi_grid_pin {
+        info!(
+            "Pre-setup CSI grid pin active: {}MHz/{}ant/{}sc/ppdu{}/flags0x{:02x}",
+            grid_pin.center_frequency_mhz,
+            grid_pin.antenna_count,
+            grid_pin.subcarrier_count,
+            grid_pin.ppdu_type,
+            grid_pin.layout_flags,
+        );
     }
     let position_setup = match args.position_setup.as_deref() {
         Some(path) => match position_setup::load_position_setup_for_current_executable(path) {
@@ -13204,6 +15103,68 @@ async fn main() {
         }
     };
 
+    // Restore the newest calibration only when the current profile still has
+    // the same baseline-relevant context. A label or P01-P09 change keeps the
+    // context and can reuse the bundle; a moved TX/RX, changed room metadata,
+    // or changed sealed setup leaves the server uncalibrated.
+    let restored_calibration = if let (Some(store), Some(setup)) =
+        (experiment_store.as_ref(), position_setup.as_deref())
+    {
+        match store
+            .latest_calibration_for_setup(setup.setup_id(), setup.setup_sha256())
+            .await
+        {
+            Ok(Some(bundle)) => match store.get_profile(&bundle.profile_id).await {
+                Ok(Some(profile)) => match calibration_persistence::profile_context_sha256(
+                    &profile.document,
+                ) {
+                    Ok(context) if context == bundle.profile_context_sha256 => {
+                        info!(
+                            "Restored persisted D5/D6 calibration {} for setup {}",
+                            bundle.calibration_id,
+                            setup.setup_id()
+                        );
+                        Some(Arc::new(bundle))
+                    }
+                    Ok(_) => {
+                        info!(
+                            "Persisted D5/D6 calibration is stale for the current setup profile; new empty-room calibration required"
+                        );
+                        None
+                    }
+                    Err(error) => {
+                        warn!("Could not derive current profile calibration context: {error}");
+                        None
+                    }
+                },
+                Ok(None) => {
+                    warn!(
+                        "Persisted D5/D6 calibration references a missing profile; ignoring it"
+                    );
+                    None
+                }
+                Err(error) => {
+                    warn!("Could not read persisted calibration profile: {error}");
+                    None
+                }
+            },
+            Ok(None) => None,
+            Err(error) => {
+                warn!("Could not restore persisted D5/D6 calibration: {error}");
+                None
+            }
+        }
+    } else {
+        None
+    };
+    let restored_calibration_context = restored_calibration
+        .as_ref()
+        .map(|bundle| bundle.context());
+    let mut initial_d5_presence = d5_presence::PresenceFusionState::default();
+    if restored_calibration.is_some() {
+        initial_d5_presence.restore_ready(std::time::Instant::now());
+    }
+
     // ADR-102: optional Edge Module Registry. None when --no-edge-registry
     // is set (or when the URL is empty); otherwise we construct one with
     // the configured TTL. The fetch happens lazily on first request.
@@ -13286,13 +15247,22 @@ async fn main() {
         );
     }
 
-    // ADR-262 P3: build the live RuField surface (dedicated ed25519 signer from
-    // WDP_RUFIELD_SIGNING_SEED, else a logged dev default). The same Arc is
-    // stored in AppStateInner (so the sensing loop can `emit()` per cycle) and
-    // cloned into the additive `/api/field` + `/ws/field` router below.
-    let field_surface: rufield_surface::FieldState =
-        Arc::new(RwLock::new(rufield_surface::FieldSurface::from_env()));
+    // ADR-262 P3: build the live RuField surface with a provisioned ed25519
+    // signer. A missing or malformed seed is a startup error: live events must
+    // never be signed with a publicly recoverable fallback key.
+    let field_surface: rufield_surface::FieldState = match
+        rufield_surface::FieldSurface::from_env()
+    {
+        Ok(surface) => Arc::new(RwLock::new(surface)),
+        Err(error) => {
+            tracing::error!("RuField surface configuration rejected: {error}");
+            std::process::exit(78);
+        }
+    };
 
+    let mmwave_url_configured = args.mmwave_node_url.is_some();
+    let mmwave_token_configured = std::env::var(&args.mmwave_token_env)
+        .is_ok_and(|token| !token.trim().is_empty());
     let mmwave_control = args.mmwave_node_url.as_ref().and_then(|base_url| {
         match std::env::var(&args.mmwave_token_env) {
             Ok(bearer_token) if !bearer_token.trim().is_empty() => {
@@ -13311,6 +15281,50 @@ async fn main() {
         }
     });
 
+    let mut mmwave_manager = mmwave_calibration::MmwaveManager::new(
+        args.mmwave_udp_port,
+        runtime_position_geometry.room_dimensions,
+        mmwave_control,
+        position_setup
+            .as_deref()
+            .and_then(position_setup::SealedPositionSetup::mmwave)
+            .map(|definition| {
+                let (origin_x_mm, origin_z_mm, yaw_mdeg, raw_x_inverted) = definition.transform();
+                mmwave_calibration::ExpectedNode {
+                    node_id: definition.node_id().to_string(),
+                    mounting_position_m: Some(definition.mounting_position_m()),
+                    transform: mmwave_calibration::CoordinateFrame {
+                        local: "x_right_y_forward_mm".to_string(),
+                        room: "x_length_z_width_mm".to_string(),
+                        origin_x_mm,
+                        origin_z_mm,
+                        yaw_mdeg,
+                        raw_x_inverted,
+                    },
+                }
+            }),
+        position_setup.as_deref().and_then(|setup| {
+            setup.mmwave()?;
+            Some(mmwave_calibration::ExperimentContext {
+                setup_id: setup.setup_id().to_string(),
+                setup_sha256: setup.setup_sha256().to_string(),
+                server_version: env!("CARGO_PKG_VERSION").to_string(),
+                geometry: position_capture::PositionCaptureGeometry {
+                    room_dimensions_m: setup.room_dimensions_m(),
+                    tx_position_m: setup.transmitter_position_m(),
+                    rx_positions_m: setup.receiver_positions_m().to_vec(),
+                },
+            })
+        }),
+    );
+    mmwave_manager.set_node_control_configuration(
+        mmwave_url_configured,
+        mmwave_token_configured,
+    );
+    if let Err(error) = mmwave_manager.restore_session_manifests(&data_dir) {
+        warn!("Could not restore mmWave session manifests: {error}");
+    }
+
     let state: SharedState = Arc::new(RwLock::new(AppStateInner {
         latest_update: None,
         rssi_history: VecDeque::new(),
@@ -13320,42 +15334,9 @@ async fn main() {
         tx_position: runtime_position_geometry.tx_position,
         room_dimensions: runtime_position_geometry.room_dimensions,
         position_setup: position_setup.clone(),
-        mmwave: mmwave_calibration::MmwaveManager::new(
-            args.mmwave_udp_port,
-            runtime_position_geometry.room_dimensions,
-            mmwave_control,
-            position_setup
-                .as_deref()
-                .and_then(position_setup::SealedPositionSetup::mmwave)
-                .map(|definition| {
-                    let (origin_x_mm, origin_z_mm, yaw_mdeg, raw_x_inverted) =
-                        definition.transform();
-                    mmwave_calibration::ExpectedNode {
-                        node_id: definition.node_id().to_string(),
-                        transform: mmwave_calibration::CoordinateFrame {
-                            local: "x_right_y_forward_mm".to_string(),
-                            room: "x_length_z_width_mm".to_string(),
-                            origin_x_mm,
-                            origin_z_mm,
-                            yaw_mdeg,
-                            raw_x_inverted,
-                        },
-                    }
-                }),
-            position_setup.as_deref().and_then(|setup| {
-                setup.mmwave()?;
-                Some(mmwave_calibration::ExperimentContext {
-                    setup_id: setup.setup_id().to_string(),
-                    setup_sha256: setup.setup_sha256().to_string(),
-                    server_version: env!("CARGO_PKG_VERSION").to_string(),
-                    geometry: position_capture::PositionCaptureGeometry {
-                        room_dimensions_m: setup.room_dimensions_m(),
-                        tx_position_m: setup.transmitter_position_m(),
-                        rx_positions_m: setup.receiver_positions_m().to_vec(),
-                    },
-                })
-            }),
-        ),
+        csi_grid_pin: args.csi_grid_pin,
+        mmwave: mmwave_manager,
+        mmwave_node_diagnostics: MmwaveNodeDiagnosticsCache::default(),
         live_position_tracker: position_live::LivePositionTracker::new(live_position_runtime),
         last_esp32_frame: None,
         last_raw_csi_frame: None,
@@ -13423,7 +15404,11 @@ async fn main() {
                 })
                 .filter(|m| adaptive_model_is_trusted(m.training_accuracy)),
         node_states: HashMap::new(),
-        d5_presence: d5_presence::PresenceFusionState::default(),
+        d5_presence: initial_d5_presence,
+        active_calibration_bundle: restored_calibration,
+        active_calibration_source: Some("restored".to_string())
+            .filter(|_| restored_calibration_context.is_some()),
+        calibration_context: restored_calibration_context,
         // Accuracy sprint
         pose_tracker: PoseTracker::new(),
         last_tracker_instant: None,
@@ -13492,6 +15477,8 @@ async fn main() {
         tokio::spawn(simulated_data_task(state.clone(), args.tick_ms));
     }
     tokio::spawn(mmwave_receiver_task(state.clone(), args.mmwave_udp_port));
+    spawn_mmwave_node_diagnostics_poller(state.clone());
+    spawn_mmwave_session_ticker(state.clone());
 
     // ADR-166: Parse bind address once, use for all listeners
     let bind_ip: std::net::IpAddr = args
@@ -13499,9 +15486,10 @@ async fn main() {
         .parse()
         .expect("Invalid --bind-addr (use 127.0.0.1 or 0.0.0.0)");
 
-    // #443: optional bearer-token auth on `/api/v1/*`. `RUVIEW_API_TOKEN`
-    // unset/empty ⇒ middleware is a no-op (LAN-mode default preserved); set ⇒
-    // every `/api/v1/*` request must carry `Authorization: Bearer <token>`.
+    // #443: bearer-token auth on `/api/v1/*`. A token is optional only for a
+    // loopback-bound server; routable binds refuse to start without one.
+    // When configured, every `/api/v1/*` request must carry
+    // `Authorization: Bearer <token>`.
     let bearer_auth_state = wifi_densepose_sensing_server::bearer_auth::AuthState::from_env();
     if bearer_auth_state.is_enabled() {
         info!("API auth: bearer-token enforcement ON for /api/v1/* (RUVIEW_API_TOKEN set)");
@@ -13512,8 +15500,16 @@ async fn main() {
             );
         }
     } else {
+        if !bind_ip.is_loopback() {
+            tracing::error!(
+                "Refusing non-loopback bind on {bind_ip} without RUVIEW_API_TOKEN; \
+                 set a strong bearer token before exposing the sensing API"
+            );
+            std::process::exit(64);
+        }
         info!(
-            "API auth: OFF — /api/v1/* is unauthenticated. Set RUVIEW_API_TOKEN=<token> to enforce bearer auth."
+            "API auth: loopback-only mode — set RUVIEW_API_TOKEN=<token> before using a \
+             routable --bind-addr"
         );
     }
 
@@ -13541,6 +15537,29 @@ async fn main() {
         allowlist
     };
 
+    let browser_origin_allowlist =
+        wifi_densepose_sensing_server::host_validation::BrowserOriginAllowlist::from_cli_and_env(
+            args.allowed_origins.iter().cloned(),
+            args.http_port,
+        )
+        .unwrap_or_else(|error| {
+            tracing::error!("Invalid browser Origin configuration: {error}");
+            std::process::exit(64);
+        });
+    let browser_origin_count = browser_origin_allowlist.entries_for_test().len();
+    if browser_origin_count == 0 {
+        warn!(
+            "Browser Origin validation has no allowed origins because --http-port is 0; \
+             configure --allowed-origin or {} before using browser clients",
+            wifi_densepose_sensing_server::host_validation::ALLOWED_ORIGINS_ENV
+        );
+    } else {
+        info!(
+            "Browser Origin validation ON ({} exact origin(s))",
+            browser_origin_count
+        );
+    }
+
     // WebSocket server on dedicated port (8765)
     let ws_state = state.clone();
     let ws_app = Router::new()
@@ -13551,6 +15570,12 @@ async fn main() {
         // so a client on :8765 can stream signed RuField FieldEvents alongside
         // `/ws/sensing`. Merged with its own FieldState (different state type).
         .merge(rufield_surface::router(field_surface.clone()))
+        // Browser WebSocket handshakes carry an Origin but are not protected
+        // by CORS; reject foreign origins before the handler can upgrade.
+        .layer(axum::middleware::from_fn_with_state(
+            browser_origin_allowlist.clone(),
+            wifi_densepose_sensing_server::host_validation::require_safe_browser_origin,
+        ))
         .layer(axum::middleware::from_fn_with_state(
             host_allowlist.clone(),
             wifi_densepose_sensing_server::host_validation::require_allowed_host,
@@ -13605,6 +15630,10 @@ async fn main() {
         .route(
             "/api/v1/experiments/setup-profiles/:id",
             put(setup_profile_update),
+        )
+        .route(
+            "/api/v1/experiments/setup-profiles/:id/setup-v2-draft",
+            get(setup_profile_v2_draft),
         )
         .route(
             "/api/v1/experiments/workflows",
@@ -13712,6 +15741,14 @@ async fn main() {
             "/api/v1/classification/calibration/status",
             get(classification_calibration_status),
         )
+        .route(
+            "/api/v1/classification/calibration/availability",
+            get(classification_calibration_availability),
+        )
+        .route(
+            "/api/v1/classification/calibration/reuse",
+            post(classification_calibration_reuse),
+        )
         // Field model calibration (eigenvalue-based person counting)
         .route("/api/v1/calibration/start", post(calibration_start))
         .route("/api/v1/calibration/stop", post(calibration_stop))
@@ -13731,10 +15768,10 @@ async fn main() {
             axum::http::header::CACHE_CONTROL,
             HeaderValue::from_static("no-cache, no-store, must-revalidate"),
         ))
-        // Opt-in bearer-token auth on `/api/v1/*` (#443). When `RUVIEW_API_TOKEN`
-        // is unset/empty the middleware is a no-op — the default stays
-        // LAN-mode-friendly. `/health*`, `/ws/sensing`, and `/ui/*` are never
-        // gated (orchestrator probes + local browsers).
+        // Bearer-token auth on `/api/v1/*` (#443). It is optional only for a
+        // loopback-bound server; routable binds are rejected above without a
+        // configured token. `/health*` and `/ui/*` remain public, while live
+        // WebSockets additionally pass through the browser-origin boundary.
         .layer(axum::middleware::from_fn_with_state(
             bearer_auth_state.clone(),
             wifi_densepose_sensing_server::bearer_auth::require_bearer,
@@ -13748,6 +15785,13 @@ async fn main() {
         // runs first, over the whole merged router). The surface's own §10
         // egress gate is what keeps above-policy classes off the wire.
         .merge(rufield_surface::router(field_surface.clone()))
+        // Reject foreign browser Origins on state-changing `/api/v1/*`
+        // requests and every live WebSocket route. The Host layer below still
+        // provides the DNS-rebinding defense.
+        .layer(axum::middleware::from_fn_with_state(
+            browser_origin_allowlist.clone(),
+            wifi_densepose_sensing_server::host_validation::require_safe_browser_origin,
+        ))
         // DNS-rebinding defense: applied last so it runs first on the request
         // path (axum layers run outermost-in). Rejects requests whose `Host`
         // header is not in the allowlist before any handler — including
@@ -14072,13 +16116,18 @@ mod sync_snapshot_helper_tests {
     #[test]
     fn accepted_csi_frame_records_mesh_timestamp_for_fusion() {
         let mut ns = NodeState::new();
+        let now = std::time::Instant::now() - std::time::Duration::from_secs(4);
         let sync = populated_sync(9);
-        let expected = sync.mesh_aligned_us_for_sequence(22, 20.0);
-        let now = std::time::Instant::now();
         ns.apply_sync_packet(sync, now);
+        let mut second = populated_sync(9);
+        second.sequence = 60;
+        second.local_us += 2_000_000;
+        second.epoch_us += 2_000_000;
+        ns.apply_sync_packet(second.clone(), now + std::time::Duration::from_secs(2));
+        let expected = second.mesh_aligned_us_for_sequence(62, 20.0);
 
-        let frame_time = now + std::time::Duration::from_millis(50);
-        ns.observe_accepted_csi_frame(22, frame_time);
+        let frame_time = now + std::time::Duration::from_millis(2_050);
+        ns.observe_accepted_csi_frame(62, frame_time);
 
         assert_eq!(ns.last_frame_time, Some(frame_time));
         assert_eq!(ns.latest_frame_mesh_time_us, Some(expected));
@@ -14104,6 +16153,148 @@ mod sync_snapshot_helper_tests {
         assert_eq!(cur.sequence, 40); // newer sequence persisted
         assert_eq!(cur.local_us, 30_000_000); // newer local persisted
         assert_eq!(ns.latest_sync_at, Some(t1)); // staleness clock reset
+    }
+
+    #[test]
+    fn sync_intervals_estimate_sequence_rate_despite_lost_csi_packets() {
+        let mut ns = NodeState::new();
+        let t0 = std::time::Instant::now() - std::time::Duration::from_secs(4);
+        let mut first = populated_sync(9);
+        first.sequence = 100;
+        first.local_us = 1_000_000;
+        first.epoch_us = 1_000_000;
+        ns.apply_sync_packet(first, t0);
+
+        let mut second = populated_sync(9);
+        second.sequence = 140;
+        second.local_us = 3_000_000;
+        second.epoch_us = 3_000_000;
+        ns.apply_sync_packet(second, t0 + std::time::Duration::from_secs(2));
+
+        assert_eq!(ns.csi_fps_samples, 1);
+        assert!((ns.csi_fps_ema - 20.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn sync_fps_estimation_handles_sequence_wrap() {
+        let mut ns = NodeState::new();
+        let t0 = std::time::Instant::now() - std::time::Duration::from_secs(4);
+        let mut first = populated_sync(9);
+        first.sequence = u32::MAX - 9;
+        first.local_us = 1_000_000;
+        first.epoch_us = 1_000_000;
+        ns.apply_sync_packet(first, t0);
+
+        let mut second = populated_sync(9);
+        second.sequence = 10;
+        second.local_us = 3_000_000;
+        second.epoch_us = 3_000_000;
+        ns.apply_sync_packet(second, t0 + std::time::Duration::from_secs(2));
+
+        assert_eq!(ns.csi_fps_samples, 1);
+        assert!((ns.csi_fps_ema - 10.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn invalid_sync_is_never_used_for_mesh_time() {
+        let mut ns = NodeState::new();
+        let mut sync = populated_sync(9);
+        sync.flags.is_valid = false;
+        ns.apply_sync_packet(sync, std::time::Instant::now());
+
+        assert!(ns.mesh_aligned_us_for_csi_frame(20).is_none());
+    }
+
+    #[test]
+    fn frame_older_than_sync_high_water_fails_closed() {
+        let mut ns = NodeState::new();
+        let t0 = std::time::Instant::now() - std::time::Duration::from_secs(4);
+        let mut first = populated_sync(9);
+        first.sequence = 100;
+        first.local_us = 1_000_000;
+        first.epoch_us = 1_000_000;
+        ns.apply_sync_packet(first, t0);
+        let mut second = populated_sync(9);
+        second.sequence = 120;
+        second.local_us = 3_000_000;
+        second.epoch_us = 3_000_000;
+        ns.apply_sync_packet(second, t0 + std::time::Duration::from_secs(2));
+
+        assert!(ns.mesh_aligned_us_for_csi_frame(119).is_none());
+    }
+
+    #[test]
+    fn implausible_forward_sequence_jump_fails_closed() {
+        let mut ns = NodeState::new();
+        let t0 = std::time::Instant::now() - std::time::Duration::from_secs(4);
+        let mut first = populated_sync(9);
+        first.sequence = 100;
+        first.local_us = 1_000_000;
+        first.epoch_us = 1_000_000;
+        ns.apply_sync_packet(first, t0);
+        let mut second = populated_sync(9);
+        second.sequence = 120;
+        second.local_us = 3_000_000;
+        second.epoch_us = 3_000_000;
+        ns.apply_sync_packet(second, t0 + std::time::Duration::from_secs(2));
+
+        assert!(ns.mesh_aligned_us_for_csi_frame(10_000).is_none());
+    }
+
+    #[test]
+    fn node_reboot_resets_rate_and_requires_a_fresh_sync_interval() {
+        let mut ns = NodeState::new();
+        let t0 = std::time::Instant::now() - std::time::Duration::from_secs(6);
+        let mut first = populated_sync(9);
+        first.sequence = 100;
+        first.local_us = 10_000_000;
+        first.epoch_us = 10_000_000;
+        ns.apply_sync_packet(first, t0);
+        let mut second = populated_sync(9);
+        second.sequence = 140;
+        second.local_us = 12_000_000;
+        second.epoch_us = 12_000_000;
+        ns.apply_sync_packet(second, t0 + std::time::Duration::from_secs(2));
+        assert_eq!(ns.csi_fps_samples, 1);
+        ns.fusion_frame_history.push_back(FusionFrameSample {
+            amplitude: vec![1.0; 56],
+            host_monotonic_us: 10_000,
+            mesh_timestamp_us: Some(10_000),
+        });
+
+        let mut rebooted = populated_sync(9);
+        rebooted.sequence = 3;
+        rebooted.local_us = 200_000;
+        rebooted.epoch_us = 200_000;
+        ns.apply_sync_packet(rebooted, t0 + std::time::Duration::from_secs(4));
+
+        assert_eq!(ns.csi_fps_samples, 0);
+        assert!(
+            ns.fusion_frame_history.is_empty(),
+            "a reboot must not bridge pre-reboot frames into the next quartet"
+        );
+        assert!(ns.mesh_aligned_us_for_csi_frame(4).is_none());
+    }
+
+    #[test]
+    fn regressing_csi_sequence_is_excluded_from_fusion_queue() {
+        let mut ns = NodeState::new();
+        ns.latest_sequence = Some(100);
+        ns.fusion_frame_history.push_back(FusionFrameSample {
+            amplitude: vec![1.0; 56],
+            host_monotonic_us: 10_000,
+            mesh_timestamp_us: Some(10_000),
+        });
+
+        let now = std::time::Instant::now();
+        ns.observe_accepted_csi_frame(90, now);
+        assert!(ns.fusion_frame_history.is_empty());
+
+        ns.observe_live_fusion_frame(&[1.0; 56], 11_000_000);
+        assert!(
+            ns.fusion_frame_history.is_empty(),
+            "the regressing frame itself must remain out of fusion"
+        );
     }
 
     #[test]
@@ -14176,6 +16367,8 @@ mod sync_snapshot_helper_tests {
         let mut ns = NodeState::new();
         let now = std::time::Instant::now();
         ns.latest_sync = Some(populated_sync(9));
+        ns.csi_fps_ema = 20.0;
+        ns.csi_fps_samples = 1;
 
         // Fresh: 1 s old → should return Some.
         ns.latest_sync_at = now.checked_sub(std::time::Duration::from_secs(1));

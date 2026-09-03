@@ -24,11 +24,9 @@
 //! but: (a) it is the **single-link CSI** sensing with its existing caveats —
 //! there is **no validated room-coordinate accuracy** (`field_localize` says so;
 //! positions are "strongest field peak", not triangulation); (b) the signing
-//! key is a **dedicated dev/sensing key** pending the ADR-262 §8 Q1 ownership
-//! decision (reusing the `cog-ha-matter` Ed25519 key is the **deferred P2**
-//! call — P3 deliberately uses a standalone key so it does not pre-empt that);
-//! (c) **no accuracy is claimed.** The win is narrowly: "RuView's live sensing
-//! now speaks RuField on `/ws/field`."
+//! seed is mandatory configuration and is never replaced with a built-in
+//! fallback; (c) **no accuracy is claimed.** The win is narrowly: "RuView's
+//! live sensing now speaks RuField on `/ws/field`."
 
 use std::collections::VecDeque;
 use std::sync::Arc;
@@ -60,14 +58,8 @@ pub const FIELD_RING_CAPACITY: usize = 64;
 pub const FIELD_BROADCAST_CAPACITY: usize = 256;
 
 /// Environment variable carrying the 32-byte hex/raw signing seed for the
-/// dedicated RuField sensing signer. When unset, a deterministic dev default is
-/// used (with a logged warning). See [`FieldSurface::from_env`].
+/// dedicated RuField sensing signer. It is required by [`FieldSurface::from_env`].
 pub const SIGNING_SEED_ENV: &str = "WDP_RUFIELD_SIGNING_SEED";
-
-/// Deterministic dev signing seed used when [`SIGNING_SEED_ENV`] is unset. This
-/// is a **dev/sensing key**, intentionally standalone (ADR-262 §8 Q1 — the
-/// `cog-ha-matter` key reuse is the deferred P2 decision, not pre-empted here).
-const DEV_SIGNING_SEED: &[u8; 32] = b"adr262-ruview-rufield-dev-seed!!";
 
 /// The live RuField surface state held in `AppStateInner` (ADR-262 P3).
 ///
@@ -79,9 +71,9 @@ pub struct FieldSurface {
     recent: VecDeque<FieldEvent>,
     /// Broadcast topic for `/ws/field` (JSON-serialized `FieldEvent`s).
     tx: broadcast::Sender<String>,
-    /// True when the dev default seed is in use (drives a one-time warning and
-    /// is surfaced in `/api/field` metadata so operators can see they are on a
-    /// dev key).
+    /// True only when an explicit caller marks the supplied seed as a
+    /// development key. The live environment constructor always sets this to
+    /// false and never supplies a default seed.
     using_dev_key: bool,
 }
 
@@ -101,33 +93,23 @@ impl FieldSurface {
     /// Build a surface from the environment (ADR-262 §4 P3 / open-question 1).
     ///
     /// Reads [`SIGNING_SEED_ENV`] as either a 64-char hex string or a raw 32+
-    /// byte UTF-8 value (first 32 bytes used). When unset/invalid it falls back
-    /// to the deterministic [`DEV_SIGNING_SEED`] and logs a `WARN` — the key is
-    /// a standalone **dev/sensing** key, NOT the deferred-P2 `cog-ha-matter`
-    /// key.
-    #[must_use]
-    pub fn from_env() -> Self {
-        match std::env::var(SIGNING_SEED_ENV)
-            .ok()
-            .and_then(|v| parse_seed(&v))
-        {
-            Some(seed) => {
-                tracing::info!(
-                    "ADR-262 P3: RuField surface using signing seed from {SIGNING_SEED_ENV} \
-                     (dedicated sensing key)"
-                );
-                Self::from_seed(&seed, false)
-            }
-            None => {
-                tracing::warn!(
-                    "ADR-262 P3: {SIGNING_SEED_ENV} unset/invalid — RuField surface using the \
-                     DETERMINISTIC DEV signing key. This is a dev/sensing key pending the \
-                     ADR-262 §8 Q1 (P2) key-ownership decision; set {SIGNING_SEED_ENV} (64-hex \
-                     or 32-byte value) for a real deployment."
-                );
-                Self::from_seed(DEV_SIGNING_SEED, true)
-            }
-        }
+    /// byte UTF-8 value (first 32 bytes used). Missing or malformed
+    /// configuration is rejected so live events can never be signed with a
+    /// publicly recoverable key.
+    pub fn from_env() -> Result<Self, String> {
+        let raw = std::env::var(SIGNING_SEED_ENV).map_err(|_| {
+            format!(
+                "{SIGNING_SEED_ENV} is required; set a 64-character hex seed or a 32-byte value"
+            )
+        })?;
+        let seed = parse_seed(&raw).ok_or_else(|| {
+            format!("{SIGNING_SEED_ENV} is invalid; use a 64-character hex seed or a 32-byte value")
+        })?;
+        tracing::info!(
+            "ADR-262 P3: RuField surface using signing seed from {SIGNING_SEED_ENV} \
+             (dedicated sensing key)"
+        );
+        Ok(Self::from_seed(&seed, false))
     }
 
     /// The public key of the dedicated signer (hex), so consumers can verify
@@ -137,7 +119,7 @@ impl FieldSurface {
         self.signer.public_hex()
     }
 
-    /// Whether the dev default key is in use.
+    /// Whether the explicitly supplied seed was marked as a development key.
     #[must_use]
     pub fn using_dev_key(&self) -> bool {
         self.using_dev_key
@@ -214,7 +196,7 @@ fn parse_seed(v: &str) -> Option<[u8; 32]> {
         return Some(out);
     }
     // Otherwise: first 32 bytes of the raw value (must be at least 32 long so a
-    // short/typo'd value fails closed to the dev key rather than a weak key).
+    // short/typo'd value is rejected rather than silently weakening the key).
     let bytes = v.as_bytes();
     if bytes.len() >= 32 {
         let mut out = [0u8; 32];
@@ -345,6 +327,8 @@ mod tests {
     use super::*;
     use wifi_densepose_rufield::{is_fusable, PrivacyClass};
 
+    const TEST_SIGNING_SEED: &[u8; 32] = &[0x42; 32];
+
     fn features() -> SensingFeatures {
         SensingFeatures {
             mean_rssi: -55.0,
@@ -374,13 +358,13 @@ mod tests {
         assert_eq!(parsed[31], 0xff);
         // Raw 32-byte value.
         assert!(parse_seed("0123456789abcdef0123456789abcdef").is_some());
-        // Too short → fail closed (None → dev key).
+        // Too short → reject rather than silently selecting a weak fallback.
         assert!(parse_seed("short").is_none());
     }
 
     #[test]
     fn anonymous_cycle_surfaces_fusable_event() {
-        let mut surface = FieldSurface::from_seed(DEV_SIGNING_SEED, true);
+        let mut surface = FieldSurface::from_seed(TEST_SIGNING_SEED, true);
         let snap = build_snapshot(
             1_791_986_400_000_000_000,
             "esp32_room_01".into(),
@@ -404,7 +388,7 @@ mod tests {
     fn derived_cycle_never_surfaces_low_privacy() {
         // The privacy-safety pin: a Derived (identity) cycle maps to P4/P5 and
         // is held edge-local — it must NEVER appear on the network surface.
-        let mut surface = FieldSurface::from_seed(DEV_SIGNING_SEED, true);
+        let mut surface = FieldSurface::from_seed(TEST_SIGNING_SEED, true);
         for identity_bound in [false, true] {
             let snap = build_snapshot(
                 1_791_986_400_000_000_000,
@@ -429,7 +413,7 @@ mod tests {
 
     #[test]
     fn ring_buffer_is_bounded() {
-        let mut surface = FieldSurface::from_seed(DEV_SIGNING_SEED, true);
+        let mut surface = FieldSurface::from_seed(TEST_SIGNING_SEED, true);
         for i in 0..(FIELD_RING_CAPACITY + 10) {
             let snap = build_snapshot(
                 1_791_986_400_000_000_000 + i as u64,

@@ -389,7 +389,7 @@ The first-class provenance badge requires each entity to carry its lineage. Conv
 
 ### 11.10 Auth, credentials, config
 
-- **Browser → gateway:** one long-lived access token (the §4.10 LLAT), sent as `Authorization: Bearer`; validated by `homecore-api`'s `LongLivedTokenStore`. The dev default (`allow_any_non_empty`) stays for local runs; production provisions `HOMECORE_TOKENS`.
+- **Browser → gateway:** one long-lived access token (the §4.10 LLAT), sent as `Authorization: Bearer`; validated by `homecore-api`'s `LongLivedTokenStore`. `HOMECORE_TOKENS` is the only boot-time provisioning path; an unset or empty store is locked and rejects every bearer.
 - **Gateway → upstreams:** SEED bearer tokens and the calibration token live **only** server-side (SEED registry + `HOMECORE_CALIBRATION_TOKEN`); never sent to the browser. This is the reason the gateway exists.
 - **Config:** `HOMECORE_CALIBRATION_URL`, SEED registry store path, per-proxy timeout (default 2 s), `HOMECORE_UI_DEMO` (dev fixture). No browser CORS needed (same origin); gateway→upstream is server-to-server.
 
@@ -441,4 +441,4 @@ A high-effort public-PR review of the merged gateway + front-end surfaced the fo
 
 **Known limitations carried forward (not regressions):**
 - **`reqwest` rustls-only is a workspace-wide concern.** `homecore-server` opts into `rustls-tls` only, but cargo feature-unification means any sibling crate enabling the default `native-tls` re-introduces OpenSSL into the final binary. A true "no OpenSSL on the appliance" guarantee requires aligning **every** reqwest-pulling crate on rustls-only — out of scope for this PR; documented at the dependency in `Cargo.toml`.
-- **DEV-mode auth.** When `HOMECORE_TOKENS` is unset, the token store falls back to `allow_any_non_empty()` (any non-empty bearer accepted) on `0.0.0.0`. This is pre-existing and intentionally **unchanged** here; the loud boot `warn!` is retained. Provision real tokens (`HOMECORE_TOKENS=…`) before exposing the server to a network.
+- **Locked default.** When `HOMECORE_TOKENS` is unset or empty, the token store remains locked and rejects every bearer, including on the default `0.0.0.0` bind. Provision explicit tokens (`HOMECORE_TOKENS=…`) before using the API; there is no wildcard development mode.

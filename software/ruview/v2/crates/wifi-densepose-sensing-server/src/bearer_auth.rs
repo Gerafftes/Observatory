@@ -3,10 +3,10 @@
 //! When the `RUVIEW_API_TOKEN` environment variable is set, every request
 //! whose path begins with `/api/v1/` must carry a matching
 //! `Authorization: Bearer <token>` header, otherwise the server responds with
-//! `401 Unauthorized`. When the env var is unset (or empty), the middleware is
-//! a no-op and the API stays unauthenticated — preserving the long-standing
-//! LAN-only deployment posture documented in the issue. This is a binary,
-//! deployment-time switch with **no default authentication change**.
+//! `401 Unauthorized`. The binary permits an unset token only when it binds to
+//! loopback; routable deployments are refused before listeners start. This
+//! keeps local development convenient without leaving a LAN API open by
+//! default.
 //!
 //! Endpoints outside `/api/v1/*` (`/health*`, `/ws/sensing`, the static `/ui/*`
 //! mount, `/`) are intentionally **not** gated:
@@ -28,7 +28,9 @@ use axum::{
     response::{IntoResponse, Response},
 };
 
-/// Environment variable that gates the middleware. Unset / empty ⇒ auth off.
+/// Environment variable that configures the API token. Unset / empty means
+/// loopback-only mode in the binary; the middleware itself remains a reusable
+/// no-op for unit tests and library callers.
 pub const API_TOKEN_ENV: &str = "RUVIEW_API_TOKEN";
 
 /// Path prefix the middleware protects when auth is enabled.
@@ -37,7 +39,8 @@ pub const PROTECTED_PREFIX: &str = "/api/v1/";
 /// Cheap, cloneable handle to the configured token (or `None`).
 #[derive(Debug, Clone, Default)]
 pub struct AuthState {
-    /// The expected bearer token, if any. `None` ⇒ middleware is a no-op.
+    /// The expected bearer token, if any. `None` ⇒ middleware is a no-op; the
+    /// binary's bind-address guard supplies the deployment boundary.
     token: Option<Arc<String>>,
 }
 
@@ -55,10 +58,10 @@ impl AuthState {
     }
 
     /// Read [`API_TOKEN_ENV`] from the process environment. Returns
-    /// `AuthState { token: None }` when the variable is unset or empty.
+    /// `AuthState { token: None }` when the variable is unset or whitespace.
     pub fn from_env() -> Self {
         match std::env::var(API_TOKEN_ENV) {
-            Ok(s) if !s.is_empty() => AuthState::from_token(s),
+            Ok(s) if !s.trim().is_empty() => AuthState::from_token(s),
             _ => AuthState::default(),
         }
     }

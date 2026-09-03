@@ -67,10 +67,13 @@ RUN set -e; \
     test -x /app/homecore-server || { echo "FATAL: /app/homecore-server is not executable"; exit 1; }; \
     echo "image assets OK"
 
-# Optional bearer-token auth on /api/v1/*: leave unset for LAN-mode (default),
-# set to enforce `Authorization: Bearer <token>` (see bearer_auth module, #443).
+# Bearer-token auth on /api/v1/*: required for the default routable bind.
 #   docker run -e RUVIEW_API_TOKEN=$(openssl rand -hex 32) ...
 ENV RUVIEW_API_TOKEN=
+
+# Required deployment-specific RuField signing seed (64 hex characters).
+#   docker run -e WDP_RUFIELD_SIGNING_SEED=$(openssl rand -hex 32) ...
+ENV WDP_RUFIELD_SIGNING_SEED=
 
 # HTTP API
 EXPOSE 3000

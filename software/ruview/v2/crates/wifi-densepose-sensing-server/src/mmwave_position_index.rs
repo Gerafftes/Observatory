@@ -236,6 +236,34 @@ impl MmwavePositionIndexArtifact {
             .predict(&features)
             .map_err(|error| error.to_string())
     }
+
+    /// Diagnostic single-receiver ablation for a complete, grid-validated
+    /// blind feature block. This never replaces the four-RX live decision.
+    pub(crate) fn predict_receiver_feature_block(
+        &self,
+        block: &PositionFeatureBlock,
+        rx_id: u8,
+    ) -> Result<FingerprintPosition, String> {
+        let receiver_index = usize::from(
+            rx_id
+                .checked_sub(1)
+                .ok_or_else(|| "receiver ablation rx_id must be in 1..=4".to_string())?,
+        );
+        if receiver_index >= RECEIVER_COUNT || block.receivers.len() != RECEIVER_COUNT {
+            return Err("receiver ablation requires a complete RX1-RX4 block".to_string());
+        }
+        for (index, receiver) in block.receivers.iter().enumerate() {
+            if receiver.rx_id != index as u8 + 1 || receiver.grid != self.receiver_grids[index] {
+                return Err("mmWave feature block CSI grid does not match the index".to_string());
+            }
+        }
+        self.model
+            .nearest_position_for_receiver(
+                receiver_index,
+                &block.receivers[receiver_index].features,
+            )
+            .map_err(|error| error.to_string())
+    }
 }
 
 pub(crate) fn load_mmwave_position_index(
@@ -455,6 +483,15 @@ mod tests {
             prediction,
             PositionFingerprintPrediction::Position { position, .. } if position.id == "Z005"
         ));
+        for rx_id in 1..=4 {
+            assert_eq!(
+                artifact
+                    .predict_receiver_feature_block(&feature_block, rx_id)
+                    .expect("receiver ablation uses WiFi features only")
+                    .id,
+                "Z005"
+            );
+        }
 
         let directory = tempfile::tempdir().expect("temporary directory");
         let path = directory.path().join("guided-index.json");

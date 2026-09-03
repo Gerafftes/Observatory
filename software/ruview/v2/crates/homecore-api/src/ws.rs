@@ -73,9 +73,8 @@ async fn handle_socket(mut socket: WebSocket, state: SharedState) {
     // `auth::BearerAuth`). Before the HC-WS-01 fix this checked only
     // `token.trim().is_empty()` and accepted ANY non-empty token even
     // with a provisioned `HOMECORE_TOKENS` whitelist — a full WS auth
-    // bypass. `is_valid()` rejects the empty token internally and, in
-    // DEV (`allow_any`) mode, still accepts any non-empty bearer (with
-    // a warn) so smoke tests keep working.
+    // bypass. `is_valid()` rejects the empty token internally and accepts
+    // only tokens explicitly provisioned in the store.
     if !state.tokens().is_valid(&token).await {
         let _ = socket
             .send(Message::Text(

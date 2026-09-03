@@ -11,3 +11,6 @@ dependencies:
 
   ## Onboard WS2812 LED Disabling
   espressif/led_strip: "^3.0.0"
+
+  ## Real Ed25519 verification for signed RVF WASM containers
+  espressif/libsodium: "^1.0.21"

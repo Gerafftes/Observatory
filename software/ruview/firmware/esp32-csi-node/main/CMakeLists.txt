@@ -38,6 +38,7 @@ set(REQUIRES
     driver
     lwip
     mbedtls
+    espressif__libsodium
 )
 
 # ADR-110: C6-only components — pulled in when building for esp32c6.

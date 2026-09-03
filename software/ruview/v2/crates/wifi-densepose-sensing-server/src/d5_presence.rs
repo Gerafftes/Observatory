@@ -50,6 +50,25 @@ pub(crate) struct PresenceReference {
     pub(crate) sample_count: usize,
 }
 
+impl PresenceReference {
+    pub(crate) fn validate(&self) -> Result<(), String> {
+        if !self.median.is_finite() || !self.mad.is_finite() || !self.scale.is_finite() {
+            return Err("D5 reference contains a non-finite value".to_string());
+        }
+        if self.mad < 0.0 || self.scale <= 0.0 {
+            return Err("D5 reference has an invalid robust scale".to_string());
+        }
+        let minimum_samples = self
+            .block_count
+            .checked_mul(MIN_CALIBRATION_SAMPLES_PER_BLOCK)
+            .ok_or_else(|| "D5 reference calibration sample count is too large".to_string())?;
+        if self.block_count < MIN_CALIBRATION_BLOCKS || self.sample_count < minimum_samples {
+            return Err("D5 reference does not contain enough calibration data".to_string());
+        }
+        Ok(())
+    }
+}
+
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub(crate) struct NodePresenceSnapshot {
     pub(crate) reference_ready: bool,
@@ -383,6 +402,17 @@ impl PresenceFusionState {
     }
 
     pub(crate) fn finish_calibration(&mut self, now: Instant) {
+        self.phase = CalibrationPhase::Ready;
+        self.calibration_started_at = None;
+        self.calibrated_at = Some(now);
+        self.present = false;
+        self.candidate = None;
+    }
+
+    /// Restore a previously persisted D5/D6 calibration after a server
+    /// restart. This is deliberately separate from `finish_calibration`,
+    /// which is reserved for a fresh measurement run.
+    pub(crate) fn restore_ready(&mut self, now: Instant) {
         self.phase = CalibrationPhase::Ready;
         self.calibration_started_at = None;
         self.calibrated_at = Some(now);

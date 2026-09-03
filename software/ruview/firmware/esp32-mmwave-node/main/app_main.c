@@ -23,6 +23,8 @@
 #define RADAR_RX_GPIO 20
 #define RADAR_TX_GPIO 21
 #define RADAR_BAUD 256000
+#define RADAR_NETWORK_SETTLE_MS 1000
+#define RADAR_STREAM_INTERVAL_US 100000
 #define WIFI_CONNECTED_BIT BIT0
 
 static const char *TAG = "mmwave_node";
@@ -91,6 +93,9 @@ static void radar_task(void *argument)
                                  UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE));
     ESP_ERROR_CHECK(uart_driver_install(RADAR_UART, 2048, 0, 0, NULL, 0));
 
+    // Let the freshly restored WiFi route and ARP entry settle before the
+    // first radar frame is counted as a transport diagnostic.
+    vTaskDelay(pdMS_TO_TICKS(RADAR_NETWORK_SETTLE_MS));
     measurement_stream_t *stream = measurement_stream_create(&s_config);
     if (stream == NULL) {
         ESP_LOGE(TAG, "Cannot start measurement stream");
@@ -99,6 +104,7 @@ static void radar_task(void *argument)
     ld2450_parser_t parser;
     ld2450_parser_init(&parser);
     uint8_t bytes[128];
+    int64_t last_stream_time_us = 0;
     while (true) {
         int count = uart_read_bytes(RADAR_UART, bytes, sizeof(bytes),
                                     pdMS_TO_TICKS(100));
@@ -109,9 +115,13 @@ static void radar_task(void *argument)
             ld2450_frame_t frame;
             if (ld2450_parser_push(&parser, bytes[index], &frame)) {
                 node_diagnostics_record_radar_frame();
-                bool sent = measurement_stream_send(
-                    stream, &frame, esp_timer_get_time());
-                node_diagnostics_record_udp_send(sent);
+                int64_t now_us = esp_timer_get_time();
+                if (last_stream_time_us == 0 ||
+                    now_us - last_stream_time_us >= RADAR_STREAM_INTERVAL_US) {
+                    bool sent = measurement_stream_send(stream, &frame, now_us);
+                    node_diagnostics_record_udp_send(sent);
+                    last_stream_time_us = now_us;
+                }
             }
         }
     }

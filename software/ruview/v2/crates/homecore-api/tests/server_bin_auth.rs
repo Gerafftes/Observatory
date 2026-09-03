@@ -6,8 +6,8 @@
 //! token-provisioning path (`LongLivedTokenStore::from_env()` when
 //! `HOMECORE_TOKENS` is set) and drives a real HTTP request through the
 //! router. On the pre-fix bin — which used `SharedState::new()` →
-//! `allow_any_non_empty()` with NO env path — a wrong bearer was
-//! accepted; this test asserts it is now rejected with 401.
+//! `allow_any_non_empty()` with NO env path — a wrong bearer was accepted;
+//! this test asserts that the provisioned path now rejects it.
 
 use axum::body::Body;
 use axum::http::{Request, StatusCode};
@@ -73,7 +73,7 @@ async fn from_env_path_enforces_whitelist() {
     assert!(store.is_valid("env_token_1").await);
     assert!(store.is_valid("env_token_2").await);
     assert!(!store.is_valid("not_in_whitelist").await);
-    assert!(!store.is_dev_mode().await, "from_env must NOT be dev mode");
+    assert_eq!(store.len().await, 2);
 }
 
 // ─── HC-API-AUTH-01: `GET /api/` must be auth-gated like every sibling ───

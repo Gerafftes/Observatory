@@ -1,7 +1,7 @@
 //! Long-lived bearer-token store.
 //!
 //! Closes audit findings **HC-01** and **HC-02** by replacing the
-//! "any non-empty bearer" P1 placeholder with a real token whitelist.
+//! former "any non-empty bearer" P1 placeholder with a real token whitelist.
 //!
 //! P2 scope (this commit):
 //! - Token set held in memory; populated at boot from env / config /
@@ -16,18 +16,16 @@
 //! Provided constructors:
 //! - `LongLivedTokenStore::empty()` → no tokens accepted (use after
 //!   boot to add tokens manually)
+//! - `LongLivedTokenStore::from_tokens(...)` → synchronously provisions
+//!   an explicit token list (useful for adapters and tests)
 //! - `LongLivedTokenStore::from_env()` → reads `HOMECORE_TOKENS`,
-//!   splits on commas, trims, drops empties
-//! - `LongLivedTokenStore::allow_any_non_empty()` → **DEV ONLY**;
-//!   preserves the legacy "accept anything non-empty" behaviour
-//!   for users who haven't migrated yet. Emits a warning on every
-//!   call. Removed in P3.
+//!   splits on commas, trims, drops empties. If the variable is unset
+//!   or empty, the store remains locked (no bearer is accepted).
 
 use std::collections::HashSet;
 use std::sync::Arc;
 
 use tokio::sync::RwLock;
-use tracing::warn;
 
 #[derive(Clone)]
 pub struct LongLivedTokenStore {
@@ -36,9 +34,6 @@ pub struct LongLivedTokenStore {
 
 struct LongLivedTokenStoreInner {
     tokens: HashSet<String>,
-    /// DEV-only escape hatch: when true, ANY non-empty bearer is
-    /// accepted. Logged on every check so the operator notices.
-    allow_any: bool,
 }
 
 impl LongLivedTokenStore {
@@ -48,45 +43,39 @@ impl LongLivedTokenStore {
         Self {
             inner: Arc::new(RwLock::new(LongLivedTokenStoreInner {
                 tokens: HashSet::new(),
-                allow_any: false,
             })),
         }
     }
 
-    /// Reads `HOMECORE_TOKENS` from the environment and registers
-    /// each comma-separated value. Trims whitespace; drops empty
-    /// values. If the env var is unset / empty, the store starts
-    /// empty.
-    pub fn from_env() -> Self {
+    /// Build a store from an explicit list of bearer tokens.
+    ///
+    /// Empty and whitespace-only values are ignored. Values not present in
+    /// this list are always rejected; there is no wildcard mode.
+    pub fn from_tokens<I, S>(tokens: I) -> Self
+    where
+        I: IntoIterator<Item = S>,
+        S: AsRef<str>,
+    {
         let store = Self::empty();
-        if let Ok(raw) = std::env::var("HOMECORE_TOKENS") {
-            // Note: we'd ideally `.await` here but constructors stay
-            // sync. Use try_write to populate synchronously at boot.
-            // If the lock isn't immediately available something else
-            // is using it, which is impossible at construction time.
-            if let Ok(mut guard) = store.inner.try_write() {
-                for raw_token in raw.split(',') {
-                    let t = raw_token.trim();
-                    if !t.is_empty() {
-                        guard.tokens.insert(t.to_string());
-                    }
+        if let Ok(mut guard) = store.inner.try_write() {
+            for token in tokens {
+                let token = token.as_ref().trim();
+                if !token.is_empty() {
+                    guard.tokens.insert(token.to_string());
                 }
             }
         }
         store
     }
 
-    /// **DEV ONLY** — closes HC-01/02 audit findings on paper while
-    /// preserving the legacy "any non-empty bearer" behaviour for
-    /// users mid-migration. Emits a warn on every check. Removed
-    /// in P3.
-    pub fn allow_any_non_empty() -> Self {
-        Self {
-            inner: Arc::new(RwLock::new(LongLivedTokenStoreInner {
-                tokens: HashSet::new(),
-                allow_any: true,
-            })),
-        }
+    /// Reads `HOMECORE_TOKENS` from the environment and registers
+    /// each comma-separated value. Trims whitespace; drops empty
+    /// values. If the env var is unset / empty, the store starts empty
+    /// and rejects every bearer token.
+    pub fn from_env() -> Self {
+        std::env::var("HOMECORE_TOKENS")
+            .map(|raw| Self::from_tokens(raw.split(',')))
+            .unwrap_or_else(|_| Self::empty())
     }
 
     /// Register a token. Idempotent. Returns true if the token was
@@ -102,34 +91,18 @@ impl LongLivedTokenStore {
         guard.tokens.remove(token)
     }
 
-    /// Check a token against the store. Fast O(1) hashset lookup.
-    /// In `allow_any` mode, any non-empty token returns true and a
-    /// warn is logged.
+    /// Check a token against the explicit store. Fast O(1) hashset lookup.
     pub async fn is_valid(&self, token: &str) -> bool {
         if token.is_empty() {
             return false;
         }
         let guard = self.inner.read().await;
-        if guard.allow_any {
-            warn!(
-                "LongLivedTokenStore::is_valid called in `allow_any` mode — \
-                 any non-empty bearer is accepted. Provision real tokens via \
-                 HOMECORE_TOKENS or LongLivedTokenStore::register() before \
-                 production."
-            );
-            return true;
-        }
         guard.tokens.contains(token)
     }
 
     /// Number of registered tokens. Useful for boot log lines.
     pub async fn len(&self) -> usize {
         self.inner.read().await.tokens.len()
-    }
-
-    /// Is the store accepting any non-empty bearer (DEV mode)?
-    pub async fn is_dev_mode(&self) -> bool {
-        self.inner.read().await.allow_any
     }
 }
 
@@ -180,15 +153,15 @@ mod tests {
 
     #[tokio::test]
     async fn empty_token_always_rejected() {
-        let s = LongLivedTokenStore::allow_any_non_empty();
+        let s = LongLivedTokenStore::empty();
         assert!(!s.is_valid("").await);
     }
 
     #[tokio::test]
-    async fn allow_any_mode_accepts_any_non_empty() {
-        let s = LongLivedTokenStore::allow_any_non_empty();
-        assert!(s.is_valid("literally-anything").await);
-        assert!(s.is_dev_mode().await);
+    async fn from_tokens_accepts_only_explicit_values() {
+        let s = LongLivedTokenStore::from_tokens(["listed", "  ", ""]);
+        assert!(s.is_valid("listed").await);
+        assert!(!s.is_valid("literally-anything").await);
     }
 
     #[tokio::test]
@@ -197,5 +170,6 @@ mod tests {
         std::env::remove_var("HOMECORE_TOKENS");
         let s = LongLivedTokenStore::from_env();
         assert_eq!(s.len().await, 0);
+        assert!(!s.is_valid("anything").await);
     }
 }

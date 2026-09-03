@@ -31,7 +31,7 @@ const MIN_BIN_SCALE: f64 = 0.01;
 const MIN_STABLE_BINS: usize = 2;
 const STANDARDIZED_RESIDUAL_CLIP: f64 = 6.0;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub(crate) struct FingerprintReference {
     centroid: Vec<f64>,
     bin_mad: Vec<f64>,
@@ -82,6 +82,48 @@ pub(crate) struct FingerprintReferenceSummary {
 }
 
 impl FingerprintReference {
+    pub(crate) fn validate(&self) -> Result<(), String> {
+        let dimensions = self.centroid.len();
+        if dimensions == 0
+            || self.bin_mad.len() != dimensions
+            || self.stable_bins.len() != dimensions
+        {
+            return Err("D6 reference dimensions do not match".to_string());
+        }
+        if self
+            .centroid
+            .iter()
+            .chain(&self.bin_mad)
+            .any(|value| !value.is_finite() || *value < 0.0)
+        {
+            return Err("D6 reference contains an invalid bin value".to_string());
+        }
+        if !self.bin_scale_floor.is_finite()
+            || self.bin_scale_floor <= 0.0
+            || !self.distance_median.is_finite()
+            || self.distance_median < 0.0
+            || !self.distance_mad.is_finite()
+            || self.distance_mad < 0.0
+            || !self.distance_threshold.is_finite()
+            || self.distance_threshold <= 0.0
+        {
+            return Err("D6 reference contains an invalid distance scale".to_string());
+        }
+        if self.stable_bins.iter().filter(|stable| **stable).count() < MIN_STABLE_BINS {
+            return Err(format!(
+                "D6 reference needs at least {MIN_STABLE_BINS} stable subcarriers"
+            ));
+        }
+        let minimum_samples = self
+            .block_count
+            .checked_mul(MIN_CALIBRATION_SAMPLES_PER_BLOCK)
+            .ok_or_else(|| "D6 reference calibration sample count is too large".to_string())?;
+        if self.block_count < MIN_CALIBRATION_BLOCKS || self.sample_count < minimum_samples {
+            return Err("D6 reference does not contain enough calibration data".to_string());
+        }
+        Ok(())
+    }
+
     fn summary(&self) -> FingerprintReferenceSummary {
         let stable_bin_mads: Vec<f64> = self
             .bin_mad
@@ -594,6 +636,11 @@ impl NodeFingerprintState {
             sample_count: MIN_CALIBRATION_BLOCKS * MIN_CALIBRATION_SAMPLES_PER_BLOCK,
         });
         Ok(())
+    }
+
+    #[cfg(test)]
+    pub(crate) fn reference_for_test(&self) -> Option<FingerprintReference> {
+        self.reference.clone()
     }
 
     fn accept_calibration_amplitudes(&mut self, amplitudes: &[f64]) -> Option<Vec<f64>> {

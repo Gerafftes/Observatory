@@ -1,8 +1,20 @@
 import { apiService } from '../services/api.service.js';
 import { experimentService } from '../services/experiment.service.js';
-import { DEFAULT_SENSOR_MOUNT_RADIUS_M, RoomGeometryEditor, validateGeometryDraft } from './RoomGeometryEditor.js';
+import {
+  DEFAULT_MMWAVE_POSITION_M,
+  DEFAULT_SENSOR_MOUNT_RADIUS_M,
+  mmwaveMountingPosition,
+  MMWAVE_SENSOR,
+  RoomGeometryEditor,
+  validateGeometryDraft,
+} from './RoomGeometryEditor.js';
 
 const EXPECTED_POINTS = Array.from({ length: 9 }, (_, index) => `P${String(index + 1).padStart(2, '0')}`);
+const EMPTY_CALIBRATION_MIN_SECONDS = 60;
+const EMPTY_CALIBRATION_DEFAULT_SECONDS = 60;
+const EMPTY_CALIBRATION_MIN_LEAD_SECONDS = 5;
+const EMPTY_CALIBRATION_DEFAULT_LEAD_SECONDS = 20;
+const EMPTY_CALIBRATION_TIMER_MS = 250;
 const WORKFLOW_PHASES = [
   'create_experiment',
   'seal_setup',
@@ -32,6 +44,12 @@ export function defaultSetupProfileDocument() {
       { id: 'RX3', role: 'receiver', position_m: [0.00, 0.74, 2.11] },
       { id: 'RX4', role: 'receiver', position_m: [4.02, 0.87, 2.46] },
     ],
+    mmwave: {
+      sensor: MMWAVE_SENSOR,
+      mounting_position_m: [...DEFAULT_MMWAVE_POSITION_M],
+      mounting_revision: 'draft',
+      allow_exterior: true,
+    },
     points: EXPECTED_POINTS.map((id, index) => ({
       id,
       coordinates_m: [x[index % 3], 0, z[Math.floor(index / 3)]],
@@ -86,6 +104,14 @@ function formatTime(value) {
   if (!value) return '--';
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? String(value) : date.toLocaleString('de-DE');
+}
+
+function formatClockTime(value) {
+  if (!Number.isFinite(value)) return '--:--:--';
+  const date = new Date(value);
+  return Number.isNaN(date.getTime())
+    ? '--:--:--'
+    : date.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
 }
 
 function phaseLabel(phase) {
@@ -148,6 +174,7 @@ export class ObservatoryControlCenter {
   constructor(container) {
     this.container = container;
     this.status = null;
+    this.calibrationAvailability = null;
     this.profiles = [];
     this.runs = [];
     this.recordings = [];
@@ -175,6 +202,8 @@ export class ObservatoryControlCenter {
     this.message = '';
     this._mounted = false;
     this._pollTimer = null;
+    this._emptyCalibrationTimer = null;
+    this.emptyCalibrationPlan = null;
     this.geometryEditor = null;
   }
 
@@ -194,6 +223,7 @@ export class ObservatoryControlCenter {
     this._mounted = false;
     if (this._pollTimer) clearInterval(this._pollTimer);
     this._pollTimer = null;
+    this._clearEmptyCalibrationTimer();
     this.geometryEditor?.dispose();
     this.geometryEditor = null;
   }
@@ -231,6 +261,13 @@ export class ObservatoryControlCenter {
         this.selectedRun = runs.find((run) => run.id === this.selectedRun.id) || this.selectedRun;
       }
       if (!this.selectedRun && !this.runSelectionCleared && runs[0]) this.selectedRun = runs[0];
+      const calibrationContext = this._calibrationContextRequest();
+      this.calibrationAvailability = calibrationContext
+        ? await experimentService.getCalibrationAvailability({
+          profileId: calibrationContext.profile_id,
+          profileRevisionId: calibrationContext.profile_revision_id,
+        }).catch(() => ({ available: false }))
+        : null;
       if (!quiet) this.message = '';
       this.error = '';
       this.connectionState = 'ready';
@@ -259,6 +296,79 @@ export class ObservatoryControlCenter {
     this.profileDraft = typeof structuredClone === 'function'
       ? structuredClone(profile.document)
       : JSON.parse(JSON.stringify(profile.document));
+  }
+
+  _calibrationContextRequest() {
+    const workflow = this.selectedRun?.workflow;
+    const profileId = workflow?.profile_id || this.selectedProfile?.id;
+    if (!profileId) return null;
+    const profileRevisionId = workflow
+      ? workflow.profile_revision_id
+      : this.selectedProfile?.revision_id;
+    return {
+      profile_id: profileId,
+      ...(profileRevisionId ? { profile_revision_id: profileRevisionId } : {}),
+    };
+  }
+
+  calibrationContextRequest() {
+    return this._calibrationContextRequest();
+  }
+
+  /**
+   * Return the exact geometry currently rendered by the CAD editor. The
+   * read-only Radar/RX debug view consumes this snapshot so its fixed mmWave
+   * marker cannot drift to a server fallback when setup metadata is absent.
+   */
+  getCurrentGeometrySnapshot() {
+    const profile = this.profileDraft || {};
+    return {
+      roomDimensions: Array.isArray(profile.room_dimensions_m)
+        ? profile.room_dimensions_m.slice(0, 3)
+        : null,
+      mountingPositionM: mmwaveMountingPosition(profile),
+      txPosition: Array.isArray(profile.transmitter?.position_m)
+        ? profile.transmitter.position_m.slice(0, 3)
+        : null,
+      receiverPositionsM: Array.isArray(profile.receivers)
+        ? profile.receivers.map((receiver) => ({
+          id: receiver.id,
+          position: Array.isArray(receiver.position_m)
+            ? receiver.position_m.slice(0, 3)
+            : null,
+        }))
+        : [],
+    };
+  }
+
+  _setupV2DraftActionMarkup() {
+    const profile = this.selectedProfile;
+    if (!profile?.id || this.status?.capabilities?.setup_v2_draft_export !== true) return '';
+    const revision = profile.revision_id
+      ? `?revision_id=${encodeURIComponent(profile.revision_id)}`
+      : '';
+    const endpoint = `/api/v1/experiments/setup-profiles/${encodeURIComponent(profile.id)}/setup-v2-draft${revision}`;
+    const filename = `${profile.id}-v${profile.version || 1}-setup-v2.draft.json`;
+    return `<a class="occ-button occ-button-quiet" href="${attribute(endpoint)}" download="${attribute(filename)}">Setup-v2-Entwurf laden</a>`;
+  }
+
+  _activePositionSetup() {
+    const setup = this.status?.position_setup;
+    return setup?.active === true && setup.setup_id && setup.setup_sha256 ? setup : null;
+  }
+
+  _workflowRuntimeSeal(run = this.selectedRun) {
+    const setup = this._activePositionSetup();
+    const workflow = run?.workflow;
+    if (!setup || !workflow) return null;
+    return [...(workflow.events || [])].reverse().find((event) => (
+      event.phase === 'seal_setup'
+      && event.status === 'PASS'
+      && event.payload?.seal_kind === 'active_position_setup_v2'
+      && event.payload?.profile_sha256 === workflow.profile_sha256
+      && event.payload?.setup_id === setup.setup_id
+      && event.payload?.setup_sha256 === setup.setup_sha256
+    )) || null;
   }
 
   _render() {
@@ -292,7 +402,7 @@ export class ObservatoryControlCenter {
         ${this.message ? `<div class="occ-message" role="status">${escapeHTML(this.message)}</div>` : ''}
 
         <section class="occ-panel occ-wide-panel occ-room-panel">
-          ${panelHeading('SETUP', 'Raum-Setup', 'Setup-Profil', 'Speichert Raum, TX und RX als versioniertes Profil. P01–P09 bleibt Legacy.')}
+          ${panelHeading('SETUP', 'Raum-Setup', 'Setup-Profil', 'Speichert Raum, TX, RX und mmWave-Montagepunkt als versioniertes Profil. P01–P09 bleibt Legacy.')}
           <p class="occ-panel-intro">Maße in m · Achsen: <strong>x / y / z</strong>.</p>
           <div id="occRoomCadEditor" class="occ-cad-editor"></div>
           <form id="occProfileForm">
@@ -312,6 +422,11 @@ export class ObservatoryControlCenter {
                 <div class="occ-node-editor">${(this.profileDraft.receivers || []).map((receiver) => `
                   <div class="occ-node-row"><strong>${escapeHTML(receiver.id)}</strong><div class="occ-triple">${this._tripleInputs(`receiver.${receiver.id}`, receiver.position_m)}</div></div>
                 `).join('')}</div>
+              </div>
+              <div class="occ-form-section">
+                <div class="occ-subheading">mmWave [x / y / z] (m) ${infoTip('mmWave', 'Fester Montagepunkt des HLK-LD2450. Radar-Truth bleibt getrennt vom WiFi-Modell.')}</div>
+                <div class="occ-triple">${this._tripleInputs('mmwave.mounting_position_m', mmwaveMountingPosition(this.profileDraft))}</div>
+                <p class="occ-helper">Montagepunkt, nicht die aktuelle Zielposition.</p>
               </div>
               </div>
               <div class="occ-room-form-column">
@@ -334,9 +449,11 @@ export class ObservatoryControlCenter {
               </div>
             </div>
             <div class="occ-inline-actions">
+              <button type="button" class="occ-button occ-button-primary occ-mmwave-placement-button" data-occ-action="calculate-mmwave-placement">mmWave-Position berechnen</button>
               <button type="submit" class="occ-button occ-button-primary" ${experimentActionsDisabled ? 'disabled' : ''}>${this.selectedProfile ? 'Neue Profilversion speichern' : 'Setup-Profil speichern'}</button>
+              ${this._setupV2DraftActionMarkup()}
             </div>
-            <p class="occ-helper">Speichert eine neue Profilversion. Keine Hardwaremessung.</p>
+            <p class="occ-helper" data-occ-mmwave-placement-status>Berechnet die mmWave-Montage aus Raum-, TX- und RX-Geometrie und übernimmt sie direkt in die Felder und den CAD-Plan. Danach Profilversion speichern.</p>
           </form>
           <details class="occ-fold" ${this.profilesExpanded ? 'open' : ''}>
             <summary data-occ-action="toggle-profiles"><span>Profile</span><small>${this.profiles.length ? `${this.profiles.length} Versionen` : 'leer'}</small></summary>
@@ -379,6 +496,8 @@ export class ObservatoryControlCenter {
           this.profileDraft = document;
           this._syncProfileFormFromDraft();
         },
+        onSave: (document) => this._saveGeometryDocument(document),
+        saveDisabled: experimentActionsDisabled,
       });
       this.geometryEditor.mount();
     }
@@ -415,7 +534,20 @@ export class ObservatoryControlCenter {
     set('room_dimensions_m', this.profileDraft.room_dimensions_m);
     set('transmitter.position_m', this.profileDraft.transmitter?.position_m);
     (this.profileDraft.receivers || []).forEach((receiver) => set(`receiver.${receiver.id}`, receiver.position_m));
+    set('mmwave.mounting_position_m', mmwaveMountingPosition(this.profileDraft));
     (this.profileDraft.points || []).forEach((point) => set(`point.${point.id}`, point.coordinates_m));
+  }
+
+  _saveGeometryDocument(document) {
+    this.profileDraft = document;
+    this._syncProfileFormFromDraft();
+    const form = this.container?.querySelector('#occProfileForm');
+    if (!form) return;
+    if (typeof form.checkValidity === 'function' && !form.checkValidity()) {
+      form.reportValidity?.();
+      return;
+    }
+    void this._saveProfile(form);
   }
 
   _guideState() {
@@ -456,11 +588,12 @@ export class ObservatoryControlCenter {
     const softwareOnly = (workflow.events || []).some((event) => event.payload?.software_only === true || event.payload?.demo === 'guide walkthrough only');
     const phaseIndex = WORKFLOW_PHASES.indexOf(phase);
     const progress = `PHASE ${String(phaseIndex + 1).padStart(2, '0')} / ${WORKFLOW_PHASES.length}`;
-    const done = status === 'PASS';
+    const done = status === 'PASS' || status === 'REUSED';
     const states = {
       RUNNING: 'PHASE OFFEN',
       READY: 'BEREIT',
       PASS: 'ABGESCHLOSSEN',
+      REUSED: 'WIEDERVERWENDET',
     };
     const guide = {
       progress,
@@ -472,31 +605,142 @@ export class ObservatoryControlCenter {
       navigationOnly: false,
     };
 
+    if (phase !== 'create_experiment' && !softwareOnly && !this._workflowRuntimeSeal()) {
+      return {
+        ...guide,
+        state: 'GESPERRT',
+        tone: 'is-waiting',
+        title: 'Run besitzt kein gültiges Runtime-Seal',
+        body: 'Dieser ältere oder abweichende Run darf nicht fortgesetzt werden. Lege mit dem aktiven Setup-v2 einen neuen Run an.',
+        checklist: ['Alt-Run nicht weiterverwenden', 'Run-Auswahl lösen', 'Neuen Run versiegeln'],
+        action: 'clear-run',
+        actionLabel: 'Neuen Run anlegen',
+        helper: 'Bestehende Daten bleiben unverändert erhalten.',
+        navigationOnly: true,
+      };
+    }
+
     if (phase === 'create_experiment') {
-      guide.title = 'Run software-seitig versiegeln';
-      guide.body = 'Prüfe den ausgewählten Setup-Hash. Danach bleibt die Raumgeometrie für diesen Run unverändert.';
-      guide.checklist = ['Profil-Hash kontrollieren', 'Setup versiegeln', 'Leerkalibrierung öffnen'];
-      guide.action = 'seal';
-      guide.actionLabel = 'Setup versiegeln';
-      guide.helper = 'Das ist ein Software-Seal und ersetzt keine physische Vermessung.';
+      const setup = this._activePositionSetup();
+      if (!setup) {
+        guide.state = 'GESPERRT';
+        guide.tone = 'is-waiting';
+        guide.title = 'Runtime-Setup fehlt';
+        guide.body = 'Dieser Run kann erst versiegelt werden, wenn der Server mit dem gültigen Setup-v2 gestartet wurde.';
+        guide.checklist = ['Setup-v2 erzeugen', 'Server mit --position-setup starten', 'Profilabgleich bestehen'];
+        guide.action = null;
+        guide.helper = 'Ein Profil-Hash allein ist kein Runtime-Seal.';
+      } else {
+        guide.title = 'Run mit Runtime-Setup versiegeln';
+        guide.body = 'Der Server prüft Profilgeometrie und Deployment-Metadaten gegen das aktive Setup-v2.';
+        guide.checklist = ['Profil-Hash kontrollieren', `Runtime ${setup.setup_id}`, 'Setup versiegeln'];
+        guide.action = 'seal';
+        guide.actionLabel = 'Setup versiegeln';
+        guide.helper = 'Setup-ID und Setup-Hash werden serverseitig im Run gespeichert.';
+      }
     } else if (phase === 'seal_setup') {
-      guide.title = 'Leere WiFi-Baseline aufnehmen';
-      guide.body = 'Halte den Raum leer und erfasse die stabile CSI-Baseline. mmWave wird dabei noch nicht als Positionsreferenz verwendet.';
-      guide.checklist = ['Raum verlassen', 'Leerkalibrierung starten', 'Nach Abschluss Training öffnen'];
-      guide.action = 'start-empty';
-      guide.actionLabel = 'Leerkalibrierung starten';
-      guide.helper = 'Die Baseline ist unabhängig von der späteren mmWave-Positionsreferenz.';
+      const plan = this.emptyCalibrationPlan;
+      const remaining = this._emptyCalibrationRemainingSeconds();
+      if (!plan) {
+        if (this.calibrationAvailability?.available === true) {
+          guide.title = 'Gespeicherte Leerkalibrierung verwenden';
+          guide.body = 'Für dieses unveränderte Setup ist bereits eine passende Baseline vorhanden. Du kannst ohne neue Leeraumkalibrierung fortfahren.';
+          guide.checklist = ['Profil- und Setup-Kontext bestätigt', 'Gespeicherte Baseline verwenden', 'mmWave-Schritt öffnen'];
+          guide.action = 'reuse-empty';
+          guide.actionLabel = 'Gespeicherte Baseline verwenden';
+          guide.helper = 'Eine neue Messung bleibt als Alternative im Workflow verfügbar.';
+        } else {
+          guide.title = 'Leerkalibrierung vorbereiten';
+          guide.body = 'Lege Messdauer und Vorlauf fest. Die Messung startet erst nach dem Countdown.';
+          guide.checklist = ['Messdauer mindestens 60 s', 'Vorlauf festlegen', 'Raum vor Start verlassen'];
+          guide.action = 'prepare-empty';
+          guide.actionLabel = 'Leerkalibrierung vorbereiten';
+          guide.helper = 'Noch keine Datenaufnahme. Die Baseline bleibt unabhängig von der späteren mmWave-Positionsreferenz.';
+        }
+      } else if (plan.phase === 'form') {
+        guide.title = 'Leerkalibrierung konfigurieren';
+        guide.body = 'Wähle die Messdauer und wie viele Sekunden bis zum Start verbleiben sollen.';
+        guide.checklist = ['Messdauer mindestens 60 s', 'Countdown starten', 'Raum verlassen'];
+        guide.action = 'focus-empty-preparation';
+        guide.actionLabel = 'Dauer und Vorlauf einstellen';
+        guide.navigationOnly = true;
+        guide.helper = 'Die Messung beginnt erst nach dem Countdown.';
+      } else if (plan.phase === 'countdown') {
+        guide.title = 'Raum verlassen';
+        guide.body = `Die Leerkalibrierung startet in ${remaining} s. Sicher zurück ab ${formatClockTime(this._emptyCalibrationSafeReturnAt())} Uhr.`;
+        guide.checklist = ['Raum verlassen', 'Tür schließen', 'Nicht zurückkehren'];
+        guide.action = 'cancel-empty-preparation';
+        guide.actionLabel = 'Countdown abbrechen';
+        guide.helper = 'Es werden noch keine CSI-Daten gesammelt.';
+      } else if (plan.phase === 'starting') {
+        guide.title = 'Leerkalibrierung startet';
+        guide.body = 'Der Server wird jetzt für die leere Baseline aktiviert.';
+        guide.checklist = ['Raum leer halten', 'Messung abwarten', 'Nicht zurückkehren'];
+        guide.action = null;
+        guide.helper = 'Start wird bestätigt …';
+      } else if (plan.phase === 'collecting') {
+        guide.title = 'Leerkalibrierung läuft';
+        guide.body = `Noch ${remaining} s. Sicher zurück ab ${formatClockTime(this._emptyCalibrationSafeReturnAt())} Uhr. Der Raum muss vollständig leer bleiben.`;
+        guide.checklist = ['Raum leer halten', 'Nicht bewegen', 'Automatischen Abschluss abwarten'];
+        guide.action = null;
+        guide.helper = `Automatischer Abschluss nach ${plan.durationSeconds} s.`;
+      } else if (plan.phase === 'stopping') {
+        guide.title = 'Leerkalibrierung wird abgeschlossen';
+        guide.body = 'Die Baseline wird jetzt geprüft und gespeichert.';
+        guide.checklist = ['Raum leer halten', 'Baseline prüfen', 'mmWave-Schritt abwarten'];
+        guide.action = null;
+        guide.helper = 'Bitte noch nicht in den Raum zurückkehren.';
+      } else {
+        guide.title = 'Leerkalibrierung abschließen';
+        guide.body = 'Der automatische Abschluss konnte noch nicht bestätigt werden.';
+        guide.checklist = ['Raum leer halten', 'Abschluss erneut senden', 'Ergebnis prüfen'];
+        guide.action = 'stop-empty';
+        guide.actionLabel = 'Leerkalibrierung abschließen';
+        guide.helper = 'Die Mindestdauer wurde bereits abgewartet.';
+      }
     } else if (phase === 'empty_calibration') {
-      guide.title = status === 'PASS' ? 'mmWave-Kalibrierung vorbereiten' : status === 'RUNNING' ? 'Leerkalibrierung laufen lassen' : 'Leerkalibrierung erneut starten';
-      guide.body = status === 'PASS'
-        ? 'Die leere WiFi-Baseline ist abgeschlossen. Öffne jetzt den mmWave-geführten Kalibrierungsweg.'
-        : 'Warte, bis genügend leere CSI-Fingerprints gesammelt wurden. Bewege dich währenddessen nicht im Raum.';
-      guide.checklist = status === 'PASS'
-        ? ['Baseline abgeschlossen', 'mmWave-Assistent öffnen', 'Radarreferenz prüfen']
-        : ['Raum leer halten', 'CSI-Pakete prüfen', 'Aufnahme abschließen'];
-      guide.action = status === 'PASS' ? 'open-training' : status === 'RUNNING' ? 'stop-empty' : 'start-empty';
-      guide.actionLabel = status === 'PASS' ? 'mmWave-Kalibrierung öffnen' : status === 'RUNNING' ? 'Leerkalibrierung abschließen' : 'Leerkalibrierung starten';
-      guide.helper = 'Bei zu wenigen RX-Fingerprints bleibt der Schritt absichtlich gesperrt.';
+      const plan = this.emptyCalibrationPlan;
+      const remaining = this._emptyCalibrationRemainingSeconds();
+      if (status === 'PASS' || status === 'REUSED') {
+        guide.title = 'mmWave-Kalibrierung vorbereiten';
+        guide.body = status === 'REUSED'
+          ? 'Die gespeicherte leere WiFi-Baseline ist wiederverwendet. Öffne jetzt den mmWave-geführten Kalibrierungsweg.'
+          : 'Die leere WiFi-Baseline ist abgeschlossen. Öffne jetzt den mmWave-geführten Kalibrierungsweg.';
+        guide.checklist = ['Baseline abgeschlossen', 'mmWave-Assistent öffnen', 'Radarreferenz prüfen'];
+        guide.action = 'open-training';
+        guide.actionLabel = 'mmWave-Kalibrierung öffnen';
+        guide.helper = 'Die Baseline ist unabhängig von der späteren mmWave-Positionsreferenz.';
+      } else if (plan?.phase === 'collecting') {
+        guide.title = 'Leerkalibrierung läuft';
+        guide.body = `Noch ${remaining} s. Sicher zurück ab ${formatClockTime(this._emptyCalibrationSafeReturnAt())} Uhr. Der Raum muss vollständig leer bleiben.`;
+        guide.checklist = ['Raum leer halten', 'Nicht bewegen', 'Automatischen Abschluss abwarten'];
+        guide.action = null;
+        guide.helper = `Automatischer Abschluss nach ${plan.durationSeconds} s.`;
+      } else if (plan?.phase === 'stopping') {
+        guide.title = 'Leerkalibrierung wird abgeschlossen';
+        guide.body = 'Die Baseline wird jetzt geprüft und gespeichert.';
+        guide.checklist = ['Raum leer halten', 'Baseline prüfen', 'Nächsten Schritt abwarten'];
+        guide.action = null;
+        guide.helper = 'Bitte noch nicht in den Raum zurückkehren.';
+      } else if (plan?.phase === 'ready_to_finish') {
+        guide.title = 'Leerkalibrierung abschließen';
+        guide.body = 'Die Mindestdauer ist erreicht. Der Server wartet noch auf die Abschlussbestätigung.';
+        guide.checklist = ['Raum leer halten', 'Abschluss senden', 'Ergebnis prüfen'];
+        guide.action = 'stop-empty';
+        guide.actionLabel = 'Leerkalibrierung abschließen';
+        guide.helper = 'Die Messdauer wurde bereits abgewartet.';
+      } else {
+        guide.title = status === 'RUNNING' ? 'Leerkalibrierung läuft lassen' : 'Leerkalibrierung erneut vorbereiten';
+        guide.body = status === 'RUNNING'
+          ? 'Warte, bis genügend leere CSI-Fingerprints gesammelt wurden. Bewege dich währenddessen nicht im Raum.'
+          : 'Bereite eine neue leere WiFi-Baseline mit Vorlauf und fester Messdauer vor.';
+        guide.checklist = status === 'RUNNING'
+          ? ['Raum leer halten', 'CSI-Pakete prüfen', 'Aufnahme abschließen']
+          : ['Vorbereitung öffnen', 'Messdauer festlegen', 'Raum verlassen'];
+        guide.action = status === 'RUNNING' ? 'stop-empty' : 'prepare-empty';
+        guide.actionLabel = status === 'RUNNING' ? 'Leerkalibrierung abschließen' : 'Leerkalibrierung vorbereiten';
+        guide.helper = 'Bei zu wenigen RX-Fingerprints bleibt der Schritt absichtlich gesperrt.';
+      }
     } else if (phase === 'train_p01_p09') {
       guide.title = done ? 'Kalibrierung abgeschlossen' : 'CSI mit mmWave-Referenz kalibrieren';
       guide.body = done
@@ -639,7 +883,7 @@ export class ObservatoryControlCenter {
       <div class="occ-flow-heading"><span>Workflow-Phasen</span>${infoTip('Workflow-Phasen', 'Die Reihenfolge schützt die Trennung von Training, Prediction und Truth. Ein Schritt wird erst nach seiner Vorbedingung freigeschaltet.')}</div>
       <ol class="occ-phase-list">${WORKFLOW_PHASES.map((phase, index) => {
         const currentIndex = WORKFLOW_PHASES.indexOf(workflow?.current_phase);
-        const done = index < currentIndex || (index === currentIndex && workflow?.current_status === 'PASS');
+        const done = index < currentIndex || (index === currentIndex && ['PASS', 'REUSED'].includes(workflow?.current_status));
         const current = index === currentIndex;
         return `<li class="${done ? 'is-done' : ''} ${current ? 'is-current' : ''}"><span>${String(index + 1).padStart(2, '0')}</span><strong>${escapeHTML(phaseLabel(phase))}</strong><small>${current ? escapeHTML(workflow.current_status) : done ? 'PASS' : 'gesperrt'}</small></li>`;
       }).join('')}</ol>
@@ -668,16 +912,32 @@ export class ObservatoryControlCenter {
 
   _workflowActions(workflow, trainingCount, blindCount, currentPoint, completedTrainingPoints = new Set()) {
     if (!workflow) return '';
+    const softwareOnly = (workflow.events || []).some((event) => (
+      event.payload?.software_only === true || event.payload?.demo === 'guide walkthrough only'
+    ));
+    if (workflow.current_phase !== 'create_experiment'
+      && !softwareOnly
+      && this.selectedRun?.workflow === workflow
+      && !this._workflowRuntimeSeal()) {
+      return '<button type="button" class="occ-button occ-button-primary" disabled>Run ohne gültiges Runtime-Seal</button><p class="occ-helper">Dieser Alt-Run bleibt unverändert, kann aber nicht fortgesetzt werden. Run-Auswahl lösen und einen neuen Run anlegen.</p>';
+    }
     if (workflow.current_phase === 'create_experiment') {
-      return `<button type="button" class="occ-button occ-button-primary" data-occ-action="seal">Setup software-seitig versiegeln</button><p class="occ-helper">${infoTip('Software-Seal', 'Der Server friert die Profilreferenz und den Setup-Hash für diesen Run ein. Das ist noch keine physische Validierung.')}</p>`;
+      const setup = this._activePositionSetup();
+      if (!setup) {
+        return '<button type="button" class="occ-button occ-button-primary" disabled>Runtime-Setup fehlt</button><p class="occ-helper">Server mit dem gültigen Setup-v2 über <code>--position-setup</code> starten. Ein Profil-Hash allein kann den Run nicht versiegeln.</p>';
+      }
+      return `<button type="button" class="occ-button occ-button-primary" data-occ-action="seal">Mit ${escapeHTML(setup.setup_id)} versiegeln</button><p class="occ-helper">${infoTip('Runtime-Seal', 'Der Server prüft das Run-Profil gegen das aktive Setup-v2 und speichert Setup-ID plus Setup-Hash im Phasenereignis.')}</p>`;
     }
     if (workflow.current_phase === 'seal_setup') {
-      return `<button type="button" class="occ-button occ-button-primary" data-occ-action="start-empty">Leerkalibrierung starten</button><p class="occ-helper">Nur WiFi-CSI. Raum leer halten; mmWave ist nicht beteiligt. ${infoTip('Leerkalibrierung', 'Erfasst die leere Raumantwort als Baseline. Sie liefert keine Person- oder Positionswahrheit.')}</p>`;
+      return this._emptyCalibrationWorkflowMarkup();
     }
     if (workflow.current_phase === 'empty_calibration') {
+      if (['collecting', 'stopping', 'ready_to_finish'].includes(this.emptyCalibrationPlan?.phase)) {
+        return this._emptyCalibrationWorkflowMarkup();
+      }
       if (workflow.current_status === 'RUNNING') return '<button type="button" class="occ-button occ-button-primary" data-occ-action="stop-empty">Leerkalibrierung abschließen</button>';
-      if (workflow.current_status === 'PASS') return '<button type="button" class="occ-button occ-button-primary" data-occ-action="open-training">Training öffnen</button>';
-      return '<button type="button" class="occ-button occ-button-primary" data-occ-action="start-empty">Leerkalibrierung starten</button>';
+      if (['PASS', 'REUSED'].includes(workflow.current_status)) return '<button type="button" class="occ-button occ-button-primary" data-occ-action="open-training">Training öffnen</button>';
+      return this._emptyCalibrationWorkflowMarkup();
     }
     if (workflow.current_phase === 'train_p01_p09') {
       if (workflow.current_status === 'PASS') return '<button type="button" class="occ-button occ-button-primary" data-occ-action="open-randomize">Blindtest-Vorbereitung öffnen</button>';
@@ -734,6 +994,38 @@ export class ObservatoryControlCenter {
     return '';
   }
 
+  _calibrationReuseMarkup() {
+    const availability = this.calibrationAvailability;
+    const calibration = availability?.calibration;
+    if (availability?.available !== true || !calibration) return '';
+    return `<div class="occ-calibration-reuse"><div class="occ-route-kicker">KOMPATIBLE BASELINE</div><h5>Gespeicherte Leerkalibrierung gefunden</h5><p>Profilkontext und versiegeltes Setup stimmen überein. Die Baseline von ${escapeHTML(formatTime(calibration.captured_at))} kann für diesen Run wiederverwendet werden.</p><div class="occ-inline-actions"><button type="button" class="occ-button occ-button-primary" data-occ-action="reuse-empty">Gespeicherte Baseline verwenden</button><button type="button" class="occ-button occ-button-quiet" data-occ-action="prepare-empty">Neue Leerkalibrierung</button></div><p class="occ-helper">Kalibrierung ${escapeHTML(calibration.calibration_id)} · ${escapeHTML(calibration.node_count)} RX-Referenzen. Eine Positions-, Raum-, Firmware-, Grid- oder TX-Filteränderung würde diese Option entfernen.</p></div>`;
+  }
+
+  _emptyCalibrationWorkflowMarkup() {
+    const plan = this.emptyCalibrationPlan;
+    const remaining = this._emptyCalibrationRemainingSeconds();
+    const reuseMarkup = this._calibrationReuseMarkup();
+    if (!plan) {
+      return `${reuseMarkup}<div id="occEmptyCalibrationRoute" class="occ-calibration-route"><div class="occ-route-kicker">VORBEREITUNG</div><h5>Leerkalibrierung vorbereiten</h5><p>Lege zuerst die Messdauer und den Vorlauf fest. Die Aufnahme startet erst nach dem Countdown.</p><button type="button" class="occ-button occ-button-primary" data-occ-action="prepare-empty">Leerkalibrierung vorbereiten</button><p class="occ-helper">Mindestens 60 Sekunden · Vorlauf schützt den Raum vor Bewegung beim Start.</p></div>`;
+    }
+    if (plan.phase === 'form') {
+      return `${reuseMarkup}<div id="occEmptyCalibrationRoute" class="occ-calibration-route"><div class="occ-route-kicker">VORBEREITUNG</div><h5>Dauer und Vorlauf festlegen</h5><p>Die Messung beginnt erst, wenn der Countdown abgelaufen ist.</p><form id="occEmptyCalibrationPrepareForm" class="occ-empty-calibration-form"><label class="occ-field"><span>Messdauer (Sekunden) · mindestens 60</span><input name="duration_seconds" type="number" min="${EMPTY_CALIBRATION_MIN_SECONDS}" step="1" value="${plan.durationSeconds}" required></label><label class="occ-field"><span>Vorlauf bis Start (Sekunden)</span><input name="lead_seconds" type="number" min="${EMPTY_CALIBRATION_MIN_LEAD_SECONDS}" step="1" value="${plan.leadSeconds}" required></label><div class="occ-inline-actions"><button type="submit" class="occ-button occ-button-primary">Countdown starten</button><button type="button" class="occ-button occ-button-quiet" data-occ-action="cancel-empty-preparation">Abbrechen</button></div></form><p class="occ-helper">Nach dem Vorlauf startet die WiFi-Leerkalibrierung automatisch und endet nach der gewählten Dauer.</p></div>`;
+    }
+    if (plan.phase === 'countdown') {
+      return `<div id="occEmptyCalibrationRoute" class="occ-calibration-route"><div class="occ-route-kicker">RAUM VERLASSEN</div><div class="occ-instruction"><span>LEERKALIBRIERUNG STARTET IN</span><strong>${remaining} s</strong><small>Bitte jetzt den Raum verlassen. Es werden noch keine CSI-Daten gesammelt.</small>${this._emptyCalibrationSafeReturnMarkup()}</div><button type="button" class="occ-button occ-button-quiet" data-occ-action="cancel-empty-preparation">Countdown abbrechen</button></div>`;
+    }
+    if (plan.phase === 'starting') {
+      return `<div id="occEmptyCalibrationRoute" class="occ-calibration-route"><div class="occ-route-kicker">START</div><div class="occ-instruction"><span>LEERKALIBRIERUNG WIRD GESTARTET</span><strong>…</strong><small>Bitte außerhalb bleiben.</small>${this._emptyCalibrationSafeReturnMarkup()}</div></div>`;
+    }
+    if (plan.phase === 'collecting') {
+      return `<div id="occEmptyCalibrationRoute" class="occ-calibration-route"><div class="occ-route-kicker">MESSUNG LÄUFT</div><div class="occ-instruction"><span>LEERKALIBRIERUNG ENDET IN</span><strong>${remaining} s</strong><small>Raum leer halten. Der Abschluss erfolgt automatisch.</small>${this._emptyCalibrationSafeReturnMarkup()}</div></div>`;
+    }
+    if (plan.phase === 'stopping') {
+      return `<div id="occEmptyCalibrationRoute" class="occ-calibration-route"><div class="occ-route-kicker">AUSWERTUNG</div><div class="occ-instruction"><span>BASELINE WIRD GESPEICHERT</span><strong>…</strong><small>Bitte noch nicht in den Raum zurückkehren.</small></div></div>`;
+    }
+    return `<div id="occEmptyCalibrationRoute" class="occ-calibration-route"><div class="occ-route-kicker">ABSCHLUSS</div><div class="occ-instruction"><span>MESSDAUER ERREICHT</span><strong>0 s</strong><small>Der automatische Abschluss muss noch bestätigt werden.</small></div><button type="button" class="occ-button occ-button-primary" data-occ-action="stop-empty">Leerkalibrierung abschließen</button></div>`;
+  }
+
   _artifactForm(kind, label, placeholder) {
     const explanation = {
       prediction: 'Prediction enthält nur die Modellvorhersagen aus dem Blindtest.',
@@ -764,6 +1056,129 @@ export class ObservatoryControlCenter {
     return `<div class="occ-benchmark-grid"><div><span>Modell</span><strong>${escapeHTML(activeModel)}</strong></div><div><span>RVF</span><strong>${this.models.length}</strong></div><div><span>Baseline</span><strong>${escapeHTML(catalog.baseline?.id || 'prototype_d6')}</strong></div><div><span>Vergleich</span><strong>${comparators.map((model) => escapeHTML(model.id)).join(' · ') || 'lädt'}</strong></div><div><span>Split</span><strong>${escapeHTML(catalog.split?.id || 'sealed_wifi_train_blind_test_v1')}</strong></div><div><span>RX-Ablation</span><strong>${ablation.length || 5}</strong></div></div><p class="occ-helper">${catalog.status === 'READY_FOR_WIFI_DATA' ? 'Bereit. Ohne neue gelabelte Captures keine Modellwerte.' : 'Benchmark lädt.'} mmWave bleibt Referenz.</p>`;
   }
 
+  _emptyCalibrationRemainingSeconds() {
+    const plan = this.emptyCalibrationPlan;
+    let deadline = null;
+    if (plan?.phase === 'countdown') {
+      deadline = plan.startsAtMs;
+    } else if (plan?.phase === 'collecting') {
+      deadline = plan.endsAtMs;
+    }
+    if (!Number.isFinite(deadline)) return 0;
+    return Math.max(0, Math.ceil((deadline - Date.now()) / 1000));
+  }
+
+  _emptyCalibrationSafeReturnAt() {
+    const plan = this.emptyCalibrationPlan;
+    if (!plan || !Number.isFinite(plan.durationSeconds)) return null;
+    if (['countdown', 'starting'].includes(plan.phase) && Number.isFinite(plan.startsAtMs)) {
+      return plan.startsAtMs + plan.durationSeconds * 1000;
+    }
+    if (plan.phase === 'collecting' && Number.isFinite(plan.endsAtMs)) return plan.endsAtMs;
+    return null;
+  }
+
+  _emptyCalibrationSafeReturnMarkup() {
+    const safeReturnAt = this._emptyCalibrationSafeReturnAt();
+    if (!Number.isFinite(safeReturnAt)) return '';
+    return `<small class="occ-safe-return">Sicher zurück ab ${formatClockTime(safeReturnAt)} Uhr</small>`;
+  }
+
+  _clearEmptyCalibrationTimer() {
+    if (this._emptyCalibrationTimer !== null) clearInterval(this._emptyCalibrationTimer);
+    this._emptyCalibrationTimer = null;
+  }
+
+  _startEmptyCalibrationTimer() {
+    this._clearEmptyCalibrationTimer();
+    this._emptyCalibrationTimer = setInterval(() => this._tickEmptyCalibration(), EMPTY_CALIBRATION_TIMER_MS);
+  }
+
+  _prepareEmptyCalibration() {
+    if (this.emptyCalibrationPlan?.phase === 'collecting' || this.emptyCalibrationPlan?.phase === 'stopping') return;
+    this._clearEmptyCalibrationTimer();
+    this.emptyCalibrationPlan = {
+      phase: 'form',
+      durationSeconds: EMPTY_CALIBRATION_DEFAULT_SECONDS,
+      leadSeconds: EMPTY_CALIBRATION_DEFAULT_LEAD_SECONDS,
+    };
+    this.error = '';
+    this.message = '';
+    this._render();
+  }
+
+  _cancelEmptyCalibrationPreparation() {
+    if (!['form', 'countdown'].includes(this.emptyCalibrationPlan?.phase)) return;
+    this._clearEmptyCalibrationTimer();
+    this.emptyCalibrationPlan = null;
+    this.error = '';
+    this.message = 'Leerkalibrierung nicht gestartet.';
+    this._render();
+  }
+
+  _tickEmptyCalibration() {
+    const plan = this.emptyCalibrationPlan;
+    if (!plan) {
+      this._clearEmptyCalibrationTimer();
+      return;
+    }
+    if (this.busy) return;
+    const now = Date.now();
+    if (plan.phase === 'countdown') {
+      if (now >= plan.startsAtMs) {
+        this._clearEmptyCalibrationTimer();
+        void this._startEmptyCalibration(plan);
+        return;
+      }
+      const remaining = this._emptyCalibrationRemainingSeconds();
+      if (plan.displaySeconds !== remaining) {
+        this.emptyCalibrationPlan = { ...plan, displaySeconds: remaining };
+        this._render();
+      }
+      return;
+    }
+    if (plan.phase === 'collecting') {
+      if (now >= plan.endsAtMs) {
+        this._clearEmptyCalibrationTimer();
+        void this._stopEmptyCalibration({ automatic: true });
+        return;
+      }
+      const remaining = this._emptyCalibrationRemainingSeconds();
+      if (plan.displaySeconds !== remaining) {
+        this.emptyCalibrationPlan = { ...plan, displaySeconds: remaining };
+        this._render();
+      }
+    }
+  }
+
+  _scheduleEmptyCalibration(form) {
+    const read = (name) => Number(form.querySelector(`[name="${name}"]`)?.value);
+    const durationSeconds = read('duration_seconds');
+    const leadSeconds = read('lead_seconds');
+    if (!Number.isInteger(durationSeconds) || durationSeconds < EMPTY_CALIBRATION_MIN_SECONDS) {
+      this.error = `Die Messdauer muss eine ganze Zahl von mindestens ${EMPTY_CALIBRATION_MIN_SECONDS} Sekunden sein.`;
+      this._render();
+      return;
+    }
+    if (!Number.isInteger(leadSeconds) || leadSeconds < EMPTY_CALIBRATION_MIN_LEAD_SECONDS) {
+      this.error = `Der Vorlauf muss eine ganze Zahl von mindestens ${EMPTY_CALIBRATION_MIN_LEAD_SECONDS} Sekunden sein.`;
+      this._render();
+      return;
+    }
+
+    this.error = '';
+    this.message = `Start in ${leadSeconds} s. Bitte jetzt den Raum verlassen.`;
+    this.emptyCalibrationPlan = {
+      phase: 'countdown',
+      durationSeconds,
+      leadSeconds,
+      startsAtMs: Date.now() + leadSeconds * 1000,
+      displaySeconds: leadSeconds,
+    };
+    this._startEmptyCalibrationTimer();
+    this._render();
+  }
+
   async _onSubmit(event) {
     if (event.target.id === 'occProfileForm') {
       event.preventDefault();
@@ -771,6 +1186,9 @@ export class ObservatoryControlCenter {
     } else if (event.target.id === 'occWorkflowForm') {
       event.preventDefault();
       await this._createWorkflow(event.target);
+    } else if (event.target.id === 'occEmptyCalibrationPrepareForm') {
+      event.preventDefault();
+      this._scheduleEmptyCalibration(event.target);
     }
   }
 
@@ -796,7 +1214,21 @@ export class ObservatoryControlCenter {
       if (run) {
         this.selectedRun = run;
         this.runSelectionCleared = false;
+        this.calibrationAvailability = null;
         this._render();
+        const context = this._calibrationContextRequest();
+        if (context) {
+          void experimentService.getCalibrationAvailability({
+            profileId: context.profile_id,
+            profileRevisionId: context.profile_revision_id,
+          }).then((availability) => {
+            const currentContext = this._calibrationContextRequest();
+            if (currentContext?.profile_id !== context.profile_id
+              || currentContext?.profile_revision_id !== context.profile_revision_id) return;
+            this.calibrationAvailability = availability;
+            this._render();
+          }).catch(() => {});
+        }
       }
       return;
     }
@@ -805,7 +1237,25 @@ export class ObservatoryControlCenter {
       const profile = this.profiles.find((candidate) => candidate.id === profileButton.dataset.occProfileId);
       if (profile) {
         this._selectProfile(profile);
+        this.calibrationAvailability = null;
         this._render();
+        const workflow = this.selectedRun?.workflow;
+        const context = workflow?.profile_id
+          ? this._calibrationContextRequest()
+          : {
+            profile_id: profile.id,
+            ...(profile.revision_id ? { profile_revision_id: profile.revision_id } : {}),
+          };
+        void experimentService.getCalibrationAvailability({
+          profileId: context.profile_id,
+          profileRevisionId: context.profile_revision_id,
+        }).then((availability) => {
+          const currentContext = this._calibrationContextRequest();
+          if (currentContext?.profile_id !== context.profile_id
+            || currentContext?.profile_revision_id !== context.profile_revision_id) return;
+          this.calibrationAvailability = availability;
+          this._render();
+        }).catch(() => {});
       }
       return;
     }
@@ -819,6 +1269,16 @@ export class ObservatoryControlCenter {
       return this._focusAndScroll(`[data-occ-artifact-input="${attribute(action.replace('focus-artifact-', ''))}"]`);
     }
     if (action === 'generate-points') return this._generatePointsFromForm();
+    if (action === 'calculate-mmwave-placement') {
+      const result = this.geometryEditor?.calculateOptimalMmwavePlacement?.();
+      const status = this.container.querySelector('[data-occ-mmwave-placement-status]');
+      if (result?.ok) {
+        if (status) status.textContent = `Berechnet: ${result.label} · Position ${result.positionM.map((value) => Number(value).toFixed(2)).join(' / ')} m · ${result.referencePointsCovered}/${result.referencePointCount} TX/RX-Referenzen im Sichtfeld. Profilversion speichern.`;
+      } else if (status) {
+        status.textContent = result?.error || 'Die mmWave-Position konnte nicht berechnet werden.';
+      }
+      return;
+    }
     if (action === 'toggle-profiles') {
       event.preventDefault();
       this.profilesExpanded = !this.profilesExpanded;
@@ -843,6 +1303,10 @@ export class ObservatoryControlCenter {
       this._render();
       return;
     }
+    if (action === 'prepare-empty') return this._prepareEmptyCalibration();
+    if (action === 'focus-empty-preparation') return this._focusAndScroll('#occEmptyCalibrationPrepareForm [name="duration_seconds"]');
+    if (action === 'cancel-empty-preparation') return this._cancelEmptyCalibrationPreparation();
+    if (action === 'reuse-empty') return this._reuseEmptyCalibration();
     if (action === 'open-mmwave-calibration') {
       const assistant = document.querySelector('.mmwave-assistant');
       if (assistant) {
@@ -857,12 +1321,13 @@ export class ObservatoryControlCenter {
       return;
     }
     if (action === 'clear-run') {
+      if (['form', 'countdown'].includes(this.emptyCalibrationPlan?.phase)) this._cancelEmptyCalibrationPreparation();
       this.selectedRun = null;
       this.runSelectionCleared = true;
       this._render();
       return;
     }
-    if (action === 'seal') return this._advance('seal_setup', 'PASS', { profile_sha256: this.selectedProfile?.profile_sha256, software_only: true });
+    if (action === 'seal') return this._sealSetup();
     if (action === 'start-empty') return this._startEmptyCalibration();
     if (action === 'stop-empty') return this._stopEmptyCalibration();
     if (action === 'open-training') return this._advance('train_p01_p09', 'READY', { resumed_after_empty_baseline: true, calibration_reference: 'mmwave' });
@@ -897,6 +1362,18 @@ export class ObservatoryControlCenter {
 
   _readProfileFromForm(form = this.container.querySelector('#occProfileForm')) {
     const read = (prefix) => [0, 1, 2].map((index) => numberValue(form.querySelector(`[data-occ-field="${prefix}.${index}"]`)?.value));
+    const existingMmwave = this.profileDraft?.mmwave || {};
+    const mmwaveExteriorInput = form.querySelector('[data-cad-mmwave-exterior]')
+      || this.container?.querySelector?.('[data-cad-mmwave-exterior]');
+    const allowMmwaveExterior = mmwaveExteriorInput
+      ? Boolean(mmwaveExteriorInput.checked)
+      : existingMmwave.allow_exterior !== false;
+    const existingRadio = this.profileDraft?.radio || { channel: 6 };
+    const existingEnvironment = this.profileDraft?.environment || {
+      layout_revision: 'control-center',
+      furniture_revision: 'control-center',
+      door_state_revision: 'closed',
+    };
     return {
       schema_version: 1,
       profile_kind: 'ruview.setup-profile',
@@ -904,9 +1381,16 @@ export class ObservatoryControlCenter {
       sensor_mount_radius_m: this.profileDraft?.sensor_mount_radius_m ?? DEFAULT_SENSOR_MOUNT_RADIUS_M,
       transmitter: { id: 'TX', position_m: read('transmitter.position_m') },
       receivers: ['RX1', 'RX2', 'RX3', 'RX4'].map((id) => ({ id, role: 'receiver', position_m: read(`receiver.${id}`) })),
+      mmwave: {
+        ...existingMmwave,
+        sensor: existingMmwave.sensor || MMWAVE_SENSOR,
+        mounting_position_m: read('mmwave.mounting_position_m'),
+        mounting_revision: existingMmwave.mounting_revision || 'draft',
+        allow_exterior: allowMmwaveExterior,
+      },
       points: EXPECTED_POINTS.map((id) => ({ id, coordinates_m: read(`point.${id}`) })),
-      radio: { channel: 6 },
-      environment: { layout_revision: 'control-center', furniture_revision: 'control-center', door_state_revision: 'closed' },
+      radio: existingRadio,
+      environment: existingEnvironment,
       mmwave_status: 'NOT_CONNECTED',
     };
   }
@@ -970,9 +1454,14 @@ export class ObservatoryControlCenter {
       const data = new FormData(form);
       const profileId = String(data.get('profile_id') || '');
       this.workflowLabel = String(data.get('workflow_label') || '').trim();
-      this.selectedRun = await experimentService.createWorkflow({ label: this.workflowLabel, profileId });
+      const selectedProfile = this.profiles.find((profile) => profile.id === profileId) || this.selectedProfile;
+      this.selectedRun = await experimentService.createWorkflow({
+        label: this.workflowLabel,
+        profileId,
+        profileRevisionId: selectedProfile?.revision_id,
+      });
       this.runSelectionCleared = false;
-      this.message = 'Workflow angelegt. Setup software-seitig versiegeln ist der nächste Schritt.';
+      this.message = 'Workflow angelegt. Als Nächstes das aktive Runtime-Setup prüfen und versiegeln.';
       await this.refresh({ quiet: true, allowWhileBusy: true });
     } catch (error) {
       this.message = '';
@@ -998,6 +1487,20 @@ export class ObservatoryControlCenter {
       this.busy = false;
       this._render();
     }
+  }
+
+  async _sealSetup() {
+    const setup = this._activePositionSetup();
+    if (!setup) {
+      this.message = '';
+      this.error = 'Setup kann nicht versiegelt werden: Der Server läuft ohne aktives Setup-v2.';
+      this._render();
+      return;
+    }
+    return this._advance('seal_setup', 'PASS', {
+      setup_id: setup.setup_id,
+      setup_sha256: setup.setup_sha256,
+    });
   }
 
   async _completePhaseAndOpenNext(currentPhase, nextPhase, payload = {}, nextPayload = {}, nextStatus = 'READY') {
@@ -1027,34 +1530,117 @@ export class ObservatoryControlCenter {
     }
   }
 
-  async _startEmptyCalibration() {
+  async _startEmptyCalibration(plan = this.emptyCalibrationPlan) {
+    if (!plan || plan.phase !== 'countdown') return;
+    this._clearEmptyCalibrationTimer();
+    this.emptyCalibrationPlan = { ...plan, phase: 'starting', displaySeconds: 0 };
     this.busy = true;
+    this.error = '';
+    this.message = '';
+    this._render();
     try {
-      const response = await apiService.post('/api/v1/classification/calibration/start', {});
+      const context = this._calibrationContextRequest();
+      if (!context) throw new Error('Bitte zuerst ein Setup-Profil auswählen.');
+      const response = await apiService.post('/api/v1/classification/calibration/start', context);
       if (response?.success !== true) throw new Error(response?.error || 'D5/D6-Kalibrierung konnte nicht starten.');
-      await this._advance('empty_calibration', 'RUNNING', { calibration_kind: 'wifi_d5_d6' });
+      const startedAtMs = Date.now();
+      this.emptyCalibrationPlan = {
+        ...plan,
+        phase: 'collecting',
+        startedAtMs,
+        endsAtMs: startedAtMs + plan.durationSeconds * 1000,
+        displaySeconds: plan.durationSeconds,
+      };
+      this.message = `Leerkalibrierung läuft ${plan.durationSeconds} s.`;
+      this._startEmptyCalibrationTimer();
+      await this._advance('empty_calibration', 'RUNNING', {
+        calibration_kind: 'wifi_d5_d6',
+        requested_duration_seconds: plan.durationSeconds,
+        start_delay_seconds: plan.leadSeconds,
+      });
     } catch (error) {
+      this._clearEmptyCalibrationTimer();
+      this.emptyCalibrationPlan = null;
       this.message = '';
       this.error = error?.message || 'WiFi-Kalibrierung konnte nicht gestartet werden.';
+    } finally {
       this.busy = false;
       this._render();
     }
   }
 
-  async _stopEmptyCalibration() {
+  async _stopEmptyCalibration({ automatic = false } = {}) {
+    const plan = this.emptyCalibrationPlan;
+    this._clearEmptyCalibrationTimer();
+    this.emptyCalibrationPlan = plan ? { ...plan, phase: 'stopping' } : null;
     this.busy = true;
+    this.error = '';
+    this._render();
     try {
       const response = await apiService.post('/api/v1/classification/calibration/stop', {});
       if (response?.success !== true) throw new Error(response?.error || 'D5/D6-Kalibrierung ist noch nicht bereit.');
+      this.emptyCalibrationPlan = null;
       await this._completePhaseAndOpenNext(
         'empty_calibration',
         'train_p01_p09',
-        { calibration_kind: 'wifi_d5_d6', response },
+        {
+          calibration_kind: 'wifi_d5_d6',
+          calibration_id: response.calibration_id,
+          calibration_source: response.calibration_source || 'captured',
+          calibration_context_sha256: response.calibration_context_sha256,
+          response,
+          ...(plan?.durationSeconds ? { requested_duration_seconds: plan.durationSeconds } : {}),
+          ...(automatic ? { automatic_completion: true } : {}),
+        },
         { training_points: EXPECTED_POINTS },
       );
     } catch (error) {
+      if (plan?.durationSeconds) this.emptyCalibrationPlan = { ...plan, phase: 'ready_to_finish' };
       this.message = '';
       this.error = error?.message || 'WiFi-Kalibrierung konnte nicht abgeschlossen werden.';
+    } finally {
+      this.busy = false;
+      this._render();
+    }
+  }
+
+  async _reuseEmptyCalibration() {
+    if (!this.selectedRun) return;
+    this.busy = true;
+    this.error = '';
+    this.message = '';
+    this._render();
+    try {
+      const context = this._calibrationContextRequest();
+      if (!context) throw new Error('Bitte zuerst ein Setup-Profil auswählen.');
+      const response = await experimentService.reuseCalibration({
+        profileId: context.profile_id,
+        profileRevisionId: context.profile_revision_id,
+      });
+      if (response?.success !== true) throw new Error(response?.error || response?.message || 'Gespeicherte Leerkalibrierung konnte nicht verwendet werden.');
+      let run = await experimentService.advancePhase(this.selectedRun.id, {
+        phase: 'empty_calibration',
+        status: 'REUSED',
+        payload: {
+          calibration_kind: 'wifi_d5_d6',
+          calibration_id: response.calibration_id,
+          calibration_source: 'reused',
+          calibration_context_sha256: response.calibration_context_sha256,
+          reused_without_measurement: true,
+        },
+      });
+      run = await experimentService.advancePhase(run.id, {
+        phase: 'train_p01_p09',
+        status: 'READY',
+        payload: { training_points: EXPECTED_POINTS, resumed_after_reused_baseline: true },
+      });
+      this.selectedRun = run;
+      this.message = 'Gespeicherte Leerkalibrierung wiederverwendet. Keine neue Leeraumkalibrierung nötig.';
+      await this.refresh({ quiet: true, allowWhileBusy: true });
+    } catch (error) {
+      this.message = '';
+      this.error = error?.message || 'Gespeicherte Leerkalibrierung konnte nicht verwendet werden.';
+    } finally {
       this.busy = false;
       this._render();
     }

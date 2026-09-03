@@ -2,7 +2,9 @@
  * Lightweight HTTP client for the RuView sensing-server.
  *
  * Uses Node's built-in `fetch` (available since Node 18).  All requests respect
- * the optional RUVIEW_API_TOKEN bearer header and a 10-second hard timeout.
+ * the RUVIEW_API_TOKEN bearer header when configured and a 10-second hard
+ * timeout. Routable sensing servers require the token; loopback-only servers
+ * may omit it.
  *
  * Failure model: every public function returns a typed `Result<T>` tuple to
  * avoid try/catch proliferation in callers.
