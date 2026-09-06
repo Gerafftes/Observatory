@@ -723,7 +723,7 @@ export class PoseService {
       zoneIds: params.zone_ids ? params.zone_ids.split(',') : undefined,
       minConfidence: params.min_confidence ? parseFloat(params.min_confidence) : undefined,
       maxFps: params.max_fps ? parseInt(params.max_fps) : undefined,
-      token: params.token
+      token: params.token || wsService.getConnectionToken(this.streamConnection)
     };
 
     // Stop current stream

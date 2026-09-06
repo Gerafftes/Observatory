@@ -24,6 +24,8 @@ const SHELL_ASSETS = [
   'services/websocket.service.js',
   'services/health.service.js',
   'services/sensing.service.js',
+  'services/ws-auth.js',
+  'utils/auth-controls.js',
   'services/pose.service.js',
   'services/stream.service.js',
   'utils/backend-detector.js',

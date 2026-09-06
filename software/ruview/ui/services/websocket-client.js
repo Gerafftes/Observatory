@@ -3,6 +3,8 @@
 // Callers (e.g. viz.html) usually pass an explicit `url` derived from
 // `buildSensingWsUrl()` so HTTP/WS port pairings are handled centrally.
 
+import { sensingProtocols } from './ws-auth.js';
+
 function _defaultWsUrl() {
   if (typeof window === 'undefined' || !window.location) {
     return 'ws://localhost:8765/ws/sensing';
@@ -14,6 +16,7 @@ function _defaultWsUrl() {
 export class WebSocketClient {
   constructor(options = {}) {
     this.url = options.url || _defaultWsUrl();
+    this.token = options.token;
     this.ws = null;
     this.state = 'disconnected'; // disconnected, connecting, connected, error
     this.isRealData = false;
@@ -57,7 +60,7 @@ export class WebSocketClient {
     console.log(`[WS-VIZ] Connecting to ${this.url}`);
 
     try {
-      this.ws = new WebSocket(this.url);
+      this.ws = new WebSocket(this.url, sensingProtocols(this.url, this.token));
       this.ws.binaryType = 'arraybuffer';
 
       this.ws.onopen = () => this._handleOpen();

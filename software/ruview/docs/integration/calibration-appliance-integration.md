@@ -203,12 +203,15 @@ embedding. This is the ADR-150 follow-on — *not required* for the calibration 
 
 **Privacy / security:** keep baselines + banks local; if federating across appliances (ADR-105),
 exchange bank/model deltas, never raw CSI. Hardening already in place:
-- **`--token <T>`** (or `CALIBRATE_TOKEN` env) requires `Authorization: Bearer <T>` on every route; the
-  server warns loudly if bound to a non-loopback address without a token.
+- **`--token <T>`** (or `CALIBRATE_TOKEN` env) requires `Authorization: Bearer <T>` on every API route;
+  a non-empty token is mandatory and startup fails before binding when the HTTP API is non-loopback.
+  Loopback-only operation may omit the token for local compatibility.
 - **`room_id` is sanitized** to `[A-Za-z0-9_-]` (≤64 chars) before it touches the baseline write path —
   no `../` / absolute-path traversal.
-- CORS is permissive for dev — in production bind to loopback and reverse-proxy through the appliance
-  gateway (which already enforces bearer auth).
+- CORS uses an exact allowlist. The default permits the service's loopback origin and local UI development
+  on port 3000; set `CALIBRATE_CORS_ORIGINS` to a comma-separated list of exact origins for another UI.
+  Wildcards are ignored. In production bind to loopback and reverse-proxy through the appliance gateway
+  (which already enforces bearer auth).
 
 ---
 

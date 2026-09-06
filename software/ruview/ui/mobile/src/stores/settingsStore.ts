@@ -6,6 +6,8 @@ export type Theme = 'light' | 'dark' | 'system';
 
 export interface SettingsState {
   serverUrl: string;
+  apiToken: string;
+  setApiToken: (token: string) => void;
   rssiScanEnabled: boolean;
   theme: Theme;
   alertSoundEnabled: boolean;
@@ -19,12 +21,14 @@ export const useSettingsStore = create<SettingsState>()(
   persist(
     (set) => ({
       serverUrl: 'http://localhost:3000',
+      apiToken: '',
+      setApiToken: (apiToken) => set({ apiToken }),
       rssiScanEnabled: false,
       theme: 'system',
       alertSoundEnabled: true,
 
       setServerUrl: (url) => {
-        set({ serverUrl: url });
+        set((state) => ({ serverUrl: url, apiToken: url === state.serverUrl ? state.apiToken : '' }));
       },
 
       setRssiScanEnabled: (value) => {
@@ -42,6 +46,8 @@ export const useSettingsStore = create<SettingsState>()(
     {
       name: 'wifi-densepose-settings',
       storage: createJSONStorage(() => AsyncStorage),
+      // Credentials are session-only, never written to unencrypted AsyncStorage.
+      partialize: ({ apiToken: _token, ...settings }) => settings,
     },
   ),
 );

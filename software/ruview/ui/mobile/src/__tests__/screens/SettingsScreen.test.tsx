@@ -15,6 +15,7 @@ jest.mock('@/services/ws.service', () => ({
 jest.mock('@/services/api.service', () => ({
   apiService: {
     setBaseUrl: jest.fn(),
+    setAuthToken: jest.fn(),
     get: jest.fn(),
     post: jest.fn(),
     getStatus: jest.fn(),

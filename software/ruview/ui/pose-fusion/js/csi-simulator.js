@@ -8,6 +8,8 @@
  * matching the ADR-018 frame format expectations.
  */
 
+import { sensingProtocols } from '../../services/ws-auth.js';
+
 export class CsiSimulator {
   static VERSION = 'v4-drift';  // Cache-bust verification
 
@@ -52,7 +54,7 @@ export class CsiSimulator {
   async connectLive(url) {
     return new Promise((resolve) => {
       try {
-        this.ws = new WebSocket(url);
+        this.ws = new WebSocket(url, sensingProtocols(url));
         this.ws.binaryType = 'arraybuffer';
         this.ws.onmessage = (evt) => this._handleLiveFrame(evt.data);
         this.ws.onopen = () => { this.mode = 'live'; resolve(true); };

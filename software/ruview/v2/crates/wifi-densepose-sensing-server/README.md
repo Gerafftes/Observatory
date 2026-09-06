@@ -112,6 +112,11 @@ wildcard, or host-only entry. `--allowed-origin` can be repeated; the
 comma-separated `SENSING_ALLOWED_ORIGINS` variable is equivalent. The
 dedicated WebSocket port remains compatible with a UI served from the allowed
 HTTP Origin, and non-browser clients without an `Origin` header remain usable.
+When a token is configured, live WebSockets require it before upgrade. Browser
+clients can enter it in the UI; native clients may use `Authorization: Bearer`
+or the documented `ruview.v1` subprotocol credential. See
+`../../../docs/security/live-websocket-auth.md` for the wire contract and
+client setup.
 
 ### Experimental fixed-room position workflow
 
