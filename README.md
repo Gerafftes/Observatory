@@ -17,7 +17,6 @@
 
 <p align="center">
   <a href="https://stardance.hackclub.com/projects/25673"><img src="https://img.shields.io/badge/Hack%20Club-Stardance-ec3750?style=flat-square&amp;logo=hackclub&amp;logoColor=white" alt="Hack Club Stardance"></a>
-  <a href="https://www.espressif.com/en/products/socs/esp32"><img src="https://img.shields.io/badge/ESP32-E7352C?style=flat-square&amp;logo=espressif&amp;logoColor=white" alt="ESP32"></a>
   <a href="#aktueller-validierungsstand"><img src="https://img.shields.io/badge/status-experimental-orange" alt="Experimental status"></a>
   <a href="LICENSE.md"><img src="https://img.shields.io/badge/License-PolyForm%20Noncommercial%201.0.0-blue.svg" alt="PolyForm Noncommercial 1.0.0 license"></a>
   <a href="https://github.com/Gerafftes/Observatory"><img src="https://img.shields.io/github/repo-size/Gerafftes/Observatory?style=flat-square&amp;label=Projektgr%C3%B6%C3%9Fe" alt="Projektgröße"></a>
