@@ -5584,7 +5584,8 @@ async fn ws_sensing_handler(
     ws: WebSocketUpgrade,
     State(state): State<SharedState>,
 ) -> impl IntoResponse {
-    ws.on_upgrade(|socket| handle_ws_client(socket, state))
+    ws.protocols([wifi_densepose_sensing_server::bearer_auth::WS_PROTOCOL])
+        .on_upgrade(|socket| handle_ws_client(socket, state))
 }
 
 async fn handle_ws_client(mut socket: WebSocket, state: SharedState) {
@@ -5644,7 +5645,8 @@ async fn ws_introspection_handler(
     ws: WebSocketUpgrade,
     State(state): State<SharedState>,
 ) -> impl IntoResponse {
-    ws.on_upgrade(|socket| handle_ws_introspection_client(socket, state))
+    ws.protocols([wifi_densepose_sensing_server::bearer_auth::WS_PROTOCOL])
+        .on_upgrade(|socket| handle_ws_introspection_client(socket, state))
 }
 
 async fn handle_ws_introspection_client(mut socket: WebSocket, state: SharedState) {
@@ -5693,7 +5695,8 @@ async fn ws_pose_handler(
     ws: WebSocketUpgrade,
     State(state): State<SharedState>,
 ) -> impl IntoResponse {
-    ws.on_upgrade(|socket| handle_ws_pose_client(socket, state))
+    ws.protocols([wifi_densepose_sensing_server::bearer_auth::WS_PROTOCOL])
+        .on_upgrade(|socket| handle_ws_pose_client(socket, state))
 }
 
 fn pose_source_for_frame(model_loaded: bool, model_output_present: bool) -> &'static str {
@@ -15492,7 +15495,7 @@ async fn main() {
     // `Authorization: Bearer <token>`.
     let bearer_auth_state = wifi_densepose_sensing_server::bearer_auth::AuthState::from_env();
     if bearer_auth_state.is_enabled() {
-        info!("API auth: bearer-token enforcement ON for /api/v1/* (RUVIEW_API_TOKEN set)");
+        info!("API auth: bearer-token enforcement ON for /api/v1/* and live WebSockets (RUVIEW_API_TOKEN set)");
         if bind_ip.is_unspecified() {
             warn!(
                 "API auth ON but bind-addr is {} — consider --bind-addr 127.0.0.1 for LAN-only deployments",
@@ -15570,6 +15573,16 @@ async fn main() {
         // so a client on :8765 can stream signed RuField FieldEvents alongside
         // `/ws/sensing`. Merged with its own FieldState (different state type).
         .merge(rufield_surface::router(field_surface.clone()))
+        // Browser WebSocket handshakes carry an Origin but are not protected
+        // by CORS; reject foreign origins before the handler can upgrade.
+        .layer(axum::middleware::from_fn_with_state(
+            browser_origin_allowlist.clone(),
+            wifi_densepose_sensing_server::host_validation::require_safe_browser_origin,
+        ))
+        .layer(axum::middleware::from_fn_with_state(
+            bearer_auth_state.clone(),
+            wifi_densepose_sensing_server::bearer_auth::require_bearer,
+        ))
         // Browser WebSocket handshakes carry an Origin but are not protected
         // by CORS; reject foreign origins before the handler can upgrade.
         .layer(axum::middleware::from_fn_with_state(
@@ -15771,7 +15784,7 @@ async fn main() {
         // Bearer-token auth on `/api/v1/*` (#443). It is optional only for a
         // loopback-bound server; routable binds are rejected above without a
         // configured token. `/health*` and `/ui/*` remain public, while live
-        // WebSockets additionally pass through the browser-origin boundary.
+        // WebSockets require the same token and pass the browser-origin boundary.
         .layer(axum::middleware::from_fn_with_state(
             bearer_auth_state.clone(),
             wifi_densepose_sensing_server::bearer_auth::require_bearer,

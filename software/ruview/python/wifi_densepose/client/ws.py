@@ -19,7 +19,10 @@ import asyncio
 from wifi_densepose.client import SensingClient, EdgeVitalsMessage
 
 async def main():
-    async with SensingClient("ws://localhost:8765/ws/sensing") as client:
+    async with SensingClient(
+        "ws://localhost:8765/ws/sensing",
+        token=os.environ.get("RUVIEW_API_TOKEN"),
+    ) as client:
         async for msg in client.stream():
             if isinstance(msg, EdgeVitalsMessage):
                 print(f"BR={msg.breathing_rate_bpm}, HR={msg.heartrate_bpm}")
@@ -33,6 +36,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import os
 from dataclasses import dataclass, field
 from typing import Any, AsyncIterator, Optional
 
@@ -178,6 +182,7 @@ class SensingClient:
         self,
         url: str,
         *,
+        token: Optional[str] = None,
         ping_interval: float = 20.0,
         ping_timeout: float = 20.0,
         max_size: int = 16 * 1024 * 1024,
@@ -188,6 +193,10 @@ class SensingClient:
                 "`pip install \"wifi-densepose[client]\"` to enable the client extras."
             )
         self.url = url
+        self._subprotocols = (
+            ["ruview.v1", "ruview.bearer." + token.encode("utf-8").hex()]
+            if token else None
+        )
         self._ping_interval = ping_interval
         self._ping_timeout = ping_timeout
         self._max_size = max_size
@@ -196,6 +205,7 @@ class SensingClient:
     async def __aenter__(self) -> "SensingClient":
         self._ws = await websockets.connect(
             self.url,
+            subprotocols=self._subprotocols,
             ping_interval=self._ping_interval,
             ping_timeout=self._ping_timeout,
             max_size=self._max_size,

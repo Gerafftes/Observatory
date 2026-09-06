@@ -9,6 +9,7 @@
  * - Reflective floor, settings dialog, and practical data HUD
  */
 import * as THREE from 'three';
+import { sensingProtocols } from '../../services/ws-auth.js';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
 import { DemoDataGenerator } from './demo-data.js';
@@ -801,7 +802,7 @@ class Observatory {
     this._liveDataReceivedAtMs = null;
     this._liveConnectionOpenedAtMs = null;
     try {
-      const socket = new WebSocket(url);
+      const socket = new WebSocket(url, sensingProtocols(url));
       this._ws = socket;
       socket.onopen = () => {
         if (this._ws !== socket) return;

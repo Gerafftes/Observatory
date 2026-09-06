@@ -1,6 +1,6 @@
 # Bklit render specification — D4/D5/D6
 
-Render date: 27 August 2026<br>
+Render date: 27 August 2026
 Purpose: replace the four result figures with Bklit UI chart components without changing measurements, denominators, thresholds, or classifications.
 
 ## Source

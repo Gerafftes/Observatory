@@ -8,13 +8,10 @@
 //! keeps local development convenient without leaving a LAN API open by
 //! default.
 //!
-//! Endpoints outside `/api/v1/*` (`/health*`, `/ws/sensing`, the static `/ui/*`
-//! mount, `/`) are intentionally **not** gated:
-//! * `/health*` is the liveness/readiness probe that orchestrators hit
-//!   anonymously;
-//! * `/ws/sensing` and `/ui/*` are served to local browsers that can't easily
-//!   inject headers — the sensitive control plane is the `/api/v1/*` tree, and
-//!   that is what this layer protects.
+//! `/ws/sensing` and `/ws/introspection` require the same token when configured.
+//! Browsers may offer `ruview.v1` and `ruview.bearer.<hex UTF-8 token>` in
+//! Sec-WebSocket-Protocol. Only `ruview.v1` is negotiated back to the client;
+//! the credential is never echoed. Health probes and static UI remain public.
 //!
 //! The header check uses a length-then-byte constant-time compare to avoid
 //! leaking the token through timing.
@@ -23,7 +20,10 @@ use std::sync::Arc;
 
 use axum::{
     extract::{Request, State},
-    http::{header::AUTHORIZATION, StatusCode},
+    http::{
+        header::{AUTHORIZATION, SEC_WEBSOCKET_PROTOCOL},
+        HeaderMap, StatusCode,
+    },
     middleware::Next,
     response::{IntoResponse, Response},
 };
@@ -35,6 +35,43 @@ pub const API_TOKEN_ENV: &str = "RUVIEW_API_TOKEN";
 
 /// Path prefix the middleware protects when auth is enabled.
 pub const PROTECTED_PREFIX: &str = "/api/v1/";
+
+/// Public wire protocol; never negotiate the credential-bearing offer.
+pub const WS_PROTOCOL: &str = "ruview.v1";
+const WS_TOKEN_PREFIX: &str = "ruview.bearer.";
+
+fn is_live_websocket(path: &str) -> bool {
+    matches!(
+        path,
+        "/ws/sensing" | "/ws/introspection" | "/api/v1/stream/pose"
+    )
+}
+
+fn websocket_token_matches(headers: &HeaderMap, expected: &str) -> bool {
+    let mut has_protocol = false;
+    let mut supplied = None;
+    for value in headers.get_all(SEC_WEBSOCKET_PROTOCOL) {
+        let Ok(value) = value.to_str() else {
+            return false;
+        };
+        for protocol in value.split(',').map(str::trim) {
+            if protocol == WS_PROTOCOL {
+                has_protocol = true;
+            } else if let Some(token) = protocol.strip_prefix(WS_TOKEN_PREFIX) {
+                // Ambiguous credentials must fail closed, including across headers.
+                if supplied.replace(token).is_some() {
+                    return false;
+                }
+            }
+        }
+    }
+    let encoded: String = expected
+        .as_bytes()
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect();
+    has_protocol && supplied.is_some_and(|token| ct_eq(token.as_bytes(), encoded.as_bytes()))
+}
 
 /// Cheap, cloneable handle to the configured token (or `None`).
 #[derive(Debug, Clone, Default)]
@@ -66,7 +103,7 @@ impl AuthState {
         }
     }
 
-    /// Whether the middleware will enforce auth on `/api/v1/*` requests.
+    /// Whether a token is configured for protected API and live WS routes.
     pub fn is_enabled(&self) -> bool {
         self.token.is_some()
     }
@@ -85,9 +122,9 @@ fn ct_eq(a: &[u8], b: &[u8]) -> bool {
     diff == 0
 }
 
-/// Axum middleware: enforces `Authorization: Bearer <token>` on `/api/v1/*`
-/// requests when [`AuthState::is_enabled`] returns `true`. Wires up via
-/// [`axum::middleware::from_fn_with_state`].
+/// Axum middleware: enforces `Authorization: Bearer <token>` on protected API
+/// and live WebSocket routes when [`AuthState::is_enabled`] returns `true`.
+/// Browser WebSocket clients may use the credential-bearing subprotocol offer.
 pub async fn require_bearer(
     State(auth): State<AuthState>,
     request: Request,
@@ -96,7 +133,8 @@ pub async fn require_bearer(
     let Some(expected) = auth.token.clone() else {
         return next.run(request).await;
     };
-    if !request.uri().path().starts_with(PROTECTED_PREFIX) {
+    let websocket = is_live_websocket(request.uri().path());
+    if !websocket && !request.uri().path().starts_with(PROTECTED_PREFIX) {
         return next.run(request).await;
     }
     let supplied = request
@@ -114,9 +152,14 @@ pub async fn require_bearer(
                 .eq_ignore_ascii_case("Bearer")
                 .then(|| token.trim_start())
         });
-    let ok = supplied
+    let mut ok = supplied
         .map(|s| ct_eq(s.as_bytes(), expected.as_bytes()))
         .unwrap_or(false);
+    if request.headers().get_all(AUTHORIZATION).iter().count() > 1 {
+        ok = false;
+    } else if !request.headers().contains_key(AUTHORIZATION) && websocket {
+        ok = websocket_token_matches(request.headers(), &expected);
+    }
     if ok {
         next.run(request).await
     } else {
@@ -141,6 +184,9 @@ mod tests {
 
     fn ok_handler() -> Router {
         Router::new()
+            .route("/ws/sensing", get(|| async { "ok" }))
+            .route("/ws/introspection", get(|| async { "ok" }))
+            .route("/api/v1/stream/pose", get(|| async { "ok" }))
             .route("/health", get(|| async { "ok" }))
             .route("/api/v1/info", get(|| async { "ok" }))
             .route("/api/v1/sensitive", axum::routing::post(|| async { "ok" }))
@@ -149,6 +195,93 @@ mod tests {
 
     fn wrap(auth: AuthState) -> Router {
         ok_handler().layer(axum::middleware::from_fn_with_state(auth, require_bearer))
+    }
+
+    #[tokio::test]
+    async fn websocket_credentials_are_required_and_unambiguous() {
+        let token = "sëcret ,+/=🙂";
+        let encoded: String = token
+            .as_bytes()
+            .iter()
+            .map(|b| format!("{b:02x}"))
+            .collect();
+        let valid = format!("ruview.v1, ruview.bearer.{encoded}");
+        let duplicate = format!("{valid}, ruview.bearer.{encoded}");
+        for path in ["/ws/sensing", "/ws/introspection", "/api/v1/stream/pose"] {
+            for (protocol, expected) in [
+                (None, StatusCode::UNAUTHORIZED),
+                (Some("ruview.v1"), StatusCode::UNAUTHORIZED),
+                (
+                    Some("ruview.v1, ruview.bearer.invalid"),
+                    StatusCode::UNAUTHORIZED,
+                ),
+                (Some(duplicate.as_str()), StatusCode::UNAUTHORIZED),
+                (Some(valid.as_str()), StatusCode::OK),
+            ] {
+                let mut req = Request::builder().uri(path).header("host", "localhost");
+                if let Some(value) = protocol {
+                    req = req.header(SEC_WEBSOCKET_PROTOCOL, value);
+                }
+                let response = wrap(AuthState::from_token(token))
+                    .oneshot(req.body(Body::empty()).unwrap())
+                    .await
+                    .unwrap();
+                assert_eq!(response.status(), expected, "{path}");
+            }
+            // An invalid explicit Authorization must not fall back to the protocol.
+            let req = Request::builder()
+                .uri(path)
+                .header(AUTHORIZATION, "Bearer wrong")
+                .header(SEC_WEBSOCKET_PROTOCOL, &valid)
+                .body(Body::empty())
+                .unwrap();
+            assert_eq!(
+                wrap(AuthState::from_token(token))
+                    .oneshot(req)
+                    .await
+                    .unwrap()
+                    .status(),
+                StatusCode::UNAUTHORIZED
+            );
+            assert_eq!(
+                status(
+                    wrap(AuthState::from_token("secret")),
+                    "GET",
+                    path,
+                    Some("secret")
+                )
+                .await,
+                StatusCode::OK
+            );
+            assert_eq!(
+                status(wrap(AuthState::default()), "GET", path, None).await,
+                StatusCode::OK
+            );
+            assert_eq!(
+                status(
+                    wrap(AuthState::from_token("secret")),
+                    "GET",
+                    &format!("{path}?token=secret"),
+                    None
+                )
+                .await,
+                StatusCode::UNAUTHORIZED
+            );
+        }
+        // Subprotocol credentials never authenticate ordinary REST requests.
+        let req = Request::builder()
+            .uri("/api/v1/info")
+            .header(SEC_WEBSOCKET_PROTOCOL, valid)
+            .body(Body::empty())
+            .unwrap();
+        assert_eq!(
+            wrap(AuthState::from_token(token))
+                .oneshot(req)
+                .await
+                .unwrap()
+                .status(),
+            StatusCode::UNAUTHORIZED
+        );
     }
 
     async fn status(router: Router, method: &str, path: &str, auth: Option<&str>) -> StatusCode {
