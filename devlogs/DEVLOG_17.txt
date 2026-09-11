@@ -1,0 +1,22 @@
+# DEVLOG #17
+
+I finally verified the complete **breadboard mmWave data path** with the
+HLK-LD2450.
+
+![Temporary breadboard setup with the ESP32-C3 and HLK-LD2450](wifi-csi-dokumentation/images/mmwave-breadboard-setup.jpeg)
+
+After flashing the known firmware to a new ESP32-C3, it joined `csi-test`,
+received `192.168.4.2`, and exposed `/ota/status` on port `8032`. The status
+confirmed the expected UART mapping: GPIO20 RX, GPIO21 TX, and `256000` baud in
+calibration mode.
+
+The important test was a read-only UDP capture: `224` valid LD2450 datagrams in
+20 seconds, followed by `222` more while the setup was powered only from the
+normal power supply. Every packet matched `ruview.mmwave.ld2450.v1` and
+contained a recognized target. This proves that the breadboard wiring, UART
+parser, ESP Wi-Fi connection, and UDP transport work together. The reported
+coordinates are still sensor-frame data, not a validated room position.
+
+The permanent **PCB-02** is still pending. Next I will validate the radar
+transform with known room marks, connect the CSI receivers, and continue with
+D6 calibration, training, blind tests, and the quality gates.

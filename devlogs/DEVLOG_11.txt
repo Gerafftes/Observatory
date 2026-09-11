@@ -1,0 +1,21 @@
+# DEVLOG #11
+
+I started assembling the **reference-sensor PCB** and soldered the available
+parts. The SMD capacitors have not arrived yet, and the ESP pads turned out to
+be too small for reliable soldering, so I have started connecting the ESP with
+wires instead.
+
+On the software side, I added diagnostics for UART bytes, valid radar frames,
+UDP transmissions, and errors. The server and UI now display these values and
+detect connection or network problems.
+
+I also tested the complete software path synthetically—from radar input through
+calibration, position indexing, blind-test gates, and the UI. All relevant tests
+passed, including `10/10` UI tests. This confirms the software path, but not the
+final live hardware setup.
+
+A read-only CSI check currently receives no RX packets. The last discovery did
+find TX and RX1–RX4 with a stable 64-subcarrier grid, although sequence gaps
+were around `5–6%`.
+
+Next: `finish the wiring, add the capacitors, and restore live CSI reception`.

@@ -15,6 +15,7 @@ export const MMWAVE_STATUS_ENDPOINT = '/api/v1/mmwave/status';
 export const MMWAVE_STATUS_FRESH_MS = 1500;
 export const MMWAVE_REJECTION_VISIBLE_MS = 3000;
 export const RX_POSITION_FRESH_MS = 3000;
+export const MMWAVE_DEBUG_HARDWARE_VISIBILITY_KEY = 'ruview-mmwave-debug-hardware-visible';
 
 export const DEFAULT_ROOM_DIMENSIONS = [4.02, 2.59, 3.44];
 
@@ -24,6 +25,24 @@ const SIGNAL_RED = 0xe51c23;
 const INK_BLACK = 0x111111;
 const HARDWARE_GREY = 0x68737a;
 const ROOM_GREY = 0x707070;
+
+export function readMmwaveDebugHardwareVisibility(storage) {
+  try {
+    const target = storage ?? globalThis.localStorage;
+    return target?.getItem(MMWAVE_DEBUG_HARDWARE_VISIBILITY_KEY) === 'true';
+  } catch {
+    return false;
+  }
+}
+
+export function saveMmwaveDebugHardwareVisibility(visible, storage) {
+  try {
+    const target = storage ?? globalThis.localStorage;
+    target?.setItem(MMWAVE_DEBUG_HARDWARE_VISIBILITY_KEY, String(Boolean(visible)));
+  } catch {
+    // localStorage may be unavailable in private or restricted browser contexts.
+  }
+}
 
 function finiteNumber(value) {
   return typeof value === 'number' && Number.isFinite(value);
@@ -157,7 +176,7 @@ export function normalizeMmwaveDebugStatus(status, nowMs = Date.now()) {
           : state === 'invalid'
             ? 'INVALID'
             : state.toUpperCase(),
-    reason: typeof raw.reason === 'string' ? raw.reason : '',
+    reason: [raw.reason, raw.connection?.hint, raw.cad_profile_error].filter((value) => typeof value === 'string' && value).join(' '),
     roomDimensions,
     mountingPositionM: finiteTriplet(raw.mounting_position_m)
       ? raw.mounting_position_m.slice(0, 3)
@@ -296,6 +315,13 @@ function formatRadarCoordinates(positionMm) {
   return `[${positionMm.map((coordinate) => Math.round(coordinate)).join(', ')}] mm`;
 }
 
+/** Keep receiver labels stable when the backend already prefixes an ID with RX. */
+export function receiverDisplayLabel(value, fallbackIndex = 0) {
+  const suffix = String(value ?? '').match(/(\d+)\s*$/)?.[1];
+  const id = suffix == null ? fallbackIndex + 1 : Number(suffix);
+  return `RX${id}`;
+}
+
 function sameTuple(a, b, tolerance = 1e-4) {
   if (a == null && b == null) return true;
   return finiteTriplet(a) && finiteTriplet(b)
@@ -382,7 +408,7 @@ export class MmwaveDebugView {
     this._rxMarker = null;
     this._rxNodeMeshes = [];
     this._txMarker = null;
-    this._showReferenceNodes = false;
+    this._showReferenceNodes = readMmwaveDebugHardwareVisibility();
     this._canvas = null;
     this._viewport = null;
     this._viewMode = '3d';
@@ -449,6 +475,7 @@ export class MmwaveDebugView {
     this._refreshConfiguredGeometry();
     this._bindControls();
     this._initScene();
+    this._syncHardwareVisibility();
     this.setView('reset');
     this._renderFacts();
     return this;
@@ -466,6 +493,7 @@ export class MmwaveDebugView {
     if (hardwareButton) {
       const listener = () => {
         this._showReferenceNodes = !this._showReferenceNodes;
+        saveMmwaveDebugHardwareVisibility(this._showReferenceNodes);
         this._syncHardwareVisibility();
       };
       hardwareButton.addEventListener('click', listener);
@@ -684,7 +712,7 @@ export class MmwaveDebugView {
         new THREE.MeshBasicMaterial({ color: HARDWARE_GREY, transparent: true, opacity: 0.82 }),
       );
       mesh.position.set(...scenePosition);
-      const label = createMarkerLabel(`RX${node.id}`, HARDWARE_GREY, THREE);
+      const label = createMarkerLabel(receiverDisplayLabel(node.id, index), HARDWARE_GREY, THREE);
       if (label) mesh.add(label);
       this._hardwareGroup.add(mesh);
       this._rxNodeMeshes.push(mesh);

@@ -19,21 +19,23 @@ manufacturing preview documents the earlier board revision:
 The [PCB-01 Gerber and drill files](pcb-01/) are available with a SHA-256
 checksum and manufacturing note.
 
-The revised [PCB-02 with KiCad sources, validation reports, and ordering archive](pcb-02/)
-restores the SMD capacitors, uses standard pin-header pads for the ESP32-C3,
-and keeps the PCB-01 outer dimensions and mounting-hole positions.
+The final [PCB-03 with KiCad sources, validation reports, and ordering archive](pcb-03/)
+applies the corrected 180° LD2450 orientation, keeps the SMD capacitors, and
+preserves the PCB-01/PCB-02 outer dimensions and mounting-hole positions.
+
+PCB-02 remains documented as the previous revision.
 
 > [!IMPORTANT]
-> **PCB-02 is the required revision for the current setup.** PCB-01 remains documented as the earlier manufacturing preview and is not the current target revision.
+> **PCB-03 is the required revision for the current setup.** PCB-01 and PCB-02 remain documented as previous revisions.
 
 ## Breadboard setup
 
-The comparison below shows the current PCB-02 revision next to the temporary
+The comparison below shows the current PCB-03 revision next to the temporary
 breadboard setup:
 
 <table>
 <tr>
-<td><img src="pcb-02/preview/PCB-02-top.png" alt="PCB-02 top view with USB connector, U1, C1, and C2" width="460"><br><strong>PCB-02 — current revision</strong><br>This revised board is the one to use for the current mmWave setup.</td>
+<td><img src="pcb-03/preview/PCB-03-top.png" alt="PCB-03 top view with ANT KEEP CLEAR, USB connector, U1, C1, and C2" width="460"><br><strong>PCB-03 — current revision</strong><br>This final board is the one to use for the current mmWave setup.</td>
 <td><img src="../images/mmwave-breadboard-setup.jpeg" alt="Temporary breadboard setup with HLK-LD2450 and ESP32-C3" width="460"><br><strong>Temporary breadboard setup</strong><br>The photo documents the provisional mmWave wiring on the breadboard.</td>
 </tr>
 </table>

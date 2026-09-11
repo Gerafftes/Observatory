@@ -13,11 +13,14 @@ class WsService {
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private simulationTimer: ReturnType<typeof setInterval> | null = null;
   private targetUrl = '';
+  private token = '';
   private active = false;
   private status: ConnectionStatus = 'disconnected';
 
-  connect(url: string): void {
+  connect(url: string, token = ''): void {
+    if (url !== this.targetUrl || token !== this.token) this.disconnect();
     this.targetUrl = url;
+    this.token = token;
     this.active = true;
     this.reconnectAttempt = 0;
 
@@ -35,7 +38,10 @@ class WsService {
 
     try {
       const endpoint = this.buildWsUrl(url);
-      const socket = new WebSocket(endpoint);
+      // Encode UTF-8 as lowercase hex using APIs also available in React Native.
+      const hex = encodeURIComponent(token).replace(/%([0-9A-F]{2})|([^%])/g,
+        (_, byte: string, char: string) => byte ? byte.toLowerCase() : char.charCodeAt(0).toString(16).padStart(2, '0'));
+      const socket = new WebSocket(endpoint, token ? ['ruview.v1', `ruview.bearer.${hex}`] : []);
       this.ws = socket;
 
       socket.onopen = () => {
@@ -80,6 +86,7 @@ class WsService {
     this.clearReconnectTimer();
     this.stopSimulation();
     if (this.ws) {
+      this.ws.onclose = null;
       this.ws.close(1000, 'client disconnect');
       this.ws = null;
     }
@@ -128,7 +135,7 @@ class WsService {
     this.clearReconnectTimer();
     this.reconnectTimer = setTimeout(() => {
       this.reconnectTimer = null;
-      this.connect(this.targetUrl);
+      this.connect(this.targetUrl, this.token);
     }, delay);
     this.startSimulation();
   }

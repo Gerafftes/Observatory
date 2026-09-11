@@ -2,6 +2,7 @@
 
 import { API_CONFIG, buildApiUrl } from '../config/api.config.js';
 import { backendDetector } from '../utils/backend-detector.js';
+import { getApiToken } from './ws-auth.js';
 
 export class ApiService {
   constructor() {
@@ -26,14 +27,15 @@ export class ApiService {
   }
 
   // Build headers for requests
-  getHeaders(customHeaders = {}) {
+  getHeaders(customHeaders = {}, url) {
     const headers = {
       ...API_CONFIG.DEFAULT_HEADERS,
       ...customHeaders
     };
 
-    if (this.authToken) {
-      headers['Authorization'] = `Bearer ${this.authToken}`;
+    const token = this.authToken || getApiToken(url);
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
     }
 
     return headers;
@@ -80,7 +82,7 @@ export class ApiService {
       // Make the request
       const response = await fetch(finalUrl, {
         ...processed.options,
-        headers: this.getHeaders(processed.options.headers)
+        headers: this.getHeaders(processed.options.headers, finalUrl)
       });
 
       // Process response through interceptors

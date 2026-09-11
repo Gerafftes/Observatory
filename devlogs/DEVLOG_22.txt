@@ -1,0 +1,33 @@
+# DEVLOG #22
+
+Today I closed the remaining local browser-origin gap from the 13-entry
+security review; entries 8/11 and 12/13 were duplicates.
+
+The old host-based check accepted every localhost port. A page on
+`http://localhost:3000` could therefore reach an unauthenticated service on a
+different local port. I separated browser Origin checks from Host/DNS-rebinding
+checks. WebSockets and mutating `/api/v1/*` requests now require an exact
+scheme, host, and port. The defaults allow only
+`http://localhost:<http_port>`, `http://127.0.0.1:<http_port>`, and
+`http://[::1]:<http_port>`. Repeatable `--allowed-origin` values and the
+comma-separated `SENSING_ALLOWED_ORIGINS` variable explicitly replace those
+defaults. Host-only values, wildcards, `null`, paths, userinfo, and invalid
+ports are rejected. The protection covers `/ws/*` and
+`/api/v1/stream/pose` on both HTTP and the dedicated WebSocket port, while CLI
+clients without `Origin` remain compatible.
+
+The regression test now returns `403` for an unlisted cross-port UI, while an
+explicitly allowlisted cross-port UI still works. `24/24` Origin/Host tests,
+`471` sensing-server tests (`1` ignored), HomeCore server/API/auth/WebSocket
+tests (`18 + 18 + 6 + 5`), and `7` Python/firmware security-boundary tests
+passed. Binary checks, targeted rustfmt, and `git diff --check` also passed.
+No flash or OTA action was performed.
+
+The ESP-IDF v5.4 matrix is still inconclusive: the native ARM64 image is
+missing a containerd layer, and the AMD64 fallback crashes in the emulated
+Xtensa compiler inside MbedTLS. I therefore do not claim the three firmware
+builds as passed.
+
+Suggested image: the supplied before/after security-findings screenshots.
+
+Next: solder PCB-02 first, then mount the mmWave sensor in the corner.

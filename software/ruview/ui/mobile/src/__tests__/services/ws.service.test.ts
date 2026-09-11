@@ -31,6 +31,35 @@ function createWsService() {
 }
 
 describe('WsService', () => {
+  it('retains encoded credentials on reconnect and replaces them after token rotation', () => {
+    jest.useFakeTimers();
+    const original = globalThis.WebSocket;
+    const sockets: any[] = [];
+    class Socket {
+      static OPEN = 1;
+      static CONNECTING = 0;
+      readyState = 0;
+      onclose: any = null;
+      constructor(public url: string, public protocols: string[]) { sockets.push(this); }
+      close() {}
+    }
+    globalThis.WebSocket = Socket as any;
+    const service = createWsService();
+    try {
+      service.connect('http://localhost:3000', 'sëcret');
+      expect(sockets[0].protocols).toEqual(['ruview.v1', 'ruview.bearer.73c3ab63726574']);
+      sockets[0].onclose({ code: 1006 });
+      jest.advanceTimersByTime(1000);
+      expect(sockets[1].protocols).toEqual(sockets[0].protocols);
+      service.connect('http://localhost:3000', 'new');
+      expect(sockets[2].protocols).toEqual(['ruview.v1', 'ruview.bearer.6e6577']);
+    } finally {
+      service.disconnect();
+      globalThis.WebSocket = original;
+      jest.useRealTimers();
+    }
+  });
+
   beforeEach(() => {
     jest.useFakeTimers();
     jest.clearAllMocks();

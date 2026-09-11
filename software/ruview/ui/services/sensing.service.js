@@ -9,6 +9,8 @@
  * emit simulated frames so the UI can clearly distinguish live vs. fallback data.
  */
 
+import { getApiToken, sensingProtocols } from './ws-auth.js';
+
 const SENSING_WS_PORT_BY_HTTP_PORT = {
   // Docker image: HTTP UI/API on 3000, sensing stream on 3001.
   '3000': '3001',
@@ -128,7 +130,7 @@ class SensingService {
     this._setState('connecting');
 
     try {
-      this._ws = new WebSocket(SENSING_WS_URL);
+      this._ws = new WebSocket(SENSING_WS_URL, sensingProtocols(SENSING_WS_URL));
     } catch (err) {
       console.warn('[Sensing] WebSocket constructor failed:', err.message);
       this._fallbackToSimulation();
@@ -293,7 +295,10 @@ class SensingService {
    */
   async _detectServerSource() {
     try {
-      const resp = await fetch('/api/v1/status', { cache: 'no-store' });
+      const token = getApiToken();
+      const resp = await fetch('/api/v1/status', {
+        cache: 'no-store', headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
       if (resp.ok) {
         const json = await resp.json();
         this._applyServerSource(json.source);

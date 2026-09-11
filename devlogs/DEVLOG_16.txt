@@ -1,0 +1,15 @@
+# DEVLOG #16 — The ESP was not the problem
+
+After the original PCB failed during WLAN authentication, I redesigned the mmWave carrier as **PCB-02** and isolated the ESP to find the real cause.
+
+![PCB-02 top preview](hardware/mmwave-PCB/PCB-02/preview/PCB-02-top.png)
+
+PCB-02 replaces the too-small ESP contact pads with proper through-hole header rows, keeps the case-compatible outline, protects the antenna area, and retains the SMD capacitors. The routing and electrical checks passed, and the Gerbers are ready to order.
+
+The important experiment came next. I unsoldered the suspect ESP from the old PCB and powered it by itself. It joined `csi-test`, answered every ping, and returned `HTTP 200` from `/ota/status`. A second ESP did exactly the same without any PCB attached.
+
+This was the key finding: both ESPs work outside the PCB. The earlier `auth → init` failure is therefore very unlikely to be a dead ESP. The likely cause is the old PCB assembly, its soldered fly-wires, power delivery, or the antenna/contact area.
+
+The LD2450 UART and radar path are still unverified.
+
+Next: as an interim solution, continue on a breadboard with one known-good ESP and the LD2450 before moving to manufactured PCB-02.

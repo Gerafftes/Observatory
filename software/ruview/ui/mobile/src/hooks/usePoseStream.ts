@@ -14,6 +14,7 @@ export function usePoseStream(): UsePoseStreamResult {
   const lastFrame = usePoseStore((state) => state.lastFrame);
   const isSimulated = usePoseStore((state) => state.isSimulated);
   const serverUrl = useSettingsStore((state) => state.serverUrl);
+  const apiToken = useSettingsStore((state) => state.apiToken);
 
   useEffect(() => {
     const unsubscribe = wsService.subscribe((frame) => {
@@ -21,12 +22,12 @@ export function usePoseStream(): UsePoseStreamResult {
     });
 
     // Auto-connect to sensing server on mount
-    wsService.connect(serverUrl);
+    wsService.connect(serverUrl, apiToken);
 
     return () => {
       unsubscribe();
     };
-  }, [serverUrl]);
+  }, [serverUrl, apiToken]);
 
   return { connectionStatus, lastFrame, isSimulated };
 }

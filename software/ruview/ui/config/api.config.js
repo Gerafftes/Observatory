@@ -125,8 +125,9 @@ export function buildWsUrl(endpoint, params = {}) {
   const host = window.location.host;
   let url = `${protocol}${host}${endpoint}`;
   
-  // Add query parameters
-  const queryParams = new URLSearchParams(params);
+  // Credentials belong in the handshake, never in a URL that can be logged.
+  const { token: _token, access_token: _accessToken, ...publicParams } = params;
+  const queryParams = new URLSearchParams(publicParams);
   if (queryParams.toString()) {
     url += `?${queryParams.toString()}`;
   }

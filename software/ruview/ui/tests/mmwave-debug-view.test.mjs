@@ -5,11 +5,15 @@ import test from 'node:test';
 import {
   MMWAVE_REJECTION_VISIBLE_MS,
   MMWAVE_STATUS_FRESH_MS,
+  MMWAVE_DEBUG_HARDWARE_VISIBILITY_KEY,
   MmwaveDebugView,
   clampScenePositionToRoom,
   normalizeMmwaveDebugStatus,
   normalizeRxDebugState,
+  receiverDisplayLabel,
+  readMmwaveDebugHardwareVisibility,
   roomPositionToScene,
+  saveMmwaveDebugHardwareVisibility,
 } from '../components/MmwaveDebugView.js';
 import { displayCoordinatesForRoom } from '../components/gaussian-splats.js';
 
@@ -150,6 +154,28 @@ test('fresh live RX position is independent from the radar marker', () => {
   assert.deepEqual(state.nodes[0].position, [0, 1, 0]);
 });
 
+test('receiver labels do not duplicate an existing RX prefix', () => {
+  assert.equal(receiverDisplayLabel('RX1'), 'RX1');
+  assert.equal(receiverDisplayLabel('RXRX2'), 'RX2');
+  assert.equal(receiverDisplayLabel(3), 'RX3');
+  assert.equal(receiverDisplayLabel('unknown', 3), 'RX4');
+});
+
+test('RX/TX visibility preference survives a page reload', () => {
+  const values = new Map();
+  const storage = {
+    getItem: (key) => values.get(key) ?? null,
+    setItem: (key, value) => values.set(key, value),
+  };
+
+  assert.equal(readMmwaveDebugHardwareVisibility(storage), false);
+  saveMmwaveDebugHardwareVisibility(true, storage);
+  assert.equal(values.get(MMWAVE_DEBUG_HARDWARE_VISIBILITY_KEY), 'true');
+  assert.equal(readMmwaveDebugHardwareVisibility(storage), true);
+  saveMmwaveDebugHardwareVisibility(false, storage);
+  assert.equal(readMmwaveDebugHardwareVisibility(storage), false);
+});
+
 test('debug component keeps the source legend explicit', () => {
   const source = readFileSync(new URL('../components/MmwaveDebugView.js', import.meta.url), 'utf8');
   assert.match(source, /class="mmwave-assistant sensing-mmwave-debug"/);
@@ -166,7 +192,7 @@ test('debug component keeps the source legend explicit', () => {
   assert.match(source, /keine Fusion/);
   assert.match(source, /createMarkerLabel\('MMWAVE1'/);
   assert.match(source, /createMarkerLabel\('RADAR TARGET'/);
-  assert.match(source, /createMarkerLabel\(`RX\$\{node\.id\}`/);
+  assert.match(source, /createMarkerLabel\(receiverDisplayLabel\(node\.id, index\)/);
   assert.doesNotMatch(source, /PlaneGeometry|CylinderGeometry|ConeGeometry|TorusGeometry/);
   assert.doesNotMatch(source, /0xffa62b|0x2dd4e8|0x7dd3fc/);
   assert.doesNotMatch(source, /children\[1\]\.scale/);

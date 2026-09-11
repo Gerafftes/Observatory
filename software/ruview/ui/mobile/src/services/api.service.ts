@@ -4,6 +4,7 @@ import type { ApiError, HistoricalFrames, PoseStatus, ZoneConfig } from '@/types
 
 class ApiService {
   private baseUrl = '';
+  private token = '';
   private client: AxiosInstance;
 
   constructor() {
@@ -17,7 +18,12 @@ class ApiService {
   }
 
   setBaseUrl(url: string): void {
+    if (url !== this.baseUrl) this.token = '';
     this.baseUrl = url ?? '';
+  }
+
+  setAuthToken(token: string): void {
+    this.token = token;
   }
 
   private buildUrl(path: string): string {
@@ -55,9 +61,12 @@ class ApiService {
 
   private async requestWithRetry<T>(config: AxiosRequestConfig, retriesLeft: number): Promise<T> {
     try {
+      const url = this.buildUrl(config.url || '');
+      const authorized = this.token && this.baseUrl && new URL(url, this.baseUrl).origin === new URL(this.baseUrl).origin;
       const response = await this.client.request<T>({
         ...config,
-        url: this.buildUrl(config.url || ''),
+        url,
+        ...(authorized ? { headers: { ...config.headers, Authorization: `Bearer ${this.token}` } } : {}),
       });
       return response.data;
     } catch (error) {
