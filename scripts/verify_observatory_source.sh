@@ -3,7 +3,7 @@ set -eu
 
 repo_dir=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 source_dir="$repo_dir/software/ruview"
-expected_source_entries=15878
+expected_source_entries=15888
 
 required_paths='README.md
 LICENSE
@@ -49,7 +49,7 @@ for relative_path in $required_reports; do
   fi
 done
 
-source_entries=$(find "$source_dir" \( -type f -o -type l \) | wc -l | tr -d ' ')
+source_entries=$(git -C "$repo_dir" ls-files --cached -- 'software/ruview/**' | wc -l | tr -d ' ')
 if [ "$source_entries" -ne "$expected_source_entries" ]; then
   printf 'SOURCE COUNT: expected %s, found %s\n' \
     "$expected_source_entries" "$source_entries" >&2
