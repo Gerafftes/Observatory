@@ -230,7 +230,7 @@ testRunner.test('buildWsUrl constructs WebSocket URLs', 'apiConfig', () => {
   const url = buildWsUrl('/api/v1/stream/pose', { token: 'test-token' });
   testRunner.assert(url.startsWith('ws://') || url.startsWith('wss://'), 'URL should be WebSocket protocol');
   testRunner.assert(url.includes('/api/v1/stream/pose'), 'URL should contain endpoint');
-  testRunner.assert(url.includes('token=test-token'), 'URL should contain token parameter');
+  testRunner.assert(!url.includes('token='), 'URL must not contain token parameters');
 });
 
 testRunner.test('buildSensingWsUrl maps Docker UI port to sensing WebSocket port', 'apiConfig', () => {

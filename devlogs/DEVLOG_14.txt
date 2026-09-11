@@ -1,0 +1,25 @@
+# DEVLOG #14
+
+Since the last devlog, I published a new **Observatory Control Center** and a
+guided calibration workflow for the D6 experiment.
+
+The setup now includes a CAD-style room editor for the TX and RX1–RX4
+positions. It validates room boundaries, duplicate receiver positions, and the
+canonical node IDs. The continuous mmWave calibration route is now the primary
+workflow; the manual `P01–P09` grid remains only as a legacy fallback.
+
+Experiment profiles, run phases, setup hashes, and prediction/truth artifact
+hashes are persisted in SQLite. The UI also makes `READY`, `RUNNING`, `PASS`,
+`OFFLINE`, and `SOFTWARE-ONLY / UNVALIDATED` states explicit, so a simulated
+workflow cannot be mistaken for a real sensor result.
+
+I ran **41 UI/Observatory tests** and **4 targeted Rust workflow tests**; all
+passed. This validates the software workflow, but not the real CSI stream,
+LD2450 UART/UDP path, calibration data, or position accuracy.
+
+Next: connect the LD2450 to the working ESP on the breadboard, verify UART
+bytes and valid radar frames, and then continue with the sealed hardware
+workflow and real blind tests.
+
+Suggested image: a screenshot of the new Observatory Control Center showing
+the room editor, workflow guide, and the honest `Wartet auf mmWave` status.

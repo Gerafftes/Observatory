@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Linking, ScrollView, View } from 'react-native';
+import { Linking, ScrollView, View, TextInput } from 'react-native';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 import { colors } from '@/theme/colors';
@@ -85,6 +85,9 @@ export const SettingsScreen = () => {
   const rssiScanEnabled = useSettingsStore((state) => state.rssiScanEnabled);
   const theme = useSettingsStore((state) => state.theme);
   const setServerUrl = useSettingsStore((state) => state.setServerUrl);
+  const apiToken = useSettingsStore((state) => state.apiToken);
+  const setApiToken = useSettingsStore((state) => state.setApiToken);
+  const [draftToken, setDraftToken] = useState(apiToken);
   const setRssiScanEnabled = useSettingsStore((state) => state.setRssiScanEnabled);
   const setTheme = useSettingsStore((state) => state.setTheme);
 
@@ -100,9 +103,13 @@ export const SettingsScreen = () => {
   const handleSaveUrl = () => {
     const newUrl = draftUrl.trim();
     setServerUrl(newUrl);
+    const token = draftToken;
+    setApiToken(token);
+    setDraftToken(token);
     wsService.disconnect();
-    wsService.connect(newUrl);
+    wsService.connect(newUrl, token);
     apiService.setBaseUrl(newUrl);
+    apiService.setAuthToken(token);
   };
 
   const handleOpenGitHub = async () => {
@@ -123,7 +130,18 @@ export const SettingsScreen = () => {
         }}
       >
         <GlowCard title="SERVER">
-          <ServerUrlInput value={draftUrl} onChange={setDraftUrl} onSave={handleSaveUrl} />
+          <TextInput
+            accessibilityLabel="Server token"
+            placeholder="Server token (session only)"
+            placeholderTextColor={colors.textSecondary}
+            secureTextEntry
+            autoCapitalize="none"
+            autoCorrect={false}
+            value={draftToken}
+            onChangeText={setDraftToken}
+            style={{ color: colors.textPrimary, padding: spacing.sm }}
+          />
+          <ServerUrlInput value={draftUrl} onChange={(url) => { setDraftUrl(url); setDraftToken(''); }} onSave={handleSaveUrl} />
         </GlowCard>
 
         <GlowCard title="SENSING">

@@ -17,17 +17,18 @@
 //! A single background task owns the UDP socket (ESP32 `0xC511_0001` frames) and
 //! the optional active recorder; the HTTP handlers communicate with it over an
 //! mpsc command channel and read a shared status snapshot. This keeps the
-//! `&mut` recorder lock-free and the API non-blocking. CORS is permissive so a
-//! browser UI served from any origin can call it during development.
+//! `&mut` recorder lock-free and the API non-blocking. CORS is restricted to an
+//! exact local allowlist by default and can be configured for a specific UI.
 
 use std::collections::{HashMap, VecDeque};
+use std::net::IpAddr;
 use std::sync::Arc;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use anyhow::Result;
 use axum::{
     extract::{Query, State},
-    http::StatusCode,
+    http::{header, HeaderValue, Method, StatusCode},
     response::IntoResponse,
     routing::{get, post},
     Json, Router,
@@ -36,7 +37,7 @@ use clap::Args;
 use serde::{Deserialize, Serialize};
 use tokio::net::UdpSocket;
 use tokio::sync::{mpsc, oneshot, RwLock};
-use tower_http::cors::CorsLayer;
+use tower_http::cors::{AllowOrigin, CorsLayer};
 use wifi_densepose_calibration::extract::{AnchorFeature, Features};
 use wifi_densepose_calibration::{
     AnchorLabel, AnchorQualityGate, AnchorRecorder, MixtureOfSpecialists, NodeGeometry,
@@ -50,6 +51,60 @@ use crate::calibrate::{parse_csi_packet, tier_config, RECV_BUF};
 /// Rolling window of per-frame scalars (mean amplitude) for live `room-state`
 /// inference. Maintained by the ingest task regardless of any baseline session.
 const LIVE_WINDOW: usize = 256;
+const CALIBRATE_CORS_ORIGINS_ENV: &str = "CALIBRATE_CORS_ORIGINS";
+
+/// Parse a comma-separated list of exact browser Origins. Wildcards are
+/// intentionally ignored: this API has state-changing endpoints and must not
+/// fall back to a permissive browser boundary.
+fn parse_cors_origins(raw: &str) -> Vec<HeaderValue> {
+    raw.split(',')
+        .map(str::trim)
+        .filter(|origin| {
+            !origin.is_empty() && *origin != "*" && !origin.eq_ignore_ascii_case("null")
+        })
+        .filter_map(|origin| origin.parse::<HeaderValue>().ok())
+        .collect()
+}
+
+/// Safe local defaults for direct development and same-origin use. A remote
+/// UI must opt in explicitly through `CALIBRATE_CORS_ORIGINS`.
+fn default_cors_origins(http_bind: &str, http_port: u16) -> Vec<HeaderValue> {
+    let mut origins = vec![
+        format!("http://localhost:{http_port}"),
+        format!("http://127.0.0.1:{http_port}"),
+        "http://localhost:3000".to_owned(),
+        "http://127.0.0.1:3000".to_owned(),
+    ];
+    if let Ok(address) = http_bind.trim().parse::<IpAddr>() {
+        if address.is_loopback() {
+            let host = match address {
+                IpAddr::V4(address) => address.to_string(),
+                IpAddr::V6(address) => format!("[{address}]"),
+            };
+            origins.push(format!("http://{host}:{http_port}"));
+            origins.push(format!("http://{host}:3000"));
+        }
+    }
+    origins
+        .into_iter()
+        .filter_map(|origin| origin.parse::<HeaderValue>().ok())
+        .collect()
+}
+
+fn configured_cors_origins(http_bind: &str, http_port: u16) -> Vec<HeaderValue> {
+    match std::env::var(CALIBRATE_CORS_ORIGINS_ENV) {
+        Ok(raw) if !raw.trim().is_empty() => parse_cors_origins(&raw),
+        _ => default_cors_origins(http_bind, http_port),
+    }
+}
+
+fn cors_layer(origins: &[HeaderValue]) -> CorsLayer {
+    CorsLayer::new()
+        .allow_origin(AllowOrigin::list(origins.to_vec()))
+        .allow_methods([Method::GET, Method::POST, Method::OPTIONS])
+        .allow_headers([header::AUTHORIZATION, header::CONTENT_TYPE, header::ACCEPT])
+        .allow_credentials(false)
+}
 
 /// One scalar per frame: mean amplitude across subcarriers/streams.
 fn frame_scalar(frame: &CsiFrame) -> f32 {
@@ -93,8 +148,9 @@ pub struct CalibrateServeArgs {
     #[arg(long, default_value = "./baselines")]
     pub output_dir: String,
 
-    /// Require `Authorization: Bearer <token>` on every API request. Strongly
-    /// recommended before binding to anything other than 127.0.0.1.
+    /// Require `Authorization: Bearer <token>` on every API request. A
+    /// non-empty token is mandatory before binding the HTTP API outside the
+    /// loopback interface.
     #[arg(long, env = "CALIBRATE_TOKEN")]
     pub token: Option<String>,
 }
@@ -267,14 +323,20 @@ struct ApiState {
     enroll: Arc<RwLock<HashMap<String, RoomEnroll>>>,
 }
 
-/// Bearer-token gate (applied only when `--token` is set). Constant-time-ish
-/// compare is unnecessary here (local appliance), but reject anything that
-/// isn't an exact `Bearer <token>` match.
+/// Bearer-token gate. Constant-time-ish compare is unnecessary here (local
+/// appliance), but reject anything that isn't an exact `Bearer <token>` match.
 async fn require_bearer(
     axum::extract::State(token): axum::extract::State<String>,
     req: axum::extract::Request,
     next: axum::middleware::Next,
 ) -> axum::response::Response {
+    // Browsers do not send application credentials on a CORS preflight. The
+    // CORS layer still applies the exact Origin/method/header policy; only the
+    // actual state-changing request needs bearer authentication.
+    if req.method() == Method::OPTIONS {
+        return next.run(req).await;
+    }
+
     let authorized = req
         .headers()
         .get(axum::http::header::AUTHORIZATION)
@@ -293,13 +355,46 @@ async fn require_bearer(
     }
 }
 
+fn is_loopback_http_bind(bind: &str) -> bool {
+    let bind = bind.trim();
+    bind.eq_ignore_ascii_case("localhost")
+        || bind
+            .parse::<IpAddr>()
+            .map(|address| address.is_loopback())
+            .unwrap_or(false)
+}
+
+fn configured_bearer_token(raw: Option<&str>) -> Option<String> {
+    raw.map(str::trim)
+        .filter(|token| !token.is_empty())
+        .map(ToOwned::to_owned)
+}
+
+/// Validate the HTTP exposure before creating the output directory or
+/// binding either socket. Loopback-only operation keeps the existing local
+/// no-token workflow; every routable deployment must authenticate.
+fn validate_http_security(args: &CalibrateServeArgs) -> Result<Option<String>> {
+    let token = configured_bearer_token(args.token.as_deref());
+    if !is_loopback_http_bind(&args.http_bind) && token.is_none() {
+        anyhow::bail!(
+            "calibrate-serve refuses non-loopback HTTP bind '{}' without a non-empty --token or CALIBRATE_TOKEN",
+            args.http_bind
+        );
+    }
+    Ok(token)
+}
+
 // ---------------------------------------------------------------------------
 // Public entry point
 // ---------------------------------------------------------------------------
 
-/// Build the API router (without the optional auth layer). Shared by `execute`
-/// and the integration tests.
+/// Build the default test router without the bearer-auth layer.
+#[cfg(test)]
 fn build_router(state: ApiState) -> Router {
+    build_router_with_cors(state, configured_cors_origins("127.0.0.1", 8090))
+}
+
+fn build_router_with_cors(state: ApiState, origins: Vec<HeaderValue>) -> Router {
     Router::new()
         .route("/", get(descriptor))
         .route("/api/v1/calibration/health", get(health))
@@ -313,12 +408,15 @@ fn build_router(state: ApiState) -> Router {
         .route("/api/v1/enroll/anchor", post(enroll_anchor))
         .route("/api/v1/enroll/geometry", post(enroll_geometry))
         .route("/api/v1/enroll/status", get(enroll_status))
-        .layer(CorsLayer::permissive())
+        .layer(cors_layer(&origins))
         .with_state(state)
 }
 
 /// Run the calibration HTTP API server (blocks until Ctrl-C).
 pub async fn execute(args: CalibrateServeArgs) -> Result<()> {
+    let token = validate_http_security(&args)?;
+    let cors_origins = configured_cors_origins(&args.http_bind, args.http_port);
+
     std::fs::create_dir_all(&args.output_dir)
         .map_err(|e| anyhow::anyhow!("cannot create output dir {}: {e}", args.output_dir))?;
 
@@ -367,16 +465,14 @@ pub async fn execute(args: CalibrateServeArgs) -> Result<()> {
         fs_hz: 15.0,
         enroll,
     };
-    let mut app = build_router(state);
+    let mut app = build_router_with_cors(state, cors_origins);
 
-    // Optional bearer auth — required before any non-loopback exposure.
-    if let Some(token) = args.token.clone() {
+    if let Some(token) = token {
         app = app.layer(axum::middleware::from_fn_with_state(token, require_bearer));
         eprintln!("[calibrate-serve] bearer auth ENABLED");
-    } else if args.http_bind != "127.0.0.1" && args.http_bind != "localhost" {
+    } else {
         eprintln!(
-            "[calibrate-serve] WARNING: bound to {} with NO --token — anyone on the network can drive calibration",
-            args.http_bind
+            "[calibrate-serve] bearer auth disabled: HTTP API is loopback-only and CORS is allowlisted"
         );
     }
 
@@ -1206,6 +1302,63 @@ mod tests {
     }
 
     #[test]
+    fn non_loopback_http_bind_requires_non_empty_token() {
+        let mut args = CalibrateServeArgs {
+            http_port: 8090,
+            http_bind: "0.0.0.0".into(),
+            udp_port: 5005,
+            udp_bind: "0.0.0.0".into(),
+            tier: "ht20".into(),
+            output_dir: "./baselines".into(),
+            token: None,
+        };
+        assert!(validate_http_security(&args).is_err());
+
+        args.token = Some("   ".into());
+        assert!(validate_http_security(&args).is_err());
+
+        args.token = Some("secret".into());
+        assert_eq!(
+            validate_http_security(&args).unwrap().as_deref(),
+            Some("secret")
+        );
+
+        args.http_bind = "::1".into();
+        args.token = None;
+        assert!(validate_http_security(&args).is_ok());
+
+        args.http_bind = "127.0.0.2".into();
+        assert!(validate_http_security(&args).is_ok());
+    }
+
+    #[test]
+    fn default_cors_origins_follow_loopback_bind() {
+        let origins = default_cors_origins("127.0.0.2", 8090);
+        assert!(origins
+            .iter()
+            .any(|origin| { origin.to_str().ok() == Some("http://127.0.0.2:8090") }));
+        assert!(origins
+            .iter()
+            .any(|origin| { origin.to_str().ok() == Some("http://127.0.0.2:3000") }));
+
+        let ipv6_origins = default_cors_origins("::1", 8090);
+        assert!(ipv6_origins
+            .iter()
+            .any(|origin| { origin.to_str().ok() == Some("http://[::1]:8090") }));
+    }
+
+    #[test]
+    fn cors_rejects_opaque_null_origin() {
+        let origins = parse_cors_origins("null, https://trusted.example, *");
+        assert!(!origins
+            .iter()
+            .any(|origin| origin.to_str().ok() == Some("null")));
+        assert!(origins
+            .iter()
+            .any(|origin| origin.to_str().ok() == Some("https://trusted.example")));
+    }
+
+    #[test]
     fn sanitize_blocks_path_traversal() {
         assert_eq!(sanitize_room_id("../../etc/passwd"), "etcpasswd");
         assert_eq!(sanitize_room_id("/abs/path"), "abspath");
@@ -1240,17 +1393,28 @@ mod tests {
         }
     }
 
-    async fn req(app: Router, method: &str, uri: &str, body: Option<&str>) -> StatusCode {
+    async fn req_with_headers(
+        app: Router,
+        method: &str,
+        uri: &str,
+        body: Option<&str>,
+        headers: &[(&str, &str)],
+    ) -> axum::response::Response {
         let b = body
             .map(|s| Body::from(s.to_string()))
             .unwrap_or_else(Body::empty);
-        let r = Request::builder()
-            .method(method)
-            .uri(uri)
-            .header("content-type", "application/json")
-            .body(b)
-            .unwrap();
-        app.oneshot(r).await.unwrap().status()
+        let mut builder = Request::builder().method(method).uri(uri);
+        if body.is_some() {
+            builder = builder.header("content-type", "application/json");
+        }
+        for &(name, value) in headers {
+            builder = builder.header(name, value);
+        }
+        app.oneshot(builder.body(b).unwrap()).await.unwrap()
+    }
+
+    async fn req(app: Router, method: &str, uri: &str, body: Option<&str>) -> StatusCode {
+        req_with_headers(app, method, uri, body, &[]).await.status()
     }
 
     #[tokio::test]
@@ -1261,6 +1425,115 @@ mod tests {
         assert_eq!(
             req(app, "GET", "/api/v1/calibration/health", None).await,
             StatusCode::OK
+        );
+    }
+
+    #[tokio::test]
+    async fn configured_bearer_protects_every_state_changing_route() {
+        let dir = tempfile::tempdir().unwrap();
+        let app =
+            build_router_with_cors(test_state(dir.path().to_str().unwrap()), Vec::new()).layer(
+                axum::middleware::from_fn_with_state("test-token".to_owned(), require_bearer),
+            );
+        let routes = [
+            "/api/v1/calibration/start",
+            "/api/v1/calibration/stop",
+            "/api/v1/room/train",
+            "/api/v1/enroll/anchor",
+            "/api/v1/enroll/geometry",
+        ];
+
+        for route in routes {
+            assert_eq!(
+                req_with_headers(app.clone(), "POST", route, Some("{}"), &[])
+                    .await
+                    .status(),
+                StatusCode::UNAUTHORIZED,
+                "missing bearer must reject {route}"
+            );
+            assert_eq!(
+                req_with_headers(
+                    app.clone(),
+                    "POST",
+                    route,
+                    Some("{}"),
+                    &[("authorization", "Bearer wrong-token")],
+                )
+                .await
+                .status(),
+                StatusCode::UNAUTHORIZED,
+                "wrong bearer must reject {route}"
+            );
+        }
+
+        assert_eq!(
+            req_with_headers(
+                app,
+                "GET",
+                "/",
+                None,
+                &[("authorization", "Bearer test-token")],
+            )
+            .await
+            .status(),
+            StatusCode::OK
+        );
+    }
+
+    #[tokio::test]
+    async fn cors_allows_only_configured_origins() {
+        let dir = tempfile::tempdir().unwrap();
+        let app = build_router_with_cors(
+            test_state(dir.path().to_str().unwrap()),
+            vec!["http://localhost:3000".parse().unwrap()],
+        )
+        .layer(axum::middleware::from_fn_with_state(
+            "test-token".to_owned(),
+            require_bearer,
+        ));
+        let preflight_headers = [
+            ("access-control-request-method", "POST"),
+            ("access-control-request-headers", "content-type"),
+        ];
+
+        let blocked = req_with_headers(
+            app.clone(),
+            "OPTIONS",
+            "/api/v1/calibration/start",
+            None,
+            &[
+                ("origin", "https://evil.example"),
+                preflight_headers[0],
+                preflight_headers[1],
+            ],
+        )
+        .await;
+        assert!(
+            blocked
+                .headers()
+                .get(header::ACCESS_CONTROL_ALLOW_ORIGIN)
+                .is_none(),
+            "untrusted Origin must not receive CORS permission"
+        );
+
+        let allowed = req_with_headers(
+            app,
+            "OPTIONS",
+            "/api/v1/calibration/start",
+            None,
+            &[
+                ("origin", "http://localhost:3000"),
+                preflight_headers[0],
+                preflight_headers[1],
+            ],
+        )
+        .await;
+        assert_eq!(
+            allowed
+                .headers()
+                .get(header::ACCESS_CONTROL_ALLOW_ORIGIN)
+                .and_then(|value| value.to_str().ok()),
+            Some("http://localhost:3000")
         );
     }
 

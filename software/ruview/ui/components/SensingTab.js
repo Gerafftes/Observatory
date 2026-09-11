@@ -11,7 +11,7 @@ import {
   GaussianSplatRenderer,
   positionEstimateViewModel,
 } from './gaussian-splats.js';
-import { ObservatoryControlCenter } from './ObservatoryControlCenter.js';
+import { mmwaveStatusSummary, ObservatoryControlCenter } from './ObservatoryControlCenter.js';
 import { MmwaveCalibrationAssistant } from './MmwaveCalibrationAssistant.js';
 import { MmwaveDebugView, MMWAVE_STATUS_ENDPOINT } from './MmwaveDebugView.js';
 
@@ -35,6 +35,7 @@ export class SensingTab {
     this._mmwaveStatusTimer = null;
     this._mmwaveStatusPollInFlight = false;
     this._mmwaveStatusPollGeneration = 0;
+    this._latestMmwaveStatus = null;
     this._lastSensingDataReceivedAtMs = null;
   }
 
@@ -301,10 +302,34 @@ export class SensingTab {
     );
   }
 
+  _updateSourceBanner() {
+    const banner = this.container?.querySelector?.('#sensingSourceBanner');
+    if (!banner) return;
+
+    const dataSource = sensingService.dataSource;
+    const bannerConfig = {
+      'live':              { text: 'LIVE · ESP32', cls: 'sensing-source-live' },
+      'server-simulated':  { text: 'SIMULATION · SERVER', cls: 'sensing-source-server-sim' },
+      'server-offline':    { text: 'WIFI/CSI OFFLINE', cls: 'sensing-source-offline' },
+      'reconnecting':      { text: 'VERBINDE …', cls: 'sensing-source-reconnecting' },
+      'simulated':         { text: 'OFFLINE · SIMULATION', cls: 'sensing-source-simulated' },
+    };
+    let cfg = bannerConfig[dataSource] || bannerConfig.reconnecting;
+    if (dataSource === 'server-offline') {
+      const radar = mmwaveStatusSummary({ mmwave: this._latestMmwaveStatus });
+      if (radar.active) {
+        cfg = { text: 'WIFI/CSI OFFLINE · MMWAVE AKTIV', cls: 'sensing-source-mixed' };
+      } else if (radar.reachable) {
+        cfg = { text: 'WIFI/CSI OFFLINE · MMWAVE VERBUNDEN', cls: 'sensing-source-mixed' };
+      }
+    }
+    banner.textContent = cfg.text;
+    banner.className = 'sensing-source-banner ' + cfg.cls;
+  }
+
   _onStateChange(state) {
     const dot    = this.container.querySelector('#sensingDot');
     const text   = this.container.querySelector('#sensingState');
-    const banner = this.container.querySelector('#sensingSourceBanner');
 
     if (dot && text) {
       const stateLabels = {
@@ -318,20 +343,7 @@ export class SensingTab {
       text.textContent = stateLabels[state] || state;
     }
 
-    if (banner) {
-      // Map the service's dataSource to banner text and CSS modifier class.
-      const dataSource = sensingService.dataSource;
-      const bannerConfig = {
-        'live':              { text: 'LIVE · ESP32',             cls: 'sensing-source-live' },
-        'server-simulated':  { text: 'SIMULATION · SERVER',       cls: 'sensing-source-server-sim' },
-        'server-offline':    { text: 'OFFLINE · ESP32',           cls: 'sensing-source-offline' },
-        'reconnecting':      { text: 'VERBINDE …',                cls: 'sensing-source-reconnecting' },
-        'simulated':         { text: 'OFFLINE · SIMULATION',      cls: 'sensing-source-simulated' },
-      };
-      const cfg = bannerConfig[dataSource] || bannerConfig.reconnecting;
-      banner.textContent = cfg.text;
-      banner.className = 'sensing-source-banner ' + cfg.cls;
-    }
+    this._updateSourceBanner?.();
 
     if (['disconnected', 'connecting', 'reconnecting'].includes(state)) {
       this._invalidateLiveReadout();
@@ -354,10 +366,14 @@ export class SensingTab {
           }
           const status = await response.json();
           if (!this._disposed && generation === this._lifecycleGeneration) {
+            this._latestMmwaveStatus = status;
+            this._updateSourceBanner();
             this.mmwaveDebugView?.updateStatus(status, Date.now());
           }
         } catch (error) {
           if (!this._disposed && generation === this._lifecycleGeneration) {
+            this._latestMmwaveStatus = null;
+            this._updateSourceBanner();
             this.mmwaveDebugView?.setStatusError('mmWave-Status nicht erreichbar');
           }
         } finally {

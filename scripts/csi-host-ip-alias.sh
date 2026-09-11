@@ -2,7 +2,7 @@
 set -e
 
 IFACE="${1:-en0}"
-CSI_HOST_IP="${2:-CSI_HOST_IP}"
+CSI_HOST_IP="${2:-192.168.4.50}"
 NETMASK="${3:-255.255.255.0}"
 
 echo "CSI interface: $IFACE"
@@ -23,7 +23,7 @@ fi
 
 echo
 echo "Current $IFACE IPv4 addresses:"
-ifconfig "$IFACE" | grep "inet $CSI_HOST_IP" || true
+ifconfig "$IFACE" | grep "inet 192.168.4" || true
 
 echo
 echo "If you need to remove the alias later:"

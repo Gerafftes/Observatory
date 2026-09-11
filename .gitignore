@@ -33,3 +33,18 @@ firmware/**/managed_components/
 firmware/**/dependencies.lock
 firmware/**/sdkconfig
 firmware/**/sdkconfig.old
+
+# Local BLL workspace material; do not publish with Observatory.
+/.toolchains/
+/.wakatime-project
+/private/
+/artifacts/
+/*.pdf
+/data/mmwave/
+/data/models/
+**/data/mmwave/
+**/data/calibrations/
+software/ruview/archive/**/data/*.db
+software/ruview/vendor/ruvector/ui/ruvocal/.env.ci
+**/*.kicad_prl
+**/*.lck

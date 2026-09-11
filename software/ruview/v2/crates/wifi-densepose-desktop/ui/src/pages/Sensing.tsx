@@ -316,6 +316,8 @@ export const Sensing: React.FC = () => {
 
   // WebSocket connection state
   const [wsConnected, setWsConnected] = useState(false);
+  const [apiToken, setApiToken] = useState('');
+  const [draftToken, setDraftToken] = useState('');
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimeoutRef = useRef<number | null>(null);
 
@@ -333,7 +335,8 @@ export const Sensing: React.FC = () => {
 
     const connect = () => {
       const wsUrl = `ws://127.0.0.1:${status.ws_port}/ws/sensing`;
-      const ws = new WebSocket(wsUrl);
+      const hex = Array.from(new TextEncoder().encode(apiToken), byte => byte.toString(16).padStart(2, '0')).join('');
+      const ws = new WebSocket(wsUrl, apiToken ? ['ruview.v1', `ruview.bearer.${hex}`] : []);
 
       ws.onopen = () => {
         setWsConnected(true);
@@ -422,11 +425,12 @@ export const Sensing: React.FC = () => {
         clearTimeout(reconnectTimeoutRef.current);
       }
       if (wsRef.current) {
+        wsRef.current.onclose = null;
         wsRef.current.close();
         wsRef.current = null;
       }
     };
-  }, [isRunning, status?.ws_port]);
+  }, [isRunning, status?.ws_port, apiToken]);
 
   const handleClearLog = useCallback(() => setLogEntries([]), []);
   const handleTogglePause = useCallback(() => setPaused((p) => !p), []);
@@ -455,6 +459,10 @@ export const Sensing: React.FC = () => {
       <h2 className="heading-lg" style={{ marginBottom: "var(--space-5)" }}>
         Sensing
       </h2>
+      <form onSubmit={(event) => { event.preventDefault(); setApiToken(draftToken); }}>
+        <label>Server token (session only) <input type="password" autoComplete="off" value={draftToken} onChange={event => setDraftToken(event.target.value)} /></label>
+        <button type="submit">Connect</button>
+      </form>
 
       {/* ----------------------------------------------------------------- */}
       {/* Section 1: Server Control                                         */}

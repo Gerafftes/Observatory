@@ -23,6 +23,21 @@ function zones(trainingBlocks = 0, blindVisits = 0) {
   }));
 }
 
+test('transport facts explain the target mismatch and show missing counters as unknown', () => {
+  const assistant = new MmwaveCalibrationAssistant({});
+  const html = assistant._transportFacts({
+    node_control: { reachable: true, url_configured: true, token_configured: true },
+    connection: { hint: 'Radar sendet an 192.168.4.50:5010; Server 192.168.4.3:5010.' },
+    uart_bytes_received: null,
+    cad_profile: { profile_sha256: 'd7682b4dccbadae3', mounting_position_m: [3.9, 0, 3.3] },
+  });
+  assert.match(html, /192\.168\.4\.50:5010/);
+  assert.match(html, /192\.168\.4\.3:5010/);
+  assert.match(html, /CAD-Profil d7682b4dccbadae3/);
+  assert.match(html, /UART<\/dt><dd>--<\/dd>/);
+  assert.doesNotMatch(html, /Konfiguration unvollständig/);
+});
+
 test('assistant starts at the connection gate', () => {
   const model = mmwaveAssistantViewModel({ state: 'disconnected', zones: [] });
   assert.equal(model.activeStep, 0);

@@ -5,6 +5,7 @@
  */
 
 import { VideoCapture } from './video-capture.js?v=13';
+import { buildSensingWsUrl } from '../../services/sensing.service.js';
 import { CsiSimulator } from './csi-simulator.js?v=13';
 import { CnnEmbedder } from './cnn-embedder.js?v=13';
 import { FusionEngine } from './fusion-engine.js?v=13';
@@ -137,7 +138,7 @@ function init() {
   csiCnn.tryLoadWasm(wasmBase);
 
   // Auto-connect to local sensing server WebSocket if available
-  const defaultWsUrl = 'ws://localhost:8765/ws/sensing';
+  const defaultWsUrl = buildSensingWsUrl();
   if (wsUrlInput) wsUrlInput.value = defaultWsUrl;
   csiSimulator.connectLive(defaultWsUrl).then(ok => {
     if (ok && connectWsBtn) {

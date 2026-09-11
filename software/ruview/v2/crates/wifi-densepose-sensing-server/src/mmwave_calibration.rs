@@ -402,6 +402,8 @@ struct GuidedBlindGates {
 
 #[derive(Debug, Clone, Serialize)]
 pub(crate) struct MmwaveStatus {
+    pub(crate) cad_profile: Option<CadProfileGeometry>,
+    pub(crate) cad_profile_error: Option<String>,
     pub(crate) udp_port: u16,
     pub(crate) state: LinkState,
     pub(crate) reason: String,
@@ -486,6 +488,15 @@ pub(crate) struct NodeControlStatus {
     pub(crate) last_success_age_ms: Option<u64>,
     pub(crate) last_error_kind: Option<String>,
     pub(crate) last_error: Option<String>,
+}
+
+/// Saved CAD geometry for unsealed radar preview, never a calibration seal.
+#[derive(Debug, Clone, Serialize)]
+pub(crate) struct CadProfileGeometry {
+    pub(crate) revision_id: String,
+    pub(crate) profile_sha256: String,
+    pub(crate) room_dimensions_m: [f64; 3],
+    pub(crate) mounting_position_m: [f64; 3],
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -844,6 +855,8 @@ pub(crate) struct ExpectedNode {
 
 #[derive(Debug)]
 pub(crate) struct MmwaveManager {
+    cad_profile: Option<CadProfileGeometry>,
+    cad_profile_error: Option<String>,
     udp_port: u16,
     room_dimensions_mm: Option<[i32; 2]>,
     control: Option<NodeControl>,
@@ -909,6 +922,8 @@ impl MmwaveManager {
         });
         let node_control_configured = control.is_some();
         Self {
+            cad_profile: None,
+            cad_profile_error: None,
             udp_port,
             room_dimensions_mm,
             control,
@@ -962,6 +977,49 @@ impl MmwaveManager {
 
     pub(crate) fn control(&self) -> Option<NodeControl> {
         self.control.clone()
+    }
+
+    pub(crate) fn discovered_control(&mut self, url: Option<String>, token: Option<String>) {
+        self.node_url_configured = url.is_some();
+        self.node_token_configured = token.is_some();
+        self.control = url.zip(token).map(|(base_url, bearer_token)| NodeControl { base_url, bearer_token });
+    }
+
+    pub(crate) fn apply_cad_profile(&mut self, profile: &super::experiment::SetupProfile) {
+        // A running or sealed experiment keeps its exact acquisition geometry.
+        // Saving remains possible, but cannot silently rewrite that experiment.
+        if self.expected_node.is_some() || self.experiment.is_some() || self.session.is_some() {
+            self.cad_profile_error = Some("Profil gespeichert. Aktiver Versuch behält seine versiegelte Geometrie; für die neue Profilversion ist ein neues Setup nötig.".to_string());
+            return;
+        }
+        let room = serde_json::from_value::<[f64; 3]>(profile.document["room_dimensions_m"].clone());
+        let mounting = serde_json::from_value::<[f64; 3]>(profile.document["mmwave"]["mounting_position_m"].clone());
+        let (Ok(room), Ok(mounting)) = (room, mounting) else {
+            self.cad_profile_error = Some("CAD-Profil enthält keine vollständige Raum- und mmWave-Geometrie.".to_string());
+            return;
+        };
+        if !room.iter().all(|v| v.is_finite() && *v > 0.0 && *v <= 100.0)
+            || !mounting.iter().all(|v| v.is_finite() && v.abs() <= 100.0) {
+            self.cad_profile_error = Some("CAD-Geometrie liegt außerhalb des unterstützten Bereichs.".to_string());
+            return;
+        }
+        if self.cad_profile.as_ref().is_some_and(|cad| cad.profile_sha256 == profile.profile_sha256) {
+            return;
+        }
+        self.room_dimensions_mm = Some([(room[0] * 1000.0).round() as i32, (room[2] * 1000.0).round() as i32]);
+        self.cad_profile = Some(CadProfileGeometry {
+            revision_id: profile.revision_id.clone(), profile_sha256: profile.profile_sha256.clone(),
+            room_dimensions_m: room, mounting_position_m: mounting,
+        });
+        self.cad_profile_error = None;
+        self.last_transform = None;
+        self.target_position_mm = None;
+        self.target_raw_position_mm = None;
+        self.last_rejection = None;
+        self.coverage.clear();
+        self.reset_stability();
+        self.state = LinkState::Disconnected;
+        self.reason = "CAD-Profil übernommen; warte auf ein neues Radar-Paket.".to_string();
     }
 
     pub(crate) fn transport_metrics(&self) -> Arc<MmwaveTransportMetrics> {
@@ -1186,7 +1244,7 @@ impl MmwaveManager {
 
     fn ingest(
         &mut self,
-        packet: RadarPacket,
+        mut packet: RadarPacket,
         original_bytes: &[u8],
         host_time: HostTimestamp,
     ) -> Result<(), String> {
@@ -1198,6 +1256,21 @@ impl MmwaveManager {
                     host_time.host_monotonic_ns,
                 )
             })?;
+        if let Some(cad) = &self.cad_profile {
+            // Preview uses the saved mounting point and the sensor's measured
+            // coordinate convention. Raw packet bytes are never rewritten.
+            let origin_x = (cad.mounting_position_m[0] * 1000.0).round() as i32;
+            let origin_z = (cad.mounting_position_m[2] * 1000.0).round() as i32;
+            let yaw = (packet.coordinate_frame.yaw_mdeg as f64 / 1000.0).to_radians();
+            for target in &mut packet.targets {
+                let right = f64::from(target.x_mm) * if packet.coordinate_frame.raw_x_inverted { -1.0 } else { 1.0 };
+                let forward = f64::from(target.y_mm);
+                target.room_x_mm = origin_x + (forward * yaw.cos() - right * yaw.sin()).round() as i32;
+                target.room_z_mm = origin_z + (forward * yaw.sin() + right * yaw.cos()).round() as i32;
+            }
+            packet.coordinate_frame.origin_x_mm = origin_x;
+            packet.coordinate_frame.origin_z_mm = origin_z;
+        }
         let sequence_disposition = self
             .validate_identity_and_sequence(&packet, host_time.host_monotonic_ns)
             .map_err(|error| {
@@ -2568,6 +2641,8 @@ impl MmwaveManager {
         let stale = age_ns.is_some_and(|age| age > STALE_AFTER_NS);
         let transport = self.transport_metrics.snapshot();
         MmwaveStatus {
+            cad_profile: self.cad_profile.clone(),
+            cad_profile_error: self.cad_profile_error.clone(),
             udp_port: self.udp_port,
             state: if stale { LinkState::Stale } else { self.state },
             reason: if stale {
@@ -2580,11 +2655,13 @@ impl MmwaveManager {
             room_dimensions_m: self
                 .experiment
                 .as_ref()
-                .map(|experiment| experiment.geometry.room_dimensions_m),
+                .map(|experiment| experiment.geometry.room_dimensions_m)
+                .or_else(|| self.cad_profile.as_ref().map(|cad| cad.room_dimensions_m)),
             mounting_position_m: self
                 .expected_node
                 .as_ref()
-                .and_then(|node| node.mounting_position_m),
+                .and_then(|node| node.mounting_position_m)
+                .or_else(|| self.cad_profile.as_ref().map(|cad| cad.mounting_position_m)),
             receiver_positions_m: self
                 .experiment
                 .as_ref()
@@ -3398,6 +3475,57 @@ mod tests {
 
     fn manager() -> MmwaveManager {
         MmwaveManager::new(DEFAULT_UDP_PORT, Some([4.02, 2.59, 3.44]), None, None, None)
+    }
+
+    fn cad_profile(mount: [f64; 3], revision: &str) -> super::super::experiment::SetupProfile {
+        super::super::experiment::SetupProfile {
+            id: "cad-test".to_string(), label: "CAD test".to_string(), version: 1,
+            revision_id: revision.to_string(), profile_sha256: revision.to_string(),
+            profile_context_sha256: "test".to_string(), created_at: String::new(), updated_at: String::new(),
+            document: serde_json::json!({ "room_dimensions_m": [4.02, 2.59, 3.44], "mmwave": { "mounting_position_m": mount } }),
+        }
+    }
+
+    #[test]
+    fn cad_profile_drives_unsealed_radar_without_rx_and_updates_after_save() {
+        let mut manager = MmwaveManager::new(DEFAULT_UDP_PORT, None, None, None, None);
+        let bytes = packet(0, 1, MeasurementMode::Calibration);
+        manager.apply_cad_profile(&cad_profile([1.0, 1.2, 0.5], "v1"));
+        manager.ingest_json(&bytes, 1_000_000_000).unwrap();
+        let status = manager.status(1_000_000_000);
+        assert_eq!(status.target_raw_position_mm, Some([100, 1000]));
+        assert_eq!(status.target_position_mm, Some([2000, 600]));
+        assert_eq!(status.room_dimensions_m, Some([4.02, 2.59, 3.44]));
+        assert!(!status.setup_sealed);
+        assert!(!status.preflight_ready());
+        assert!(!status.position_live_approved);
+
+        manager.apply_cad_profile(&cad_profile([2.0, 1.2, 1.0], "v2"));
+        assert_eq!(manager.status(1_000_000_000).target_position_mm, None);
+        manager.ingest_json(&packet(1, 1, MeasurementMode::Calibration), 1_100_000_000).unwrap();
+        let status = manager.status(1_100_000_000);
+        assert_eq!(status.target_position_mm, Some([3000, 1100]));
+        assert_eq!(status.cad_profile.unwrap().revision_id, "v2");
+        // The original firmware packet is untouched and still uses its own origin.
+        assert_eq!(serde_json::from_slice::<serde_json::Value>(&bytes).unwrap()["coordinate_frame"]["origin_x_mm"], 0);
+    }
+
+    #[test]
+    fn cad_profile_cannot_rewrite_a_sealed_experiment() {
+        let mut manager = sealed_manager();
+        let before = manager.room_dimensions_mm;
+        manager.apply_cad_profile(&cad_profile([3.9, 0.0, 3.3], "v5"));
+        assert!(manager.cad_profile.is_none());
+        assert!(manager.cad_profile_error.is_some());
+        assert_eq!(manager.room_dimensions_mm, before);
+    }
+
+    #[test]
+    fn cad_preview_still_rejects_outside_room_targets() {
+        let mut manager = manager();
+        manager.apply_cad_profile(&cad_profile([3.9, 0.0, 3.3], "v5"));
+        assert!(manager.ingest_json(&packet(0, 1, MeasurementMode::Calibration), 1_000_000_000).is_err());
+        assert_eq!(manager.status(1_000_000_000).last_rejection.unwrap().category, "room_bounds");
     }
 
     #[test]

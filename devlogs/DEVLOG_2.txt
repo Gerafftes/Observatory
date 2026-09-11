@@ -1,0 +1,21 @@
+# DEVLOG #02
+
+## So, I had a big issue today.
+
+I finished my PCB after **five hours of work** and recorded the entire process
+as a timelapse in `Lookout`. Then I accidentally clicked *Discard*.
+
+Fortunately, I was able to recover the video on my Mac, including all of its
+metadata. Getting the logged time restored now depends on the incredible team
+at **Hack Club/Laps**. I have already asked for help on Slack and sent an email.
+
+## The PCB Is Finished
+
+Despite the timelapse issue, the PCB shown below is **finished and already
+ordered**.
+
+Its purpose is to provide reference data for evaluating how accurately the
+Wi-Fi-based tracking system works. The board includes:
+
+- an `ESP32-C3 SuperMini`; and
+- an mmWave radar sensor.

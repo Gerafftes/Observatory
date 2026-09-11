@@ -6,21 +6,12 @@
 - the Rust workspace and sensing backend under `v2/`
 - the ESP32 CSI and mmWave firmware under `firmware/`
 - the historical Python backend under `archive/v1/`
-- scripts, tests and D4/D5/D6 implementation paths
+- scripts, tests, architecture documents and D4/D5/D6 implementation paths
 - all eight upstream submodule source trees as ordinary vendored files
 
 A clone of Observatory therefore does not need a second checkout from
 `ruvnet/RuView`. Cargo, npm, Python and ESP-IDF may still download normal
 package dependencies when they are not already cached.
-
-## Repository layout
-
-Project-level Observatory material has one canonical copy at the repository
-root: `images/`, `hardware/`, `results/`, `skizzen/`, the numbered reports,
-templates and the root `scripts/` directory. `software/ruview/` contains the
-complete software snapshot only; it does not mirror those project folders.
-Its own `scripts/`, `docs/`, `archive/`, `v2/`, `ui/`, `firmware/` and vendored
-trees are software-specific and remain part of the standalone source bundle.
 
 ## Provenance
 
@@ -40,14 +31,17 @@ at their pinned commits:
 | `v2/crates/ruview-swarm` | `267aba5be2288aa6cbe574492062b04fa8c8a6ce` |
 | `v2/crates/worldgraph` | `fdade422069d3162634292710d78cb9963c0f48d` |
 
-The snapshot also contains the current Observatory development changes across:
+The snapshot also contains the current Observatory working-tree changes in:
 
-- the experiment cockpit, room geometry, mmWave calibration and sensing UI
-- the Rust sensing server, calibration persistence, authentication and HomeCore services
-- the ESP32 CSI and mmWave firmware
-- the MCP, capture, audit and source-verification scripts
-- the matching unit, integration and security-boundary tests
-- the technical setup and operator documentation that accompanies those changes
+- `ui/components/MmwaveCalibrationAssistant.js`
+- `ui/components/ObservatoryControlCenter.js`
+- `ui/components/RoomGeometryEditor.js`
+- `ui/components/SensingTab.js`
+- `ui/index.html`
+- `ui/style.css`
+- `ui/tests/`
+- `ui/utils/i18n.js`
+- `v2/crates/wifi-densepose-sensing-server/src/experiment.rs`
 
 Git histories, build directories, dependency caches, recordings, logs,
 credentials and device-specific provisioning exports are intentionally not
@@ -71,15 +65,6 @@ Then open `http://127.0.0.1:3002/ui/index.html#sensing`.
 Simulation and software tests do not prove real CSI, mmWave operation or
 position accuracy. Hardware results remain subject to the setup, preflight,
 calibration and blind-validation gates documented in the repository root.
-
-## Integrity
-
-`SHA256SUMS.txt` records the SHA-256 digest of every tracked repository file
-except the manifest itself. Verify the published tree with:
-
-```bash
-sh scripts/verify_observatory_source.sh
-```
 
 ## Licenses
 

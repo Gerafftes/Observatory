@@ -2,6 +2,7 @@
 
 import { API_CONFIG, buildWsUrl } from '../config/api.config.js';
 import { backendDetector } from '../utils/backend-detector.js';
+import { sensingProtocols } from './ws-auth.js';
 
 export class WebSocketService {
   constructor() {
@@ -36,6 +37,9 @@ export class WebSocketService {
 
   // Connect to WebSocket endpoint
   async connect(endpoint, params = {}, handlers = {}) {
+    // Never place credentials in URL parameters or logs.
+    const { token, access_token: _accessToken, ...publicParams } = params;
+    params = publicParams;
     this.logger.debug('Attempting to connect to WebSocket', { endpoint, params });
     
     // Determine if we should use mock WebSockets
@@ -65,6 +69,7 @@ export class WebSocketService {
       ws: null,
       url,
       handlers,
+      token,
       status: 'connecting',
       lastPing: null,
       reconnectTimer: null,
@@ -80,7 +85,7 @@ export class WebSocketService {
 
     try {
       // Create WebSocket connection with timeout
-      const ws = await this.createWebSocketWithTimeout(url);
+      const ws = await this.createWebSocketWithTimeout(url, token);
       connectionData.ws = ws;
 
       // Set up event handlers (replaces onopen/onmessage/etc.)
@@ -114,9 +119,9 @@ export class WebSocketService {
     }
   }
 
-  async createWebSocketWithTimeout(url) {
+  async createWebSocketWithTimeout(url, token) {
     return new Promise((resolve, reject) => {
-      const ws = new WebSocket(url);
+      const ws = new WebSocket(url, sensingProtocols(url, token));
       const timeout = setTimeout(() => {
         ws.close();
         reject(new Error(`Connection timeout after ${this.config.connectionTimeout}ms`));
@@ -460,7 +465,7 @@ export class WebSocketService {
         this.logger.debug('Attempting reconnection', { url, endpoint, params });
         
         // Attempt reconnection
-        await this.connect(endpoint, params, connection.handlers);
+        await this.connect(endpoint, { ...params, token: connection.token }, connection.handlers);
       } catch (error) {
         this.logger.error('Reconnection failed', { url, error: error.message });
         
@@ -591,6 +596,10 @@ export class WebSocketService {
       reconnectAttempts: this.reconnectAttempts.get(connection.url) || 0,
       readyState: connection.ws ? connection.ws.readyState : null
     };
+  }
+
+  getConnectionToken(connectionId) {
+    return this.findConnectionById(connectionId)?.token;
   }
 
   // Debug utilities

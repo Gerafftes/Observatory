@@ -10,6 +10,7 @@ import {
   resolveFieldGridGeometry,
 } from '../components/gaussian-splats.js';
 import { SensingTab } from '../components/SensingTab.js';
+import { sensingService } from '../services/sensing.service.js';
 
 const room = [4.02, 2.59, 3.44];
 const columns = 25;
@@ -482,6 +483,28 @@ assert.equal(
   1,
   'disconnect must clear the previous body and point readout immediately'
 );
+
+const sourceBanner = { textContent: '', className: '' };
+const sourceTab = new SensingTab({
+  querySelector(selector) {
+    return selector === '#sensingSourceBanner' ? sourceBanner : null;
+  },
+});
+const previousDataSource = sensingService._dataSource;
+try {
+  sensingService._dataSource = 'server-offline';
+  sourceTab._latestMmwaveStatus = {
+    raw_udp_packets: 12,
+    packets_received: 0,
+    packets_rejected: 12,
+    state: 'invalid',
+  };
+  sourceTab._updateSourceBanner();
+  assert.equal(sourceBanner.textContent, 'WIFI/CSI OFFLINE · MMWAVE AKTIV');
+  assert.equal(sourceBanner.className, 'sensing-source-banner sensing-source-mixed');
+} finally {
+  sensingService._dataSource = previousDataSource;
+}
 
 let rendererInvalidationState = null;
 SensingTab.prototype._invalidateLiveReadout.call({

@@ -1,0 +1,35 @@
+import { getApiToken, setApiToken } from '../services/ws-auth.js';
+
+const form = document.createElement('form');
+form.setAttribute('aria-label', 'Server authentication');
+form.style.cssText = 'padding:8px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;position:relative;z-index:100';
+const label = document.createElement('label');
+const serverLabel = document.createElement('label');
+serverLabel.textContent = 'Server URL ';
+const server = document.createElement('input');
+server.type = 'url';
+server.required = true;
+server.value = location.origin;
+serverLabel.append(server);
+label.textContent = 'Server token ';
+const input = document.createElement('input');
+input.type = 'password';
+input.autocomplete = 'off';
+input.placeholder = getApiToken() ? 'Token set for this tab' : 'RUVIEW_API_TOKEN';
+label.append(input);
+const button = document.createElement('button');
+button.type = 'submit';
+button.textContent = 'Connect';
+const clear = document.createElement('button');
+clear.type = 'button';
+clear.textContent = 'Clear token';
+clear.onclick = () => { setApiToken('', server.value); location.reload(); };
+form.append(serverLabel, label, button, clear);
+form.onsubmit = event => {
+  event.preventDefault();
+  if (!input.value) return;
+  setApiToken(input.value, server.value);
+  input.value = '';
+  location.reload();
+};
+(document.querySelector('.header-meta') || document.body).prepend(form);

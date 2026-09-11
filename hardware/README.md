@@ -19,21 +19,24 @@ Fertigungsvorschau dokumentiert den früheren Platinenstand:
 Die [Gerber- und Bohrdaten von PCB-01](pcb-01/) liegen mit SHA-256 und
 Fertigungshinweis im Repository.
 
-Die überarbeitete [PCB-02 mit KiCad-Quellen, Prüfberichten und Bestellarchiv](pcb-02/)
-verwendet wieder SMD-Kondensatoren, Standard-Pinheader-Pads für den ESP32-C3
-und dieselben Außenmaße sowie Montagebohrungen wie PCB-01.
+Die finale [PCB-03 mit KiCad-Quellen, Prüfberichten und Bestellarchiv](pcb-03/)
+übernimmt die korrigierte 180°-Ausrichtung des LD2450, verwendet weiterhin
+SMD-Kondensatoren und behält dieselben Außenmaße sowie Montagebohrungen wie
+PCB-01/PCB-02.
+
+PCB-02 bleibt als vorherige Revision dokumentiert.
 
 > [!IMPORTANT]
-> Für den aktuellen Aufbau ist ausdrücklich **PCB-02** zu verwenden. PCB-01 bleibt als frühere Fertigungsvorschau dokumentiert und ist nicht die vorgesehene aktuelle Revision.
+> Für den aktuellen Aufbau ist ausdrücklich **PCB-03** zu verwenden. PCB-01 und PCB-02 bleiben als frühere Revisionen dokumentiert.
 
 ## Breadboard-Aufbau
 
-Die folgende Gegenüberstellung zeigt die aktuelle PCB-02-Revision neben dem
+Die folgende Gegenüberstellung zeigt die aktuelle PCB-03-Revision neben dem
 vorläufigen Breadboard-Aufbau:
 
 <table>
 <tr>
-<td><img src="pcb-02/preview/PCB-02-top.png" alt="PCB-02-Top-Ansicht mit USB-Anschluss, U1, C1 und C2" width="460"><br><strong>PCB-02 — aktuelle Revision</strong><br>Diese überarbeitete Platine ist für den aktuellen mmWave-Aufbau zu verwenden.</td>
+<td><img src="pcb-03/preview/PCB-03-top.png" alt="PCB-03-Top-Ansicht mit ANT KEEP CLEAR, USB-Anschluss, U1, C1 und C2" width="460"><br><strong>PCB-03 — aktuelle Revision</strong><br>Diese finale Platine ist für den aktuellen mmWave-Aufbau zu verwenden.</td>
 <td><img src="../images/mmwave-breadboard-setup.jpeg" alt="Vorläufiger Breadboard-Aufbau mit HLK-LD2450 und ESP32-C3" width="460"><br><strong>Vorläufiger Breadboard-Aufbau</strong><br>Das Foto dokumentiert den provisorischen mmWave-Aufbau auf dem Breadboard.</td>
 </tr>
 </table>

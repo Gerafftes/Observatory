@@ -1,0 +1,23 @@
+# DEVLOG #18
+
+Since the LD2450 first worked, I connected TX, RX1–RX4, and Wi-Fi, positioned
+the sensor, sealed `setup-v2`, and added a calibration preparation phase with a
+countdown and a minimum duration of `60 seconds`.
+
+The real hardware UI is running on port `8080`; port `3002` still shows the
+simulation. I started the workflow, but it currently stops at **step 4, the
+empty-room Wi-Fi baseline**, because radar packets are being lost.
+
+I improved server-side packet sorting and built a new `10 Hz` firmware. The OTA
+update started, but the device still boots the old firmware from `ota_0` at
+about `20.6 Hz`.
+
+The sensor is online, but calibration is not ready. `63` UI tests pass; one
+Rust test mismatch remains. No real D6 calibration or blind validation has
+been completed yet.
+
+Next: activate the `10 Hz` firmware, resolve the packet-loss blocker, and rerun
+the preflight and empty-room baseline.
+
+Suggested image: the port-8080 UI showing the online sensor, packet-loss
+warning, and OTA status.
