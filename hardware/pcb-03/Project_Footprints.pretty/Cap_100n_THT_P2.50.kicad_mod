@@ -1,0 +1,119 @@
+(footprint "Cap_100n_THT_P2.50"
+	(version 20260206)
+	(generator "pcbnew")
+	(generator_version "10.0")
+	(layer "F.Cu")
+	(descr "100 nF through-hole ceramic capacitor, 2.50 mm pitch, 5.0 x 2.5 mm body")
+	(tags "capacitor THT ceramic 2.50mm")
+	(property "Reference" "C1"
+		(at 0 -1.8 0)
+		(layer "F.SilkS")
+		(uuid "4f135b65-a3cc-47ce-bc08-b73801179310")
+		(effects
+			(font
+				(size 1 1)
+				(thickness 0.15)
+			)
+		)
+	)
+	(property "Value" "100nF"
+		(at 13.63 0.11 0)
+		(layer "F.Fab")
+		(uuid "0b9a3ad4-a47b-4ff4-96e9-12088e27d57d")
+		(effects
+			(font
+				(size 1 1)
+				(thickness 0.15)
+			)
+		)
+	)
+	(property "Datasheet" ""
+		(at 0 0 0)
+		(layer "F.Fab")
+		(hide yes)
+		(uuid "bb9674ec-38c8-4ee8-89cf-6a67a91ee982")
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+		)
+	)
+	(property "Description" "Unpolarized 100 nF decoupling capacitor"
+		(at 0 0 0)
+		(layer "F.Fab")
+		(hide yes)
+		(uuid "a9834411-40d4-4613-a983-38822cc3705e")
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+		)
+	)
+	(property "KiLib_Generator" "SMD_2terminal_chip_molded"
+		(at 0 0 0)
+		(layer "F.SilkS")
+		(hide yes)
+		(uuid "28470e99-3f51-4b1e-a169-0e5c1734f200")
+		(effects
+			(font
+				(size 1 1)
+				(thickness 0.15)
+			)
+		)
+	)
+	(property ki_fp_filters "C_*")
+	(sheetname "/")
+	(sheetfile "PCB-02.kicad_sch")
+	(attr through_hole)
+	(duplicate_pad_numbers_are_jumpers no)
+	(fp_rect
+		(start -2.75 -1.5)
+		(end 2.75 1.5)
+		(stroke
+			(width 0.05)
+			(type solid)
+		)
+		(fill no)
+		(layer "F.CrtYd")
+		(uuid "a71836bf-d3cc-430d-8df1-576aab19939c")
+	)
+	(fp_rect
+		(start -2.5 -1.25)
+		(end 2.5 1.25)
+		(stroke
+			(width 0.1)
+			(type solid)
+		)
+		(fill no)
+		(layer "F.Fab")
+		(uuid "6e03d213-62fa-4df0-9d8b-311045835de9")
+	)
+	(fp_text user "${REFERENCE}"
+		(at 0 0 0)
+		(layer "F.Fab")
+		(uuid "0f0e0b5e-fe2b-4caa-9ffd-6dad6c8f7b1a")
+		(effects
+			(font
+				(size 0.5 0.5)
+				(thickness 0.08)
+			)
+		)
+	)
+	(pad "1" thru_hole rect
+		(at -1.25 0)
+		(size 2 2)
+		(drill 0.8)
+		(layers "*.Cu" "*.Mask")
+		(remove_unused_layers no)
+		(uuid "8883f6bf-1bee-422d-b41a-1dc780dde46c")
+	)
+	(pad "2" thru_hole circle
+		(at 1.25 0)
+		(size 2 2)
+		(drill 0.8)
+		(layers "*.Cu" "*.Mask")
+		(remove_unused_layers no)
+		(uuid "b374f1ca-9b97-4260-8a0d-66da9f351882")
+	)
+	(embedded_fonts no)
+)

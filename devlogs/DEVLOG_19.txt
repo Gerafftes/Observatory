@@ -1,0 +1,55 @@
+# DEVLOG #19
+
+I activated the new mmWave firmware and got the live `25-second` preflight to
+pass once, but the first empty-room recording did not complete.
+
+The main work was hardening the transport: the firmware now sends redundant
+radar packets, while the server handles reordering, duplicates, short CSI gaps,
+and recent diagnostics instead of relying on cumulative counters. The UI also
+gained a controlled empty-room countdown.
+
+The remaining failure is intermittent: the sensor stays online and reports no
+local UDP send errors, but the server still recorded `packets_lost=10` and
+`packets_rejected=324`. The empty-room capture lasted only `4.8 s` for radar
+and `5.1 s` for CSI, so it is not a valid calibration reference.
+
+No calibration, training, or blind position result is claimed yet.
+
+Next: expose the exact reject reason and sequence-gap timing, fix the remaining
+transport problem, and repeat the complete empty-room measurement.
+
+Suggested image: the port-8080 UI showing the online sensor, preflight gates,
+and the packet-loss blocker.
+
+## 2026-08-29 — Stabilisation implementation
+
+I implemented the backend-first stabilisation plan. The mmWave receiver now
+separates raw UDP transport from accepted radar content, exposes categorised
+rejects, the last rejection, sequence-gap timing, duplicate/discard counts,
+queue pressure, and receive-to-process delay. Invalid target coordinates never
+become calibration labels, while a valid transport packet keeps the stream
+fresh independently of target content.
+
+I added ESP status diagnostics with configuration flags, reachability,
+timeout/HTTP/invalid-JSON classification, last-success age, and no token
+logging. Session start is transactional: the node mode, fresh expected-mode
+packet, diagnostics progression, and full preflight must pass before recording
+files are created. Session manifests are durable; active manifests become
+`interrupted` after a server restart, and flush or file errors remain visible
+instead of disappearing.
+
+I updated the UI so action errors such as HTTP 409 are not erased by status
+refreshes. Active stale sessions remain visible with an explicit radar-stream
+interruption message, interrupted sessions are shown without auto-resume, and
+preflight blockers use readable labels plus transport evidence.
+
+The targeted verification passed: 28 mmWave Rust tests and 22 UI tests. The
+local browser surface also renders the new diagnostics and blocker labels. No
+new empty-room calibration or blind result is claimed: the live server still
+needs to be rebuilt/restarted with valid node URL/token configuration, then a
+fresh loss-free preflight and at least a complete 60-second empty-room capture
+must be verified from the new manifest and packet diagnostics.
+
+Next: rebuild the server, verify `/api/v1/mmwave/status`, run the complete
+empty-room measurement, and record raw UDP, reject reasons, sequence gaps,
+queue delay, and the resulting manifest before proceeding to the guided walk.

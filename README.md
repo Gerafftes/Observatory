@@ -113,7 +113,7 @@ Die wichtigsten Einstiegspunkte sind:
 2. [Aktueller D6-/mmWave-Arbeitsstand](08-aktueller-arbeitsstand-d6-und-position.md)
 3. [Ergebnisberichte](results/)
 4. [PCB-01-Fertigungsdaten](hardware/pcb-01/)
-5. [PCB-02-Fertigungsdaten und KiCad-Quellen](hardware/pcb-02/)
+5. [PCB-03-Fertigungsdaten und KiCad-Quellen](hardware/pcb-03/)
 
 Die Software basiert auf [ruvnet/RuView](https://github.com/ruvnet/RuView), ist
 aber mit den Observatory-Anpassungen und den benötigten Unterprojekten direkt
@@ -214,10 +214,10 @@ HLK-LD2450 als unabhängiger mmWave-Referenz. Die vollständige
 Befestigungs- und mmWave-Bauteile, Bilder und Gehäusehinweise.
 
 > [!IMPORTANT]
-> Für den aktuellen Aufbau ist ausdrücklich **PCB-02** zu verwenden. PCB-01 bleibt als frühere Fertigungsvorschau dokumentiert.
+> Für den aktuellen Aufbau ist ausdrücklich **PCB-03** zu verwenden. PCB-01 und PCB-02 bleiben als frühere Revisionen dokumentiert.
 
 - [PCB-01 Gerber- und Bohrdaten](hardware/pcb-01/)
-- [PCB-02 KiCad-Quellen, Prüfberichte und Bestellarchiv](hardware/pcb-02/)
+- [PCB-03 KiCad-Quellen, Prüfberichte und Bestellarchiv](hardware/pcb-03/)
 - [Breadboard-CAD, Befestigungsteile und mmWave-BOM](hardware/breadboard/README.md)
 
 ## Dokumentation

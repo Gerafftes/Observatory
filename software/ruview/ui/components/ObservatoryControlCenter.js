@@ -129,6 +129,91 @@ function phaseLabel(phase) {
   }[phase] || phase;
 }
 
+/**
+ * Summarise the independent mmWave transport for compact status surfaces.
+ *
+ * `packets_received` counts only packets that passed room/geometry validation;
+ * `raw_udp_packets` proves that the radar is sending and the server is
+ * receiving. Keeping both counters here avoids presenting a healthy transport
+ * as disconnected when only the current geometry needs attention.
+ */
+export function mmwaveStatusSummary(status) {
+  const mmwave = status?.mmwave || {};
+  const rawPackets = numberValue(mmwave.raw_udp_packets ?? mmwave.transport?.raw_udp_packets);
+  const packetsReceived = numberValue(mmwave.packets_received);
+  const packetsRejected = numberValue(mmwave.packets_rejected);
+  const reachable = mmwave.connection?.reachable === true
+    || mmwave.node_control?.reachable === true;
+  const active = rawPackets > 0;
+  const geometryNeedsAttention = active && packetsReceived === 0 && (
+    packetsRejected > 0 || mmwave.state === 'invalid' || mmwave.last_rejection
+  );
+
+  if (geometryNeedsAttention) {
+    return {
+      active: true,
+      reachable: true,
+      accepted: packetsReceived,
+      rejected: packetsRejected,
+      value: 'UDP empfangen',
+      state: 'AKTIV · PRÜFEN',
+      tone: 'is-warn',
+      routeTone: 'is-warning',
+      routeLabel: 'mmWave aktiv · Geometrie prüfen',
+    };
+  }
+  if (active && packetsReceived > 0) {
+    return {
+      active: true,
+      reachable: true,
+      accepted: packetsReceived,
+      rejected: packetsRejected,
+      value: 'verbunden',
+      state: 'AKTIV',
+      tone: 'is-good',
+      routeTone: 'is-ready',
+      routeLabel: 'mmWave verbunden',
+    };
+  }
+  if (active) {
+    return {
+      active: true,
+      reachable: true,
+      accepted: packetsReceived,
+      rejected: packetsRejected,
+      value: 'Datenstrom',
+      state: 'AKTIV',
+      tone: 'is-good',
+      routeTone: 'is-ready',
+      routeLabel: 'mmWave aktiv',
+    };
+  }
+  if (reachable) {
+    return {
+      active: false,
+      reachable: true,
+      accepted: packetsReceived,
+      rejected: packetsRejected,
+      value: 'verbunden',
+      state: 'WARTET',
+      tone: 'is-warn',
+      routeTone: 'is-waiting',
+      routeLabel: 'mmWave verbunden · wartet auf Daten',
+    };
+  }
+  return {
+    active: false,
+    reachable: false,
+    accepted: packetsReceived,
+    rejected: packetsRejected,
+    value: 'offline',
+    state: 'OFFLINE',
+    tone: 'is-offline',
+    routeTone: 'is-waiting',
+    routeLabel: 'Wartet auf mmWave',
+  };
+}
+
 function eventPayload(run, phase, key) {
   return (run?.workflow?.events || []).filter((event) => event.phase === phase)
     .map((event) => event.payload || {})
@@ -195,6 +280,7 @@ export class ObservatoryControlCenter {
     this.runsExpanded = false;
     this.pointGridExpanded = false;
     this.manualCaptureExpanded = false;
+    this.roomDetailsExpanded = false;
     this.runSelectionCleared = false;
     this._nextRetryAt = 0;
     this.busy = false;
@@ -382,6 +468,7 @@ export class ObservatoryControlCenter {
       offline: { className: 'is-offline', label: 'OFFLINE' },
       loading: { className: 'is-loading', label: 'LOAD …' },
     }[this.connectionState] || { className: 'is-loading', label: 'LOAD …' };
+    const radar = mmwaveStatusSummary(this.status);
     const experimentActionsDisabled = this.busy || this.connectionState !== 'ready';
     this.container.innerHTML = `
       <section class="occ" aria-labelledby="occTitle">
@@ -405,7 +492,13 @@ export class ObservatoryControlCenter {
           ${panelHeading('SETUP', 'Raum-Setup', 'Setup-Profil', 'Speichert Raum, TX, RX und mmWave-Montagepunkt als versioniertes Profil. P01–P09 bleibt Legacy.')}
           <p class="occ-panel-intro">Maße in m · Achsen: <strong>x / y / z</strong>.</p>
           <div id="occRoomCadEditor" class="occ-cad-editor"></div>
-          <form id="occProfileForm">
+          <button type="button" class="occ-room-details-toggle" data-occ-action="toggle-room-details" aria-expanded="${this.roomDetailsExpanded ? 'true' : 'false'}" aria-controls="occRoomDetails">
+            <span class="occ-room-details-title"><span class="occ-route-kicker">SETUP</span><strong>Profil- und Sensorpositionen</strong></span>
+            <span class="occ-room-details-action">${this.roomDetailsExpanded ? 'Ausblenden' : 'Details anzeigen'}</span>
+            <span class="occ-room-details-icon" aria-hidden="true">${this.roomDetailsExpanded ? '−' : '+'}</span>
+          </button>
+          <div id="occRoomDetails" class="occ-room-details-panel" ${this.roomDetailsExpanded ? '' : 'hidden'}>
+            <form id="occProfileForm">
             <label class="occ-field occ-profile-name"><span>Profilname</span><input name="profile_label" maxlength="120" value="${attribute(this.profileLabel)}" required></label>
             <div class="occ-room-form-grid">
               <div class="occ-room-form-column">
@@ -432,7 +525,7 @@ export class ObservatoryControlCenter {
               <div class="occ-room-form-column">
                 <div class="occ-calibration-route">
                   <div class="occ-route-kicker">REFERENZ</div>
-                  <div class="occ-route-status ${this.status?.mmwave?.packets_received > 0 ? 'is-ready' : 'is-waiting'}"><span></span>${this.status?.mmwave?.packets_received > 0 ? 'mmWave verbunden' : 'Wartet auf mmWave'}</div>
+                  <div class="occ-route-status ${radar.routeTone}"><span></span>${radar.routeLabel}</div>
                   <h5>Radar-Referenz</h5>
                   <p>Radar liefert x/z zu jedem CSI-Fenster. Kein P01–P09-Raster nötig.</p>
                   <button type="button" class="occ-button occ-button-primary" data-occ-action="open-mmwave-calibration">mmWave öffnen</button>
@@ -454,18 +547,19 @@ export class ObservatoryControlCenter {
               ${this._setupV2DraftActionMarkup()}
             </div>
             <p class="occ-helper" data-occ-mmwave-placement-status>Berechnet die mmWave-Montage aus Raum-, TX- und RX-Geometrie und übernimmt sie direkt in die Felder und den CAD-Plan. Danach Profilversion speichern.</p>
-          </form>
-          <details class="occ-fold" ${this.profilesExpanded ? 'open' : ''}>
-            <summary data-occ-action="toggle-profiles"><span>Profile</span><small>${this.profiles.length ? `${this.profiles.length} Versionen` : 'leer'}</small></summary>
-            <div class="occ-profile-list">
-              ${this.profiles.length ? this.profiles.map((profile) => `
-                <button type="button" class="occ-profile-row ${profile.id === this.selectedProfile?.id ? 'is-selected' : ''}" data-occ-profile-id="${attribute(profile.id)}">
-                  <span><strong>${escapeHTML(profile.label)}</strong><small>v${profile.version} · ${escapeHTML(profile.profile_sha256.slice(0, 12))}…</small></span>
-                  <small>${escapeHTML(formatTime(profile.updated_at))}</small>
-                </button>
-              `).join('') : '<div class="occ-empty">Noch kein Profil.</div>'}
-            </div>
-          </details>
+            </form>
+            <details class="occ-fold" ${this.profilesExpanded ? 'open' : ''}>
+              <summary data-occ-action="toggle-profiles"><span>Profile</span><small>${this.profiles.length ? `${this.profiles.length} Versionen` : 'leer'}</small></summary>
+              <div class="occ-profile-list">
+                ${this.profiles.length ? this.profiles.map((profile) => `
+                  <button type="button" class="occ-profile-row ${profile.id === this.selectedProfile?.id ? 'is-selected' : ''}" data-occ-profile-id="${attribute(profile.id)}">
+                    <span><strong>${escapeHTML(profile.label)}</strong><small>v${profile.version} · ${escapeHTML(profile.profile_sha256.slice(0, 12))}…</small></span>
+                    <small>${escapeHTML(formatTime(profile.updated_at))}</small>
+                  </button>
+                `).join('') : '<div class="occ-empty">Noch kein Profil.</div>'}
+              </div>
+            </details>
+          </div>
         </section>
 
         <section class="occ-panel occ-wide-panel occ-workflow-panel">
@@ -508,14 +602,75 @@ export class ObservatoryControlCenter {
     const active = nodes.filter((node) => node.status === 'active').length;
     const txAttested = nodes.filter((node) => node.source_binding_attested === true).length;
     const current = this.selectedRun?.workflow;
-    return [
-      ['Aktive RX', `${active}/${nodes.length || 4}`, active === 4 ? 'is-good' : 'is-warn', 'Aktive RX', 'Online-Zahl im letzten Status.'],
-      ['TX', txAttested ? `${txAttested} RX` : 'unbekannt', txAttested ? 'is-good' : 'is-warn', 'TX-Bindung', 'Bestätigte TX-Quelle.'],
-      ['Präsenz', this.status?.classification_calibration?.phase || '--', this.status?.classification_calibration?.phase === 'ready' ? 'is-good' : 'is-warn', 'Präsenz', 'WiFi-Präsenzstatus, unabhängig von mmWave.'],
-      ['Run', current ? phaseLabel(current.current_phase) : 'kein Run', current?.current_status === 'PASS' ? 'is-good' : '', 'Workflow', 'Aktiver Run-Schritt.'],
-      ['Radar', this.status?.mmwave?.packets_received > 0 ? 'verbunden' : 'nicht verbunden', 'is-locked', 'Radar', 'Ground Truth für Kalibrierung und Blindtest; kein WiFi-Feature.'],
-      ['Runs', String(this.runs.length), '', 'Runs', 'Gespeicherte Experimentläufe.'],
-    ].map(([label, value, cls, infoLabel, infoText]) => `<div class="occ-metric ${cls}"><span class="occ-metric-label">${escapeHTML(label)}${infoTip(infoLabel, infoText)}</span><strong>${escapeHTML(value)}</strong></div>`).join('');
+    const radar = mmwaveStatusSummary(this.status);
+    const presenceReady = this.status?.classification_calibration?.phase === 'ready';
+    const runState = current?.current_status === 'RUNNING'
+      ? { label: 'AKTIV', tone: 'is-good' }
+      : current?.current_status === 'PASS'
+        ? { label: 'ABGESCHLOSSEN', tone: 'is-good' }
+        : current
+          ? { label: 'BEREIT', tone: 'is-warn' }
+          : { label: 'KEIN RUN', tone: 'is-warn' };
+    const metrics = [
+      {
+        label: 'Aktive RX',
+        value: `${active}/${nodes.length || 4}`,
+        state: active === 4 ? 'AKTIV' : active > 0 ? 'TEILWEISE' : 'INAKTIV',
+        tone: active === 4 ? 'is-good' : 'is-warn',
+        infoLabel: 'Aktive RX',
+        infoText: 'Online-Zahl im letzten Status (WiFi/CSI).',
+      },
+      {
+        label: 'TX',
+        value: txAttested ? `${txAttested} RX` : 'unbekannt',
+        state: txAttested ? 'GEBUNDEN' : 'NICHT BESTÄTIGT',
+        tone: txAttested ? 'is-good' : 'is-warn',
+        infoLabel: 'TX-Bindung',
+        infoText: 'Bestätigte TX-Quelle für WiFi/CSI.',
+      },
+      {
+        label: 'Präsenz',
+        value: this.status?.classification_calibration?.phase || '--',
+        state: presenceReady ? 'BEREIT' : 'INAKTIV',
+        tone: presenceReady ? 'is-good' : 'is-warn',
+        infoLabel: 'Präsenz',
+        infoText: 'WiFi-Präsenzstatus, unabhängig von mmWave.',
+      },
+      {
+        label: 'Run',
+        value: current ? phaseLabel(current.current_phase) : 'kein Run',
+        state: runState.label,
+        tone: runState.tone,
+        infoLabel: 'Workflow',
+        infoText: 'Aktueller WiFi-Workflow-Schritt.',
+      },
+      {
+        label: 'Radar',
+        value: radar.value,
+        state: radar.state,
+        tone: radar.tone,
+        infoLabel: 'Radar',
+        infoText: 'UDP-Rohdaten zeigen die mmWave-Verbindung. Gültige Raumdaten können zusätzlich von Montage/Yaw abhängen; Ground Truth bleibt getrennt, kein WiFi-Feature.',
+      },
+      {
+        label: 'Runs',
+        value: String(this.runs.length),
+        state: this.runs.length ? 'VORHANDEN' : 'LEER',
+        tone: this.runs.length ? 'is-good' : 'is-warn',
+        infoLabel: 'Runs',
+        infoText: 'Gespeicherte Experimentläufe.',
+      },
+    ];
+    return metrics.map(({ label, value, state, tone, infoLabel, infoText }) => `
+      <div class="occ-metric ${tone}">
+        <span class="occ-metric-label">
+          <span class="occ-metric-name">${escapeHTML(label)}</span>
+          <span class="occ-metric-state">${escapeHTML(state)}</span>
+          ${infoTip(infoLabel, infoText)}
+        </span>
+        <strong>${escapeHTML(value)}</strong>
+      </div>
+    `).join('');
   }
 
   _tripleInputs(prefix, values = []) {
@@ -542,12 +697,11 @@ export class ObservatoryControlCenter {
     this.profileDraft = document;
     this._syncProfileFormFromDraft();
     const form = this.container?.querySelector('#occProfileForm');
-    if (!form) return;
-    if (typeof form.checkValidity === 'function' && !form.checkValidity()) {
-      form.reportValidity?.();
-      return;
-    }
-    void this._saveProfile(form);
+    // The CAD editor already owns the complete, current profile document.
+    // Pass it through directly instead of rebuilding it from form controls
+    // which may be hidden, invalid, or one render behind the editor. Geometry
+    // validation below is the single source of truth for this save action.
+    void this._saveProfile(form, document);
   }
 
   _guideState() {
@@ -912,6 +1066,7 @@ export class ObservatoryControlCenter {
 
   _workflowActions(workflow, trainingCount, blindCount, currentPoint, completedTrainingPoints = new Set()) {
     if (!workflow) return '';
+    const radar = mmwaveStatusSummary(this.status);
     const softwareOnly = (workflow.events || []).some((event) => (
       event.payload?.software_only === true || event.payload?.demo === 'guide walkthrough only'
     ));
@@ -944,7 +1099,7 @@ export class ObservatoryControlCenter {
       return `
         <div class="occ-calibration-route occ-workflow-route">
           <div class="occ-route-kicker">STANDARDWEG</div>
-          <div class="occ-route-status ${this.status?.mmwave?.packets_received > 0 ? 'is-ready' : 'is-waiting'}"><span></span>${this.status?.mmwave?.packets_received > 0 ? 'Radar-Referenz verfügbar' : 'Radar noch nicht verbunden'}</div>
+          <div class="occ-route-status ${radar.routeTone}"><span></span>${radar.active ? (radar.accepted > 0 ? 'Radar-Referenz verfügbar' : 'Radar aktiv · Geometrie prüfen') : radar.routeLabel}</div>
           <h5>CSI mit mmWave-Koordinaten kalibrieren</h5>
           <p>CSI-Fenster werden mit Radarpositionen gekoppelt. P01–P09 entfällt.</p>
           <button type="button" class="occ-button occ-button-primary" data-occ-action="open-mmwave-calibration">mmWave öffnen</button>
@@ -1263,7 +1418,13 @@ export class ObservatoryControlCenter {
     if (!button || this.busy) return;
     const action = button.dataset.occAction;
     if (action === 'refresh') return this.refresh();
-    if (action === 'focus-profile') return this._focusAndScroll('#occProfileForm [name="profile_label"]');
+    if (action === 'focus-profile') {
+      if (!this.roomDetailsExpanded) {
+        this.roomDetailsExpanded = true;
+        this._render();
+      }
+      return this._focusAndScroll('#occProfileForm [name="profile_label"]');
+    }
     if (action === 'focus-workflow') return this._focusAndScroll('#occWorkflowForm [name="workflow_label"]');
     if (action.startsWith('focus-artifact-')) {
       return this._focusAndScroll(`[data-occ-artifact-input="${attribute(action.replace('focus-artifact-', ''))}"]`);
@@ -1300,6 +1461,12 @@ export class ObservatoryControlCenter {
     if (action === 'toggle-manual-capture') {
       event.preventDefault();
       this.manualCaptureExpanded = !this.manualCaptureExpanded;
+      this._render();
+      return;
+    }
+    if (action === 'toggle-room-details') {
+      event.preventDefault();
+      this.roomDetailsExpanded = !this.roomDetailsExpanded;
       this._render();
       return;
     }
@@ -1395,9 +1562,15 @@ export class ObservatoryControlCenter {
     };
   }
 
-  async _saveProfile(form) {
-    const label = String(new FormData(form).get('profile_label') || '').trim();
-    const document = this._readProfileFromForm(form);
+  async _saveProfile(form, documentOverride = null) {
+    const label = form
+      ? String(new FormData(form).get('profile_label') || '').trim()
+      : String(this.profileLabel || '').trim();
+    const document = documentOverride
+      ? (typeof structuredClone === 'function'
+        ? structuredClone(documentOverride)
+        : JSON.parse(JSON.stringify(documentOverride)))
+      : this._readProfileFromForm(form);
     const validation = validateGeometryDraft(document);
     if (!label) {
       this.message = '';
@@ -1424,7 +1597,9 @@ export class ObservatoryControlCenter {
       await this.refresh({ quiet: true, allowWhileBusy: true });
     } catch (error) {
       this.message = '';
-      this.error = error?.message || 'Setup-Profil konnte nicht gespeichert werden.';
+      this.error = error?.message === 'Failed to fetch'
+        ? 'Server nicht erreichbar. Bitte Server-URL prüfen und den Sensing-Server starten.'
+        : error?.message || 'Setup-Profil konnte nicht gespeichert werden.';
     } finally {
       this.busy = false;
       this._render();

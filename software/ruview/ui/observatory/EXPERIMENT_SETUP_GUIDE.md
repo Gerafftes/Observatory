@@ -64,6 +64,26 @@ Das darf erst nach dem Hardware- und Transportcheck geschehen.
 
 ### Schritt 1 — Setup-Profil
 
+Gespeicherte Profile werden direkt in die unversiegelte Radar-Vorschau übernommen:
+Raummaße und mmWave-Montagepunkt gelten sofort; nach einem Server-Neustart wird
+das zuletzt gespeicherte Profil wiederhergestellt. Der Server berechnet die
+Vorschauposition aus Radar-Rohkoordinaten, gespeicherter Montageposition und der
+vom Sensor gemeldeten Ausrichtung. Das ist noch keine geprüfte Kalibrierung.
+Ein versiegelter oder laufender Versuch behält seine gebundene Geometrie und
+meldet Profiländerungen ausdrücklich, statt sie während der Messung zu übernehmen.
+
+Die Verbindungssuche prüft bekannte private LAN-Nachbarn auf Port 8032 und
+wiederholt sich nach Verbindungsabbrüchen. Bei mehreren Knoten muss
+`MMWAVE_NODE_URL` gesetzt werden. Der Zugriffstoken kommt aus `MMWAVE_NODE_TOKEN`
+oder lokal aus `data/mmwave-node-token.txt`; bestehende BLL-Installationen können
+weiter die Datei `private/mmwave-ota-token.txt` ein oder zwei Verzeichnisse oberhalb
+des Arbeitsverzeichnisses verwenden. Token werden nicht in der API ausgegeben.
+Die öffentliche Statusabfrage funktioniert auch ohne Token. Die Oberfläche zeigt
+Sensorziel und tatsächliche Empfangs-IP/Port bei einer Abweichung konkret an.
+Alte Firmware ohne veränderbares UDP-Ziel benötigt weiterhin eine passende
+Hostadresse oder eine Firmwareanpassung. Fehlende Diagnosezähler sind unbekannt,
+nicht null gemessene Frames. RX-Knoten sind für die Radar-Vorschau nicht nötig.
+
 Im Bereich Setup-Profil eintragen:
 
 - Raum: [Länge, Höhe, Breite] in Metern

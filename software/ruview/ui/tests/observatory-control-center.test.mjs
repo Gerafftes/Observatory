@@ -74,6 +74,20 @@ test('room editor presents mmWave as the primary calibration route', () => {
   assert.match(container.innerHTML, /Radar-Referenz/);
   assert.match(container.innerHTML, /mmWave \[x \/ y \/ z\]/);
   assert.match(container.innerHTML, /mmwave\.mounting_position_m/);
+  assert.match(container.innerHTML, /toggle-room-details/);
+  assert.match(container.innerHTML, /aria-expanded="false"/);
+  assert.match(container.innerHTML, /class="occ-room-details-panel" hidden/);
+  const toggle = { dataset: { occAction: 'toggle-room-details' } };
+  controlCenter._onClick({
+    target: {
+      closest(selector) {
+        return selector === '[data-occ-action]' ? toggle : null;
+      },
+    },
+    preventDefault() {},
+  });
+  assert.match(container.innerHTML, /aria-expanded="true"/);
+  assert.doesNotMatch(container.innerHTML, /class="occ-room-details-panel" hidden/);
   assert.match(container.innerHTML, /mmWave öffnen/);
   assert.match(container.innerHTML, /data-occ-action="calculate-mmwave-placement"/);
   assert.match(container.innerHTML, />mmWave-Position berechnen</);
@@ -83,7 +97,10 @@ test('room editor presents mmWave as the primary calibration route', () => {
 });
 
 test('CAD save forwards the complete edited profile to the existing profile submit', () => {
-  const form = { querySelector() { return null; } };
+  const form = {
+    querySelector() { return null; },
+    checkValidity() { return false; },
+  };
   const container = {
     querySelector(selector) {
       return selector === '#occProfileForm' ? form : null;
@@ -103,6 +120,67 @@ test('CAD save forwards the complete edited profile to the existing profile subm
   assert.deepEqual(controlCenter.profileDraft.transmitter.position_m, [1.6, 1.25, 0.45]);
   assert.deepEqual(controlCenter.profileDraft.receivers[0].position_m, [-0.2, 0.5, 0.28]);
   assert.deepEqual(controlCenter.profileDraft.mmwave.mounting_position_m, [4.2, 1.2, 1.72]);
+});
+
+test('CAD save keeps the current editor document when profile details are hidden', () => {
+  const controlCenter = new ObservatoryControlCenter({ querySelector() { return null; } });
+  const document = defaultSetupProfileDocument();
+  document.mmwave.mounting_position_m = [3.95, 1.37, 3.35];
+  let submitted = null;
+  controlCenter._saveProfile = async (form, documentOverride) => {
+    submitted = { form, documentOverride };
+  };
+
+  controlCenter._saveGeometryDocument(document);
+
+  assert.equal(submitted.form, null);
+  assert.deepEqual(submitted.documentOverride.mmwave.mounting_position_m, [3.95, 1.37, 3.35]);
+});
+
+test('direct CAD profile save uses the editor document without a profile form', async () => {
+  const controlCenter = new ObservatoryControlCenter(null);
+  controlCenter.profileLabel = 'CAD test';
+  const document = defaultSetupProfileDocument();
+  document.mmwave.mounting_position_m = [3.95, 1.41, 3.35];
+  const originalCreateProfile = experimentService.createProfile;
+  let submitted = null;
+  experimentService.createProfile = async (payload) => {
+    submitted = payload;
+    return {
+      id: 'profile-cad-test',
+      label: payload.label,
+      document: payload.document,
+      profile_sha256: 'a'.repeat(64),
+    };
+  };
+
+  try {
+    await controlCenter._saveProfile(null, document);
+  } finally {
+    experimentService.createProfile = originalCreateProfile;
+  }
+
+  assert.equal(submitted.label, 'CAD test');
+  assert.deepEqual(submitted.document.mmwave.mounting_position_m, [3.95, 1.41, 3.35]);
+  assert.notEqual(submitted.document, document);
+});
+
+test('profile save translates a fetch failure into an actionable server hint', async () => {
+  const controlCenter = new ObservatoryControlCenter(null);
+  controlCenter.profileLabel = 'CAD test';
+  const originalCreateProfile = experimentService.createProfile;
+  experimentService.createProfile = async () => {
+    throw new Error('Failed to fetch');
+  };
+
+  try {
+    await controlCenter._saveProfile(null, defaultSetupProfileDocument());
+  } finally {
+    experimentService.createProfile = originalCreateProfile;
+  }
+
+  assert.match(controlCenter.error, /Server nicht erreichbar/);
+  assert.match(controlCenter.error, /Sensing-Server starten/);
 });
 
 test('setup-v2 draft action binds the exact saved CAD profile revision', () => {
@@ -608,6 +686,26 @@ test('unclear cockpit metrics expose keyboard-focusable explanations', () => {
   assert.match(markup, /class="occ-info" tabindex="0" role="note"/);
   assert.match(markup, /Online-Zahl im letzten Status/);
   assert.match(markup, /kein WiFi-Feature/);
+});
+
+test('cockpit treats raw mmWave UDP as active even when geometry rejects targets', () => {
+  const controlCenter = new ObservatoryControlCenter(null);
+  controlCenter.status = {
+    nodes: [],
+    classification_calibration: { phase: 'uncalibrated' },
+    mmwave: {
+      state: 'invalid',
+      raw_udp_packets: 18,
+      packets_received: 0,
+      packets_rejected: 18,
+    },
+  };
+
+  const markup = controlCenter._overviewMarkup();
+
+  assert.match(markup, /occ-metric-state">AKTIV · PRÜFEN</);
+  assert.match(markup, /<strong>UDP empfangen<\/strong>/);
+  assert.doesNotMatch(markup, /nicht verbunden/);
 });
 
 test('artifact inputs explain the prediction-truth boundary', () => {
