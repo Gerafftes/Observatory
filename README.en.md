@@ -160,20 +160,22 @@ results?
 
 ## Current validation status
 
-**As of August 14, 2026**
+**As of August 30, 2026**
 
 | Area | Status | What this status proves |
 |---|---|---|
-| 1 TX / 4 RX | Transport verified | All four receivers delivered source-bound Raw CSI using the same subcarrier grid. |
+| 1 TX / 4 RX | Capture technically verified | All four receivers delivered Raw CSI using the same subcarrier grid; audited D6 recordings were complete at recorder level and setup-bound. Lossless wireless transport is not proven. |
 | D4 movement | Experimental | Coarse movement false alarms were reduced; still-presence detection remains unreliable. |
 | D5 still presence | Live test failed | With a motionless person present, 350 out of 350 samples remained `ABSENT`. |
+| D5-abs | Failed overall | Empty-room false presence was 0/273 (0.0%), while still recall was 0/276 (0.0%); the empty-room target passed, but the overall result failed. |
 | D6 position | Software prepared | Captures, discrete position estimation, and blind tests are implemented; a real position index passing blind evaluation is still missing. |
 | Breathing/heart rate | Experimental | CSI-based signal indicators are explored, but are not physiologically validated without an independent reference. |
-| mmWave reference | Partially operational | ESP32-C3, CSI WiFi, and the status service are verified; the real LD2450 data path has not yet been fully validated. |
+| mmWave reference | Runtime test failed | The audited run accepted 179 packets but contained a 66-packet sequence gap and a 25.4 s interruption; the runtime window was therefore rated `FAIL`. |
 | Overall system | Not validated | There is no joint real-world PASS for classification, position, and mmWave. |
 
-Software tests, a successful flash operation, or lossless transport are
-explicitly not treated as proof of real sensor or positioning accuracy.
+Software tests, a successful flash operation, or `dropped_frames=0` are
+explicitly not treated as proof of lossless wireless transport or real sensor
+or positioning accuracy.
 
 ## User interface
 

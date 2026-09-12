@@ -15648,6 +15648,12 @@ async fn main() {
         // so a client on :8765 can stream signed RuField FieldEvents alongside
         // `/ws/sensing`. Merged with its own FieldState (different state type).
         .merge(rufield_surface::router(field_surface.clone()))
+        // Browser WebSocket handshakes carry an Origin but are not protected
+        // by CORS; reject foreign origins before the handler can upgrade.
+        .layer(axum::middleware::from_fn_with_state(
+            browser_origin_allowlist.clone(),
+            wifi_densepose_sensing_server::host_validation::require_safe_browser_origin,
+        ))
         .layer(axum::middleware::from_fn_with_state(
             bearer_auth_state.clone(),
             wifi_densepose_sensing_server::bearer_auth::require_bearer,
