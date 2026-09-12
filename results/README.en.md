@@ -5,6 +5,14 @@
 This page collects the checked D4/D5/D6 results, figures, and evidence files.
 Raw data and detailed methodology remain in the linked reports.
 
+## Source of truth
+
+This root directory is the canonical source for measured BLL results.
+`software/ruview/results/` remains a historical software snapshot containing
+29 copied files; eight same-named files currently differ from their root
+versions. They are not synchronized automatically or interpreted as newer
+measurements. New or corrected result evidence belongs here only.
+
 ## Summary
 
 - The technical discovery on August 9 captured `2,612` frames from RX1 through

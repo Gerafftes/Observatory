@@ -14,7 +14,6 @@ mod benchmark;
 mod calibration_persistence;
 mod calibration_dataset;
 mod classification_evaluation;
-pub mod cli;
 mod coarse_localization;
 pub mod csi;
 mod d5_presence;
@@ -27,7 +26,6 @@ mod field_localize;
 mod mmwave_calibration;
 mod mmwave_connection;
 mod mmwave_position_index;
-mod model_format;
 mod multistatic_bridge;
 pub mod pose;
 mod position_artifact;
@@ -39,17 +37,18 @@ mod position_offline;
 mod position_setup;
 mod raw_csi_recording;
 mod raw_csi_replay;
-mod rvf_container;
-mod rvf_pipeline;
+mod routes;
 mod server_clock;
-mod torso;
 mod tracker_bridge;
 pub mod types;
-mod vital_signs;
 
 // Training pipeline modules (exposed via lib.rs)
 use wifi_densepose_sensing_server::{
-    dataset, embedding, error_response, graph_transformer, rufield_surface, trainer,
+    dataset, embedding, error_response, graph_transformer, model_format, rufield_surface,
+    rvf_container::{self, RvfBuilder, RvfContainerInfo, RvfReader, VitalSignConfig},
+    rvf_pipeline::{self, ProgressiveLoader},
+    torso, trainer,
+    vital_signs::{self, VitalSignDetector, VitalSigns},
 };
 
 use ruvector_mincut::{DynamicMinCut, MinCutBuilder};
@@ -78,10 +77,6 @@ use tokio::sync::{broadcast, mpsc, Mutex, RwLock};
 use tower_http::services::ServeDir;
 use tower_http::set_header::SetResponseHeaderLayer;
 use tracing::{debug, error, info, warn};
-
-use rvf_container::{RvfBuilder, RvfContainerInfo, RvfReader, VitalSignConfig};
-use rvf_pipeline::ProgressiveLoader;
-use vital_signs::{VitalSignDetector, VitalSigns};
 
 // ADR-022 Phase 3: Multi-BSSID pipeline integration
 use wifi_densepose_wifiscan::parse_netsh_output as parse_netsh_bssid_output;
@@ -2362,11 +2357,6 @@ struct AppStateInner {
     /// Completion result from the writer. Stop and shutdown must await this
     /// before reporting the recording as durable or allowing delete/reuse.
     recording_done_rx: Option<tokio::sync::oneshot::Receiver<RecordingWriterResult>>,
-    // ── Training fields ─────────────────────────────────────────────────────
-    /// Training status: "idle", "running", "completed", "failed".
-    training_status: String,
-    /// Training configuration, if any.
-    training_config: Option<serde_json::Value>,
     // ── Adaptive classifier (environment-tuned) ──────────────────────────
     /// Trained adaptive model (loaded from data/adaptive_model.json or trained at runtime).
     adaptive_model: Option<adaptive_classifier::AdaptiveModel>,
@@ -7987,10 +7977,7 @@ async fn control_center_status(State(state): State<SharedState>) -> Json<serde_j
                 s.position_setup.is_some(),
             ),
             recording,
-            serde_json::json!({
-                "status": s.training_status,
-                "config": s.training_config,
-            }),
+            training_status_payload(),
             serde_json::json!({
                 "phase": s.d5_presence.phase().as_str(),
                 "position_setup_active": s.position_setup.is_some(),
@@ -8852,6 +8839,57 @@ async fn list_models(State(state): State<SharedState>) -> Json<serde_json::Value
         s.discovered_models = models.clone();
     }
     Json(serde_json::json!({ "models": models, "total": total }))
+}
+
+/// GET /api/v1/models/:id — return metadata for one discovered RVF model.
+async fn get_model(Path(id): Path<String>) -> impl IntoResponse {
+    if wifi_densepose_sensing_server::path_safety::safe_id(&id).is_err() {
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({
+                "error": "invalid model id",
+                "success": false,
+            })),
+        );
+    }
+
+    match find_model_metadata(scan_model_files(), &id) {
+        Some(model) => (StatusCode::OK, Json(model)),
+        None => (
+            StatusCode::NOT_FOUND,
+            Json(serde_json::json!({
+                "error": "model not found",
+                "success": false,
+            })),
+        ),
+    }
+}
+
+fn find_model_metadata(
+    models: Vec<serde_json::Value>,
+    id: &str,
+) -> Option<serde_json::Value> {
+    models.into_iter().find(|model| {
+        model.get("id").and_then(serde_json::Value::as_str) == Some(id)
+    })
+}
+
+#[cfg(test)]
+mod model_contract_tests {
+    use super::find_model_metadata;
+
+    #[test]
+    fn model_detail_uses_the_same_metadata_shape_as_the_model_list() {
+        let expected = serde_json::json!({
+            "id": "room-v1",
+            "name": "room-v1",
+            "format": "rvf",
+            "size_bytes": 42,
+        });
+        let models = vec![expected.clone(), serde_json::json!({ "id": "other" })];
+
+        assert_eq!(find_model_metadata(models, "room-v1"), Some(expected));
+    }
 }
 
 /// GET /api/v1/models/active — return currently loaded model or null.
@@ -10546,52 +10584,45 @@ mod raw_recording_lifecycle_tests {
 
 // ── Training Endpoints ──────────────────────────────────────────────────────
 
-/// GET /api/v1/train/status — get training status.
-async fn train_status(State(state): State<SharedState>) -> Json<serde_json::Value> {
-    let s = state.read().await;
-    Json(serde_json::json!({
-        "status": s.training_status,
-        "config": s.training_config,
-    }))
+fn training_status_payload() -> serde_json::Value {
+    serde_json::json!({
+        "active": false,
+        "status": "unavailable",
+        "phase": "unavailable",
+        "capabilities": {
+            "start": false,
+            "pretrain": false,
+            "lora": false,
+            "progress_websocket": false,
+        },
+        "message": "HTTP training is unavailable: the retained API implementation does not support the active raw-csi-v1 recording contract.",
+    })
 }
 
-/// POST /api/v1/train/start — start a training run.
-async fn train_start(
-    State(state): State<SharedState>,
-    Json(body): Json<serde_json::Value>,
-) -> Json<serde_json::Value> {
-    let mut s = state.write().await;
-    if s.training_status == "running" {
-        return Json(serde_json::json!({
-            "error": "training already running",
-            "success": false,
-        }));
-    }
-    s.training_status = "running".to_string();
-    s.training_config = Some(body.clone());
-    info!("Training started with config: {}", body);
-    Json(serde_json::json!({
-        "success": true,
-        "status": "running",
-        "message": "Training pipeline started. Use GET /api/v1/train/status to monitor.",
-    }))
+/// GET /api/v1/train/status — report the executable training capabilities.
+async fn train_status() -> Json<serde_json::Value> {
+    Json(training_status_payload())
 }
 
-/// POST /api/v1/train/stop — stop the current training run.
-async fn train_stop(State(state): State<SharedState>) -> Json<serde_json::Value> {
-    let mut s = state.write().await;
-    if s.training_status != "running" {
-        return Json(serde_json::json!({
-            "error": "no training in progress",
-            "success": false,
-        }));
+/// Training mutations stay explicit until a compatible, validated pipeline exists.
+async fn train_unavailable() -> impl IntoResponse {
+    (StatusCode::NOT_IMPLEMENTED, Json(training_status_payload()))
+}
+
+#[cfg(test)]
+mod training_contract_tests {
+    use super::training_status_payload;
+
+    #[test]
+    fn unavailable_training_contract_cannot_claim_an_active_run() {
+        let status = training_status_payload();
+        assert_eq!(status["active"], false);
+        assert_eq!(status["status"], "unavailable");
+        assert_eq!(status["capabilities"]["start"], false);
+        assert_eq!(status["capabilities"]["pretrain"], false);
+        assert_eq!(status["capabilities"]["lora"], false);
+        assert_eq!(status["capabilities"]["progress_websocket"], false);
     }
-    s.training_status = "idle".to_string();
-    info!("Training stopped");
-    Json(serde_json::json!({
-        "success": true,
-        "status": "idle",
-    }))
 }
 
 // ── Adaptive classifier endpoints ────────────────────────────────────────────
@@ -15459,9 +15490,6 @@ async fn main() {
         recording_current_id: None,
         recording_stop_tx: None,
         recording_done_rx: None,
-        // Training
-        training_status: "idle".to_string(),
-        training_config: None,
         adaptive_model:
             adaptive_classifier::AdaptiveModel::load(&adaptive_classifier::model_path())
                 .ok()
@@ -15690,10 +15718,8 @@ async fn main() {
         .route("/health/ready", get(health_ready))
         .route("/health/version", get(health_version))
         .route("/health/metrics", get(health_metrics))
-        // API info
-        .route("/api/v1/info", get(api_info))
-        .route("/api/v1/status", get(health_ready))
-        .route("/api/v1/metrics", get(health_metrics))
+        // Read-only API observability routes.
+        .merge(routes::api_observability_routes())
         // Sensing endpoints
         .route("/api/v1/sensing/latest", get(latest))
         // Observatory Control Center — metadata-only experiment catalogue and
@@ -15800,7 +15826,7 @@ async fn main() {
         .route("/api/v1/models/active", get(get_active_model))
         .route("/api/v1/models/load", post(load_model))
         .route("/api/v1/models/unload", post(unload_model))
-        .route("/api/v1/models/:id", delete(delete_model))
+        .route("/api/v1/models/:id", get(get_model).delete(delete_model))
         .route("/api/v1/models/lora/profiles", get(list_lora_profiles))
         .route("/api/v1/models/lora/activate", post(activate_lora_profile))
         // Recording endpoints
@@ -15810,8 +15836,11 @@ async fn main() {
         .route("/api/v1/recording/:id", delete(delete_recording))
         // Training endpoints
         .route("/api/v1/train/status", get(train_status))
-        .route("/api/v1/train/start", post(train_start))
-        .route("/api/v1/train/stop", post(train_stop))
+        .route("/api/v1/train/start", post(train_unavailable))
+        .route("/api/v1/train/stop", post(train_unavailable))
+        .route("/api/v1/train/pretrain", post(train_unavailable))
+        .route("/api/v1/train/lora", post(train_unavailable))
+        .route("/ws/train/progress", get(train_unavailable))
         // Adaptive classifier endpoints
         .route("/api/v1/adaptive/train", post(adaptive_train))
         .route("/api/v1/adaptive/status", get(adaptive_status))

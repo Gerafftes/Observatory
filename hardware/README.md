@@ -24,7 +24,10 @@ Die finale [PCB-03 mit KiCad-Quellen, Prüfberichten und Bestellarchiv](pcb-03/)
 SMD-Kondensatoren und behält dieselben Außenmaße sowie Montagebohrungen wie
 PCB-01/PCB-02.
 
-PCB-02 bleibt als vorherige Revision dokumentiert.
+PCB-02 bleibt als vorherige Revision dokumentiert. Die kanonischen
+[PCB-02-Designquellen](mmwave-PCB/PCB-02/) enthalten KiCad-, Gerber- und
+STEP-Dateien; das separate [PCB-02-Fertigungsarchiv](pcb-02/) bewahrt die
+Bestell-, Prüf- und Vorschaudateien dieser Revision.
 
 > [!IMPORTANT]
 > Für den aktuellen Aufbau ist ausdrücklich **PCB-03** zu verwenden. PCB-01 und PCB-02 bleiben als frühere Revisionen dokumentiert.

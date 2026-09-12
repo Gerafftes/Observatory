@@ -1,5 +1,9 @@
 # PCB-02 – ESP32-C3 SuperMini / LD2450 carrier
 
+This directory is the canonical PCB-02 design source. The complementary
+[manufacturing archive](../../pcb-02/) contains the order-ready ZIP, validation
+reports, and rendered preview retained for this historical revision.
+
 This is a revised, separate copy of `PCB-01`. The original project was not modified.
 
 ## Changes from PCB-01

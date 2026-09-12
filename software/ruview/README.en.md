@@ -1,6 +1,13 @@
 # Observatory
 [Deutsch](README.md) · [**English**](README.en.md)
 
+> [!NOTE]
+> This is the embedded software snapshot. The current project structure and
+> evidence trail start at the [BLL root](../../README.md); provenance, build
+> entry points, and active API contracts are documented in the
+> [software overview](../README.md). Measured results are maintained
+> canonically under [`/results`](../../results/README.en.md).
+
 [![Hack Club Stardance](https://img.shields.io/badge/Hack%20Club-Stardance-ec3750?style=flat-square&logo=hackclub&logoColor=white)](https://stardance.hackclub.com/projects/25673)
 [![ESP32](https://img.shields.io/badge/ESP32-E7352C?style=flat-square&logo=espressif&logoColor=white)](https://www.espressif.com/en/products/socs/esp32)
 [![Status](https://img.shields.io/badge/status-experimental-orange)](#current-validation-status)
