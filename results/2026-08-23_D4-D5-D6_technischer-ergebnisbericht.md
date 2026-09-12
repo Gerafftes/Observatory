@@ -1,6 +1,6 @@
 # D4/D5/D6 — technischer Ergebnisbericht
 
-Stand: 23. August 2026<br>
+Stand: 23. August 2026
 Auswertung: vorhandene Aufnahmen, keine neue Messung, keine Schwellenwertänderung
 
 Diagramm-Render: 27. August 2026 mit den offiziellen `@bklitui/ui/charts`-Komponenten
