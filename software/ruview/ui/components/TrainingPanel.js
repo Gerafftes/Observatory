@@ -3,6 +3,10 @@
 
 import { trainingService } from '../services/training.service.js';
 
+export function trainingCapability(status, name) {
+  return status?.capabilities?.[name] === true;
+}
+
 const TP_STYLES = `
 .tp-panel{background:rgba(17,24,39,.9);border:1px solid rgba(56,68,89,.6);border-radius:8px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;color:#e0e0e0;overflow:hidden}
 .tp-header{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;background:rgba(13,17,23,.95);border-bottom:1px solid rgba(56,68,89,.6)}
@@ -138,11 +142,17 @@ export default class TrainingPanel {
     } catch (e) { this._set({ loading: false, error: `Delete failed: ${e.message}` }); }
   }
 
-  async _launchTraining(method, extraCfg = {}) {
+  async _launchTraining(method, capability, extraCfg = {}) {
+    if (!trainingCapability(this.state.trainingStatus, capability)) {
+      this._set({ error: this.state.trainingStatus?.message || 'Training is unavailable.' });
+      return;
+    }
     this._set({ loading: true, error: null });
     this.progressData = { losses: [], pcks: [] };
     try {
-      trainingService.connectProgressStream();
+      if (trainingCapability(this.state.trainingStatus, 'progress_websocket')) {
+        trainingService.connectProgressStream();
+      }
       const payload = {
         dataset_ids: this.config.selectedRecordings.filter(id => {
           const recording = this.state.recordings.find(rec => rec.id === id);
@@ -283,12 +293,18 @@ export default class TrainingPanel {
 
     const acts = this._el('div', 'tp-train-actions');
     const btns = [
-      this._btn('Start Training', 'tp-btn tp-btn-success', () => this._launchTraining('startTraining', { patience: this.config.patience, base_model: this.config.base_model || undefined })),
-      this._btn('Pretrain', 'tp-btn tp-btn-secondary', () => this._launchTraining('startPretraining')),
-      this._btn('LoRA', 'tp-btn tp-btn-secondary', () => this._launchTraining('startLoraTraining', { base_model: this.config.base_model || undefined, profile_name: this.config.lora_profile_name || 'default' }))
+      ['start', this._btn('Start Training', 'tp-btn tp-btn-success', () => this._launchTraining('startTraining', 'start', { patience: this.config.patience, base_model: this.config.base_model || undefined }))],
+      ['pretrain', this._btn('Pretrain', 'tp-btn tp-btn-secondary', () => this._launchTraining('startPretraining', 'pretrain'))],
+      ['lora', this._btn('LoRA', 'tp-btn tp-btn-secondary', () => this._launchTraining('startLoraTraining', 'lora', { base_model: this.config.base_model || undefined, profile_name: this.config.lora_profile_name || 'default' }))]
     ];
-    btns.forEach(b => { b.disabled = this.state.loading; acts.appendChild(b); });
+    btns.forEach(([capability, button]) => {
+      button.disabled = this.state.loading || !trainingCapability(this.state.trainingStatus, capability);
+      acts.appendChild(button);
+    });
     s.appendChild(acts);
+    if (this.state.trainingStatus?.message) {
+      s.appendChild(this._el('div', 'tp-empty', this.state.trainingStatus.message));
+    }
     return s;
   }
 

@@ -6,6 +6,15 @@ Diese Seite bündelt die geprüften D4/D5/D6-Ergebnisse, Diagramme und
 Nachweisdateien. Rohdaten und ausführliche Methodik bleiben in den jeweils
 verlinkten Berichten.
 
+## Quelle der Wahrheit
+
+Dieses Root-Verzeichnis ist die kanonische Quelle für gemessene
+BLL-Ergebnisse. `software/ruview/results/` bleibt ein historischer
+Software-Snapshot mit 29 übernommenen Dateien; acht gleichnamige Dateien
+weichen derzeit von der Root-Fassung ab. Sie werden nicht automatisch
+synchronisiert oder als aktuellere Messung interpretiert. Neue oder
+korrigierte Ergebnisnachweise gehören ausschließlich hierher.
+
 ## Kurzfazit
 
 - Die technische Discovery vom 9. August lieferte `2.612` Frames von RX1 bis

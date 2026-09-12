@@ -66,6 +66,31 @@ Simulation and software tests do not prove real CSI, mmWave operation or
 position accuracy. Hardware results remain subject to the setup, preflight,
 calibration and blind-validation gates documented in the repository root.
 
+## Runtime and API ownership
+
+The executable sensing server is composed in
+`ruview/v2/crates/wifi-densepose-sensing-server/src/main.rs`. Its small
+read-only observability route group lives in `src/routes.rs`; reusable server
+modules are exported by `src/lib.rs`. Files that are not declared by either
+module graph are retained source history, not executable API implementations.
+
+The browser's `ui/config/api.config.js` is a compatibility catalogue. A path
+listed there is not automatically a supported backend capability. The active
+UI/server contract is:
+
+| Surface | Runtime status | Contract |
+|---|---|---|
+| `/api/v1/info`, `/status`, `/metrics` | supported | Read-only discovery and health routes composed in `src/routes.rs`. |
+| `/api/v1/models` and `/api/v1/models/:id` | supported | Lists models and returns one model's discovered RVF metadata. |
+| Recording routes | supported for capture | Current files use `raw-csi-v1-jsonl`; they remain offline evidence unless a compatible training pipeline is validated. |
+| `/api/v1/train/*` and `/ws/train/progress` | explicit unavailable contract | Status returns capability flags; HTTP start, stop, pretrain, LoRA, and progress-stream requests do not claim work that is not executed. The separate CLI training modes are unaffected. |
+| Other unused pose, stream, and dev catalogue paths | compatibility only | They have no active browser call site and are not registered by the Rust server. |
+
+`src/training_api.rs` and `src/model_manager.rs` are not registered wholesale:
+their state and recording assumptions differ from the active server. Reusing
+them requires an explicit contract migration and validation, not only adding a
+route declaration.
+
 ## Licenses
 
 The vendored source keeps its original `LICENSE`, `LICENSE.md`, `NOTICE` and

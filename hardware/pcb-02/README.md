@@ -1,5 +1,9 @@
 # PCB-02 – ESP32-C3 SuperMini / LD2450 carrier
 
+This directory is the preserved PCB-02 manufacturing archive. The canonical
+[KiCad, Gerber, and STEP design sources](../mmwave-PCB/PCB-02/) live in the
+mmWave PCB revision tree.
+
 This is a revised, separate copy of `PCB-01`. The original project was not modified.
 
 ## Changes from PCB-01

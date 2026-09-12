@@ -23,7 +23,10 @@ The final [PCB-03 with KiCad sources, validation reports, and ordering archive](
 applies the corrected 180° LD2450 orientation, keeps the SMD capacitors, and
 preserves the PCB-01/PCB-02 outer dimensions and mounting-hole positions.
 
-PCB-02 remains documented as the previous revision.
+PCB-02 remains documented as the previous revision. The canonical
+[PCB-02 design sources](mmwave-PCB/PCB-02/) contain the KiCad, Gerber, and
+STEP files; the separate [PCB-02 manufacturing archive](pcb-02/) preserves
+the ordering, validation, and preview artifacts for that revision.
 
 > [!IMPORTANT]
 > **PCB-03 is the required revision for the current setup.** PCB-01 and PCB-02 remain documented as previous revisions.
