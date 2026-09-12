@@ -25,6 +25,7 @@ mod experiment_evaluation;
 mod field_bridge;
 mod field_localize;
 mod mmwave_calibration;
+mod mmwave_connection;
 mod mmwave_position_index;
 mod model_format;
 mod multistatic_bridge;
@@ -2267,6 +2268,7 @@ struct AppStateInner {
     /// Cached read-only ESP counters. Polling the ESP independently avoids
     /// coupling the one-second UI refresh cadence to the shared experiment WLAN.
     mmwave_node_diagnostics: MmwaveNodeDiagnosticsCache,
+    mmwave_connection: mmwave_connection::ConnectionStatus,
     /// Fail-closed discrete live-position inference and temporal consensus.
     live_position_tracker: position_live::LivePositionTracker,
     /// Instant of the last ESP32 UDP frame received (for offline detection).
@@ -7357,8 +7359,12 @@ async fn setup_profile_create(
             "SQLite persistence is unavailable; setup profiles cannot be saved.",
         );
     };
+    let mut state = state.write().await;
     match store.create_profile(&request.label, &request.document).await {
-        Ok(profile) => (StatusCode::CREATED, Json(serde_json::json!(profile))).into_response(),
+        Ok(profile) => {
+            state.mmwave.apply_cad_profile(&profile);
+            (StatusCode::CREATED, Json(serde_json::json!(profile))).into_response()
+        }
         Err(error) => experiment_api_error(StatusCode::BAD_REQUEST, "INVALID_PROFILE", error),
     }
 }
@@ -7376,11 +7382,15 @@ async fn setup_profile_update(
             "SQLite persistence is unavailable; setup profiles cannot be saved.",
         );
     };
+    let mut state = state.write().await;
     match store
         .update_profile(&id, &request.label, &request.document)
         .await
     {
-        Ok(profile) => Json(serde_json::json!(profile)).into_response(),
+        Ok(profile) => {
+            state.mmwave.apply_cad_profile(&profile);
+            Json(serde_json::json!(profile)).into_response()
+        }
         Err(error) if error == "setup profile not found" => {
             experiment_api_error(StatusCode::NOT_FOUND, "PROFILE_NOT_FOUND", error)
         }
@@ -7513,14 +7523,7 @@ async fn workflow_advance(
     let requested_phase_index = experiment::WORKFLOW_PHASES
         .iter()
         .position(|phase| *phase == request.phase);
-    if requested_phase_index.is_some_and(|index| index > 1) {
-        let Some(setup) = position_setup.as_deref() else {
-            return experiment_api_error(
-                StatusCode::CONFLICT,
-                "POSITION_SETUP_REQUIRED",
-                "Workflow bleibt gesperrt: Der Server läuft ohne aktives --position-setup.",
-            );
-        };
+    let workflow = if requested_phase_index.is_some_and(|index| index > 0) {
         let run = match store.get_run(&id).await {
             Ok(Some(run)) => run,
             Ok(None) => {
@@ -7545,16 +7548,28 @@ async fn workflow_advance(
                 "run is not a position workflow",
             );
         };
-        if let Err(error) = validate_workflow_runtime_seal(
-            &workflow,
-            setup.setup_id(),
-            setup.setup_sha256(),
-        ) {
+        Some(workflow)
+    } else {
+        None
+    };
+    let software_only_phase = workflow
+        .as_ref()
+        .is_some_and(|workflow| workflow_allows_software_only_phase(workflow, &request.payload));
+    if requested_phase_index.is_some_and(|index| index > 1) && !software_only_phase {
+        let Some(setup) = position_setup.as_deref() else {
             return experiment_api_error(
                 StatusCode::CONFLICT,
                 "POSITION_SETUP_REQUIRED",
-                error,
+                "Workflow bleibt gesperrt: Der Server läuft ohne aktives --position-setup.",
             );
+        };
+        let workflow = workflow
+            .as_ref()
+            .expect("later workflow phases loaded the workflow above");
+        if let Err(error) =
+            validate_workflow_runtime_seal(workflow, setup.setup_id(), setup.setup_sha256())
+        {
+            return experiment_api_error(StatusCode::CONFLICT, "POSITION_SETUP_REQUIRED", error);
         }
     }
     let payload = if request.phase == "seal_setup" {
@@ -7565,86 +7580,71 @@ async fn workflow_advance(
                 "Die Setup-Phase darf nur mit einem validierten Runtime-Seal als PASS betreten werden.",
             );
         }
-        let Some(setup) = position_setup else {
-            return experiment_api_error(
-                StatusCode::CONFLICT,
-                "POSITION_SETUP_REQUIRED",
-                "Setup kann nicht versiegelt werden: Der Server läuft ohne aktives --position-setup.",
-            );
-        };
-        let run = match store.get_run(&id).await {
-            Ok(Some(run)) => run,
-            Ok(None) => {
-                return experiment_api_error(
-                    StatusCode::NOT_FOUND,
-                    "RUN_NOT_FOUND",
-                    "workflow run not found",
-                )
-            }
-            Err(error) => {
-                return experiment_api_error(
-                    StatusCode::SERVICE_UNAVAILABLE,
-                    "DB_READ_FAILED",
-                    error,
-                )
-            }
-        };
-        let Some(workflow) = run.workflow else {
-            return experiment_api_error(
-                StatusCode::CONFLICT,
-                "INVALID_PHASE",
-                "run is not a position workflow",
-            );
-        };
-        let profile = match workflow.profile_revision_id.as_deref() {
-            Some(revision_id) => store
-                .get_profile_revision(&workflow.profile_id, revision_id)
-                .await,
-            None => store.get_profile(&workflow.profile_id).await,
-        };
-        let profile = match profile {
-            Ok(Some(profile)) => profile,
-            Ok(None) => {
+        if software_only_phase {
+            request.payload
+        } else {
+            let Some(setup) = position_setup else {
                 return experiment_api_error(
                     StatusCode::CONFLICT,
-                    "PROFILE_REVISION_MISSING",
-                    "the profile revision bound to this run no longer exists",
-                )
-            }
-            Err(error) => {
+                    "POSITION_SETUP_REQUIRED",
+                    "Setup kann nicht versiegelt werden: Der Server läuft ohne aktives --position-setup.",
+                );
+            };
+            let workflow = workflow
+                .as_ref()
+                .expect("setup phase loaded the workflow above");
+            let profile = match workflow.profile_revision_id.as_deref() {
+                Some(revision_id) => {
+                    store
+                        .get_profile_revision(&workflow.profile_id, revision_id)
+                        .await
+                }
+                None => store.get_profile(&workflow.profile_id).await,
+            };
+            let profile = match profile {
+                Ok(Some(profile)) => profile,
+                Ok(None) => {
+                    return experiment_api_error(
+                        StatusCode::CONFLICT,
+                        "PROFILE_REVISION_MISSING",
+                        "the profile revision bound to this run no longer exists",
+                    )
+                }
+                Err(error) => {
+                    return experiment_api_error(
+                        StatusCode::SERVICE_UNAVAILABLE,
+                        "DB_READ_FAILED",
+                        error,
+                    )
+                }
+            };
+            if profile.profile_sha256 != workflow.profile_sha256 {
                 return experiment_api_error(
-                    StatusCode::SERVICE_UNAVAILABLE,
-                    "DB_READ_FAILED",
-                    error,
-                )
+                    StatusCode::CONFLICT,
+                    "PROFILE_REVISION_MISMATCH",
+                    "the profile revision no longer matches the hash bound to this run",
+                );
             }
-        };
-        if profile.profile_sha256 != workflow.profile_sha256 {
-            return experiment_api_error(
-                StatusCode::CONFLICT,
-                "PROFILE_REVISION_MISMATCH",
-                "the profile revision no longer matches the hash bound to this run",
-            );
-        }
-        if let Err(error) = setup.validate_observatory_profile(&profile.document) {
-            return experiment_api_error(
-                StatusCode::CONFLICT,
-                "POSITION_SETUP_MISMATCH",
-                error,
-            );
-        }
-        match bind_runtime_position_setup(
-            &request.payload,
-            &workflow.profile_sha256,
-            setup.as_ref(),
-        ) {
-            Ok(payload) => payload,
-            Err(error) => {
+            if let Err(error) = setup.validate_observatory_profile(&profile.document) {
                 return experiment_api_error(
                     StatusCode::CONFLICT,
                     "POSITION_SETUP_MISMATCH",
                     error,
-                )
+                );
+            }
+            match bind_runtime_position_setup(
+                &request.payload,
+                &workflow.profile_sha256,
+                setup.as_ref(),
+            ) {
+                Ok(payload) => payload,
+                Err(error) => {
+                    return experiment_api_error(
+                        StatusCode::CONFLICT,
+                        "POSITION_SETUP_MISMATCH",
+                        error,
+                    )
+                }
             }
         }
     } else {
@@ -7660,6 +7660,26 @@ async fn workflow_advance(
         }
         Err(error) => experiment_api_error(StatusCode::CONFLICT, "INVALID_PHASE", error),
     }
+}
+
+fn workflow_allows_software_only_phase(
+    workflow: &experiment::ExperimentWorkflow,
+    payload: &serde_json::Value,
+) -> bool {
+    let request_is_software_only = payload
+        .get("software_only")
+        .and_then(serde_json::Value::as_bool)
+        == Some(true);
+    request_is_software_only
+        && workflow.events.iter().any(|event| {
+            event.phase == "create_experiment"
+                && event.status == "PASS"
+                && event
+                    .payload
+                    .get("software_only")
+                    .and_then(serde_json::Value::as_bool)
+                    == Some(true)
+        })
 }
 
 fn validate_workflow_runtime_seal(
@@ -7728,6 +7748,33 @@ mod workflow_runtime_seal_tests {
             &"c".repeat(64),
         )
         .unwrap();
+    }
+
+    #[test]
+    fn software_only_gate_requires_the_initial_marker_and_marks_every_phase() {
+        let mut demo = workflow_with_seal(serde_json::json!({"software_only": true}));
+        demo.events[0].phase = "create_experiment".to_string();
+
+        assert!(workflow_allows_software_only_phase(
+            &demo,
+            &serde_json::json!({"software_only": true}),
+        ));
+        assert!(!workflow_allows_software_only_phase(
+            &demo,
+            &serde_json::json!({}),
+        ));
+
+        demo.events[0].status = "READY".to_string();
+        assert!(!workflow_allows_software_only_phase(
+            &demo,
+            &serde_json::json!({"software_only": true}),
+        ));
+
+        let late_marker = workflow_with_seal(serde_json::json!({"software_only": true}));
+        assert!(!workflow_allows_software_only_phase(
+            &late_marker,
+            &serde_json::json!({"software_only": true}),
+        ));
     }
 
     #[test]
@@ -8234,7 +8281,7 @@ fn mmwave_api_error(
 }
 
 async fn mmwave_status_endpoint(State(state): State<SharedState>) -> Json<serde_json::Value> {
-    let (mut status, diagnostics, node_control) = {
+    let (mut status, diagnostics, node_control, connection) = {
         let state = state.read().await;
         let status = state.mmwave.status(server_clock::now().host_monotonic_ns);
         let node_control = state.mmwave_node_diagnostics.status(
@@ -8243,40 +8290,55 @@ async fn mmwave_status_endpoint(State(state): State<SharedState>) -> Json<serde_
         );
         (
             status,
-            state
-                .mmwave
-                .control()
-                .map(|_| state.mmwave_node_diagnostics.snapshot()),
+            state.mmwave_connection.reachable.then(|| state.mmwave_node_diagnostics.snapshot()),
             node_control,
+            state.mmwave_connection.clone(),
         )
     };
     if let Some(diagnostics) = diagnostics {
         status.attach_node_diagnostics_window(diagnostics);
     }
     status.node_control = node_control;
-    Json(serde_json::to_value(status).expect("mmWave status is serializable"))
+    // HTTP reachability is independent of optional firmware diagnostic counters.
+    status.node_control.reachable = Some(connection.reachable);
+    if connection.reachable && status.node_status_error.is_some() {
+        status.node_control.last_error_kind = Some("diagnostics_unavailable".to_string());
+    }
+    status.node_control.url_configured = connection.node_url.is_some() || status.node_control.url_configured;
+    let mut response = serde_json::to_value(status).expect("mmWave status is serializable");
+    response["connection"] = serde_json::to_value(connection).expect("connection status is serializable");
+    Json(response)
 }
 
-fn spawn_mmwave_node_diagnostics_poller(state: SharedState) {
+fn spawn_mmwave_node_diagnostics_poller(state: SharedState, configured_url: Option<String>, token: Option<String>) {
     tokio::spawn(async move {
         let mut interval = tokio::time::interval(MMWAVE_NODE_DIAGNOSTICS_POLL_INTERVAL);
         interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
         loop {
             interval.tick().await;
-            let control = state.read().await.mmwave.control();
-            let Some(control) = control else {
-                continue;
+            let (preferred, expected, port) = {
+                let state = state.read().await;
+                let expected = state.position_setup.as_deref().and_then(|setup| setup.mmwave())
+                    .map(|node| node.node_id().to_string()).or_else(|| state.mmwave_connection.node_id.clone());
+                (configured_url.clone().or_else(|| state.mmwave_connection.node_url.clone()), expected, state.mmwave.status(server_clock::now().host_monotonic_ns).udp_port)
             };
-            let diagnostics = tokio::task::spawn_blocking(move || {
-                mmwave_calibration::get_node_diagnostics(&control)
+            let token_configured = token.is_some();
+            let probe = tokio::task::spawn_blocking(move || {
+                mmwave_connection::probe(preferred.as_deref(), expected.as_deref(), port, token_configured)
             })
-            .await
-            .unwrap_or_else(|error| Err(format!("mmWave node status task failed: {error}")));
-            state
-                .write()
-                .await
-                .mmwave_node_diagnostics
-                .record(diagnostics);
+            .await;
+            if let Ok(mut probe) = probe {
+                let mut state = state.write().await;
+                state.mmwave.discovered_control(probe.status.node_url.clone(), token.clone());
+                if !probe.status.reachable {
+                    // Keep the established identity across outages so discovery
+                    // cannot silently substitute a different physical radar.
+                    probe.status.node_id = state.mmwave_connection.node_id.clone();
+                    probe.status.node_url = state.mmwave_connection.node_url.clone();
+                }
+                state.mmwave_node_diagnostics.record(probe.diagnostics);
+                state.mmwave_connection = probe.status;
+            }
         }
     });
 }
@@ -15264,11 +15326,11 @@ async fn main() {
     };
 
     let mmwave_url_configured = args.mmwave_node_url.is_some();
-    let mmwave_token_configured = std::env::var(&args.mmwave_token_env)
-        .is_ok_and(|token| !token.trim().is_empty());
+    let mmwave_token = mmwave_connection::load_token(&args.mmwave_token_env);
+    let mmwave_token_configured = mmwave_token.is_some();
     let mmwave_control = args.mmwave_node_url.as_ref().and_then(|base_url| {
-        match std::env::var(&args.mmwave_token_env) {
-            Ok(bearer_token) if !bearer_token.trim().is_empty() => {
+        match mmwave_token.clone() {
+            Some(bearer_token) => {
                 Some(mmwave_calibration::NodeControl {
                     base_url: base_url.clone(),
                     bearer_token,
@@ -15324,6 +15386,18 @@ async fn main() {
         mmwave_url_configured,
         mmwave_token_configured,
     );
+    if position_setup.is_none() {
+        if let Some(store) = &experiment_store {
+            match store.list_profiles().await {
+                Ok(profiles) => {
+                    if let Some(profile) = profiles.first() {
+                        mmwave_manager.apply_cad_profile(profile);
+                    }
+                }
+                Err(error) => warn!("Could not restore CAD radar geometry: {error}"),
+            }
+        }
+    }
     if let Err(error) = mmwave_manager.restore_session_manifests(&data_dir) {
         warn!("Could not restore mmWave session manifests: {error}");
     }
@@ -15340,6 +15414,7 @@ async fn main() {
         csi_grid_pin: args.csi_grid_pin,
         mmwave: mmwave_manager,
         mmwave_node_diagnostics: MmwaveNodeDiagnosticsCache::default(),
+        mmwave_connection: mmwave_connection::ConnectionStatus::default(),
         live_position_tracker: position_live::LivePositionTracker::new(live_position_runtime),
         last_esp32_frame: None,
         last_raw_csi_frame: None,
@@ -15480,7 +15555,7 @@ async fn main() {
         tokio::spawn(simulated_data_task(state.clone(), args.tick_ms));
     }
     tokio::spawn(mmwave_receiver_task(state.clone(), args.mmwave_udp_port));
-    spawn_mmwave_node_diagnostics_poller(state.clone());
+    spawn_mmwave_node_diagnostics_poller(state.clone(), args.mmwave_node_url.clone(), mmwave_token);
     spawn_mmwave_session_ticker(state.clone());
 
     // ADR-166: Parse bind address once, use for all listeners

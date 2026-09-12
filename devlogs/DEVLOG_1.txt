@@ -1,0 +1,56 @@
+# DEVLOG #01
+
+## Hi, long time no see.
+
+Over the past few weeks, I have been developing **two** new approaches to
+presence detection. The main issue was that the system could not reliably
+distinguish between an empty room and a room with me standing inside :(.
+
+To solve this, I first developed `D5` and then `D6`. D5 is already available on
+*GitHub*. D6 is **not** available yet because it is still under development and
+has not been fully validated with real measurements and blind tests.
+
+## D5 — Presence Detection
+
+D5 was designed to determine whether a room is empty or occupied. It compares
+current CSI measurements with a previously recorded empty-room reference.
+
+However, D5 mainly evaluated changes in one direction. In practice, a person's
+presence can cause CSI values to either increase or decrease, depending on the
+receiver and propagation path. As a result, D5 behaved more like a motion
+detector and could miss a person who remained still. While it significantly
+improved presence detection, it was not robust enough for reliable real-world
+use.
+
+## D6 — Presence Detection and Position Classification
+
+D6 builds on D5 by evaluating deviations from the empty-room reference in
+**both directions**, making it much more effective at detecting people who
+remain stationary.
+
+Once a person has been detected, D6 attempts to classify their position.
+Instead of calculating arbitrary coordinates, it identifies one of **nine
+predefined locations (`P01–P09`)** that were previously trained using CSI
+recordings.
+
+A position is only reported if:
+
+- the hardware setup is valid and sealed;
+- all receivers provide fresh and valid CSI data;
+- the correct transmitter has been verified;
+- a person has been detected;
+- a valid position index is available; and
+- the classification result is sufficiently confident.
+
+If **any of these conditions** are **not** met, D6 deliberately reports *no
+position* instead of inventing one.
+
+The software pipeline is largely complete, but the system still needs to be
+validated using a new sealed setup, fresh training recordings, and independent
+blind tests before D6 can be released on GitHub.
+
+## New Interface
+
+I also redesigned the standard RuView interface as a clean, white,
+**Samaritan-inspired** UI based on the AI system from the TV series *Person of
+Interest*.

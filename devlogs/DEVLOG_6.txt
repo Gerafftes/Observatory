@@ -1,0 +1,10 @@
+# DEVLOG #06
+
+I continued redesigning the **mmWave reference sensor case** and replaced the
+honeycomb pattern with cleaner parallel openings.
+
+I also refined the inside of the enclosure by adding two posts and a
+rectangular internal feature. The case now has a much cleaner shape, but it is
+still a CAD design and has **not been printed or tested yet**.
+
+Next: `check the component fit and prepare the case for printing`.

@@ -1,0 +1,15 @@
+# DEVLOG #05
+
+*Redesigning the mmWave reference sensor case*
+
+## Today
+
+- [x] Redesigned the **3D-printed enclosure** for the mmWave reference sensor.
+- [ ] Finish the enclosure and prepare it for printing.
+
+### Current Challenge
+
+I am currently working on the honeycomb pattern. The new case is taking shape,
+but the pattern still needs to be fixed before the design is complete.
+
+Status: **Redesigned**, `NOT FINISHED`, currently focused on the *pattern*.

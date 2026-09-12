@@ -69,7 +69,8 @@ export function mmwaveTransportDiagnostic(status) {
     };
   }
   if (status?.node_status_error) {
-    return { state: 'unavailable', message: 'ESP-Status fehlt.' };
+    return { state: 'unavailable', message: status.node_control?.reachable === true
+      ? status.node_status_error : 'ESP-Status fehlt.' };
   }
   if (status?.state === 'stale') {
     return { state: 'radar_interrupted', message: 'Radar verbunden, aber Datenstrom unterbrochen.' };
@@ -655,16 +656,20 @@ export class MmwaveCalibrationAssistant {
 
   _transportFacts(status) {
     const diagnostic = mmwaveTransportDiagnostic(status);
-    const counter = (value) => Number.isFinite(Number(value)) ? Number(value).toLocaleString('de-DE') : '--';
+    const counter = (value) => value != null && Number.isFinite(Number(value)) ? Number(value).toLocaleString('de-DE') : '--';
     const duration = (value) => Number.isFinite(Number(value)) ? `${counter(value)} ms` : '--';
     const nodeControl = status.node_control || {};
     let nodeStatus = 'noch nicht geprüft';
     if (nodeControl.reachable === true) {
-      nodeStatus = `erreichbar · letzter Status vor ${duration(nodeControl.last_success_age_ms)}`;
+      nodeStatus = nodeControl.last_success_age_ms == null
+        ? 'erreichbar · Diagnosezähler fehlen'
+        : `erreichbar · letzter Status vor ${duration(nodeControl.last_success_age_ms)}`;
     } else if (nodeControl.reachable === false) {
       nodeStatus = `${nodeControl.last_error_kind || 'nicht erreichbar'}${nodeControl.last_error ? ` · ${nodeControl.last_error}` : ''}`;
     } else if (!nodeControl.url_configured || !nodeControl.token_configured) {
-      nodeStatus = 'Konfiguration unvollständig';
+      nodeStatus = !nodeControl.url_configured
+        ? 'Radar-Adresse fehlt · automatische Suche läuft'
+        : 'Zugriffstoken fehlt · UDP-Empfang bleibt möglich';
     }
     const rejectReasons = Object.entries(status.reject_reasons || {})
       .filter(([, value]) => Number(value) > 0)
@@ -677,6 +682,9 @@ export class MmwaveCalibrationAssistant {
       ? `${status.last_sequence_gap.expected_sequence} → ${status.last_sequence_gap.received_sequence} (${counter(status.last_sequence_gap.missing_packets)} fehlen, ${duration(status.last_sequence_gap.age_ms)} alt)`
       : '--';
     return `
+      ${status.connection?.hint ? `<p class="mmwave-helper" role="status">${escapeHTML(status.connection.hint)}</p>` : ''}
+      ${status.cad_profile_error ? `<p class="mmwave-helper" role="alert">${escapeHTML(status.cad_profile_error)}</p>` : ''}
+      ${status.cad_profile ? `<p class="mmwave-helper">CAD-Profil ${escapeHTML(status.cad_profile.profile_sha256.slice(0, 16))}… aktiv · Montage ${status.cad_profile.mounting_position_m.map((value) => escapeHTML(value)).join(' / ')} m · Vorschau mit Sensor-Ausrichtung, noch nicht versiegelt.</p>` : ''}
       <p class="mmwave-helper" data-transport-state="${diagnostic.state}">${escapeHTML(diagnostic.message)}</p>
       <dl class="mmwave-facts">
         <div><dt>UDP-Port</dt><dd>${escapeHTML(status.udp_port ?? '--')}</dd></div>

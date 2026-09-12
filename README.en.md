@@ -112,7 +112,7 @@ The main entry points are:
 2. [Current D6/mmWave status](08-aktueller-arbeitsstand-d6-und-position.md)
 3. [Result reports](results/)
 4. [PCB-01 manufacturing files](hardware/pcb-01/)
-5. [PCB-02 manufacturing files and KiCad sources](hardware/pcb-02/)
+5. [PCB-03 manufacturing files and KiCad sources](hardware/pcb-03/)
 
 The software is based on [ruvnet/RuView](https://github.com/ruvnet/RuView), but
 the Observatory changes and required subprojects are included directly in this
@@ -212,10 +212,10 @@ collects the PCBs, breadboard CAD, fastening and mmWave components, images, and
 enclosure notes.
 
 > [!IMPORTANT]
-> **PCB-02 is the required revision for the current setup.** PCB-01 remains documented as the earlier manufacturing preview.
+> **PCB-03 is the required revision for the current setup.** PCB-01 and PCB-02 remain documented as previous revisions.
 
 - [PCB-01 Gerber and drill files](hardware/pcb-01/)
-- [PCB-02 KiCad sources, validation reports, and ordering archive](hardware/pcb-02/)
+- [PCB-03 KiCad sources, validation reports, and ordering archive](hardware/pcb-03/)
 - [Breadboard CAD, fastening hardware, and mmWave BOM](hardware/breadboard/README.en.md)
 
 ## Documentation

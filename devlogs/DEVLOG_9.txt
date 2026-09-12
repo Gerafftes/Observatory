@@ -1,0 +1,8 @@
+# DEVLOG #09
+
+I 3D-printed the case and a PCB mockup to test the fit. The IKEA Skådis mount
+and the **retaining posts** were slightly too large, possibly because supports
+were placed in the wrong areas.
+
+I have already updated the 3D model and will print the revised version
+tomorrow.
