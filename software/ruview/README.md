@@ -276,6 +276,21 @@ vorgesehen. Wegen seiner MakerWorld Standard Digital File License wird die
 STL nicht erneut im Repository bereitgestellt. Weitere Hinweise stehen unter
 [`hardware/esp32-s3-case/`](hardware/esp32-s3-case/).
 
+### BFLD privacy layer
+
+Die Datenschutzschicht **BFLD — Beamforming Feedback Layer for Detection** ist
+im [BFLD-Crate](v2/crates/wifi-densepose-bfld/README.md) und im
+[Forschungsbundle](docs/research/BFLD/) dokumentiert. Ihre drei strukturellen
+Invarianten sind: `raw BFI never exits` den Knoten, Identitätsembeddings bleiben
+`in-RAM-only`, und `cross-site`-Identitätskorrelation ist kryptografisch
+verhindert. Die zugehörigen Architekturentscheidungen sind
+[ADR-118](docs/adr/ADR-118-bfld-beamforming-feedback-layer-for-detection.md),
+[ADR-119](docs/adr/ADR-119-bfld-frame-format-and-wire-protocol.md),
+[ADR-120](docs/adr/ADR-120-bfld-privacy-class-and-hash-rotation.md),
+[ADR-121](docs/adr/ADR-121-bfld-identity-risk-scoring.md),
+[ADR-122](docs/adr/ADR-122-bfld-ruview-ha-matter-exposure.md) und
+[ADR-123](docs/adr/ADR-123-bfld-capture-path-nexmon-and-esp32.md).
+
 ## Dokumentation
 
 | Datei | Inhalt |
@@ -289,6 +304,7 @@ STL nicht erneut im Repository bereitgestellt. Weitere Hinweise stehen unter
 | [`06-ruview-anpassungen.md`](06-ruview-anpassungen.md) | Lokale Änderungen an RuView |
 | [`07-screenshot-nachweise.md`](07-screenshot-nachweise.md) | Visuelle Nachweise und Fehlerbilder |
 | [`08-aktueller-arbeitsstand-d6-und-position.md`](08-aktueller-arbeitsstand-d6-und-position.md) | Verbindlicher D6-/mmWave-Wiedereinstieg |
+| [`v2/crates/wifi-densepose-bfld/README.md`](v2/crates/wifi-densepose-bfld/README.md) | BFLD-Datenschutzschicht, Invarianten und ADR-118 bis ADR-123 |
 | [`results/`](results/) | Ausführliche Ergebnisberichte |
 | [`templates/messblatt.md`](templates/messblatt.md) | Vorlage für neue Messungen |
 
