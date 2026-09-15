@@ -1,8 +1,0 @@
-# DEVLOG #23
-The issue encountered during initial startup was a design error: the LD2450 had been mounted rotated by 180°. The UART routing itself was correct.
-After rotating the sensor and reflashing the ESP32-C3, everything worked again, though the physical setup doesn't look very tidy.
-I designed PCB-03 based on PCB-02. The LD2450 connector and its wiring have been rotated by 180°.
-Everything else remains unchanged. I also added ground planes.
-Until the PCB arrives, the breadboard setup will continue to serve as a temporary mmWave configuration.
-
-Next steps: order PCB-03, mount the LD2450 in the marked orientation, and repeat the live radar verification. Continue using the breadboard setup until delivery.

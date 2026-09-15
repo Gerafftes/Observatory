@@ -35,6 +35,7 @@ firmware/**/sdkconfig
 firmware/**/sdkconfig.old
 
 # Local BLL workspace material; do not publish with Observatory.
+devlogs/
 /.toolchains/
 /.wakatime-project
 /private/
