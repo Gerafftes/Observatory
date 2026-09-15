@@ -105,4 +105,4 @@ Die Schwelle 0,01 ist ein Kandidat, keine endgültig validierte Einstellung. Sie
 
 E0d/E1b bestätigte die RX4-Reaktion nicht: RX4 blieb im zweiten Still-Lauf vollständig unter `0,01`. Der feste RX4-Schwellenkandidat wird daher verworfen. Reproduzierbar war stattdessen der Anstieg des RX3-Minutenmittels gegenüber dem jeweils direkt vorherigen Leerraum.
 
-Auswertung: [2026-07-26_E0d-E1b_unabhaengige-bestaetigung.md](2026-07-26_E0d-E1b_unabhaengige-bestaetigung.md)
+Auswertung: [E0d/E1b: unabhängige Bestätigung](../2026-07-26_E0d-E1b_unabhaengige-bestaetigung/README.md)

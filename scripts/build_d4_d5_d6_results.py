@@ -2,8 +2,8 @@
 """Build the D4/D5/D6 run inventory and the report figures.
 
 The script is deliberately read-only with respect to recordings. It derives the
-inventory from the archived JSONL/metadata files and writes only dated result
-artifacts below ``RuView/results``.
+inventory from the archived JSONL/metadata files and writes the associated CSVs
+plus legacy figures below ``results/2026-08-23_D4-D5-D6_technischer-bericht``.
 """
 
 from __future__ import annotations
@@ -23,10 +23,10 @@ PROJECT_DIR = Path(__file__).resolve().parent.parent
 BLL_DIR = PROJECT_DIR.parent
 API_DATA_DIR = BLL_DIR / "wifi-csi-dokumentation" / "data" / "raw"
 D6_DATA_DIR = BLL_DIR / "data" / "recordings"
-RESULTS_DIR = PROJECT_DIR / "results"
-FIGURES_DIR = RESULTS_DIR / "2026-08-23_D4-D5-D6_figures"
-INVENTORY_PATH = RESULTS_DIR / "2026-08-23_D4-D5-D6_laufuebersicht.csv"
-D4_RX_PATH = RESULTS_DIR / "2026-08-23_D4_RX_diagnostik.csv"
+RESULTS_DIR = PROJECT_DIR / "results" / "2026-08-23_D4-D5-D6_technischer-bericht"
+FIGURES_DIR = RESULTS_DIR / "archive" / "legacy-generated"
+INVENTORY_PATH = RESULTS_DIR / "data" / "laufuebersicht.csv"
+D4_RX_PATH = RESULTS_DIR / "data" / "d4-rx-diagnostik.csv"
 
 WIDTH = 1600
 HEIGHT = 900
@@ -390,7 +390,7 @@ def save_global_comparison() -> None:
                     draw.rounded_rectangle((chart_left, y, x_end, y + 45), 8, fill=color)
                 label_x = max(chart_left + 12, min(x_end + 10, chart_right - 70))
                 draw.text((label_x, y + 8), f"{value:.1f}%", fill=INK, font=font(20, True))
-    image.save(FIGURES_DIR / "01_globaler_vergleich.png")
+    image.save(FIGURES_DIR / "01-globaler-vergleich.png")
 
 
 def heat_color(value: float) -> tuple[int, int, int]:
@@ -426,7 +426,7 @@ def save_d4_heatmap() -> None:
             text_color = "#ffffff" if value > 55 else INK
             draw.text((x + 65, y + 42), f"{value:.1f}%", fill=text_color, font=font(34, True))
     draw.text((260, 735), "A single local PRESENT_STILL vote was sufficient for global D4 presence.", fill=MUTED, font=font(25))
-    image.save(FIGURES_DIR / "02_D4_RX_leerraum_heatmap.png")
+    image.save(FIGURES_DIR / "02-d4-rx-leerraum-heatmap.png")
 
 
 def save_d5_link_switching() -> None:
@@ -460,7 +460,7 @@ def save_d5_link_switching() -> None:
     draw.text((x1 + 20, bottom - (bottom - top) * first[3] / 100 - 18), "RX4 36.9%", fill=colors[3], font=font(22, True))
     draw.text((x2 + 20, top - 12), "RX3 100%", fill=colors[2], font=font(22, True))
     draw.text((300, 825), "Global Still-Recall: 0/350 samples. D5-abs E1 also produced 0/276 votes on every RX.", fill=RED, font=font(24, True))
-    image.save(FIGURES_DIR / "03_D5_live_RX_linkwechsel.png")
+    image.save(FIGURES_DIR / "03-d5-live-rx-linkwechsel.png")
 
 
 def save_d6_frame_rates(d6_rows: list[dict[str, Any]]) -> None:
@@ -491,7 +491,7 @@ def save_d6_frame_rates(d6_rows: list[dict[str, Any]]) -> None:
         x = 500 + index * 170
         draw.ellipse((x, 815, x + 20, 835), fill=colors[index])
         draw.text((x + 30, 809), rx, fill=INK, font=font(21))
-    image.save(FIGURES_DIR / "04_D6_RX_frameraten.png")
+    image.save(FIGURES_DIR / "04-d6-rx-frameraten.png")
 
 
 def main() -> None:

@@ -2,7 +2,7 @@
 """Render the mmWave transport comparison in the repository's Bklit style.
 
 The values are copied from the checked before/after and redundancy tables in
-``results/2026-09-13_mmwave-transport-ota-vergleich.md``.  This renderer is a
+``results/2026-09-13_mmwave_transport-vergleich/README.md``. This renderer is a
 deterministic static export: it keeps the Bklit chart vocabulary (neutral
 palette, rounded columns, zero-based grids, direct labels) while preserving
 the different units in separate panels instead of inventing a combined score.
@@ -16,7 +16,7 @@ from PIL import Image, ImageDraw, ImageFont
 
 
 PROJECT_DIR = Path(__file__).resolve().parent.parent
-OUTPUT_DIR = PROJECT_DIR / "results" / "diagrams" / "mmwave-transport_bklit"
+OUTPUT_DIR = PROJECT_DIR / "results" / "2026-09-13_mmwave_transport-vergleich" / "figures"
 
 WIDTH, HEIGHT = 1876, 1294
 BACKGROUND = "#ffffff"
@@ -149,7 +149,7 @@ def save_arrival_and_loss() -> None:
         100,
     )
     footer(draw, "BKLIT-Export · Werte direkt aus der Vorher-/Nachher-Tabelle · Verlust- und Duplikat-Skalen nicht zusammenlegen")
-    image.save(OUTPUT_DIR / "01_ankunft_und_verlust.png")
+    image.save(OUTPUT_DIR / "01-ankunft-und-verlust.png")
 
 
 def save_arrival_latency() -> None:
@@ -169,7 +169,7 @@ def save_arrival_latency() -> None:
         lambda value: f"{value:.0f}",
     )
     footer(draw, "Median: +18,6% (schlechter) · P95: −27,8% (besser) · der End-to-End-Abstand bleibt durch die Sensor-Quellrate begrenzt")
-    image.save(OUTPUT_DIR / "02_ankunftslatenz.png")
+    image.save(OUTPUT_DIR / "02-ankunftslatenz.png")
 
 
 def save_server_processing() -> None:
@@ -199,7 +199,7 @@ def save_server_processing() -> None:
     draw.rounded_rectangle((1140, 920, 1775, 1000), 12, fill=SOFT)
     draw.text((1168, 943), "Queue nicht monoton gewachsen", fill=INK, font=font(22, True))
     footer(draw, "Process-Median: −8,8% · Process-P95: −3,2% · Queue: keine neue Spitze in den Nachher-Läufen")
-    image.save(OUTPUT_DIR / "03_serververarbeitung.png")
+    image.save(OUTPUT_DIR / "03-serververarbeitung.png")
 
 
 def save_redundancy() -> None:
@@ -237,7 +237,7 @@ def save_redundancy() -> None:
         200,
     )
     footer(draw, "Ergebnis: 2 Kopien = −0,6 pp Verlust, aber +105 Duplikate und +92 ms P95 · Standard bleibt 1 Kopie")
-    image.save(OUTPUT_DIR / "04_redundanzvergleich.png")
+    image.save(OUTPUT_DIR / "04-redundanzvergleich.png")
 
 
 def main() -> None:
