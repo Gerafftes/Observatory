@@ -6,9 +6,13 @@
 #include "nvs.h"
 #include "sdkconfig.h"
 #include "freertos/FreeRTOS.h"
+#include "lwip/inet.h"
+#include "lwip/sockets.h"
 
 #define CONFIG_NAMESPACE "mmwave"
 #define MODE_KEY "mode"
+#define TARGET_HOST_KEY "target_host"
+#define TARGET_PORT_KEY "target_port"
 #define ORIGIN_X_KEY "origin_x"
 #define ORIGIN_Z_KEY "origin_z"
 #define YAW_KEY "yaw_mdeg"
@@ -65,6 +69,17 @@ bool app_config_load(app_config_t *config)
 
     nvs_handle_t handle;
     if (nvs_open(CONFIG_NAMESPACE, NVS_READONLY, &handle) == ESP_OK) {
+        char persisted_target_host[sizeof(config->target_host)] = {0};
+        size_t target_host_length = sizeof(persisted_target_host);
+        uint16_t persisted_target_port;
+        if (nvs_get_str(handle, TARGET_HOST_KEY, persisted_target_host,
+                        &target_host_length) == ESP_OK &&
+            nvs_get_u16(handle, TARGET_PORT_KEY, &persisted_target_port) == ESP_OK &&
+            app_config_transport_valid(persisted_target_host, persisted_target_port)) {
+            copy_string(config->target_host, sizeof(config->target_host),
+                        persisted_target_host);
+            config->target_port = persisted_target_port;
+        }
         uint8_t persisted_mode;
         if (nvs_get_u8(handle, MODE_KEY, &persisted_mode) == ESP_OK &&
             persisted_mode <= MEASUREMENT_MODE_REFERENCE) {
@@ -90,6 +105,38 @@ bool app_config_load(app_config_t *config)
     }
     return config->wifi_ssid[0] != '\0' && config->target_host[0] != '\0' &&
            public_identifier_valid(config->node_id);
+}
+
+bool app_config_transport_valid(const char *target_host, uint16_t target_port)
+{
+    struct in_addr address;
+    return target_host != NULL && target_host[0] != '\0' &&
+           strlen(target_host) < sizeof(((app_config_t *)0)->target_host) &&
+           target_port != 0 && inet_pton(AF_INET, target_host, &address) == 1;
+}
+
+bool app_config_set_transport(app_config_t *config,
+                              const char *target_host,
+                              uint16_t target_port)
+{
+    if (config == NULL || !app_config_transport_valid(target_host, target_port)) {
+        return false;
+    }
+    nvs_handle_t handle;
+    if (nvs_open(CONFIG_NAMESPACE, NVS_READWRITE, &handle) != ESP_OK) {
+        return false;
+    }
+    bool success = nvs_set_str(handle, TARGET_HOST_KEY, target_host) == ESP_OK &&
+                   nvs_set_u16(handle, TARGET_PORT_KEY, target_port) == ESP_OK &&
+                   nvs_commit(handle) == ESP_OK;
+    nvs_close(handle);
+    if (success) {
+        taskENTER_CRITICAL(&s_config_lock);
+        copy_string(config->target_host, sizeof(config->target_host), target_host);
+        config->target_port = target_port;
+        taskEXIT_CRITICAL(&s_config_lock);
+    }
+    return success;
 }
 
 bool app_config_transform_valid(int32_t origin_x_mm,

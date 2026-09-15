@@ -17,6 +17,36 @@ config MMWAVE_TARGET_PORT
     range 1 65535
     default 5010
 
+config MMWAVE_STREAM_INTERVAL_MS
+    int "Minimum interval between radar UDP packets (ms)"
+    range 20 1000
+    default 50
+    help
+        Lower values reduce the spacing between measurements when the radar
+        produces frames faster than the collector. 50 ms is the low-latency
+        default; the actual rate is still limited by the LD2450 UART stream.
+
+config MMWAVE_WIFI_PS_NONE
+    bool "Disable WiFi modem sleep for low-latency radar"
+    default y
+    help
+        Disable modem sleep so received UDP frames are not held until a DTIM
+        wake-up. This increases power use, but is the preferred setting for a
+        mains-powered sensor where measurement latency matters.
+
+config MMWAVE_UDP_REDUNDANT_COPIES
+    int "UDP copies per radar frame"
+    range 1 3
+    default 1
+    help
+        One copy is recommended. Extra copies can help a noisy isolated WLAN,
+        but consume airtime and create duplicate packets at the collector.
+
+config MMWAVE_UDP_COPY_DELAY_MS
+    int "Delay between redundant UDP copies (ms)"
+    range 0 50
+    default 0
+
 config MMWAVE_NODE_ID
     string "Stable node ID"
     default "MMWAVE1"

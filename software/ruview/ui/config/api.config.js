@@ -38,34 +38,14 @@ export const API_CONFIG = {
     // Pose
     POSE: {
       CURRENT: '/api/v1/pose/current',
-      ANALYZE: '/api/v1/pose/analyze',
-      ZONE_OCCUPANCY: '/api/v1/pose/zones/{zone_id}/occupancy',
       ZONES_SUMMARY: '/api/v1/pose/zones/summary',
-      HISTORICAL: '/api/v1/pose/historical',
-      ACTIVITIES: '/api/v1/pose/activities',
-      CALIBRATE: '/api/v1/pose/calibrate',
-      CALIBRATION_STATUS: '/api/v1/pose/calibration/status',
       STATS: '/api/v1/pose/stats'
     },
     
     // Streaming
     STREAM: {
       STATUS: '/api/v1/stream/status',
-      START: '/api/v1/stream/start',
-      STOP: '/api/v1/stream/stop',
-      CLIENTS: '/api/v1/stream/clients',
-      DISCONNECT_CLIENT: '/api/v1/stream/clients/{client_id}',
-      BROADCAST: '/api/v1/stream/broadcast',
-      METRICS: '/api/v1/stream/metrics',
-      // WebSocket endpoints
-      WS_POSE: '/api/v1/stream/pose',
-      WS_EVENTS: '/api/v1/stream/events'
-    },
-    
-    // Development (only in dev mode)
-    DEV: {
-      CONFIG: '/api/v1/dev/config',
-      RESET: '/api/v1/dev/reset'
+      WS_POSE: '/api/v1/stream/pose'
     }
   },
   
@@ -87,6 +67,34 @@ export const API_CONFIG = {
     MAX_RECONNECT_ATTEMPTS: 5,
     PING_INTERVAL: 30000,
     MESSAGE_TIMEOUT: 10000
+  }
+};
+
+// Compatibility-only paths retained for the legacy service methods below.
+// The active Rust server does not register these routes. Keeping them outside
+// API_CONFIG.ENDPOINTS prevents the catalogue from advertising them as
+// supported while preserving the existing service API for downstream users.
+export const LEGACY_ENDPOINTS = {
+  POSE: {
+    ANALYZE: '/api/v1/pose/analyze',
+    ZONE_OCCUPANCY: '/api/v1/pose/zones/{zone_id}/occupancy',
+    HISTORICAL: '/api/v1/pose/historical',
+    ACTIVITIES: '/api/v1/pose/activities',
+    CALIBRATE: '/api/v1/pose/calibrate',
+    CALIBRATION_STATUS: '/api/v1/pose/calibration/status'
+  },
+  STREAM: {
+    START: '/api/v1/stream/start',
+    STOP: '/api/v1/stream/stop',
+    CLIENTS: '/api/v1/stream/clients',
+    DISCONNECT_CLIENT: '/api/v1/stream/clients/{client_id}',
+    BROADCAST: '/api/v1/stream/broadcast',
+    METRICS: '/api/v1/stream/metrics',
+    WS_EVENTS: '/api/v1/stream/events'
+  },
+  DEV: {
+    CONFIG: '/api/v1/dev/config',
+    RESET: '/api/v1/dev/reset'
   }
 };
 

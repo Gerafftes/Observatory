@@ -1522,6 +1522,20 @@ fn normalize_profile_document(document: &Value) -> Result<Value, String> {
                     .to_string(),
             );
         }
+        if let Some(value) = mmwave.get("yaw_mdeg") {
+            value
+                .as_i64()
+                .and_then(|value| i32::try_from(value).ok())
+                .filter(|value| (-360000..=360000).contains(value))
+                .ok_or_else(|| {
+                    "mmwave.yaw_mdeg must be an integer between -360000 and 360000".to_string()
+                })?;
+        }
+        if let Some(value) = mmwave.get("raw_x_inverted") {
+            if !value.is_boolean() {
+                return Err("mmwave.raw_x_inverted must be a boolean".to_string());
+            }
+        }
         if let Some(revision) = mmwave.get("mounting_revision").and_then(Value::as_str) {
             validate_short_identity(revision, "mmwave.mounting_revision")?;
         }
@@ -2307,7 +2321,9 @@ mod tests {
         document["mmwave"] = json!({
             "sensor": "HLK-LD2450",
             "mounting_position_m": [-0.25, 1.2, 1.72],
-            "mounting_revision": "breadboard-v1"
+            "mounting_revision": "breadboard-v1",
+            "yaw_mdeg": 180000,
+            "raw_x_inverted": true
         });
 
         let profile = store
@@ -2317,6 +2333,8 @@ mod tests {
         assert_eq!(profile.document["mmwave"]["sensor"], "HLK-LD2450");
         assert_eq!(profile.document["mmwave"]["mounting_position_m"][0], -0.25);
         assert_eq!(profile.document["mmwave"]["mounting_revision"], "breadboard-v1");
+        assert_eq!(profile.document["mmwave"]["yaw_mdeg"], 180000);
+        assert_eq!(profile.document["mmwave"]["raw_x_inverted"], true);
         assert_eq!(profile.profile_sha256.len(), 64);
 
         let mut changed = document;

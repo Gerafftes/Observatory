@@ -5,6 +5,7 @@ import { apiService } from '../services/api.service.js';
 import { experimentService } from '../services/experiment.service.js';
 import {
   generateThreeByThreePoints,
+  mmwaveYawToReceiverMdeg,
   ObservatoryControlCenter,
   defaultSetupProfileDocument,
 } from '../components/ObservatoryControlCenter.js';
@@ -19,6 +20,8 @@ test('default setup profile keeps the legacy point grid only for schema compatib
   assert.equal(profile.mmwave.sensor, 'HLK-LD2450');
   assert.deepEqual(profile.mmwave.mounting_position_m, [0.0, 1.2, 1.72]);
   assert.equal(profile.mmwave.allow_exterior, true);
+  assert.equal(profile.mmwave.yaw_mdeg, 0);
+  assert.equal(profile.mmwave.raw_x_inverted, false);
   assert.deepEqual(profile.points.map((point) => point.id), [
     'P01', 'P02', 'P03', 'P04', 'P05', 'P06', 'P07', 'P08', 'P09',
   ]);
@@ -94,6 +97,30 @@ test('room editor presents mmWave as the primary calibration route', () => {
   assert.match(container.innerHTML, /P01–P09-Raster/);
   assert.match(container.innerHTML, /Legacy/);
   assert.doesNotMatch(container.innerHTML, />Trainingspunkte P01–P09/);
+});
+
+test('profile details defer mmWave orientation editing to the CAD inspector', () => {
+  const container = { innerHTML: '' };
+  const controlCenter = new ObservatoryControlCenter(container);
+  controlCenter._mounted = true;
+  controlCenter.connectionState = 'ready';
+  controlCenter.status = { mmwave: { packets_received: 0 }, nodes: [] };
+  controlCenter.roomDetailsExpanded = true;
+  controlCenter._render();
+
+  assert.match(container.innerHTML, /Blickrichtung und Links\/Rechts-Spiegelung werden direkt am mmWave-Marker im CAD-Inspector eingestellt/);
+  assert.doesNotMatch(container.innerHTML, /data-occ-field="mmwave.yaw_deg"/);
+  assert.doesNotMatch(container.innerHTML, /data-occ-action="aim-mmwave-rx1"/);
+  assert.doesNotMatch(container.innerHTML, /data-occ-action="toggle-mmwave-raw-x"/);
+});
+
+test('mmWave RX1 aiming follows the current CAD positions', () => {
+  const profile = defaultSetupProfileDocument();
+  profile.mmwave.mounting_position_m = [3.95, 1.5, 3.3];
+  profile.receivers[0].position_m = [0, 0.5, 0.28];
+
+  assert.equal(mmwaveYawToReceiverMdeg(profile), 217400);
+  assert.equal(mmwaveYawToReceiverMdeg(profile, 'RX9'), null);
 });
 
 test('CAD save forwards the complete edited profile to the existing profile submit', () => {
@@ -194,7 +221,7 @@ test('setup-v2 draft action binds the exact saved CAD profile revision', () => {
 
   const markup = controlCenter._setupV2DraftActionMarkup();
 
-  assert.match(markup, /Setup-v2-Entwurf laden/);
+  assert.match(markup, /Entwurf für versiegeltes Setup laden/);
   assert.match(markup, /profile-room-1\/setup-v2-draft\?revision_id=profile-room-1-v3/);
   assert.match(markup, /download="profile-room-1-v3-setup-v2\.draft\.json"/);
 });
@@ -519,10 +546,11 @@ test('setup seal stays locked without an active runtime setup', async () => {
   );
   await controlCenter._sealSetup();
 
-  assert.match(markup, /Runtime-Setup fehlt/);
+  assert.match(markup, /Passendes versiegeltes Setup fehlt/);
+  assert.match(markup, /dazugehörigen versiegelten Setup-Datei/);
   assert.match(markup, /disabled/);
   assert.equal(advanceCalled, false);
-  assert.match(controlCenter.error, /ohne aktives Setup-v2/);
+  assert.match(controlCenter.error, /ohne aktives versiegeltes Setup/);
 });
 
 test('legacy workflow seal without runtime identity cannot continue', () => {

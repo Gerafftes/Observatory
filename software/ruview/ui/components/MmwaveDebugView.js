@@ -4,7 +4,7 @@
  * The two sources deliberately stay separate:
  *   - signal red = mmWave target / Ground Truth
  *   - black      = WiFi CSI/RX position estimate
- *   - red outline = recent radar target rejected by room bounds
+ *   - red wireframe = live radar target outside the room
  *
  * This module has no dependency on the position-point contract. It is a
  * transport/debug view, so it can show a continuous radar coordinate even
@@ -142,17 +142,35 @@ export function normalizeMmwaveDebugStatus(status, nowMs = Date.now()) {
   const rejectionAgeMs = rejection && ageFromStatus(rejection.age_ms);
   const rejectedPositionMm = rejectionPosition(raw);
   const rejectedRawPositionMm = rejectionRawPosition(raw);
-  const rejectionVisible = rejection?.category === 'room_bounds'
+  const liveOutsideTargets = packetFresh && Array.isArray(raw.targets)
+    ? raw.targets
+      .filter((target) => target?.inside_room === false && finitePair(target.position_mm))
+      .map((target) => ({
+        slot: Number.isFinite(Number(target.slot)) ? Number(target.slot) : null,
+        positionMm: target.position_mm.slice(0, 2),
+        rawPositionMm: finitePair(target.raw_position_mm)
+          ? target.raw_position_mm.slice(0, 2)
+          : null,
+      }))
+    : [];
+  const legacyRejectionVisible = rejection?.category === 'room_bounds'
     && rejectedPositionMm
     && rejectionAgeMs != null
     && rejectionAgeMs <= MMWAVE_REJECTION_VISIBLE_MS;
+  const outsideTargets = liveOutsideTargets.length > 0
+    ? liveOutsideTargets
+    : legacyRejectionVisible
+      ? [{ slot: null, positionMm: rejectedPositionMm, rawPositionMm: rejectedRawPositionMm }]
+      : [];
+  const rejectionVisible = outsideTargets.length > 0;
+  const primaryOutsideTarget = outsideTargets[0] || null;
   const diagnosticRawPositionMm = rejectionVisible
-    ? rejectedRawPositionMm
+    ? primaryOutsideTarget.rawPositionMm
     : accepted
       ? targetRawPositionMm
       : null;
   const diagnosticRoomPositionMm = rejectionVisible
-    ? rejectedPositionMm
+    ? primaryOutsideTarget.positionMm
     : accepted
       ? targetPositionMm
       : null;
@@ -167,7 +185,9 @@ export function normalizeMmwaveDebugStatus(status, nowMs = Date.now()) {
   return {
     raw,
     state,
-    label: state === 'valid' && accepted
+    label: rejectionVisible
+      ? 'OUTSIDE ROOM'
+      : state === 'valid' && accepted
       ? 'VALID'
       : state === 'no_target'
         ? 'NO TARGET'
@@ -191,8 +211,9 @@ export function normalizeMmwaveDebugStatus(status, nowMs = Date.now()) {
     targetRawPositionMm: accepted ? targetRawPositionMm : null,
     targetPositionMm: accepted ? targetPositionMm : null,
     targetCount: Number.isFinite(Number(raw.target_count)) ? Number(raw.target_count) : 0,
-    rejectedPositionMm: rejectionVisible ? rejectedPositionMm : null,
-    rejectedRawPositionMm: rejectionVisible ? rejectedRawPositionMm : null,
+    rejectedPositionMm: rejectionVisible ? primaryOutsideTarget.positionMm : null,
+    rejectedRawPositionMm: rejectionVisible ? primaryOutsideTarget.rawPositionMm : null,
+    outsideTargets,
     rejectionVisible: Boolean(rejectionVisible),
     rejectionAgeMs,
     packetsLost: Number.isFinite(Number(raw.packets_lost)) ? Number(raw.packets_lost) : 0,
@@ -404,6 +425,7 @@ export class MmwaveDebugView {
     this._deltaLine = null;
     this._mmwaveMarker = null;
     this._rejectedMarker = null;
+    this._rejectedMarkers = [];
     this._sensorMarker = null;
     this._rxMarker = null;
     this._rxNodeMeshes = [];
@@ -658,15 +680,18 @@ export class MmwaveDebugView {
     this._mmwaveMarker.visible = false;
     this._markerGroup.add(this._mmwaveMarker);
 
-    const rejected = new THREE.Mesh(
-      new THREE.OctahedronGeometry(0.14, 0),
-      new THREE.MeshBasicMaterial({ color: SIGNAL_RED, wireframe: true, transparent: true, opacity: 0.95 }),
-    );
-    const rejectedLabel = createMarkerLabel('REJECTED', SIGNAL_RED, THREE);
-    if (rejectedLabel) rejected.add(rejectedLabel);
-    this._rejectedMarker = rejected;
-    this._rejectedMarker.visible = false;
-    this._markerGroup.add(rejected);
+    this._rejectedMarkers = Array.from({ length: 3 }, (_, index) => {
+      const rejected = new THREE.Mesh(
+        new THREE.OctahedronGeometry(0.14, 0),
+        new THREE.MeshBasicMaterial({ color: SIGNAL_RED, wireframe: true, transparent: true, opacity: 0.95 }),
+      );
+      const rejectedLabel = createMarkerLabel(`OUTSIDE ${index + 1}`, SIGNAL_RED, THREE);
+      if (rejectedLabel) rejected.add(rejectedLabel);
+      rejected.visible = false;
+      this._markerGroup.add(rejected);
+      return rejected;
+    });
+    this._rejectedMarker = this._rejectedMarkers[0] || null;
 
     const rx = new THREE.Mesh(
       new THREE.SphereGeometry(0.12, 16, 16),
@@ -794,7 +819,11 @@ export class MmwaveDebugView {
   _applyCamera() {
     if (!this._camera) return;
     const [length, height, width] = this.roomDimensions;
-    const radius = Math.max(length, width, height) * 1.8 / this._zoom;
+    const outsideExtent = (this.status?.outsideTargets || [])
+      .map((target) => mmwavePositionToScene(target.positionMm, this.roomDimensions, 0.1))
+      .filter(Boolean)
+      .reduce((extent, position) => Math.max(extent, Math.abs(position[0]) * 2, Math.abs(position[2]) * 2), 0);
+    const radius = Math.max(length, width, height, outsideExtent) * 1.8 / this._zoom;
     const targetY = Math.min(height * 0.25, 0.65);
     const horizontal = Math.cos(this._pitch) * radius;
     this._camera.position.set(
@@ -847,6 +876,7 @@ export class MmwaveDebugView {
         rejectionVisible: false,
         rejectedPositionMm: null,
         rejectedRawPositionMm: null,
+        outsideTargets: [],
         diagnosticRawPositionMm: null,
         diagnosticRoomPositionMm: null,
         diagnosticScenePositionM: null,
@@ -883,6 +913,7 @@ export class MmwaveDebugView {
       this._buildMarkers();
     }
     this._syncNodes();
+    this._applyCamera();
     this._renderMarkers();
     this._renderFacts();
   }
@@ -918,18 +949,14 @@ export class MmwaveDebugView {
       this._mmwaveMarker.visible = false;
     }
 
-    const rejectedScene = this.status.rejectionVisible
-      ? mmwavePositionToScene(this.status.rejectedPositionMm, this.roomDimensions, 0.1)
-      : null;
-    const rejectedBoundaryScene = rejectedScene
-      ? clampScenePositionToRoom(rejectedScene, this.roomDimensions)
-      : null;
-    if (rejectedBoundaryScene && this._rejectedMarker) {
-      this._rejectedMarker.visible = true;
-      this._rejectedMarker.position.set(...rejectedBoundaryScene);
-    } else if (this._rejectedMarker) {
-      this._rejectedMarker.visible = false;
-    }
+    this._rejectedMarkers.forEach((marker, index) => {
+      const outside = this.status.outsideTargets?.[index];
+      const scenePosition = outside
+        ? mmwavePositionToScene(outside.positionMm, this.roomDimensions, 0.1)
+        : null;
+      marker.visible = Boolean(scenePosition);
+      if (scenePosition) marker.position.set(...scenePosition);
+    });
 
     const rxScene = this.connectionState === 'connected' && this.rx.validPosition
       ? roomPositionToScene(this.rx.coordinates, this.roomDimensions)
@@ -976,14 +1003,14 @@ export class MmwaveDebugView {
     const radarLabel = this._statusError
       ? 'OFFLINE'
       : status.rejectionVisible
-        ? 'REJECTED'
+        ? 'OUTSIDE ROOM'
         : status.label;
     radarValue.textContent = radarLabel;
     radarValue.dataset.state = radarLabel.toLowerCase().replace(/\s+/g, '-');
     radarPosition.textContent = status.accepted
       ? formatRadarCoordinates(status.targetPositionMm)
       : status.rejectionVisible
-        ? `verworfen ${formatRadarCoordinates(status.rejectedPositionMm)}`
+        ? `${status.outsideTargets.length} außerhalb · ${formatRadarCoordinates(status.rejectedPositionMm)}`
         : status.reason || 'Kein gültiger Zielpunkt';
     rawPosition.textContent = formatRadarCoordinates(status.diagnosticRawPositionMm);
     roomPosition.textContent = formatRadarCoordinates(status.diagnosticRoomPositionMm);
@@ -1036,7 +1063,7 @@ export class MmwaveDebugView {
       : status.accepted
         ? `mmWave VALID · ${formatRadarCoordinates(status.targetPositionMm)}${this.rx.validPosition ? ' · RX separat' : ''}`
         : status.rejectionVisible
-          ? `Radar verworfen · außerhalb Raum · ${formatRadarCoordinates(status.rejectedPositionMm)}`
+          ? `${status.outsideTargets.length} Radarziel${status.outsideTargets.length === 1 ? '' : 'e'} außerhalb des Raums · ${formatRadarCoordinates(status.rejectedPositionMm)}`
           : `mmWave ${status.label}${sourceNote}`;
   }
 

@@ -4,6 +4,7 @@
 #include <stdbool.h>
 #include <stdio.h>
 #include <string.h>
+#include <stdint.h>
 
 #include "esp_app_desc.h"
 #include "esp_http_server.h"
@@ -139,6 +140,57 @@ static esp_err_t transform_handler(httpd_req_t *request)
     return httpd_resp_send(request, response, length);
 }
 
+static esp_err_t transport_handler(httpd_req_t *request)
+{
+    if (!authorized(request)) {
+        return httpd_resp_send_err(request, HTTPD_403_FORBIDDEN,
+                                   "Bearer token required");
+    }
+    if (request->content_len <= 0 || request->content_len >= 192) {
+        return httpd_resp_send_err(request, HTTPD_400_BAD_REQUEST,
+                                   "Invalid transport JSON size");
+    }
+    char body[192] = {0};
+    int offset = 0;
+    while (offset < request->content_len) {
+        int received = httpd_req_recv(request, body + offset,
+                                      request->content_len - offset);
+        if (received == HTTPD_SOCK_ERR_TIMEOUT) {
+            continue;
+        }
+        if (received <= 0) {
+            return ESP_FAIL;
+        }
+        offset += received;
+    }
+    cJSON *json = cJSON_ParseWithLength(body, (size_t)offset);
+    if (json == NULL) {
+        return httpd_resp_send_err(request, HTTPD_400_BAD_REQUEST,
+                                   "Invalid transport JSON");
+    }
+    const cJSON *host = cJSON_GetObjectItemCaseSensitive(json, "target_host");
+    const cJSON *port = cJSON_GetObjectItemCaseSensitive(json, "target_port");
+    bool valid = cJSON_IsString(host) && host->valuestring != NULL &&
+                 cJSON_IsNumber(port) && port->valuedouble == port->valueint &&
+                 port->valueint > 0 && port->valueint <= UINT16_MAX;
+    bool saved = valid && app_config_set_transport(
+        s_config, host ? host->valuestring : "",
+        valid ? (uint16_t)port->valueint : 0);
+    cJSON_Delete(json);
+    if (!saved) {
+        return httpd_resp_send_err(request, HTTPD_400_BAD_REQUEST,
+                                   "Invalid or unpersistable transport target");
+    }
+    app_config_t config;
+    app_config_snapshot(s_config, &config);
+    char response[128];
+    int length = snprintf(response, sizeof(response),
+                          "{\"target\":\"%s:%u\"}",
+                          config.target_host, config.target_port);
+    httpd_resp_set_type(request, "application/json");
+    return httpd_resp_send(request, response, length);
+}
+
 static esp_err_t mode_handler(httpd_req_t *request)
 {
     if (!authorized(request)) {
@@ -231,7 +283,7 @@ void web_server_start(app_config_t *config)
     httpd_config_t server_config = HTTPD_DEFAULT_CONFIG();
     server_config.server_port = 8032;
     server_config.recv_wait_timeout = 30;
-    server_config.max_uri_handlers = 7;
+    server_config.max_uri_handlers = 8;
     httpd_handle_t server = NULL;
     ESP_ERROR_CHECK(httpd_start(&server, &server_config));
     const httpd_uri_t status = {
@@ -246,9 +298,13 @@ void web_server_start(app_config_t *config)
     const httpd_uri_t transform = {
         .uri = "/transform", .method = HTTP_PUT, .handler = transform_handler,
     };
+    const httpd_uri_t transport = {
+        .uri = "/transport", .method = HTTP_PUT, .handler = transport_handler,
+    };
     ESP_ERROR_CHECK(httpd_register_uri_handler(server, &status));
     ESP_ERROR_CHECK(httpd_register_uri_handler(server, &mode));
     ESP_ERROR_CHECK(httpd_register_uri_handler(server, &ota));
     ESP_ERROR_CHECK(httpd_register_uri_handler(server, &transform));
-    ESP_LOGI(TAG, "HTTP status/mode/transform/OTA server listening on port 8032");
+    ESP_ERROR_CHECK(httpd_register_uri_handler(server, &transport));
+    ESP_LOGI(TAG, "HTTP status/mode/transform/transport/OTA server listening on port 8032");
 }

@@ -4,10 +4,13 @@ import {
   DEFAULT_MMWAVE_POSITION_M,
   DEFAULT_SENSOR_MOUNT_RADIUS_M,
   mmwaveMountingPosition,
+  mmwaveYawMdeg,
   MMWAVE_SENSOR,
   RoomGeometryEditor,
   validateGeometryDraft,
 } from './RoomGeometryEditor.js';
+
+export { mmwaveYawToReceiverMdeg } from './RoomGeometryEditor.js';
 
 const EXPECTED_POINTS = Array.from({ length: 9 }, (_, index) => `P${String(index + 1).padStart(2, '0')}`);
 const EMPTY_CALIBRATION_MIN_SECONDS = 60;
@@ -15,6 +18,7 @@ const EMPTY_CALIBRATION_DEFAULT_SECONDS = 60;
 const EMPTY_CALIBRATION_MIN_LEAD_SECONDS = 5;
 const EMPTY_CALIBRATION_DEFAULT_LEAD_SECONDS = 20;
 const EMPTY_CALIBRATION_TIMER_MS = 250;
+const DEFAULT_MMWAVE_YAW_MDEG = 0;
 const WORKFLOW_PHASES = [
   'create_experiment',
   'seal_setup',
@@ -49,6 +53,8 @@ export function defaultSetupProfileDocument() {
       mounting_position_m: [...DEFAULT_MMWAVE_POSITION_M],
       mounting_revision: 'draft',
       allow_exterior: true,
+      yaw_mdeg: DEFAULT_MMWAVE_YAW_MDEG,
+      raw_x_inverted: false,
     },
     points: EXPECTED_POINTS.map((id, index) => ({
       id,
@@ -435,7 +441,7 @@ export class ObservatoryControlCenter {
       : '';
     const endpoint = `/api/v1/experiments/setup-profiles/${encodeURIComponent(profile.id)}/setup-v2-draft${revision}`;
     const filename = `${profile.id}-v${profile.version || 1}-setup-v2.draft.json`;
-    return `<a class="occ-button occ-button-quiet" href="${attribute(endpoint)}" download="${attribute(filename)}">Setup-v2-Entwurf laden</a>`;
+    return `<a class="occ-button occ-button-quiet" href="${attribute(endpoint)}" download="${attribute(filename)}">Entwurf für versiegeltes Setup laden</a>`;
   }
 
   _activePositionSetup() {
@@ -520,6 +526,7 @@ export class ObservatoryControlCenter {
                 <div class="occ-subheading">mmWave [x / y / z] (m) ${infoTip('mmWave', 'Fester Montagepunkt des HLK-LD2450. Radar-Truth bleibt getrennt vom WiFi-Modell.')}</div>
                 <div class="occ-triple">${this._tripleInputs('mmwave.mounting_position_m', mmwaveMountingPosition(this.profileDraft))}</div>
                 <p class="occ-helper">Montagepunkt, nicht die aktuelle Zielposition.</p>
+                <p class="occ-helper">Blickrichtung und Links/Rechts-Spiegelung werden direkt am mmWave-Marker im CAD-Inspector eingestellt.</p>
               </div>
               </div>
               <div class="occ-room-form-column">
@@ -592,6 +599,7 @@ export class ObservatoryControlCenter {
         },
         onSave: (document) => this._saveGeometryDocument(document),
         saveDisabled: experimentActionsDisabled,
+        yawCalibration: this.status?.mmwave?.yaw_calibration || null,
       });
       this.geometryEditor.mount();
     }
@@ -690,6 +698,8 @@ export class ObservatoryControlCenter {
     set('transmitter.position_m', this.profileDraft.transmitter?.position_m);
     (this.profileDraft.receivers || []).forEach((receiver) => set(`receiver.${receiver.id}`, receiver.position_m));
     set('mmwave.mounting_position_m', mmwaveMountingPosition(this.profileDraft));
+    const yawInput = form.querySelector('[data-occ-field="mmwave.yaw_deg"]');
+    if (yawInput) yawInput.value = mmwaveYawMdeg(this.profileDraft) / 1000;
     (this.profileDraft.points || []).forEach((point) => set(`point.${point.id}`, point.coordinates_m));
   }
 
@@ -765,7 +775,7 @@ export class ObservatoryControlCenter {
         state: 'GESPERRT',
         tone: 'is-waiting',
         title: 'Run besitzt kein gültiges Runtime-Seal',
-        body: 'Dieser ältere oder abweichende Run darf nicht fortgesetzt werden. Lege mit dem aktiven Setup-v2 einen neuen Run an.',
+        body: 'Dieser ältere oder abweichende Run darf nicht fortgesetzt werden. Lege mit dem aktiven versiegelten Setup einen neuen Run an.',
         checklist: ['Alt-Run nicht weiterverwenden', 'Run-Auswahl lösen', 'Neuen Run versiegeln'],
         action: 'clear-run',
         actionLabel: 'Neuen Run anlegen',
@@ -779,14 +789,14 @@ export class ObservatoryControlCenter {
       if (!setup) {
         guide.state = 'GESPERRT';
         guide.tone = 'is-waiting';
-        guide.title = 'Runtime-Setup fehlt';
-        guide.body = 'Dieser Run kann erst versiegelt werden, wenn der Server mit dem gültigen Setup-v2 gestartet wurde.';
-        guide.checklist = ['Setup-v2 erzeugen', 'Server mit --position-setup starten', 'Profilabgleich bestehen'];
+        guide.title = 'Passendes versiegeltes Setup fehlt';
+        guide.body = 'Der Server läuft, aber das passende versiegelte Setup ist nicht aktiv. Starte ihn mit --position-setup und der dazugehörigen versiegelten Setup-Datei. Erst danach kann der Run versiegelt werden.';
+        guide.checklist = ['Passendes versiegeltes Setup bereitstellen', 'Server mit --position-setup starten', 'Profilabgleich bestehen'];
         guide.action = null;
-        guide.helper = 'Ein Profil-Hash allein ist kein Runtime-Seal.';
+        guide.helper = 'Der Profil-Hash reicht allein nicht aus. Profil, Hardware und Server-Version müssen zum aktiven versiegelten Setup passen.';
       } else {
         guide.title = 'Run mit Runtime-Setup versiegeln';
-        guide.body = 'Der Server prüft Profilgeometrie und Deployment-Metadaten gegen das aktive Setup-v2.';
+        guide.body = 'Der Server prüft Profilgeometrie und Deployment-Metadaten gegen das aktive versiegelte Setup.';
         guide.checklist = ['Profil-Hash kontrollieren', `Runtime ${setup.setup_id}`, 'Setup versiegeln'];
         guide.action = 'seal';
         guide.actionLabel = 'Setup versiegeln';
@@ -1079,9 +1089,9 @@ export class ObservatoryControlCenter {
     if (workflow.current_phase === 'create_experiment') {
       const setup = this._activePositionSetup();
       if (!setup) {
-        return '<button type="button" class="occ-button occ-button-primary" disabled>Runtime-Setup fehlt</button><p class="occ-helper">Server mit dem gültigen Setup-v2 über <code>--position-setup</code> starten. Ein Profil-Hash allein kann den Run nicht versiegeln.</p>';
+        return '<button type="button" class="occ-button occ-button-primary" disabled>Passendes versiegeltes Setup fehlt</button><p class="occ-helper">Der Server läuft, aber das passende versiegelte Setup ist nicht aktiv. Mit <code>--position-setup</code> und der dazugehörigen versiegelten Setup-Datei starten. Erst danach kann der Run versiegelt werden.</p>';
       }
-      return `<button type="button" class="occ-button occ-button-primary" data-occ-action="seal">Mit ${escapeHTML(setup.setup_id)} versiegeln</button><p class="occ-helper">${infoTip('Runtime-Seal', 'Der Server prüft das Run-Profil gegen das aktive Setup-v2 und speichert Setup-ID plus Setup-Hash im Phasenereignis.')}</p>`;
+      return `<button type="button" class="occ-button occ-button-primary" data-occ-action="seal">Mit ${escapeHTML(setup.setup_id)} versiegeln</button><p class="occ-helper">${infoTip('Runtime-Seal', 'Der Server prüft das Run-Profil gegen das aktive versiegelte Setup und speichert Setup-ID plus Setup-Hash im Phasenereignis.')}</p>`;
     }
     if (workflow.current_phase === 'seal_setup') {
       return this._emptyCalibrationWorkflowMarkup();
@@ -1530,6 +1540,10 @@ export class ObservatoryControlCenter {
   _readProfileFromForm(form = this.container.querySelector('#occProfileForm')) {
     const read = (prefix) => [0, 1, 2].map((index) => numberValue(form.querySelector(`[data-occ-field="${prefix}.${index}"]`)?.value));
     const existingMmwave = this.profileDraft?.mmwave || {};
+    const yawDegrees = numberValue(
+      form.querySelector('[data-occ-field="mmwave.yaw_deg"]')?.value,
+      mmwaveYawMdeg({ mmwave: existingMmwave }) / 1000,
+    );
     const mmwaveExteriorInput = form.querySelector('[data-cad-mmwave-exterior]')
       || this.container?.querySelector?.('[data-cad-mmwave-exterior]');
     const allowMmwaveExterior = mmwaveExteriorInput
@@ -1554,6 +1568,8 @@ export class ObservatoryControlCenter {
         mounting_position_m: read('mmwave.mounting_position_m'),
         mounting_revision: existingMmwave.mounting_revision || 'draft',
         allow_exterior: allowMmwaveExterior,
+        yaw_mdeg: Math.round(yawDegrees * 1000),
+        raw_x_inverted: existingMmwave.raw_x_inverted === true,
       },
       points: EXPECTED_POINTS.map((id) => ({ id, coordinates_m: read(`point.${id}`) })),
       radio: existingRadio,
@@ -1668,7 +1684,7 @@ export class ObservatoryControlCenter {
     const setup = this._activePositionSetup();
     if (!setup) {
       this.message = '';
-      this.error = 'Setup kann nicht versiegelt werden: Der Server läuft ohne aktives Setup-v2.';
+      this.error = 'Setup kann nicht versiegelt werden: Der Server läuft ohne aktives versiegeltes Setup.';
       this._render();
       return;
     }

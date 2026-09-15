@@ -7,7 +7,7 @@ import {
   MMWAVE_STATUS_FRESH_MS,
   MMWAVE_DEBUG_HARDWARE_VISIBILITY_KEY,
   MmwaveDebugView,
-  clampScenePositionToRoom,
+  mmwavePositionToScene,
   normalizeMmwaveDebugStatus,
   normalizeRxDebugState,
   receiverDisplayLabel,
@@ -109,12 +109,24 @@ test('recent room-bounds rejects retain their diagnostic position', () => {
   assert.deepEqual(legacy.rejectedPositionMm, [4078, 2831]);
 });
 
-test('rejected marker presentation stays on the room edge without changing diagnostics', () => {
-  const rejectedScene = [-4.152, 0.1, 1.945];
-  const clamped = clampScenePositionToRoom(rejectedScene, room);
-  assert.ok(Math.abs(clamped[0] + 1.87) < 1e-9);
-  assert.deepEqual(clamped.slice(1), [0.1, 1.58]);
-  assert.deepEqual(rejectedScene, [-4.152, 0.1, 1.945]);
+test('all fresh outside-room targets retain positions beyond the room walls', () => {
+  const state = normalizeMmwaveDebugStatus({
+    state: 'invalid',
+    room_dimensions_m: room,
+    packet_age_ms: 40,
+    targets: [
+      { slot: 1, inside_room: false, raw_position_mm: [365, 4112], position_mm: [6162, 3665] },
+      { slot: 2, inside_room: false, raw_position_mm: [-200, 900], position_mm: [-250, 900] },
+    ],
+  });
+
+  assert.equal(state.rejectionVisible, true);
+  assert.equal(state.label, 'OUTSIDE ROOM');
+  assert.equal(state.outsideTargets.length, 2);
+  assert.deepEqual(
+    state.outsideTargets.map((target) => mmwavePositionToScene(target.positionMm, room, 0.1)),
+    [[-4.152, 0.1, 1.945], [2.26, 0.1, -0.82]],
+  );
 });
 
 test('old rejects disappear from the viewport after their diagnostic TTL', () => {

@@ -152,7 +152,7 @@ test('blind completion requires two visits in every trained zone', () => {
   assert.equal(complete.activeStep, 6);
 });
 
-test('calibration start remains locked until setup v2 is sealed', () => {
+test('calibration start remains locked until the setup is sealed', () => {
   const status = {
     state: 'valid',
     configured: true,
@@ -165,12 +165,12 @@ test('calibration start remains locked until setup v2 is sealed', () => {
   const assistant = new MmwaveCalibrationAssistant({});
   assistant.status = status;
   const html = assistant._guidance(mmwaveAssistantViewModel(status));
-  assert.match(html, /Kalibrierung vorbereiten<\/button>/);
+  assert.match(html, /Zwei-Phasen-Kalibrierung<\/button>/);
   assert.match(html, /disabled/);
-  assert.match(html, /Setup-v2/);
+  assert.match(html, /versiegeltes Setup/);
 });
 
-test('passed 25-second preflight unlocks calibration start without claiming validation', () => {
+test('passed radar preflight unlocks phase one without requiring CSI', () => {
   const status = {
     state: 'valid',
     configured: true,
@@ -180,6 +180,8 @@ test('passed 25-second preflight unlocks calibration start without claiming vali
     packet_age_ms: 10,
     zones: [],
     preflight: { ready: true, gates: [] },
+    radar_preflight: { ready: true, gates: [] },
+    fixed_point_preflight: { ready: true, gates: [] },
   };
   const assistant = new MmwaveCalibrationAssistant({});
   assistant.status = status;
@@ -188,6 +190,124 @@ test('passed 25-second preflight unlocks calibration start without claiming vali
   assert.match(html, /data-mmwave-action="prepare-calibration"/);
   assert.doesNotMatch(html, /prepare-calibration" class="mmwave-primary-button" disabled/);
   assert.match(html, /SOFTWARE-ONLY \/ UNVALIDATED/);
+});
+
+test('an outside-room target stays connected and does not hide phase one', () => {
+  const status = {
+    state: 'invalid',
+    reason: 'target [5000, 1200] mm is outside room',
+    last_rejection: { category: 'room_bounds' },
+    configured: true,
+    setup_sealed: true,
+    zones: [],
+    radar_preflight: { ready: true, gates: [] },
+    fixed_point_preflight: { ready: true, gates: [] },
+    preflight: { ready: false, gates: [{ id: 'rx1_25s_ready', pass: false, detail: 'offline' }] },
+  };
+  const assistant = new MmwaveCalibrationAssistant({});
+  assistant.status = status;
+
+  const model = mmwaveAssistantViewModel(status);
+  const html = assistant._guidance(model);
+
+  assert.equal(model.connected, true);
+  assert.match(html, /Zwei-Phasen-Kalibrierung<\/button>/);
+  assert.doesNotMatch(html, /prepare-calibration" class="mmwave-primary-button" disabled/);
+  assert.doesNotMatch(html, /Warte auf Radar/);
+});
+
+test('phase one advances in server order and only then offers phase two', async () => {
+  const anchors = ['RX1', 'RX2', 'RX3', 'RX4', 'TX'].map((id, index) => ({
+    id,
+    state: index === 0 ? 'current' : 'pending',
+    check: null,
+  }));
+  const assistant = new MmwaveCalibrationAssistant({});
+  assistant._render = () => {};
+  assistant.status = {
+    preflight: { ready: true, gates: [] },
+    fixed_point_calibration: { state: 'active', current_anchor_id: 'RX1', anchors },
+  };
+  assistant.calibrationPlan = {
+    phase: 'anchor_measuring', anchorId: 'RX1', leadSeconds: 5, toleranceMm: 350, durationSeconds: 65,
+  };
+  const originalFetch = globalThis.fetch;
+  let call = 0;
+  globalThis.fetch = async () => {
+    call += 1;
+    const complete = call === 2;
+    return {
+      ok: true,
+      async json() {
+        return {
+          fixed_point_calibration: complete
+            ? {
+              state: 'complete',
+              current_anchor_id: null,
+              anchors: anchors.map((anchor) => ({ ...anchor, state: 'complete', check: { pass: true } })),
+            }
+            : {
+              state: 'active',
+              current_anchor_id: 'RX2',
+              anchors: anchors.map((anchor, index) => ({
+                ...anchor,
+                state: index === 0 ? 'complete' : index === 1 ? 'current' : 'pending',
+                check: index === 0 ? { pass: false, median_error_mm: 980, sample_count: 8 } : null,
+              })),
+            },
+        };
+      },
+    };
+  };
+
+  try {
+    await assistant._checkCurrentFixedPoint();
+    assert.equal(assistant.status.fixed_point_calibration.current_anchor_id, 'RX2');
+    assert.equal(assistant.calibrationPlan.phase, 'anchor_waiting');
+    assistant.calibrationPlan = { ...assistant.calibrationPlan, phase: 'anchor_measuring', anchorId: 'RX2' };
+    await assistant._checkCurrentFixedPoint();
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+
+  assert.equal(assistant.calibrationPlan.phase, 'phase_two_ready');
+  assert.match(assistant._calibrationPreparationMarkup(), /Phase 2 starten/);
+});
+
+test('yaw result compares every RX and TX point before phase two', () => {
+  const assistant = new MmwaveCalibrationAssistant({});
+  const html = assistant._yawCalibrationMarkup({
+    applied: true,
+    optimized_yaw_mdeg: 223400,
+    base_yaw_mdeg: 217400,
+    correction_mdeg: 6000,
+    point_count: 5,
+    before_rms_error_mm: 1010,
+    after_rms_error_mm: 180,
+    improvement_percent: 82.2,
+    anchors: ['RX1', 'RX2', 'RX3', 'RX4', 'TX'].map((id, index) => ({
+      id,
+      before_error_mm: 900 + index * 20,
+      after_error_mm: 120 + index * 10,
+    })),
+  });
+
+  assert.match(html, /KORREKTUR AKTIV/);
+  assert.match(html, /223\.4°/);
+  assert.match(html, /1010 → 180 mm/);
+  assert.match(html, /RX1/);
+  assert.match(html, /RX4/);
+  assert.match(html, /TX/);
+  assert.match(html, /5 Punkte gemeinsam/);
+});
+
+test('completed yaw calibration remains repeatable from the alignment details', () => {
+  const source = readFileSync(new URL('../components/MmwaveCalibrationAssistant.js', import.meta.url), 'utf8');
+
+  assert.match(source, /id="mmwaveYawCalibrationResult"/);
+  assert.match(source, /data-mmwave-action="repeat-yaw-calibration"/);
+  assert.match(source, />Winkel neu kalibrieren</);
+  assert.match(source, /this\.busy \|\| this\.status\?\.session \? 'disabled' : ''/);
 });
 
 test('status refresh requests are serialized to prevent stale UI snapshots', async () => {
@@ -222,41 +342,58 @@ test('status refresh requests are serialized to prevent stale UI snapshots', asy
   }
 });
 
-test('calibration preparation exposes configurable empty duration and lead time', () => {
+test('calibration preparation exposes fixed-point and phase-two settings', () => {
   const assistant = new MmwaveCalibrationAssistant({});
   assistant.status = {
     state: 'valid',
     zones: [],
     preflight: { ready: true, gates: [] },
   };
-  assistant.calibrationPlan = { phase: 'form', durationSeconds: 120, leadSeconds: 30 };
+  assistant.calibrationPlan = {
+    phase: 'form', durationSeconds: 120, leadSeconds: 30, toleranceMm: 420,
+  };
 
   const html = assistant._guidance(mmwaveAssistantViewModel(assistant.status));
 
   assert.match(html, /id="mmwaveCalibrationPrepareForm"/);
   assert.match(html, /name="duration_seconds"[^>]+min="60"[^>]+value="120"/);
   assert.match(html, /name="lead_seconds"[^>]+min="5"[^>]+value="30"/);
-  assert.match(html, /Countdown starten/);
+  assert.match(html, /name="tolerance_mm"[^>]+value="420"/);
+  assert.match(html, /Phase 1 starten/);
 });
 
-test('calibration preparation validates and schedules the chosen countdown', () => {
+test('calibration preparation starts the server-owned fixed-point phase', async () => {
   const assistant = new MmwaveCalibrationAssistant({});
   assistant._render = () => {};
-  assistant._startCalibrationTimer = () => {};
-  const before = Date.now();
   const form = {
     querySelector(selector) {
-      return { value: selector.includes('duration_seconds') ? '120' : '30' };
+      if (selector.includes('duration_seconds')) return { value: '120' };
+      if (selector.includes('lead_seconds')) return { value: '30' };
+      return { value: '420' };
     },
   };
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async () => ({
+    ok: true,
+    async json() {
+      return {
+        fixed_point_calibration: {
+          state: 'active', current_anchor_id: 'RX1', anchors: [],
+        },
+      };
+    },
+  });
 
-  assistant._scheduleCalibration(form);
+  try {
+    await assistant._scheduleCalibration(form);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
 
-  assert.equal(assistant.calibrationPlan.phase, 'countdown');
+  assert.equal(assistant.calibrationPlan.phase, 'anchor_waiting');
   assert.equal(assistant.calibrationPlan.durationSeconds, 120);
   assert.equal(assistant.calibrationPlan.leadSeconds, 30);
-  assert.ok(assistant.calibrationPlan.startsAtMs >= before + 29_000);
-  assert.match(assistant._calibrationPreparationMarkup(), /Sicher zurück ab \d{2}:\d{2}:\d{2} Uhr/);
+  assert.equal(assistant.calibrationPlan.toleranceMm, 420);
 });
 
 test('countdown starts mmWave calibration with the chosen empty duration', async () => {
@@ -381,8 +518,8 @@ test('calibration walk explains continuous radar labels without a manual point g
 
   const html = assistant._guidance(mmwaveAssistantViewModel(status));
 
-  assert.match(html, /CSI wird mit Radar-X\/Z verknüpft/);
-  assert.match(html, /P01–P09 entfällt/);
+  assert.match(html, /Phase 1 bestätigt RX1–RX4 und TX/);
+  assert.match(html, /Radar-X\/Z und CSI/);
 });
 
 test('HTTP 409 start errors survive a later successful status refresh', async () => {
@@ -527,7 +664,17 @@ test('preflight blockers use understandable labels and transport details', () =>
     },
     reject_reasons: { room_bounds: 3 },
     raw_udp_packets: 12,
-    transport: { queue_length: 2, queue_peak: 5, last_receive_to_process_delay_ms: 14 },
+    transport: {
+      queue_length: 2,
+      queue_peak: 5,
+      window_samples: 256,
+      valid_samples: 252,
+      valid_rate_hz: 9.96,
+      inter_arrival_median_ms: 100,
+      inter_arrival_p95_ms: 112,
+      receive_to_process_median_ms: 3,
+      receive_to_process_p95_ms: 14,
+    },
   };
   const assistant = new MmwaveCalibrationAssistant({});
 
@@ -540,4 +687,8 @@ test('preflight blockers use understandable labels and transport details', () =>
   assert.match(facts, /UDP roh/);
   assert.match(facts, /room_bounds 3/);
   assert.match(facts, /Queue \/ Peak/);
+  assert.match(facts, /252 \/ 256/);
+  assert.match(facts, /9\.96 Hz/);
+  assert.match(facts, /100 ms \/ 112 ms/);
+  assert.match(facts, /3 ms \/ 14 ms/);
 });

@@ -24,6 +24,10 @@ typedef struct {
 
 bool app_config_load(app_config_t *config);
 void app_config_snapshot(const app_config_t *config, app_config_t *snapshot);
+bool app_config_transport_valid(const char *target_host, uint16_t target_port);
+bool app_config_set_transport(app_config_t *config,
+                              const char *target_host,
+                              uint16_t target_port);
 bool app_config_set_mode(app_config_t *config, measurement_mode_t mode);
 bool app_config_transform_valid(int32_t origin_x_mm,
                                 int32_t origin_z_mm,

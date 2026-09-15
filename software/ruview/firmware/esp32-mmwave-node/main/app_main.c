@@ -24,7 +24,13 @@
 #define RADAR_TX_GPIO 21
 #define RADAR_BAUD 256000
 #define RADAR_NETWORK_SETTLE_MS 1000
-#define RADAR_STREAM_INTERVAL_US 100000
+#ifndef CONFIG_MMWAVE_STREAM_INTERVAL_MS
+#define CONFIG_MMWAVE_STREAM_INTERVAL_MS 50
+#endif
+#ifndef CONFIG_MMWAVE_WIFI_PS_NONE
+#define CONFIG_MMWAVE_WIFI_PS_NONE 1
+#endif
+#define RADAR_STREAM_INTERVAL_US ((int64_t)CONFIG_MMWAVE_STREAM_INTERVAL_MS * 1000)
 #define WIFI_CONNECTED_BIT BIT0
 
 static const char *TAG = "mmwave_node";
@@ -67,6 +73,12 @@ static void wifi_start(void)
     ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
     ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &wifi));
     ESP_ERROR_CHECK(esp_wifi_start());
+#if CONFIG_MMWAVE_WIFI_PS_NONE
+    // The radar node is mains-powered in the experiment setup. Disabling
+    // modem sleep avoids DTIM-sized receive delays on the UDP measurement
+    // stream; menuconfig can re-enable it for battery-powered deployments.
+    ESP_ERROR_CHECK(esp_wifi_set_ps(WIFI_PS_NONE));
+#endif
     xEventGroupWaitBits(s_wifi_events, WIFI_CONNECTED_BIT, pdFALSE, pdTRUE,
                         portMAX_DELAY);
 }

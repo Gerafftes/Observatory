@@ -17,7 +17,6 @@ logs/
 
 # RuView runtime and hardware-local state. These paths are intentionally not
 # part of the Observatory source/documentation publication.
-/.projectatlas/
 CLAUDE.local.md
 .swarm/
 .claude/

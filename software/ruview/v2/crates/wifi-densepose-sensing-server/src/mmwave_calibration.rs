@@ -10,7 +10,7 @@ use std::fs::{File, OpenOptions};
 use std::io::{BufWriter, Write};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use serde::{Deserialize, Serialize};
@@ -49,6 +49,7 @@ const BLOCKS_PER_ZONE: u8 = 6;
 const BLIND_VISITS_PER_ZONE: u8 = 2;
 const MAX_RECENT_OBSERVATIONS: usize = 256;
 const RECENT_RADAR_SEQUENCE_WINDOW: usize = 16;
+const REJECTION_WINDOW_NS: u64 = 25_000_000_000;
 const MIN_CELL_OBSERVATIONS: u32 = 3;
 const MIN_EMPTY_CALIBRATION_SECONDS: u64 = 60;
 const DEFAULT_EMPTY_CALIBRATION_SECONDS: u64 = 65;
@@ -61,6 +62,8 @@ const PREFLIGHT_FRESH_NS: u64 = 1_000_000_000;
 // clock gates below so a real interruption still fails closed.
 const PREFLIGHT_MIN_FRAMES_PER_RX: usize = 120;
 const NODE_STATUS_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(3);
+const TRANSPORT_METRIC_WINDOW_SAMPLES: usize = 256;
+const YAW_CALIBRATION_SCHEMA_VERSION: u16 = 1;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -140,6 +143,7 @@ pub(crate) struct Zone {
 pub(crate) enum SessionKind {
     Calibration,
     Blind,
+    MmwaveOnly,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -191,6 +195,7 @@ enum SessionPhase {
     Coverage,
     Training,
     Blind,
+    MmwaveOnly,
     Complete,
 }
 
@@ -218,6 +223,23 @@ pub(crate) struct EmptyCalibrationValidity {
     pub(crate) radar_packets: u64,
     pub(crate) max_radar_gap_ms: u64,
     pub(crate) csi_frames: u64,
+    pub(crate) duration_seconds: u64,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct MmwaveOnlyValidity {
+    pub(crate) verdict: String,
+    pub(crate) reasons: Vec<String>,
+    pub(crate) radar_packets: u64,
+    pub(crate) valid_target_packets: u64,
+    pub(crate) no_target_packets: u64,
+    pub(crate) outside_room_targets: u64,
+    pub(crate) multi_target_packets: u64,
+    pub(crate) invalid_packets: u64,
+    pub(crate) sequence_gaps: u64,
+    pub(crate) reboots: u64,
+    pub(crate) max_radar_gap_ms: u64,
     pub(crate) duration_seconds: u64,
 }
 
@@ -257,6 +279,7 @@ struct Session {
     empty_last_radar_packet_ns: Option<u64>,
     empty_max_radar_gap_ns: u64,
     empty_validity: Option<EmptyCalibrationValidity>,
+    mmwave_only_validity: Option<MmwaveOnlyValidity>,
     candidate_frames: Vec<RawCsiFrame>,
     candidate_positions_mm: Vec<[i32; 2]>,
     candidate_radar: Vec<RadarObservation>,
@@ -269,6 +292,16 @@ struct Session {
     dataset_records: Vec<CalibrationDatasetRecord>,
     clock_epoch_id: String,
     io_error: Option<String>,
+    mmwave_only_radar_packets: u64,
+    mmwave_only_valid_target_packets: u64,
+    mmwave_only_no_target_packets: u64,
+    mmwave_only_outside_room_targets: u64,
+    mmwave_only_multi_target_packets: u64,
+    mmwave_only_invalid_packets: u64,
+    mmwave_only_sequence_gaps: u64,
+    mmwave_only_reboots: u64,
+    mmwave_only_last_radar_packet_ns: Option<u64>,
+    mmwave_only_max_radar_gap_ns: u64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -288,6 +321,8 @@ struct SessionManifest {
     empty_duration_seconds: Option<u64>,
     #[serde(default)]
     empty_validity: Option<EmptyCalibrationValidity>,
+    #[serde(default)]
+    mmwave_only_validity: Option<MmwaveOnlyValidity>,
     error: Option<String>,
 }
 
@@ -421,11 +456,14 @@ pub(crate) struct MmwaveStatus {
     pub(crate) target_count: usize,
     pub(crate) target_raw_position_mm: Option<[i16; 2]>,
     pub(crate) target_position_mm: Option<[i32; 2]>,
+    pub(crate) targets: Vec<RadarTargetStatus>,
     pub(crate) packets_received: u64,
     pub(crate) packets_rejected: u64,
     pub(crate) packets_lost: u64,
     pub(crate) raw_udp_packets: u64,
     pub(crate) reject_reasons: BTreeMap<String, u64>,
+    pub(crate) packets_rejected_window: u64,
+    pub(crate) reject_reasons_window: BTreeMap<String, u64>,
     pub(crate) last_rejection: Option<PacketRejectionStatus>,
     pub(crate) last_sequence_gap: Option<SequenceGapStatus>,
     pub(crate) transport: MmwaveTransportStatus,
@@ -438,16 +476,21 @@ pub(crate) struct MmwaveStatus {
     pub(crate) node_status_error: Option<String>,
     pub(crate) node_control: NodeControlStatus,
     pub(crate) transform: Option<CoordinateFrame>,
+    pub(crate) source_transform: Option<CoordinateFrame>,
+    pub(crate) yaw_calibration: Option<YawCalibrationStatus>,
     pub(crate) coverage_cells: usize,
     pub(crate) zones: Vec<Zone>,
     pub(crate) zone_count: usize,
     pub(crate) recommended_zone_id: Option<String>,
     pub(crate) session: Option<SessionStatus>,
+    pub(crate) fixed_point_calibration: Option<FixedPointCalibrationStatus>,
     pub(crate) position_index_sha256: Option<String>,
     pub(crate) position_live_approved: bool,
     pub(crate) blind_report_sha256: Option<String>,
     pub(crate) blind_verdict: Option<String>,
     pub(crate) preflight: PreflightStatus,
+    pub(crate) radar_preflight: PreflightStatus,
+    pub(crate) fixed_point_preflight: PreflightStatus,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -457,6 +500,98 @@ pub(crate) struct PacketRejectionStatus {
     pub(crate) age_ms: u64,
     pub(crate) raw_position_mm: Option<[i16; 2]>,
     pub(crate) position_mm: Option<[i32; 2]>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub(crate) struct KnownPointCheck {
+    pub(crate) expected_position_mm: [i32; 2],
+    pub(crate) observed_raw_position_mm: [i32; 2],
+    pub(crate) observed_position_mm: [i32; 2],
+    pub(crate) sample_count: usize,
+    pub(crate) tolerance_mm: u32,
+    pub(crate) median_error_mm: u32,
+    pub(crate) maximum_error_mm: u32,
+    pub(crate) pass: bool,
+    pub(crate) transform: Option<CoordinateFrame>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub(crate) struct RadarTargetStatus {
+    pub(crate) slot: u8,
+    pub(crate) raw_position_mm: [i16; 2],
+    pub(crate) position_mm: [i32; 2],
+    pub(crate) inside_room: bool,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub(crate) struct FixedPointAnchorStatus {
+    pub(crate) id: String,
+    pub(crate) expected_position_mm: [i32; 2],
+    pub(crate) state: &'static str,
+    pub(crate) check: Option<KnownPointCheck>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub(crate) struct FixedPointCalibrationStatus {
+    pub(crate) state: &'static str,
+    pub(crate) current_anchor_id: Option<String>,
+    pub(crate) anchors: Vec<FixedPointAnchorStatus>,
+    pub(crate) yaw_calibration: Option<YawCalibrationStatus>,
+}
+
+#[derive(Debug, Clone)]
+struct FixedPointAnchor {
+    id: String,
+    expected_position_mm: [i32; 2],
+    check: Option<KnownPointCheck>,
+}
+
+#[derive(Debug, Clone)]
+struct FixedPointCalibration {
+    current_index: usize,
+    anchors: Vec<FixedPointAnchor>,
+    yaw_calibration: Option<YawCalibrationStatus>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct YawCalibrationAnchorStatus {
+    pub(crate) id: String,
+    pub(crate) before_error_mm: u32,
+    pub(crate) after_error_mm: u32,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct YawCalibrationStatus {
+    pub(crate) schema_version: u16,
+    pub(crate) source_kind: String,
+    pub(crate) source_id: String,
+    pub(crate) source_sha256: String,
+    pub(crate) created_at_unix_ns: u64,
+    pub(crate) base_transform: CoordinateFrame,
+    pub(crate) base_yaw_mdeg: i32,
+    pub(crate) previous_effective_yaw_mdeg: i32,
+    pub(crate) optimized_yaw_mdeg: i32,
+    pub(crate) correction_mdeg: i32,
+    pub(crate) point_count: usize,
+    pub(crate) before_rms_error_mm: u32,
+    pub(crate) after_rms_error_mm: u32,
+    pub(crate) before_median_error_mm: u32,
+    pub(crate) after_median_error_mm: u32,
+    pub(crate) before_maximum_error_mm: u32,
+    pub(crate) after_maximum_error_mm: u32,
+    pub(crate) improvement_percent: f64,
+    pub(crate) applied: bool,
+    pub(crate) persisted: bool,
+    pub(crate) anchors: Vec<YawCalibrationAnchorStatus>,
+}
+
+#[derive(Debug, Clone)]
+struct RecentRadarObservation {
+    observed_at_ns: u64,
+    raw_position_mm: [i32; 2],
+    room_position_mm: [i32; 2],
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -478,6 +613,13 @@ pub(crate) struct MmwaveTransportStatus {
     pub(crate) max_processing_duration_ms: Option<u64>,
     pub(crate) duplicate_packets: u64,
     pub(crate) sequence_discards: u64,
+    pub(crate) window_samples: usize,
+    pub(crate) valid_samples: usize,
+    pub(crate) valid_rate_hz: Option<f64>,
+    pub(crate) inter_arrival_median_ms: Option<u64>,
+    pub(crate) inter_arrival_p95_ms: Option<u64>,
+    pub(crate) receive_to_process_median_ms: Option<u64>,
+    pub(crate) receive_to_process_p95_ms: Option<u64>,
 }
 
 #[derive(Debug, Clone, Serialize, Default)]
@@ -497,6 +639,12 @@ pub(crate) struct CadProfileGeometry {
     pub(crate) profile_sha256: String,
     pub(crate) room_dimensions_m: [f64; 3],
     pub(crate) mounting_position_m: [f64; 3],
+    pub(crate) tx_position_m: Option<[f64; 3]>,
+    pub(crate) receiver_positions_m: Vec<[f64; 3]>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) yaw_mdeg: Option<i32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) raw_x_inverted: Option<bool>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -620,6 +768,95 @@ pub(crate) struct MmwaveTransportMetrics {
     max_processing_duration_ms: AtomicU64,
     duplicate_packets: AtomicU64,
     sequence_discards: AtomicU64,
+    window: Mutex<MmwaveTransportWindow>,
+}
+
+#[derive(Debug, Default)]
+struct MmwaveTransportWindow {
+    samples: VecDeque<MmwaveTransportSample>,
+}
+
+#[derive(Debug)]
+struct MmwaveTransportSample {
+    received_at_monotonic_ns: u64,
+    receive_to_process_delay_ms: u64,
+    accepted: bool,
+}
+
+#[derive(Debug, Default)]
+struct MmwaveTransportWindowSnapshot {
+    samples: usize,
+    valid_samples: usize,
+    valid_rate_hz: Option<f64>,
+    inter_arrival_median_ms: Option<u64>,
+    inter_arrival_p95_ms: Option<u64>,
+    receive_to_process_median_ms: Option<u64>,
+    receive_to_process_p95_ms: Option<u64>,
+}
+
+impl MmwaveTransportWindow {
+    fn record(&mut self, sample: MmwaveTransportSample) {
+        self.samples.push_back(sample);
+        if self.samples.len() > TRANSPORT_METRIC_WINDOW_SAMPLES {
+            self.samples.pop_front();
+        }
+    }
+
+    fn snapshot(&self) -> MmwaveTransportWindowSnapshot {
+        let mut inter_arrivals_ms: Vec<u64> = self
+            .samples
+            .iter()
+            .zip(self.samples.iter().skip(1))
+            .map(|(previous, current)| {
+                current
+                    .received_at_monotonic_ns
+                    .saturating_sub(previous.received_at_monotonic_ns)
+                    / 1_000_000
+            })
+            .collect();
+        let mut receive_to_process_ms: Vec<u64> = self
+            .samples
+            .iter()
+            .map(|sample| sample.receive_to_process_delay_ms)
+            .collect();
+        let valid_times: Vec<u64> = self
+            .samples
+            .iter()
+            .filter(|sample| sample.accepted)
+            .map(|sample| sample.received_at_monotonic_ns)
+            .collect();
+        let valid_rate_hz = valid_times.first().zip(valid_times.last()).and_then(
+            |(first, last)| {
+                let span_ns = last.saturating_sub(*first);
+                (valid_times.len() >= 2 && span_ns > 0).then(|| {
+                    (valid_times.len() - 1) as f64 * 1_000_000_000.0 / span_ns as f64
+                })
+            },
+        );
+        MmwaveTransportWindowSnapshot {
+            samples: self.samples.len(),
+            valid_samples: valid_times.len(),
+            valid_rate_hz,
+            inter_arrival_median_ms: percentile_ms(&mut inter_arrivals_ms, 50),
+            inter_arrival_p95_ms: percentile_ms(&mut inter_arrivals_ms, 95),
+            receive_to_process_median_ms: percentile_ms(&mut receive_to_process_ms, 50),
+            receive_to_process_p95_ms: percentile_ms(&mut receive_to_process_ms, 95),
+        }
+    }
+}
+
+fn percentile_ms(values: &mut [u64], percentile: usize) -> Option<u64> {
+    if values.is_empty() {
+        return None;
+    }
+    values.sort_unstable();
+    let index = values
+        .len()
+        .saturating_mul(percentile)
+        .div_ceil(100)
+        .saturating_sub(1)
+        .min(values.len() - 1);
+    Some(values[index])
 }
 
 impl MmwaveTransportMetrics {
@@ -677,6 +914,7 @@ impl MmwaveTransportMetrics {
         received_at_monotonic_ns: u64,
         processed_at_monotonic_ns: u64,
         processing_duration_ms: u64,
+        accepted: bool,
     ) {
         let queue_delay_ms = processed_at_monotonic_ns
             .saturating_sub(received_at_monotonic_ns)
@@ -687,9 +925,22 @@ impl MmwaveTransportMetrics {
         self.last_processing_duration_ms
             .store(processing_duration_ms, Ordering::Relaxed);
         update_atomic_max(&self.max_processing_duration_ms, processing_duration_ms);
+        self.window
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .record(MmwaveTransportSample {
+                received_at_monotonic_ns,
+                receive_to_process_delay_ms: queue_delay_ms,
+                accepted,
+            });
     }
 
     fn snapshot(&self) -> MmwaveTransportStatus {
+        let window = self
+            .window
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .snapshot();
         MmwaveTransportStatus {
             raw_udp_packets: self.raw_udp_packets.load(Ordering::Relaxed),
             queue_length: self.queue_length.load(Ordering::Relaxed),
@@ -708,6 +959,13 @@ impl MmwaveTransportMetrics {
             ),
             duplicate_packets: self.duplicate_packets.load(Ordering::Relaxed),
             sequence_discards: self.sequence_discards.load(Ordering::Relaxed),
+            window_samples: window.samples,
+            valid_samples: window.valid_samples,
+            valid_rate_hz: window.valid_rate_hz,
+            inter_arrival_median_ms: window.inter_arrival_median_ms,
+            inter_arrival_p95_ms: window.inter_arrival_p95_ms,
+            receive_to_process_median_ms: window.receive_to_process_median_ms,
+            receive_to_process_p95_ms: window.receive_to_process_p95_ms,
         }
     }
 }
@@ -734,6 +992,10 @@ fn update_atomic_max(target: &AtomicU64, value: u64) {
 impl MmwaveStatus {
     pub(crate) fn preflight_ready(&self) -> bool {
         self.preflight.ready
+    }
+
+    pub(crate) fn radar_preflight_ready(&self) -> bool {
+        self.radar_preflight.ready
     }
 
     pub(crate) fn attach_node_diagnostics(&mut self, diagnostics: Result<NodeDiagnostics, String>) {
@@ -828,6 +1090,7 @@ pub(crate) struct SessionStatus {
     empty_duration_seconds: Option<u64>,
     empty_remaining_seconds: Option<u64>,
     empty_validity: Option<EmptyCalibrationValidity>,
+    mmwave_only_validity: Option<MmwaveOnlyValidity>,
     error: Option<String>,
     next_instruction: String,
 }
@@ -876,10 +1139,12 @@ pub(crate) struct MmwaveManager {
     target_count: usize,
     target_raw_position_mm: Option<[i16; 2]>,
     target_position_mm: Option<[i32; 2]>,
+    targets: Vec<RadarTargetStatus>,
     packets_received: u64,
     packets_rejected: u64,
     packets_lost: u64,
     reject_reasons: BTreeMap<String, u64>,
+    recent_rejections: VecDeque<(u64, String)>,
     last_rejection: Option<LastPacketRejection>,
     last_sequence_gap: Option<LastSequenceGap>,
     reboot_count: u64,
@@ -889,7 +1154,9 @@ pub(crate) struct MmwaveManager {
     zones: Vec<Zone>,
     last_csi_ns: [Option<u64>; 4],
     session: Option<Session>,
-    recent_observations: VecDeque<(u64, [i32; 2])>,
+    fixed_point_calibration: Option<FixedPointCalibration>,
+    recent_observations: VecDeque<RecentRadarObservation>,
+    yaw_calibration: Option<YawCalibrationStatus>,
     pending_index: Option<(PathBuf, String)>,
     blind_index: Option<MmwavePositionIndexArtifact>,
     position_index_sha256: Option<String>,
@@ -943,10 +1210,12 @@ impl MmwaveManager {
             target_count: 0,
             target_raw_position_mm: None,
             target_position_mm: None,
+            targets: Vec::new(),
             packets_received: 0,
             packets_rejected: 0,
             packets_lost: 0,
             reject_reasons: BTreeMap::new(),
+            recent_rejections: VecDeque::new(),
             last_rejection: None,
             last_sequence_gap: None,
             reboot_count: 0,
@@ -956,7 +1225,9 @@ impl MmwaveManager {
             zones: Vec::new(),
             last_csi_ns: [None; 4],
             session: None,
+            fixed_point_calibration: None,
             recent_observations: VecDeque::new(),
+            yaw_calibration: None,
             pending_index: None,
             blind_index: None,
             position_index_sha256: None,
@@ -998,11 +1269,62 @@ impl MmwaveManager {
             self.cad_profile_error = Some("CAD-Profil enthält keine vollständige Raum- und mmWave-Geometrie.".to_string());
             return;
         };
+        let tx_position_m = serde_json::from_value::<[f64; 3]>(
+            profile.document["transmitter"]["position_m"].clone(),
+        )
+        .ok();
+        let receiver_positions_m = profile
+            .document
+            .get("receivers")
+            .and_then(serde_json::Value::as_array)
+            .map(|receivers| {
+                receivers
+                    .iter()
+                    .filter_map(|receiver| {
+                        serde_json::from_value::<[f64; 3]>(receiver["position_m"].clone()).ok()
+                    })
+                    .collect::<Vec<_>>()
+            })
+            .unwrap_or_default();
         if !room.iter().all(|v| v.is_finite() && *v > 0.0 && *v <= 100.0)
             || !mounting.iter().all(|v| v.is_finite() && v.abs() <= 100.0) {
             self.cad_profile_error = Some("CAD-Geometrie liegt außerhalb des unterstützten Bereichs.".to_string());
             return;
         }
+        let orientation = (|| {
+            let mmwave = profile
+                .document
+                .get("mmwave")
+                .and_then(serde_json::Value::as_object)
+                .ok_or_else(|| "CAD-Profil enthält keine mmWave-Ausrichtung.".to_string())?;
+            let yaw_mdeg = match mmwave.get("yaw_mdeg") {
+                None => None,
+                Some(value) => {
+                    let value = value
+                        .as_i64()
+                        .and_then(|value| i32::try_from(value).ok())
+                        .filter(|value| (-360000..=360000).contains(value))
+                        .ok_or_else(|| "mmwave.yaw_mdeg muss eine ganze Zahl zwischen -360000 und 360000 sein.".to_string())?;
+                    Some(value)
+                }
+            };
+            let raw_x_inverted = mmwave
+                .get("raw_x_inverted")
+                .map(|value| {
+                    value
+                        .as_bool()
+                        .ok_or_else(|| "mmwave.raw_x_inverted muss ein boolescher Wert sein.".to_string())
+                })
+                .transpose()?;
+            Ok::<_, String>((yaw_mdeg, raw_x_inverted))
+        })();
+        let (yaw_mdeg, raw_x_inverted) = match orientation {
+            Ok(orientation) => orientation,
+            Err(error) => {
+                self.cad_profile_error = Some(error);
+                return;
+            }
+        };
         if self.cad_profile.as_ref().is_some_and(|cad| cad.profile_sha256 == profile.profile_sha256) {
             return;
         }
@@ -1010,12 +1332,17 @@ impl MmwaveManager {
         self.cad_profile = Some(CadProfileGeometry {
             revision_id: profile.revision_id.clone(), profile_sha256: profile.profile_sha256.clone(),
             room_dimensions_m: room, mounting_position_m: mounting,
+            tx_position_m, receiver_positions_m,
+            yaw_mdeg, raw_x_inverted,
         });
         self.cad_profile_error = None;
         self.last_transform = None;
         self.target_position_mm = None;
         self.target_raw_position_mm = None;
+        self.targets.clear();
         self.last_rejection = None;
+        self.fixed_point_calibration = None;
+        self.yaw_calibration = None;
         self.coverage.clear();
         self.reset_stability();
         self.state = LinkState::Disconnected;
@@ -1024,6 +1351,487 @@ impl MmwaveManager {
 
     pub(crate) fn transport_metrics(&self) -> Arc<MmwaveTransportMetrics> {
         self.transport_metrics.clone()
+    }
+
+    pub(crate) fn check_known_point(
+        &self,
+        expected_position_mm: [i32; 2],
+        tolerance_mm: u32,
+        window_ms: u64,
+        now_ns: u64,
+    ) -> Result<KnownPointCheck, String> {
+        let window_ns = window_ms.saturating_mul(1_000_000);
+        let positions: Vec<[i32; 2]> = self
+            .recent_observations
+            .iter()
+            .filter(|observation| {
+                now_ns.saturating_sub(observation.observed_at_ns) <= window_ns
+            })
+            .map(|observation| observation.room_position_mm)
+            .collect();
+        let raw_positions: Vec<[i32; 2]> = self
+            .recent_observations
+            .iter()
+            .filter(|observation| {
+                now_ns.saturating_sub(observation.observed_at_ns) <= window_ns
+            })
+            .map(|observation| observation.raw_position_mm)
+            .collect();
+        let observed_position_mm = median_position_mm(&positions)
+            .ok_or_else(|| "no fresh single-target radar observations in the check window".to_string())?;
+        let observed_raw_position_mm = median_position_mm(&raw_positions)
+            .ok_or_else(|| "no fresh single-target radar observations in the check window".to_string())?;
+        let error_for = |position: [i32; 2]| -> u32 {
+            let dx = i64::from(position[0]) - i64::from(expected_position_mm[0]);
+            let dz = i64::from(position[1]) - i64::from(expected_position_mm[1]);
+            (((dx * dx + dz * dz) as f64).sqrt().round() as u64).min(u64::from(u32::MAX)) as u32
+        };
+        let errors: Vec<u32> = positions.iter().copied().map(error_for).collect();
+        let mut sorted_errors = errors.clone();
+        sorted_errors.sort_unstable();
+        let median_error_mm = sorted_errors[sorted_errors.len() / 2];
+        let maximum_error_mm = sorted_errors.iter().copied().max().unwrap_or(0);
+        Ok(KnownPointCheck {
+            expected_position_mm,
+            observed_raw_position_mm,
+            observed_position_mm,
+            sample_count: positions.len(),
+            tolerance_mm,
+            median_error_mm,
+            maximum_error_mm,
+            pass: median_error_mm <= tolerance_mm,
+            transform: self.last_transform.clone(),
+        })
+    }
+
+    fn fixed_point_status(&self) -> Option<FixedPointCalibrationStatus> {
+        let calibration = self.fixed_point_calibration.as_ref()?;
+        let complete = calibration.current_index >= calibration.anchors.len();
+        Some(FixedPointCalibrationStatus {
+            state: if complete { "complete" } else { "active" },
+            current_anchor_id: (!complete)
+                .then(|| calibration.anchors[calibration.current_index].id.clone()),
+            anchors: calibration
+                .anchors
+                .iter()
+                .enumerate()
+                .map(|(index, anchor)| FixedPointAnchorStatus {
+                    id: anchor.id.clone(),
+                    expected_position_mm: anchor.expected_position_mm,
+                    state: if anchor.check.is_some() {
+                        "complete"
+                    } else if index == calibration.current_index {
+                        "current"
+                    } else {
+                        "pending"
+                    },
+                    check: anchor.check.clone(),
+                })
+                .collect(),
+            yaw_calibration: calibration.yaw_calibration.clone(),
+        })
+    }
+
+    pub(crate) fn validate_fixed_point_start(&self, now_ns: u64) -> Result<(), String> {
+        if self.session.is_some() {
+            return Err("an mmWave session is already active".to_string());
+        }
+        let (_, receivers) = self.fixed_point_geometry().ok_or_else(|| {
+            "an active CAD profile or sealed setup with TX and RX1 through RX4 is required"
+                .to_string()
+        })?;
+        if receivers.len() != 4 {
+            return Err("fixed-point calibration requires RX1 through RX4".to_string());
+        }
+        let preflight = self.fixed_point_preflight(now_ns);
+        if !preflight.ready {
+            let blockers = preflight
+                .gates
+                .iter()
+                .filter(|gate| !gate.pass)
+                .map(|gate| gate.id)
+                .collect::<Vec<_>>()
+                .join(", ");
+            return Err(format!("mmWave radar preflight is not ready: {blockers}"));
+        }
+        Ok(())
+    }
+
+    fn fixed_point_geometry(&self) -> Option<([f64; 3], Vec<[f64; 3]>)> {
+        if let Some(experiment) = &self.experiment {
+            return Some((
+                experiment.geometry.tx_position_m,
+                experiment.geometry.rx_positions_m.clone(),
+            ));
+        }
+        let cad = self.cad_profile.as_ref()?;
+        Some((cad.tx_position_m?, cad.receiver_positions_m.clone()))
+    }
+
+    pub(crate) fn start_fixed_point_calibration(
+        &mut self,
+        now_ns: u64,
+    ) -> Result<FixedPointCalibrationStatus, String> {
+        self.validate_fixed_point_start(now_ns)?;
+        let (tx, receivers) = self
+            .fixed_point_geometry()
+            .expect("validated fixed-point geometry");
+        let mut anchors = receivers
+            .iter()
+            .enumerate()
+            .map(|(index, position)| FixedPointAnchor {
+                id: format!("RX{}", index + 1),
+                expected_position_mm: [
+                    (position[0] * 1_000.0).round() as i32,
+                    (position[2] * 1_000.0).round() as i32,
+                ],
+                check: None,
+            })
+            .collect::<Vec<_>>();
+        anchors.push(FixedPointAnchor {
+            id: "TX".to_string(),
+            expected_position_mm: [
+                (tx[0] * 1_000.0).round() as i32,
+                (tx[2] * 1_000.0).round() as i32,
+            ],
+            check: None,
+        });
+        self.fixed_point_calibration = Some(FixedPointCalibration {
+            current_index: 0,
+            anchors,
+            yaw_calibration: None,
+        });
+        self.expected_mode = Some(MeasurementMode::Calibration);
+        self.fixed_point_status()
+            .ok_or_else(|| "could not start fixed-point calibration".to_string())
+    }
+
+    pub(crate) fn check_current_fixed_point(
+        &mut self,
+        tolerance_mm: u32,
+        window_ms: u64,
+        now_ns: u64,
+    ) -> Result<FixedPointCalibrationStatus, String> {
+        let (current_index, expected_position_mm) = {
+            let calibration = self
+                .fixed_point_calibration
+                .as_ref()
+                .ok_or_else(|| "fixed-point calibration is not active".to_string())?;
+            if calibration.current_index >= calibration.anchors.len() {
+                return Err("fixed-point calibration is already complete".to_string());
+            }
+            (
+                calibration.current_index,
+                calibration.anchors[calibration.current_index].expected_position_mm,
+            )
+        };
+        let check = self.check_known_point(
+            expected_position_mm,
+            tolerance_mm,
+            window_ms,
+            now_ns,
+        )?;
+        let complete = {
+            let calibration = self
+                .fixed_point_calibration
+                .as_mut()
+                .expect("fixed-point calibration remained active");
+            calibration.anchors[current_index].check = Some(check);
+            calibration.current_index += 1;
+            calibration.current_index >= calibration.anchors.len()
+        };
+        if complete {
+            let yaw_calibration = self.optimize_fixed_point_yaw(now_unix_ns())?;
+            self.yaw_calibration = Some(yaw_calibration.clone());
+            self.fixed_point_calibration
+                .as_mut()
+                .expect("fixed-point calibration remained active")
+                .yaw_calibration = Some(yaw_calibration);
+        }
+        self.fixed_point_status()
+            .ok_or_else(|| "fixed-point calibration disappeared".to_string())
+    }
+
+    fn calibration_source(&self) -> Option<(&'static str, String, String)> {
+        if let Some(experiment) = &self.experiment {
+            return Some((
+                "setup",
+                experiment.setup_id.clone(),
+                experiment.setup_sha256.clone(),
+            ));
+        }
+        self.cad_profile.as_ref().map(|profile| {
+            (
+                "profile",
+                profile.revision_id.clone(),
+                profile.profile_sha256.clone(),
+            )
+        })
+    }
+
+    fn optimize_fixed_point_yaw(
+        &self,
+        created_at_unix_ns: u64,
+    ) -> Result<YawCalibrationStatus, String> {
+        let calibration = self
+            .fixed_point_calibration
+            .as_ref()
+            .ok_or_else(|| "fixed-point calibration is not active".to_string())?;
+        let points = calibration
+            .anchors
+            .iter()
+            .map(|anchor| {
+                anchor
+                    .check
+                    .as_ref()
+                    .map(|check| (anchor.id.clone(), anchor.expected_position_mm, check))
+                    .ok_or_else(|| format!("fixed point {} has no observation", anchor.id))
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        if points.len() < 2 {
+            return Err("yaw calibration requires at least two measured reference points".to_string());
+        }
+        let base_transform = points
+            .first()
+            .and_then(|(_, _, check)| check.transform.clone())
+            .or_else(|| self.last_transform.clone())
+            .ok_or_else(|| "yaw calibration requires a known source transform".to_string())?;
+        let (source_kind, source_id, source_sha256) = self
+            .calibration_source()
+            .ok_or_else(|| "yaw calibration requires a saved profile or sealed setup".to_string())?;
+        let previous_effective_yaw_mdeg = self
+            .yaw_calibration
+            .as_ref()
+            .filter(|calibration| {
+                calibration.source_kind == source_kind
+                    && calibration.source_id == source_id
+                    && calibration.source_sha256 == source_sha256
+                    && calibration.base_transform == base_transform
+            })
+            .map(|calibration| calibration.optimized_yaw_mdeg)
+            .unwrap_or(base_transform.yaw_mdeg);
+
+        let mut dot = 0.0_f64;
+        let mut cross = 0.0_f64;
+        for (_, expected, check) in &points {
+            let right = f64::from(check.observed_raw_position_mm[0])
+                * if base_transform.raw_x_inverted { -1.0 } else { 1.0 };
+            let forward = f64::from(check.observed_raw_position_mm[1]);
+            let expected_x = f64::from(expected[0] - base_transform.origin_x_mm);
+            let expected_z = f64::from(expected[1] - base_transform.origin_z_mm);
+            dot += forward * expected_x + right * expected_z;
+            cross += forward * expected_z - right * expected_x;
+        }
+        if dot.abs() < f64::EPSILON && cross.abs() < f64::EPSILON {
+            return Err("reference points cannot determine a yaw angle".to_string());
+        }
+        let candidate_yaw_mdeg = normalize_yaw_mdeg(
+            (cross.atan2(dot).to_degrees() * 1_000.0).round() as i32,
+        );
+        let before_errors = yaw_errors_mm(
+            &points,
+            &base_transform,
+            previous_effective_yaw_mdeg,
+        );
+        let candidate_errors = yaw_errors_mm(&points, &base_transform, candidate_yaw_mdeg);
+        let before_rms = rms_error_mm(&before_errors);
+        let candidate_rms = rms_error_mm(&candidate_errors);
+        let applied = candidate_rms + f64::EPSILON < before_rms;
+        let optimized_yaw_mdeg = if applied {
+            candidate_yaw_mdeg
+        } else {
+            previous_effective_yaw_mdeg
+        };
+        let after_errors = if applied {
+            candidate_errors
+        } else {
+            before_errors.clone()
+        };
+        let after_rms = rms_error_mm(&after_errors);
+        let before_summary = error_summary_mm(&before_errors);
+        let after_summary = error_summary_mm(&after_errors);
+        let anchors = points
+            .iter()
+            .enumerate()
+            .map(|(index, (id, _, _))| YawCalibrationAnchorStatus {
+                id: id.clone(),
+                before_error_mm: before_errors[index].round().max(0.0) as u32,
+                after_error_mm: after_errors[index].round().max(0.0) as u32,
+            })
+            .collect();
+
+        Ok(YawCalibrationStatus {
+            schema_version: YAW_CALIBRATION_SCHEMA_VERSION,
+            source_kind: source_kind.to_string(),
+            source_id,
+            source_sha256,
+            created_at_unix_ns,
+            base_transform: base_transform.clone(),
+            base_yaw_mdeg: base_transform.yaw_mdeg,
+            previous_effective_yaw_mdeg,
+            optimized_yaw_mdeg,
+            correction_mdeg: normalize_signed_yaw_mdeg(
+                optimized_yaw_mdeg - base_transform.yaw_mdeg,
+            ),
+            point_count: points.len(),
+            before_rms_error_mm: before_rms.round().max(0.0) as u32,
+            after_rms_error_mm: after_rms.round().max(0.0) as u32,
+            before_median_error_mm: before_summary.0,
+            after_median_error_mm: after_summary.0,
+            before_maximum_error_mm: before_summary.1,
+            after_maximum_error_mm: after_summary.1,
+            improvement_percent: if before_rms > 0.0 {
+                ((before_rms - after_rms) / before_rms * 100.0).max(0.0)
+            } else {
+                0.0
+            },
+            applied,
+            persisted: false,
+            anchors,
+        })
+    }
+
+    fn effective_transform(&self) -> Option<CoordinateFrame> {
+        let mut transform = self.last_transform.clone()?;
+        if let Some(calibration) = &self.yaw_calibration {
+            if calibration.base_transform == transform {
+                transform.yaw_mdeg = calibration.optimized_yaw_mdeg;
+            }
+        }
+        Some(transform)
+    }
+
+    fn apply_yaw_calibration(&self, packet: &mut RadarPacket) {
+        let Some(calibration) = self.yaw_calibration.as_ref() else {
+            return;
+        };
+        if calibration.base_transform != packet.coordinate_frame {
+            return;
+        }
+        let yaw = (f64::from(calibration.optimized_yaw_mdeg) / 1_000.0).to_radians();
+        for target in &mut packet.targets {
+            let right = f64::from(target.x_mm)
+                * if packet.coordinate_frame.raw_x_inverted { -1.0 } else { 1.0 };
+            let forward = f64::from(target.y_mm);
+            target.room_x_mm = packet.coordinate_frame.origin_x_mm
+                + (forward * yaw.cos() - right * yaw.sin()).round() as i32;
+            target.room_z_mm = packet.coordinate_frame.origin_z_mm
+                + (forward * yaw.sin() + right * yaw.cos()).round() as i32;
+        }
+    }
+
+    pub(crate) fn persist_yaw_calibration(&mut self, data_dir: &Path) -> Result<(), String> {
+        let calibration = self
+            .yaw_calibration
+            .as_mut()
+            .ok_or_else(|| "no completed yaw calibration is available".to_string())?;
+        if calibration.persisted {
+            return Ok(());
+        }
+        let directory = data_dir.join("mmwave").join("yaw-calibrations");
+        std::fs::create_dir_all(&directory)
+            .map_err(|error| format!("could not create {}: {error}", directory.display()))?;
+        let path = directory.join(format!(
+            "yaw-{}-{}.json",
+            calibration.created_at_unix_ns,
+            calibration.source_sha256.chars().take(16).collect::<String>()
+        ));
+        let mut artifact = calibration.clone();
+        artifact.persisted = true;
+        write_pretty_json_no_clobber(&path, &artifact).map_err(|error| error.to_string())?;
+        *calibration = artifact.clone();
+        if let Some(fixed) = self.fixed_point_calibration.as_mut() {
+            fixed.yaw_calibration = Some(artifact);
+        }
+        Ok(())
+    }
+
+    pub(crate) fn restore_yaw_calibration(&mut self, data_dir: &Path) -> Result<(), String> {
+        let Some((source_kind, source_id, source_sha256)) = self.calibration_source() else {
+            return Ok(());
+        };
+        let directory = data_dir.join("mmwave").join("yaw-calibrations");
+        let entries = match std::fs::read_dir(&directory) {
+            Ok(entries) => entries,
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(()),
+            Err(error) => {
+                return Err(format!("could not read {}: {error}", directory.display()));
+            }
+        };
+        let mut latest = None;
+        for entry in entries {
+            let entry = entry.map_err(|error| error.to_string())?;
+            if entry.path().extension().and_then(|value| value.to_str()) != Some("json") {
+                continue;
+            }
+            let bytes = std::fs::read(entry.path()).map_err(|error| error.to_string())?;
+            let calibration: YawCalibrationStatus = match serde_json::from_slice(&bytes) {
+                Ok(calibration) => calibration,
+                Err(_) => continue,
+            };
+            if calibration.schema_version != YAW_CALIBRATION_SCHEMA_VERSION
+                || calibration.source_kind != source_kind
+                || calibration.source_id != source_id
+                || calibration.source_sha256 != source_sha256
+                || self
+                    .expected_node
+                    .as_ref()
+                    .is_some_and(|node| node.transform != calibration.base_transform)
+            {
+                continue;
+            }
+            if latest.as_ref().is_none_or(|current: &YawCalibrationStatus| {
+                calibration.created_at_unix_ns > current.created_at_unix_ns
+            }) {
+                latest = Some(calibration);
+            }
+        }
+        self.yaw_calibration = latest;
+        Ok(())
+    }
+
+    pub(crate) fn cancel_fixed_point_calibration(&mut self) {
+        self.fixed_point_calibration = None;
+        if self.session.is_none() {
+            self.expected_mode = None;
+        }
+    }
+
+    pub(crate) fn validate_calibration_phase_two_start(&self) -> Result<(), String> {
+        let experiment = self
+            .experiment
+            .as_ref()
+            .ok_or_else(|| "a sealed schema-v2 setup is required".to_string())?;
+        let calibration = self.fixed_point_calibration.as_ref().ok_or_else(|| {
+            "phase 1 must calibrate RX1 through RX4 and TX before CSI calibration"
+                .to_string()
+        })?;
+        if calibration.current_index < calibration.anchors.len() {
+            return Err("phase 1 must be completed before CSI calibration".to_string());
+        }
+        let mut expected_positions = experiment
+            .geometry
+            .rx_positions_m
+            .iter()
+            .map(|position| [
+                (position[0] * 1_000.0).round() as i32,
+                (position[2] * 1_000.0).round() as i32,
+            ])
+            .collect::<Vec<_>>();
+        let tx = experiment.geometry.tx_position_m;
+        expected_positions.push([
+            (tx[0] * 1_000.0).round() as i32,
+            (tx[2] * 1_000.0).round() as i32,
+        ]);
+        if calibration
+            .anchors
+            .iter()
+            .map(|anchor| anchor.expected_position_mm)
+            .ne(expected_positions)
+        {
+            return Err("phase 1 positions do not match the active sealed setup".to_string());
+        }
+        Ok(())
     }
 
     pub(crate) fn set_node_control_configuration(
@@ -1093,6 +1901,7 @@ impl MmwaveManager {
         self.expected_mode = Some(match kind {
             SessionKind::Calibration => MeasurementMode::Calibration,
             SessionKind::Blind => MeasurementMode::Reference,
+            SessionKind::MmwaveOnly => MeasurementMode::Calibration,
         });
         Ok(())
     }
@@ -1257,19 +2066,25 @@ impl MmwaveManager {
                 )
             })?;
         if let Some(cad) = &self.cad_profile {
-            // Preview uses the saved mounting point and the sensor's measured
-            // coordinate convention. Raw packet bytes are never rewritten.
+            // Preview uses the saved mounting point and any explicit profile
+            // orientation. Raw packet bytes are never rewritten.
             let origin_x = (cad.mounting_position_m[0] * 1000.0).round() as i32;
             let origin_z = (cad.mounting_position_m[2] * 1000.0).round() as i32;
-            let yaw = (packet.coordinate_frame.yaw_mdeg as f64 / 1000.0).to_radians();
+            let yaw_mdeg = cad.yaw_mdeg.unwrap_or(packet.coordinate_frame.yaw_mdeg);
+            let raw_x_inverted = cad
+                .raw_x_inverted
+                .unwrap_or(packet.coordinate_frame.raw_x_inverted);
+            let yaw = (yaw_mdeg as f64 / 1000.0).to_radians();
             for target in &mut packet.targets {
-                let right = f64::from(target.x_mm) * if packet.coordinate_frame.raw_x_inverted { -1.0 } else { 1.0 };
+                let right = f64::from(target.x_mm) * if raw_x_inverted { -1.0 } else { 1.0 };
                 let forward = f64::from(target.y_mm);
                 target.room_x_mm = origin_x + (forward * yaw.cos() - right * yaw.sin()).round() as i32;
                 target.room_z_mm = origin_z + (forward * yaw.sin() + right * yaw.cos()).round() as i32;
             }
             packet.coordinate_frame.origin_x_mm = origin_x;
             packet.coordinate_frame.origin_z_mm = origin_z;
+            packet.coordinate_frame.yaw_mdeg = yaw_mdeg;
+            packet.coordinate_frame.raw_x_inverted = raw_x_inverted;
         }
         let sequence_disposition = self
             .validate_identity_and_sequence(&packet, host_time.host_monotonic_ns)
@@ -1279,6 +2094,9 @@ impl MmwaveManager {
         if sequence_disposition == RadarSequenceDisposition::Duplicate {
             return Ok(());
         }
+        // The firmware and sealed setup retain the immutable source transform.
+        // A setup-bound calibration may refine only the derived room positions.
+        self.apply_yaw_calibration(&mut packet);
         // Advance the transport high-water mark before validating content such
         // as room bounds. A well-formed packet that is rejected for content was
         // still received; otherwise every such reject is miscounted as a gap
@@ -1319,9 +2137,30 @@ impl MmwaveManager {
             .iter()
             .filter(|target| target.present)
             .collect();
+        self.node_id = Some(packet.node_id.clone());
+        self.mode = Some(packet.mode);
+        self.last_packet_ns = Some(host_time.host_monotonic_ns);
+        self.clock_epoch_id = Some(host_time.clock_epoch_id.clone());
+        self.last_transform = Some(packet.coordinate_frame.clone());
+        self.target_count = present.len();
+        self.targets = present
+            .iter()
+            .map(|target| RadarTargetStatus {
+                slot: target.slot,
+                raw_position_mm: [target.x_mm, target.y_mm],
+                position_mm: [target.room_x_mm, target.room_z_mm],
+                inside_room: self.validate_room_bounds(target).is_ok(),
+            })
+            .collect();
+        if let [target] = present.as_slice() {
+            self.remember_recent_observation(target, &host_time);
+        }
         let mut outside_room_reason = None;
-        if let Some(target) = present.first() {
-            if let Err(error) = self.validate_room_bounds(target) {
+        if let Some((target, error)) = present.iter().find_map(|target| {
+            self.validate_room_bounds(target)
+                .err()
+                .map(|error| (*target, error))
+        }) {
                 let reason = self.reject_at_with_position(
                     PacketRejectCategory::RoomBounds,
                     error,
@@ -1329,29 +2168,19 @@ impl MmwaveManager {
                     Some([target.x_mm, target.y_mm]),
                     Some([target.room_x_mm, target.room_z_mm]),
                 );
-                if self
-                    .session
-                    .as_ref()
-                    .is_some_and(|session| session.phase == SessionPhase::EmptyCalibration)
+                if self.session.as_ref().is_some_and(|session| {
+                    matches!(session.phase, SessionPhase::EmptyCalibration | SessionPhase::MmwaveOnly)
+                })
                 {
                     outside_room_reason = Some(reason);
                 } else {
                     return Err(reason);
                 }
-            }
         }
 
         self.packets_received += 1;
-        self.node_id = Some(packet.node_id.clone());
-        self.mode = Some(packet.mode);
-        self.boot_id = Some(packet.boot_id);
-        self.sequence = Some(packet.sequence);
-        self.last_packet_ns = Some(host_time.host_monotonic_ns);
-        self.clock_epoch_id = Some(host_time.clock_epoch_id.clone());
-        self.last_transform = Some(packet.coordinate_frame.clone());
-        self.target_count = present.len();
         if let Some(session) = &mut self.session {
-            if session.phase == SessionPhase::EmptyCalibration {
+            if matches!(session.phase, SessionPhase::EmptyCalibration | SessionPhase::MmwaveOnly) {
                 if let Some(previous) = session.empty_last_radar_packet_ns {
                     session.empty_max_radar_gap_ns = session
                         .empty_max_radar_gap_ns
@@ -1359,6 +2188,17 @@ impl MmwaveManager {
                 }
                 session.empty_last_radar_packet_ns = Some(host_time.host_monotonic_ns);
                 session.empty_radar_packets = session.empty_radar_packets.saturating_add(1);
+                if session.phase == SessionPhase::MmwaveOnly {
+                    if let Some(previous) = session.mmwave_only_last_radar_packet_ns {
+                        session.mmwave_only_max_radar_gap_ns = session
+                            .mmwave_only_max_radar_gap_ns
+                            .max(host_time.host_monotonic_ns.saturating_sub(previous));
+                    }
+                    session.mmwave_only_last_radar_packet_ns =
+                        Some(host_time.host_monotonic_ns);
+                    session.mmwave_only_radar_packets =
+                        session.mmwave_only_radar_packets.saturating_add(1);
+                }
             }
         }
 
@@ -1367,18 +2207,37 @@ impl MmwaveManager {
                 self.target_raw_position_mm = None;
                 self.target_position_mm = None;
                 self.state = LinkState::Invalid;
-                self.reason = format!(
-                    "Outside-room radar target ignored; empty-room calibration continues. {reason}"
-                );
+                self.reason = if self
+                    .session
+                    .as_ref()
+                    .is_some_and(|session| session.phase == SessionPhase::MmwaveOnly)
+                {
+                    format!("Outside-room radar target ignored; radar-only check continues. {reason}")
+                } else {
+                    format!("Outside-room radar target ignored; empty-room calibration continues. {reason}")
+                };
                 self.advance_empty_calibration(&host_time)?;
+                self.advance_mmwave_only_calibration(&host_time)?;
             }
             (None, []) => {
                 self.target_raw_position_mm = None;
                 self.target_position_mm = None;
                 self.state = LinkState::NoTarget;
                 self.reason = "Radar is connected but currently sees no target.".to_string();
+                if self
+                    .session
+                    .as_ref()
+                    .is_some_and(|session| session.phase == SessionPhase::MmwaveOnly)
+                {
+                    if let Some(session) = &mut self.session {
+                        session.mmwave_only_no_target_packets = session
+                            .mmwave_only_no_target_packets
+                            .saturating_add(1);
+                    }
+                }
                 self.reset_stability();
                 self.advance_empty_calibration(&host_time)?;
+                self.advance_mmwave_only_calibration(&host_time)?;
             }
             (None, [target]) => {
                 self.target_raw_position_mm = Some([target.x_mm, target.y_mm]);
@@ -1387,13 +2246,20 @@ impl MmwaveManager {
                 if self
                     .session
                     .as_ref()
-                    .is_some_and(|session| session.phase == SessionPhase::EmptyCalibration)
+                    .is_some_and(|session| matches!(session.phase, SessionPhase::EmptyCalibration | SessionPhase::MmwaveOnly))
                 {
                     if let Some(session) = &mut self.session {
-                        session.empty_in_room_targets = session.empty_in_room_targets.saturating_add(1);
+                        if session.phase == SessionPhase::MmwaveOnly {
+                            session.mmwave_only_valid_target_packets = session
+                                .mmwave_only_valid_target_packets
+                                .saturating_add(1);
+                        } else {
+                            session.empty_in_room_targets = session.empty_in_room_targets.saturating_add(1);
+                        }
                     }
                     self.reason = "In-room radar target recorded; empty-room calibration continues and will be evaluated at the end.".to_string();
                     self.advance_empty_calibration(&host_time)?;
+                    self.advance_mmwave_only_calibration(&host_time)?;
                 } else {
                     self.reason = "One valid radar target is available.".to_string();
                     self.observe_target(target, &host_time)?;
@@ -1406,15 +2272,22 @@ impl MmwaveManager {
                 if self
                     .session
                     .as_ref()
-                    .is_some_and(|session| session.phase == SessionPhase::EmptyCalibration)
+                    .is_some_and(|session| matches!(session.phase, SessionPhase::EmptyCalibration | SessionPhase::MmwaveOnly))
                 {
                     if let Some(session) = &mut self.session {
-                        session.empty_multi_target_packets = session
-                            .empty_multi_target_packets
-                            .saturating_add(1);
+                        if session.phase == SessionPhase::MmwaveOnly {
+                            session.mmwave_only_multi_target_packets = session
+                                .mmwave_only_multi_target_packets
+                                .saturating_add(1);
+                        } else {
+                            session.empty_multi_target_packets = session
+                                .empty_multi_target_packets
+                                .saturating_add(1);
+                        }
                     }
                     self.reason = "Multiple radar targets recorded; empty-room calibration continues and will be evaluated at the end.".to_string();
                     self.advance_empty_calibration(&host_time)?;
+                    self.advance_mmwave_only_calibration(&host_time)?;
                 } else {
                     self.reason =
                         "Multiple radar targets are visible; no label is emitted.".to_string();
@@ -1499,6 +2372,9 @@ impl MmwaveManager {
                     if let Some(session) = &mut self.session {
                         if session.phase == SessionPhase::EmptyCalibration {
                             session.empty_sequence_gaps = session.empty_sequence_gaps.saturating_add(1);
+                        } else if session.phase == SessionPhase::MmwaveOnly {
+                            session.mmwave_only_sequence_gaps =
+                                session.mmwave_only_sequence_gaps.saturating_add(1);
                         }
                     }
                     return Err(PacketValidationError::new(
@@ -1517,6 +2393,9 @@ impl MmwaveManager {
                     if let Some(session) = &mut self.session {
                         if session.phase == SessionPhase::EmptyCalibration {
                             session.empty_sequence_gaps = session.empty_sequence_gaps.saturating_add(1);
+                        } else if session.phase == SessionPhase::MmwaveOnly {
+                            session.mmwave_only_sequence_gaps =
+                                session.mmwave_only_sequence_gaps.saturating_add(1);
                         }
                     }
                 }
@@ -1529,6 +2408,8 @@ impl MmwaveManager {
                 if let Some(session) = &mut self.session {
                     if session.phase == SessionPhase::EmptyCalibration {
                         session.empty_reboots = session.empty_reboots.saturating_add(1);
+                    } else if session.phase == SessionPhase::MmwaveOnly {
+                        session.mmwave_only_reboots = session.mmwave_only_reboots.saturating_add(1);
                     }
                 }
                 self.reset_stability();
@@ -1593,7 +2474,25 @@ impl MmwaveManager {
                 } else {
                     session.empty_invalid_packets = session.empty_invalid_packets.saturating_add(1);
                 }
+            } else if session.phase == SessionPhase::MmwaveOnly {
+                if category == PacketRejectCategory::RoomBounds {
+                    session.mmwave_only_outside_room_targets = session
+                        .mmwave_only_outside_room_targets
+                        .saturating_add(1);
+                } else {
+                    session.mmwave_only_invalid_packets =
+                        session.mmwave_only_invalid_packets.saturating_add(1);
+                }
             }
+        }
+        self.recent_rejections
+            .push_back((now_ns, category.as_str().to_string()));
+        while self
+            .recent_rejections
+            .front()
+            .is_some_and(|(at_ns, _)| now_ns.saturating_sub(*at_ns) > REJECTION_WINDOW_NS)
+        {
+            self.recent_rejections.pop_front();
         }
         self.last_rejection = Some(LastPacketRejection {
             category: category.as_str().to_string(),
@@ -1610,11 +2509,6 @@ impl MmwaveManager {
 
     fn observe_target(&mut self, target: &RadarTarget, host_time: &HostTimestamp) -> Result<(), String> {
         let position = [target.room_x_mm, target.room_z_mm];
-        self.recent_observations
-            .push_back((host_time.host_monotonic_ns, position));
-        while self.recent_observations.len() > MAX_RECENT_OBSERVATIONS {
-            self.recent_observations.pop_front();
-        }
 
         let aligned = self.csi_is_aligned(host_time.host_monotonic_ns);
         if let Some(session) = &mut self.session {
@@ -1658,9 +2552,21 @@ impl MmwaveManager {
         Ok(())
     }
 
+    fn remember_recent_observation(&mut self, target: &RadarTarget, host_time: &HostTimestamp) {
+        self.recent_observations.push_back(RecentRadarObservation {
+            observed_at_ns: host_time.host_monotonic_ns,
+            raw_position_mm: [i32::from(target.x_mm), i32::from(target.y_mm)],
+            room_position_mm: [target.room_x_mm, target.room_z_mm],
+        });
+        while self.recent_observations.len() > MAX_RECENT_OBSERVATIONS {
+            self.recent_observations.pop_front();
+        }
+    }
+
     pub(crate) fn tick(&mut self, now: impl Into<HostTimestamp>) -> Result<(), String> {
         let now = now.into();
-        self.advance_empty_calibration(&now)
+        self.advance_empty_calibration(&now)?;
+        self.advance_mmwave_only_calibration(&now)
     }
 
     fn advance_empty_calibration(&mut self, host_time: &HostTimestamp) -> Result<(), String> {
@@ -1682,6 +2588,123 @@ impl MmwaveManager {
             )?;
         }
         Ok(())
+    }
+
+    fn advance_mmwave_only_calibration(
+        &mut self,
+        host_time: &HostTimestamp,
+    ) -> Result<(), String> {
+        let should_finish = if let Some(session) = &mut self.session {
+            if session.phase != SessionPhase::MmwaveOnly {
+                return Ok(());
+            }
+            let Some(started) = session.empty_started_at_ns else {
+                return Ok(());
+            };
+            host_time.host_monotonic_ns.saturating_sub(started) >= session.empty_duration_ns
+        } else {
+            false
+        };
+        if should_finish {
+            self.finish_mmwave_only_calibration(
+                host_time.host_unix_ns,
+                host_time.host_monotonic_ns,
+            )?;
+        }
+        Ok(())
+    }
+
+    fn finish_mmwave_only_calibration(
+        &mut self,
+        ended_at_ns: u64,
+        ended_at_monotonic_ns: u64,
+    ) -> Result<(), String> {
+        let session = self
+            .session
+            .as_mut()
+            .ok_or_else(|| "missing mmWave-only calibration session".to_string())?;
+        if let Err(error) = session.writer.flush() {
+            let message = format!("could not flush mmWave-only radar recording: {error}");
+            session.io_error = Some(message.clone());
+            return Err(message);
+        }
+        let duration_ns = session.empty_duration_ns;
+        let max_gap_ns = session.mmwave_only_max_radar_gap_ns.max(
+            ended_at_monotonic_ns.saturating_sub(
+                session
+                    .mmwave_only_last_radar_packet_ns
+                    .unwrap_or(session.empty_started_at_ns.unwrap_or(ended_at_monotonic_ns)),
+            ),
+        );
+        let mut reasons = Vec::new();
+        if session.mmwave_only_radar_packets == 0 {
+            reasons.push("no valid radar transport packet was observed".to_string());
+        }
+        if session.mmwave_only_valid_target_packets > 0 {
+            reasons.push(format!(
+                "{} in-room radar target packet(s) were observed",
+                session.mmwave_only_valid_target_packets
+            ));
+        }
+        if session.mmwave_only_outside_room_targets > 0 {
+            reasons.push(format!(
+                "{} outside-room radar target packet(s) were observed",
+                session.mmwave_only_outside_room_targets
+            ));
+        }
+        if session.mmwave_only_multi_target_packets > 0 {
+            reasons.push(format!(
+                "{} multi-target radar packet(s) were observed",
+                session.mmwave_only_multi_target_packets
+            ));
+        }
+        if session.mmwave_only_invalid_packets > 0 {
+            reasons.push(format!(
+                "{} invalid radar packet(s) were observed",
+                session.mmwave_only_invalid_packets
+            ));
+        }
+        if session.mmwave_only_sequence_gaps > 0 {
+            reasons.push(format!(
+                "{} radar sequence gap/out-of-order event(s) were observed",
+                session.mmwave_only_sequence_gaps
+            ));
+        }
+        if session.mmwave_only_reboots > 0 {
+            reasons.push(format!(
+                "{} radar reboot event(s) were observed",
+                session.mmwave_only_reboots
+            ));
+        }
+        if max_gap_ns > STALE_AFTER_NS {
+            reasons.push(format!(
+                "radar transport gap reached {} ms",
+                max_gap_ns / 1_000_000
+            ));
+        }
+        let validity = MmwaveOnlyValidity {
+            verdict: if reasons.is_empty() { "valid" } else { "invalid" }.to_string(),
+            reasons,
+            radar_packets: session.mmwave_only_radar_packets,
+            valid_target_packets: session.mmwave_only_valid_target_packets,
+            no_target_packets: session.mmwave_only_no_target_packets,
+            outside_room_targets: session.mmwave_only_outside_room_targets,
+            multi_target_packets: session.mmwave_only_multi_target_packets,
+            invalid_packets: session.mmwave_only_invalid_packets,
+            sequence_gaps: session.mmwave_only_sequence_gaps,
+            reboots: session.mmwave_only_reboots,
+            max_radar_gap_ms: max_gap_ns / 1_000_000,
+            duration_seconds: duration_ns / 1_000_000_000,
+        };
+        session.mmwave_only_validity = Some(validity);
+        session.phase = SessionPhase::Complete;
+        session.empty_started_at_ns = None;
+        let _ = session;
+        self.persist_current_session_manifest(
+            SessionLifecycle::Complete,
+            None,
+            ended_at_ns,
+        )
     }
 
     fn finish_empty_calibration(
@@ -2410,6 +3433,7 @@ impl MmwaveManager {
         self.expected_mode = Some(match kind {
             SessionKind::Calibration => MeasurementMode::Calibration,
             SessionKind::Blind => MeasurementMode::Reference,
+            SessionKind::MmwaveOnly => MeasurementMode::Calibration,
         });
         if let Err(error) = self.validate_live_session_start(kind, now.host_monotonic_ns) {
             self.expected_mode = previous_expected_mode;
@@ -2420,6 +3444,7 @@ impl MmwaveManager {
             match kind {
                 SessionKind::Calibration => "calibration",
                 SessionKind::Blind => "blind",
+                SessionKind::MmwaveOnly => "only",
             },
             now.host_unix_ns
         );
@@ -2446,6 +3471,7 @@ impl MmwaveManager {
         let phase = match kind {
             SessionKind::Calibration => SessionPhase::EmptyCalibration,
             SessionKind::Blind => SessionPhase::Blind,
+            SessionKind::MmwaveOnly => SessionPhase::MmwaveOnly,
         };
         let session_manifest = SessionManifest {
             schema_version: SESSION_MANIFEST_SCHEMA_VERSION,
@@ -2459,9 +3485,10 @@ impl MmwaveManager {
             csi_recording_path: csi_recording_path.display().to_string(),
             aligned_samples: 0,
             rejected_samples: 0,
-            empty_duration_seconds: (kind == SessionKind::Calibration)
+            empty_duration_seconds: matches!(kind, SessionKind::Calibration | SessionKind::MmwaveOnly)
                 .then_some(policy.empty_calibration_seconds),
             empty_validity: None,
+            mmwave_only_validity: None,
             error: None,
         };
         if let Err(error) = write_session_manifest(&manifest_path, &session_manifest) {
@@ -2480,7 +3507,7 @@ impl MmwaveManager {
             // immediately. Aborting or failing later must not silently restore
             // the previous deployment model.
             self.candidate_requires_validation = true;
-        } else {
+        } else if kind == SessionKind::Blind {
             self.blind_report_sha256 = None;
             self.blind_verdict = None;
             for zone in &mut self.zones {
@@ -2493,6 +3520,7 @@ impl MmwaveManager {
             phase: match kind {
                 SessionKind::Calibration => SessionPhase::EmptyCalibration,
                 SessionKind::Blind => SessionPhase::Blind,
+                SessionKind::MmwaveOnly => SessionPhase::MmwaveOnly,
             },
             started_at_ns: now.host_unix_ns,
             stable_candidate: None,
@@ -2504,7 +3532,7 @@ impl MmwaveManager {
             csi_writer: BufWriter::new(csi_file),
             aligned_samples: 0,
             rejected_samples: 0,
-            empty_started_at_ns: (kind == SessionKind::Calibration)
+            empty_started_at_ns: matches!(kind, SessionKind::Calibration | SessionKind::MmwaveOnly)
                 .then_some(now.host_monotonic_ns),
             empty_duration_ns: policy.empty_calibration_seconds * 1_000_000_000,
             empty_frames: Vec::new(),
@@ -2518,6 +3546,7 @@ impl MmwaveManager {
             empty_last_radar_packet_ns: None,
             empty_max_radar_gap_ns: 0,
             empty_validity: None,
+            mmwave_only_validity: None,
             candidate_frames: Vec::new(),
             candidate_positions_mm: Vec::new(),
             candidate_radar: Vec::new(),
@@ -2530,6 +3559,16 @@ impl MmwaveManager {
             dataset_records: Vec::new(),
             clock_epoch_id: now.clock_epoch_id,
             io_error: None,
+            mmwave_only_radar_packets: 0,
+            mmwave_only_valid_target_packets: 0,
+            mmwave_only_no_target_packets: 0,
+            mmwave_only_outside_room_targets: 0,
+            mmwave_only_multi_target_packets: 0,
+            mmwave_only_invalid_packets: 0,
+            mmwave_only_sequence_gaps: 0,
+            mmwave_only_reboots: 0,
+            mmwave_only_last_radar_packet_ns: None,
+            mmwave_only_max_radar_gap_ns: 0,
         });
         Ok(())
     }
@@ -2541,8 +3580,14 @@ impl MmwaveManager {
         if self.room_dimensions_mm.is_none() {
             return Err("a sealed room geometry is required".to_string());
         }
-        if self.experiment.is_none() {
+        if kind != SessionKind::MmwaveOnly && self.experiment.is_none() {
             return Err("a sealed schema-v2 setup with mmWave identity is required".to_string());
+        }
+        if kind == SessionKind::MmwaveOnly
+            && self.cad_profile.is_none()
+            && self.expected_node.is_none()
+        {
+            return Err("a saved CAD profile or sealed mmWave geometry is required".to_string());
         }
         if kind == SessionKind::Blind
             && (self.zones.len() != self.zone_count
@@ -2573,7 +3618,10 @@ impl MmwaveManager {
         now_monotonic_ns: u64,
     ) -> Result<(), String> {
         self.validate_session_start(kind)?;
-        let preflight = self.preflight(now_monotonic_ns);
+        let preflight = match kind {
+            SessionKind::MmwaveOnly => self.radar_preflight(now_monotonic_ns),
+            SessionKind::Calibration | SessionKind::Blind => self.preflight(now_monotonic_ns),
+        };
         if !preflight.ready {
             let blockers = preflight
                 .gates
@@ -2640,6 +3688,12 @@ impl MmwaveManager {
             .map(|seen| now_ns.saturating_sub(seen));
         let stale = age_ns.is_some_and(|age| age > STALE_AFTER_NS);
         let transport = self.transport_metrics.snapshot();
+        let mut reject_reasons_window = BTreeMap::new();
+        for (at_ns, category) in &self.recent_rejections {
+            if now_ns.saturating_sub(*at_ns) <= REJECTION_WINDOW_NS {
+                *reject_reasons_window.entry(category.clone()).or_default() += 1;
+            }
+        }
         MmwaveStatus {
             cad_profile: self.cad_profile.clone(),
             cad_profile_error: self.cad_profile_error.clone(),
@@ -2665,7 +3719,13 @@ impl MmwaveManager {
             receiver_positions_m: self
                 .experiment
                 .as_ref()
-                .map(|experiment| experiment.geometry.rx_positions_m.clone()),
+                .map(|experiment| experiment.geometry.rx_positions_m.clone())
+                .or_else(|| {
+                    self.cad_profile.as_ref().and_then(|cad| {
+                        (!cad.receiver_positions_m.is_empty())
+                            .then(|| cad.receiver_positions_m.clone())
+                    })
+                }),
             node_id: self.node_id.clone(),
             mode: self.mode,
             expected_mode: self.expected_mode,
@@ -2675,11 +3735,14 @@ impl MmwaveManager {
             target_count: self.target_count,
             target_raw_position_mm: self.target_raw_position_mm,
             target_position_mm: self.target_position_mm,
+            targets: self.targets.clone(),
             packets_received: self.packets_received,
             packets_rejected: self.packets_rejected,
             packets_lost: self.packets_lost,
             raw_udp_packets: transport.raw_udp_packets,
             reject_reasons: self.reject_reasons.clone(),
+            packets_rejected_window: reject_reasons_window.values().sum(),
+            reject_reasons_window,
             last_rejection: self.last_rejection.as_ref().map(|rejection| {
                 PacketRejectionStatus {
                     category: rejection.category.clone(),
@@ -2710,7 +3773,9 @@ impl MmwaveManager {
                 token_configured: self.node_token_configured,
                 ..NodeControlStatus::default()
             },
-            transform: self.last_transform.clone(),
+            transform: self.effective_transform(),
+            source_transform: self.last_transform.clone(),
+            yaw_calibration: self.yaw_calibration.clone(),
             coverage_cells: self.coverage.len(),
             zones: self.zones.clone(),
             zone_count: self.zone_count,
@@ -2720,12 +3785,77 @@ impl MmwaveManager {
                 .as_ref()
                 .map(|session| session_status(session, now_ns))
                 .or_else(|| self.restored_session.clone()),
+            fixed_point_calibration: self.fixed_point_status(),
             position_index_sha256: self.position_index_sha256.clone(),
             position_live_approved: self.position_index_sha256.is_some()
                 && self.position_publication_allowed(),
             blind_report_sha256: self.blind_report_sha256.clone(),
             blind_verdict: self.blind_verdict.clone(),
             preflight: self.preflight(now_ns),
+            radar_preflight: self.radar_preflight(now_ns),
+            fixed_point_preflight: self.fixed_point_preflight(now_ns),
+        }
+    }
+
+    fn fixed_point_preflight(&self, now_ns: u64) -> PreflightStatus {
+        let mut preflight = self.radar_preflight(now_ns);
+        preflight
+            .gates
+            .retain(|gate| gate.id != "node_control_configured");
+        preflight.ready = preflight.gates.iter().all(|gate| gate.pass);
+        preflight
+    }
+
+    fn radar_preflight(&self, now_ns: u64) -> PreflightStatus {
+        let sequence_fault_in_window = self.last_radar_sequence_fault_ns.is_some_and(|seen| {
+            now_ns.saturating_sub(seen) <= PREFLIGHT_WINDOW_NS
+        });
+        let reboot_in_window = self.last_radar_reboot_ns.is_some_and(|seen| {
+            now_ns.saturating_sub(seen) <= PREFLIGHT_WINDOW_NS
+        });
+        let mode_matches = self
+            .expected_mode
+            .is_none_or(|expected| self.mode == Some(expected));
+        let transform_ready = self.cad_profile.is_some() || self.expected_node.is_some();
+        let gates = vec![
+            PreflightGate {
+                id: "node_control_configured",
+                pass: self.control.is_some(),
+                detail: "mmWave node control URL and bearer token are configured".to_string(),
+            },
+            PreflightGate {
+                id: "cad_profile_active",
+                pass: transform_ready,
+                detail: "a saved CAD profile or sealed transform is active".to_string(),
+            },
+            PreflightGate {
+                id: "radar_stream_fresh",
+                pass: self.last_transport_packet_ns.is_some_and(|seen| {
+                    now_ns.saturating_sub(seen) <= PREFLIGHT_FRESH_NS && mode_matches
+                }),
+                detail: format!(
+                    "a valid radar packet must be fresh (age_ms={}, mode_matches={mode_matches})",
+                    self.last_transport_packet_ns
+                        .map(|seen| now_ns.saturating_sub(seen) / 1_000_000)
+                        .unwrap_or(u64::MAX),
+                ),
+            },
+            PreflightGate {
+                id: "radar_sequence_loss_free",
+                pass: !sequence_fault_in_window && !reboot_in_window,
+                detail: format!(
+                    "radar packet gaps={} reboots={} (25-s window: sequence_fault={} reboot={})",
+                    self.packets_lost,
+                    self.reboot_count,
+                    sequence_fault_in_window,
+                    reboot_in_window
+                ),
+            },
+        ];
+        PreflightStatus {
+            ready: gates.iter().all(|gate| gate.pass),
+            observation_window_ms: PREFLIGHT_WINDOW_NS / 1_000_000,
+            gates,
         }
     }
 
@@ -2868,6 +3998,7 @@ impl MmwaveManager {
         let incomplete = |zone: &Zone| match session.kind {
             SessionKind::Calibration => zone.training_blocks < BLOCKS_PER_ZONE,
             SessionKind::Blind => zone.blind_visits < BLIND_VISITS_PER_ZONE,
+            SessionKind::MmwaveOnly => false,
         };
         let zones = self.zones.iter().filter(|zone| incomplete(zone));
         let zone = match self.target_position_mm {
@@ -2879,9 +4010,9 @@ impl MmwaveManager {
 }
 
 fn session_status(session: &Session, now_ns: u64) -> SessionStatus {
-    let empty_duration_seconds = (session.kind == SessionKind::Calibration)
+    let empty_duration_seconds = matches!(session.kind, SessionKind::Calibration | SessionKind::MmwaveOnly)
         .then_some(session.empty_duration_ns / 1_000_000_000);
-    let empty_remaining_seconds = (session.phase == SessionPhase::EmptyCalibration).then(|| {
+    let empty_remaining_seconds = matches!(session.phase, SessionPhase::EmptyCalibration | SessionPhase::MmwaveOnly).then(|| {
         let elapsed_ns = session
             .empty_started_at_ns
             .map(|started| now_ns.saturating_sub(started))
@@ -2904,6 +4035,9 @@ fn session_status(session: &Session, now_ns: u64) -> SessionStatus {
         }
         SessionPhase::Blind => {
             "Visit every zone twice; WiFi predictions remain frozen.".to_string()
+        }
+        SessionPhase::MmwaveOnly => {
+            "Keep the room empty while the radar-only transport and geometry are checked.".to_string()
         }
         SessionPhase::Complete => {
             "Collection is complete. Stop the session to seal its recording.".to_string()
@@ -2928,6 +4062,7 @@ fn session_status(session: &Session, now_ns: u64) -> SessionStatus {
         empty_duration_seconds,
         empty_remaining_seconds,
         empty_validity: session.empty_validity.clone(),
+        mmwave_only_validity: session.mmwave_only_validity.clone(),
         error: session.io_error.clone(),
         next_instruction,
     }
@@ -2951,9 +4086,10 @@ fn session_manifest_from_session(
         csi_recording_path: session.csi_recording_path.display().to_string(),
         aligned_samples: session.aligned_samples,
         rejected_samples: session.rejected_samples,
-        empty_duration_seconds: (session.kind == SessionKind::Calibration)
+        empty_duration_seconds: matches!(session.kind, SessionKind::Calibration | SessionKind::MmwaveOnly)
             .then_some(session.empty_duration_ns / 1_000_000_000),
         empty_validity: session.empty_validity.clone(),
+        mmwave_only_validity: session.mmwave_only_validity.clone(),
         error,
     }
 }
@@ -3000,6 +4136,9 @@ fn session_status_from_manifest(manifest: &SessionManifest) -> SessionStatus {
             "Follow the highlighted zones and pause for five seconds.".to_string()
         }
         SessionPhase::Blind => "Visit every zone twice; WiFi predictions remain frozen.".to_string(),
+        SessionPhase::MmwaveOnly => {
+            "Keep the room empty while the radar-only transport and geometry are checked.".to_string()
+        }
         SessionPhase::Complete => {
             "Collection is complete. Stop the session to seal its recording.".to_string()
         }
@@ -3017,6 +4156,7 @@ fn session_status_from_manifest(manifest: &SessionManifest) -> SessionStatus {
         empty_duration_seconds: manifest.empty_duration_seconds,
         empty_remaining_seconds: None,
         empty_validity: manifest.empty_validity.clone(),
+        mmwave_only_validity: manifest.mmwave_only_validity.clone(),
         error: manifest.error.clone(),
         next_instruction,
     }
@@ -3199,6 +4339,63 @@ fn median_position_mm(positions: &[[i32; 2]]) -> Option<[i32; 2]> {
     x.sort_unstable();
     z.sort_unstable();
     Some([x[x.len() / 2], z[z.len() / 2]])
+}
+
+fn normalize_yaw_mdeg(value: i32) -> i32 {
+    value.rem_euclid(360_000)
+}
+
+fn normalize_signed_yaw_mdeg(value: i32) -> i32 {
+    let normalized = value.rem_euclid(360_000);
+    if normalized > 180_000 {
+        normalized - 360_000
+    } else {
+        normalized
+    }
+}
+
+fn yaw_errors_mm(
+    points: &[(String, [i32; 2], &KnownPointCheck)],
+    transform: &CoordinateFrame,
+    yaw_mdeg: i32,
+) -> Vec<f64> {
+    let yaw = (f64::from(yaw_mdeg) / 1_000.0).to_radians();
+    points
+        .iter()
+        .map(|(_, expected, check)| {
+            let right = f64::from(check.observed_raw_position_mm[0])
+                * if transform.raw_x_inverted { -1.0 } else { 1.0 };
+            let forward = f64::from(check.observed_raw_position_mm[1]);
+            let x = f64::from(transform.origin_x_mm)
+                + forward * yaw.cos()
+                - right * yaw.sin();
+            let z = f64::from(transform.origin_z_mm)
+                + forward * yaw.sin()
+                + right * yaw.cos();
+            ((x - f64::from(expected[0])).powi(2)
+                + (z - f64::from(expected[1])).powi(2))
+            .sqrt()
+        })
+        .collect()
+}
+
+fn rms_error_mm(errors: &[f64]) -> f64 {
+    if errors.is_empty() {
+        return 0.0;
+    }
+    (errors.iter().map(|error| error.powi(2)).sum::<f64>() / errors.len() as f64).sqrt()
+}
+
+fn error_summary_mm(errors: &[f64]) -> (u32, u32) {
+    if errors.is_empty() {
+        return (0, 0);
+    }
+    let mut sorted = errors.to_vec();
+    sorted.sort_by(f64::total_cmp);
+    (
+        sorted[sorted.len() / 2].round().max(0.0) as u32,
+        sorted.last().copied().unwrap_or(0.0).round().max(0.0) as u32,
+    )
 }
 
 fn percentile(values: &[f64], quantile: f64) -> Option<f64> {
@@ -3473,6 +4670,20 @@ mod tests {
         .unwrap()
     }
 
+    fn packet_with_raw(sequence: u32, raw: [i32; 2]) -> Vec<u8> {
+        let mut value: serde_json::Value = serde_json::from_slice(&packet(
+            sequence,
+            1,
+            MeasurementMode::Calibration,
+        ))
+        .unwrap();
+        value["targets"][0]["x_mm"] = serde_json::json!(raw[0]);
+        value["targets"][0]["y_mm"] = serde_json::json!(raw[1]);
+        value["targets"][0]["room_x_mm"] = serde_json::json!(raw[1]);
+        value["targets"][0]["room_z_mm"] = serde_json::json!(raw[0]);
+        serde_json::to_vec(&value).unwrap()
+    }
+
     fn manager() -> MmwaveManager {
         MmwaveManager::new(DEFAULT_UDP_PORT, Some([4.02, 2.59, 3.44]), None, None, None)
     }
@@ -3482,7 +4693,17 @@ mod tests {
             id: "cad-test".to_string(), label: "CAD test".to_string(), version: 1,
             revision_id: revision.to_string(), profile_sha256: revision.to_string(),
             profile_context_sha256: "test".to_string(), created_at: String::new(), updated_at: String::new(),
-            document: serde_json::json!({ "room_dimensions_m": [4.02, 2.59, 3.44], "mmwave": { "mounting_position_m": mount } }),
+            document: serde_json::json!({
+                "room_dimensions_m": [4.02, 2.59, 3.44],
+                "transmitter": { "id": "TX", "position_m": [2.0, 1.0, 1.5] },
+                "receivers": [
+                    { "id": "RX1", "position_m": [2.0, 1.0, 1.5] },
+                    { "id": "RX2", "position_m": [2.0, 1.0, 1.5] },
+                    { "id": "RX3", "position_m": [2.0, 1.0, 1.5] },
+                    { "id": "RX4", "position_m": [2.0, 1.0, 1.5] }
+                ],
+                "mmwave": { "mounting_position_m": mount }
+            }),
         }
     }
 
@@ -3508,6 +4729,247 @@ mod tests {
         assert_eq!(status.cad_profile.unwrap().revision_id, "v2");
         // The original firmware packet is untouched and still uses its own origin.
         assert_eq!(serde_json::from_slice::<serde_json::Value>(&bytes).unwrap()["coordinate_frame"]["origin_x_mm"], 0);
+    }
+
+    #[test]
+    fn mmwave_only_session_requires_cad_geometry_but_not_rx_or_sealed_setup() {
+        let mut manager = MmwaveManager::new(DEFAULT_UDP_PORT, None, None, None, None);
+        assert!(manager
+            .validate_session_start(SessionKind::MmwaveOnly)
+            .is_err());
+        manager.apply_cad_profile(&cad_profile([3.9, 1.5, 3.3], "radar-only-v1"));
+        assert!(manager
+            .validate_session_start(SessionKind::MmwaveOnly)
+            .is_ok());
+    }
+
+    #[test]
+    fn fixed_point_phase_accepts_persisted_cad_geometry_without_csi_setup() {
+        let mut manager = MmwaveManager::new(
+            DEFAULT_UDP_PORT,
+            None,
+            None,
+            None,
+            None,
+        );
+        manager.apply_cad_profile(&cad_profile([1.0, 1.2, 0.5], "cad-fixed-points"));
+        manager
+            .ingest_json(
+                &packet(0, 1, MeasurementMode::Calibration),
+                1_000_000_000,
+            )
+            .expect("fresh CAD-preview packet");
+
+        let status = manager
+            .start_fixed_point_calibration(1_000_000_000)
+            .expect("start fixed points from CAD profile");
+
+        assert_eq!(status.current_anchor_id.as_deref(), Some("RX1"));
+        assert_eq!(status.anchors.len(), 5);
+        assert!(manager.experiment.is_none());
+    }
+
+    #[test]
+    fn known_point_check_uses_fresh_median_radar_observations() {
+        let mut manager = manager();
+        for (sequence, timestamp) in [(0, 1_000_000_000), (1, 1_100_000_000), (2, 1_200_000_000)] {
+            manager
+                .ingest_json(
+                    &packet(sequence, 1, MeasurementMode::Calibration),
+                    timestamp,
+                )
+                .expect("synthetic radar packet");
+        }
+        let check = manager
+            .check_known_point([1_001, 1_500], 10, 500, 1_300_000_000)
+            .expect("fresh radar observations");
+        assert!(check.pass);
+        assert_eq!(check.sample_count, 3);
+        assert_eq!(check.observed_position_mm, [1_001, 1_500]);
+        assert_eq!(check.median_error_mm, 0);
+    }
+
+    #[test]
+    fn fixed_point_phase_enforces_rx_order_before_csi_start() {
+        let mut manager = sealed_manager();
+        manager.control = Some(NodeControl {
+            base_url: "http://radar.invalid".to_string(),
+            bearer_token: "test-only".to_string(),
+        });
+        let experiment = manager.experiment.as_mut().expect("sealed experiment");
+        experiment.geometry.rx_positions_m = vec![[1.001, 1.0, 1.5]; 4];
+        experiment.geometry.tx_position_m = [1.001, 1.0, 1.5];
+        manager
+            .ingest_json(
+                &packet(0, 1, MeasurementMode::Calibration),
+                1_000_000_000,
+            )
+            .expect("fresh radar packet");
+
+        assert!(manager.validate_calibration_phase_two_start().is_err());
+        let started = manager
+            .start_fixed_point_calibration(1_000_000_000)
+            .expect("start fixed-point phase");
+        assert_eq!(started.current_anchor_id.as_deref(), Some("RX1"));
+
+        for expected_next in [Some("RX2"), Some("RX3"), Some("RX4"), Some("TX"), None] {
+            let status = manager
+                .check_current_fixed_point(10, 500, 1_100_000_000)
+                .expect("check current fixed point");
+            assert_eq!(status.current_anchor_id.as_deref(), expected_next);
+        }
+
+        let completed = manager.fixed_point_status().expect("fixed-point status");
+        assert_eq!(completed.state, "complete");
+        assert!(completed
+            .anchors
+            .iter()
+            .all(|anchor| anchor.state == "complete" && anchor.check.as_ref().is_some_and(|check| check.pass)));
+        assert!(manager.validate_calibration_phase_two_start().is_ok());
+    }
+
+    #[test]
+    fn fixed_points_fit_one_yaw_across_all_rx_and_tx_observations() {
+        let mut manager = sealed_manager();
+        let raw_points = [
+            [-1_000, 500],
+            [-1_500, 1_000],
+            [-2_000, 500],
+            [-1_000, 1_500],
+            [-2_000, 1_500],
+        ];
+        let expected = raw_points
+            .map(|raw| [f64::from(-raw[0]) / 1_000.0, 1.0, f64::from(raw[1]) / 1_000.0]);
+        let experiment = manager.experiment.as_mut().expect("sealed experiment");
+        experiment.geometry.rx_positions_m = expected[..4].to_vec();
+        experiment.geometry.tx_position_m = expected[4];
+        manager
+            .ingest_json(
+                &packet(0, 0, MeasurementMode::Calibration),
+                1_000_000_000,
+            )
+            .unwrap();
+        manager.start_fixed_point_calibration(1_000_000_000).unwrap();
+
+        for (index, raw) in raw_points.into_iter().enumerate() {
+            let now = (u64::try_from(index).unwrap() + 2) * 1_000_000_000;
+            assert!(manager
+                .ingest_json(
+                    &packet_with_raw(u32::try_from(index + 1).unwrap(), raw),
+                    now,
+                )
+                .is_err());
+            manager
+                .check_current_fixed_point(350, 500, now)
+                .expect("outside-room observation remains calibratable");
+        }
+
+        let yaw = manager.yaw_calibration.as_ref().expect("yaw calibration");
+        assert_eq!(yaw.point_count, 5);
+        assert_eq!(yaw.optimized_yaw_mdeg, 90_000);
+        assert!(yaw.applied);
+        assert!(yaw.after_rms_error_mm < yaw.before_rms_error_mm);
+        assert!(yaw.anchors.iter().all(|anchor| anchor.after_error_mm == 0));
+
+        manager
+            .ingest_json(
+                &packet_with_raw(6, raw_points[0]),
+                7_000_000_000,
+            )
+            .expect("calibrated transform brings the target into the room");
+        assert_eq!(manager.status(7_000_000_000).target_position_mm, Some([1_000, 500]));
+    }
+
+    #[test]
+    fn yaw_calibration_is_restored_only_for_the_same_sealed_setup() {
+        let directory = tempfile::tempdir().expect("temporary calibration directory");
+        let mut manager = sealed_manager();
+        let calibration = YawCalibrationStatus {
+            schema_version: YAW_CALIBRATION_SCHEMA_VERSION,
+            source_kind: "setup".to_string(),
+            source_id: "setup-01".to_string(),
+            source_sha256: "a".repeat(64),
+            created_at_unix_ns: 42,
+            base_transform: manager.expected_node.as_ref().unwrap().transform.clone(),
+            base_yaw_mdeg: 0,
+            previous_effective_yaw_mdeg: 0,
+            optimized_yaw_mdeg: 12_500,
+            correction_mdeg: 12_500,
+            point_count: 5,
+            before_rms_error_mm: 900,
+            after_rms_error_mm: 120,
+            before_median_error_mm: 850,
+            after_median_error_mm: 100,
+            before_maximum_error_mm: 1_100,
+            after_maximum_error_mm: 180,
+            improvement_percent: 86.7,
+            applied: true,
+            persisted: false,
+            anchors: Vec::new(),
+        };
+        manager.yaw_calibration = Some(calibration);
+        manager.persist_yaw_calibration(directory.path()).unwrap();
+
+        let mut restored = sealed_manager();
+        restored.restore_yaw_calibration(directory.path()).unwrap();
+        assert_eq!(
+            restored.yaw_calibration.as_ref().map(|value| value.optimized_yaw_mdeg),
+            Some(12_500)
+        );
+
+        restored.experiment.as_mut().unwrap().setup_sha256 = "b".repeat(64);
+        restored.yaw_calibration = None;
+        restored.restore_yaw_calibration(directory.path()).unwrap();
+        assert!(restored.yaw_calibration.is_none());
+    }
+
+    #[test]
+    fn rejection_status_exposes_a_fresh_window_separately_from_lifetime_counts() {
+        let mut manager = manager();
+        let mut outside: serde_json::Value =
+            serde_json::from_slice(&packet(0, 1, MeasurementMode::Calibration)).unwrap();
+        outside["targets"][0]["room_x_mm"] = serde_json::json!(5_000);
+        let outside = serde_json::to_vec(&outside).unwrap();
+        assert!(manager.ingest_json(&outside, 1_000_000_000).is_err());
+        assert!(manager.ingest_json(b"{", 1_100_000_000).is_err());
+
+        let status = manager.status(1_100_000_000);
+        assert_eq!(status.packets_rejected, 2);
+        assert_eq!(status.packets_rejected_window, 2);
+        assert_eq!(status.reject_reasons_window.get("room_bounds"), Some(&1));
+        assert_eq!(status.reject_reasons_window.get("invalid_json"), Some(&1));
+        let expired = manager.status(27_000_000_001);
+        assert_eq!(expired.packets_rejected, 2);
+        assert_eq!(expired.packets_rejected_window, 0);
+        assert!(expired.reject_reasons_window.is_empty());
+    }
+
+    #[test]
+    fn cad_profile_orientation_overrides_packet_transform_for_preview() {
+        let mut manager = MmwaveManager::new(DEFAULT_UDP_PORT, None, None, None, None);
+        let mut profile = cad_profile([1.0, 1.2, 0.5], "orientation-v1");
+        profile.document["mmwave"]["yaw_mdeg"] = serde_json::json!(180000);
+        profile.document["mmwave"]["raw_x_inverted"] = serde_json::json!(false);
+        manager.apply_cad_profile(&profile);
+        manager
+            .ingest_json(&packet(0, 1, MeasurementMode::Calibration), 1_000_000_000)
+            .unwrap();
+        let status = manager.status(1_000_000_000);
+        assert_eq!(status.target_position_mm, Some([0, 400]));
+        assert_eq!(status.transform.unwrap().yaw_mdeg, 180000);
+
+        let mut mirrored = cad_profile([1.0, 1.2, 0.5], "orientation-v2");
+        mirrored.document["mmwave"]["yaw_mdeg"] = serde_json::json!(0);
+        mirrored.document["mmwave"]["raw_x_inverted"] = serde_json::json!(true);
+        manager.apply_cad_profile(&mirrored);
+        manager
+            .ingest_json(&packet(1, 1, MeasurementMode::Calibration), 1_100_000_000)
+            .unwrap();
+        let status = manager.status(1_100_000_000);
+        assert_eq!(status.target_position_mm, Some([2000, 400]));
+        let transform = status.transform.unwrap();
+        assert_eq!(transform.yaw_mdeg, 0);
+        assert!(transform.raw_x_inverted);
     }
 
     #[test]
@@ -3572,6 +5034,11 @@ mod tests {
             .unwrap();
         assert_eq!(rejection.raw_position_mm, Some([100, 1_000]));
         assert_eq!(rejection.position_mm, Some([5_000, 1_500]));
+        let outside_status = room_manager.status(1_000_000_000);
+        assert_eq!(outside_status.mode, Some(MeasurementMode::Calibration));
+        assert_eq!(outside_status.targets.len(), 1);
+        assert_eq!(outside_status.targets[0].position_mm, [5_000, 1_500]);
+        assert!(!outside_status.targets[0].inside_room);
         assert!(status
             .preflight
             .gates
@@ -3625,16 +5092,26 @@ mod tests {
         metrics.note_dequeued();
         metrics.note_duplicate();
         metrics.note_sequence_discard();
-        metrics.note_processed(1_000_000, 4_500_000, 3);
+        metrics.note_received();
+        metrics.note_processed(1_000_000, 4_500_000, 3, true);
+        metrics.note_processed(101_000_000, 105_000_000, 4, true);
+        metrics.note_processed(301_000_000, 309_000_000, 8, false);
 
         let status = metrics.snapshot();
-        assert_eq!(status.raw_udp_packets, 2);
-        assert_eq!(status.queue_length, 1);
+        assert_eq!(status.raw_udp_packets, 3);
+        assert_eq!(status.queue_length, 2);
         assert_eq!(status.queue_peak, 2);
-        assert_eq!(status.last_receive_to_process_delay_ms, Some(3));
-        assert_eq!(status.max_processing_duration_ms, Some(3));
+        assert_eq!(status.last_receive_to_process_delay_ms, Some(8));
+        assert_eq!(status.max_processing_duration_ms, Some(8));
         assert_eq!(status.duplicate_packets, 1);
         assert_eq!(status.sequence_discards, 1);
+        assert_eq!(status.window_samples, 3);
+        assert_eq!(status.valid_samples, 2);
+        assert_eq!(status.valid_rate_hz, Some(10.0));
+        assert_eq!(status.inter_arrival_median_ms, Some(100));
+        assert_eq!(status.inter_arrival_p95_ms, Some(200));
+        assert_eq!(status.receive_to_process_median_ms, Some(4));
+        assert_eq!(status.receive_to_process_p95_ms, Some(8));
     }
 
     #[test]
@@ -3661,6 +5138,7 @@ mod tests {
             rejected_samples: 1,
             empty_duration_seconds: Some(65),
             empty_validity: None,
+            mmwave_only_validity: None,
             error: None,
         };
         write_session_manifest(&manifest_path, &manifest).unwrap();
@@ -3801,6 +5279,7 @@ mod tests {
             empty_last_radar_packet_ns: None,
             empty_max_radar_gap_ns: 0,
             empty_validity: None,
+            mmwave_only_validity: None,
             candidate_frames: Vec::new(),
             candidate_positions_mm: Vec::new(),
             candidate_radar: Vec::new(),
@@ -3813,6 +5292,16 @@ mod tests {
             dataset_records: Vec::new(),
             clock_epoch_id: "test-clock".to_string(),
             io_error: None,
+            mmwave_only_radar_packets: 0,
+            mmwave_only_valid_target_packets: 0,
+            mmwave_only_no_target_packets: 0,
+            mmwave_only_outside_room_targets: 0,
+            mmwave_only_multi_target_packets: 0,
+            mmwave_only_invalid_packets: 0,
+            mmwave_only_sequence_gaps: 0,
+            mmwave_only_reboots: 0,
+            mmwave_only_last_radar_packet_ns: None,
+            mmwave_only_max_radar_gap_ns: 0,
         }
     }
 
@@ -3845,6 +5334,39 @@ mod tests {
         assert_eq!(session.empty_started_at_ns, Some(1_000_000_000));
         assert!(session.empty_validity.is_none());
         assert!(manager.reason.contains("ignored"));
+    }
+
+    #[test]
+    fn mmwave_only_calibration_finishes_without_csi_when_the_room_stays_empty() {
+        let directory = tempfile::tempdir().expect("temporary calibration directory");
+        let mut manager = sealed_manager();
+        let mut session = active_empty_session(directory.path(), 1_000_000_000);
+        session.kind = SessionKind::MmwaveOnly;
+        session.phase = SessionPhase::MmwaveOnly;
+        session.empty_duration_ns = 1_000_000_000;
+        manager.session = Some(session);
+        manager.expected_mode = Some(MeasurementMode::Calibration);
+
+        manager
+            .ingest_json(
+                &packet(0, 0, MeasurementMode::Calibration),
+                HostTimestamp {
+                    host_unix_ns: 2_000_000_000,
+                    host_monotonic_ns: 2_000_000_000,
+                    clock_epoch_id: "test-clock".to_string(),
+                },
+            )
+            .expect("empty radar-only packet");
+
+        let status = manager.status(2_000_000_000);
+        let session = status.session.expect("radar-only session");
+        assert_eq!(session.phase, SessionPhase::Complete);
+        let validity = session
+            .mmwave_only_validity
+            .expect("radar-only validity");
+        assert_eq!(validity.verdict, "valid");
+        assert_eq!(validity.radar_packets, 1);
+        assert_eq!(validity.no_target_packets, 1);
     }
 
     #[test]
@@ -4431,6 +5953,7 @@ mod tests {
             empty_last_radar_packet_ns: None,
             empty_max_radar_gap_ns: 0,
             empty_validity: None,
+            mmwave_only_validity: None,
             candidate_frames: Vec::new(),
             candidate_positions_mm: Vec::new(),
             candidate_radar: Vec::new(),
@@ -4443,6 +5966,16 @@ mod tests {
             dataset_records: Vec::new(),
             clock_epoch_id: "test-clock".to_string(),
             io_error: None,
+            mmwave_only_radar_packets: 0,
+            mmwave_only_valid_target_packets: 0,
+            mmwave_only_no_target_packets: 0,
+            mmwave_only_outside_room_targets: 0,
+            mmwave_only_multi_target_packets: 0,
+            mmwave_only_invalid_packets: 0,
+            mmwave_only_sequence_gaps: 0,
+            mmwave_only_reboots: 0,
+            mmwave_only_last_radar_packet_ns: None,
+            mmwave_only_max_radar_gap_ns: 0,
         });
 
         let radar_position_mm = [1_001, 1_500];

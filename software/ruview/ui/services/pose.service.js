@@ -1,6 +1,6 @@
 // Pose Service for WiFi-DensePose UI
 
-import { API_CONFIG } from '../config/api.config.js';
+import { API_CONFIG, LEGACY_ENDPOINTS } from '../config/api.config.js';
 import { apiService } from './api.service.js';
 import { wsService } from './websocket.service.js';
 
@@ -64,14 +64,14 @@ export class PoseService {
     return apiService.get(API_CONFIG.ENDPOINTS.POSE.CURRENT, params);
   }
 
-  // Analyze pose (requires auth)
+  // Legacy compatibility method; the active Rust server has no such route.
   async analyzePose(request) {
-    return apiService.post(API_CONFIG.ENDPOINTS.POSE.ANALYZE, request);
+    return apiService.post(LEGACY_ENDPOINTS.POSE.ANALYZE, request);
   }
 
-  // Get zone occupancy
+  // Legacy compatibility method; use getZonesSummary for the active API.
   async getZoneOccupancy(zoneId) {
-    const endpoint = API_CONFIG.ENDPOINTS.POSE.ZONE_OCCUPANCY.replace('{zone_id}', zoneId);
+    const endpoint = LEGACY_ENDPOINTS.POSE.ZONE_OCCUPANCY.replace('{zone_id}', zoneId);
     return apiService.get(endpoint);
   }
 
@@ -80,9 +80,9 @@ export class PoseService {
     return apiService.get(API_CONFIG.ENDPOINTS.POSE.ZONES_SUMMARY);
   }
 
-  // Get historical data (requires auth)
+  // Legacy compatibility method; the active Rust server has no such route.
   async getHistoricalData(request) {
-    return apiService.post(API_CONFIG.ENDPOINTS.POSE.HISTORICAL, request);
+    return apiService.post(LEGACY_ENDPOINTS.POSE.HISTORICAL, request);
   }
 
   // Get recent activities
@@ -97,17 +97,17 @@ export class PoseService {
       params[key] === undefined && delete params[key]
     );
 
-    return apiService.get(API_CONFIG.ENDPOINTS.POSE.ACTIVITIES, params);
+    return apiService.get(LEGACY_ENDPOINTS.POSE.ACTIVITIES, params);
   }
 
   // Calibrate system (requires auth)
   async calibrate() {
-    return apiService.post(API_CONFIG.ENDPOINTS.POSE.CALIBRATE);
+    return apiService.post(LEGACY_ENDPOINTS.POSE.CALIBRATE);
   }
 
   // Get calibration status (requires auth)
   async getCalibrationStatus() {
-    return apiService.get(API_CONFIG.ENDPOINTS.POSE.CALIBRATION_STATUS);
+    return apiService.get(LEGACY_ENDPOINTS.POSE.CALIBRATION_STATUS);
   }
 
   // Get pose statistics
@@ -573,7 +573,7 @@ export class PoseService {
     );
 
     this.eventConnection = wsService.connect(
-      API_CONFIG.ENDPOINTS.STREAM.WS_EVENTS,
+      LEGACY_ENDPOINTS.STREAM.WS_EVENTS,
       params,
       {
         onOpen: () => {

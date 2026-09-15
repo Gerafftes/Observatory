@@ -110,7 +110,7 @@ fn transport_hint(target: Option<&str>, receiver: Option<&str>, token: bool) -> 
     let mut hints = Vec::new();
     if let (Some(target), Some(receiver)) = (target, receiver) {
         if target != receiver {
-            hints.push(format!("Radar sendet an {target}; dieser Server empfängt unter {receiver}. Empfangs-IP bzw. UDP-Port angleichen. Diese Firmware bietet keine automatische Zieländerung."));
+            hints.push(format!("Radar sendet an {target}; dieser Server empfängt unter {receiver}. Der Server versucht, das Ziel über den authentifizierten Transport-Fix automatisch anzugleichen."));
         }
     }
     if !token {
@@ -119,11 +119,38 @@ fn transport_hint(target: Option<&str>, receiver: Option<&str>, token: bool) -> 
     hints.join(" ")
 }
 
+fn repair_transport(url: &str, token: &str, receiver: &str) -> Result<(), String> {
+    let (target_host, target_port) = receiver
+        .rsplit_once(':')
+        .ok_or_else(|| "lokale UDP-Empfangsadresse ist ungültig".to_string())?;
+    let target_port = target_port
+        .parse::<u16>()
+        .map_err(|_| "lokaler UDP-Port ist ungültig".to_string())?;
+    let payload = serde_json::json!({
+        "target_host": target_host,
+        "target_port": target_port,
+    });
+    let response = ureq::AgentBuilder::new()
+        .redirects(0)
+        .timeout(Duration::from_millis(1500))
+        .build()
+        .put(&format!("{}/transport", url.trim_end_matches('/')))
+        .set("Authorization", &format!("Bearer {token}"))
+        .set("Content-Type", "application/json")
+        .send_string(&payload.to_string())
+        .map_err(|error| format!("HTTP-Fehler beim automatischen Transport-Fix: {error}"))?;
+    if !(200..300).contains(&response.status()) {
+        return Err(format!("HTTP {} beim automatischen Transport-Fix", response.status()));
+    }
+    Ok(())
+}
+
 pub(crate) fn probe(
     preferred: Option<&str>,
     expected_node: Option<&str>,
     port: u16,
-    token: bool,
+    token: Option<&str>,
+    auto_repair: bool,
 ) -> Probe {
     let mut found =
         preferred.and_then(|url| read_status(url).ok().map(|value| (url.to_string(), value)));
@@ -158,7 +185,7 @@ pub(crate) fn probe(
             };
         }
     }
-    let Some((url, value)) = found else {
+    let Some((url, mut value)) = found else {
         return Probe {
             status: ConnectionStatus { hint: "Kein Radar-Knoten erreichbar. Stromversorgung und gemeinsames WLAN prüfen; bei unbekannter Adresse MMWAVE_NODE_URL setzen. Automatische Suche wird wiederholt.".to_string(), ..Default::default() },
             diagnostics: Err("Radar-Knoten nicht erreichbar.".to_string()),
@@ -166,7 +193,40 @@ pub(crate) fn probe(
     };
     let target = value["target"].as_str().map(str::to_string);
     let receiver = receiver_address(&url, port);
-    let mut hint = transport_hint(target.as_deref(), receiver.as_deref(), token);
+    let mut repair_hint = None;
+    if auto_repair {
+        if let (Some(target), Some(receiver), Some(token)) =
+            (target.as_deref(), receiver.as_deref(), token)
+        {
+            if target != receiver {
+                match repair_transport(&url, token, receiver) {
+                    Ok(()) => match read_status(&url) {
+                        Ok(updated) => {
+                            value = updated;
+                            repair_hint = Some(format!(
+                                "Transportziel automatisch auf {} gesetzt.",
+                                receiver
+                            ));
+                        }
+                        Err(error) => {
+                            repair_hint = Some(format!(
+                                "Transportziel wurde gesetzt, der neue Status konnte aber nicht gelesen werden: {error}"
+                            ));
+                        }
+                    },
+                    Err(error) => repair_hint = Some(error),
+                }
+            }
+        }
+    }
+    let target = value["target"].as_str().map(str::to_string);
+    let mut hint = transport_hint(target.as_deref(), receiver.as_deref(), token.is_some());
+    if let Some(repair_hint) = repair_hint {
+        if !hint.is_empty() {
+            hint.push(' ');
+        }
+        hint.push_str(&repair_hint);
+    }
     let diagnostics = serde_json::from_value(value["diagnostics"].clone()).map_err(|_| {
         "Knoten erreichbar; Firmware liefert keine UART-/Radar-Diagnosezähler.".to_string()
     });

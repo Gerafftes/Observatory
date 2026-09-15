@@ -416,6 +416,27 @@ Public Sensing output remains `uncalibrated` until the blind report is `PASS`;
 after `FAIL` it remains locked. Radar coordinates are never passed into the
 WiFi predictor.
 
+For a radar-only transport/geometry check, start `kind: "mmwave_only"` via
+`POST /api/v1/mmwave/session/start`. It records the radar stream for the
+configured duration and evaluates packet freshness, sequence continuity, room
+bounds, and target multiplicity without requiring RX/CSI or a sealed WiFi
+setup. The Sensing tab exposes this as **mmWave-only prüfen**. A known floor
+mark can be checked independently with `POST /api/v1/mmwave/known-point/check`
+and an `expected_position_m: [x, z]` body; this is a read-only orientation check
+and does not change the saved transform.
+
+The receiver uses a 256 KiB kernel UDP receive buffer and a 20 ms reorder hold
+by default. Override them with `--mmwave-receive-buffer-bytes` and
+`--mmwave-reorder-hold-ms` when a measured WLAN needs different tuning. If the
+node reports a different collector address, the server attempts the
+authenticated `/transport` repair endpoint and records the result in the
+status hint. Older firmware without that endpoint remains diagnosable and must
+be updated once over OTA.
+
+The status also keeps a 256-packet in-memory transport window with valid rate,
+arrival-interval median/P95 and receive-to-process median/P95. These runtime
+statistics are diagnostic only and are not persisted as calibration evidence.
+
 ### Using as a library
 
 ```rust

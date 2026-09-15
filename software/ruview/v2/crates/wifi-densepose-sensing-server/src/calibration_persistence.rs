@@ -20,10 +20,11 @@ pub(crate) const CALIBRATION_ALGORITHM_VERSION: &str = "wifi-d5-d6-empty-room-v1
 
 static CALIBRATION_COUNTER: AtomicU64 = AtomicU64::new(0);
 
-/// The part of a setup profile that can change the WiFi empty-room baseline.
-/// Labels, P01-P09 teaching points, and mmWave connection status are
-/// intentionally excluded. The sealed setup hash binds firmware, exact CSI
-/// grids, TX-source identity, and other runtime facts separately.
+/// The part of a setup profile that can change the WiFi empty-room baseline or
+/// the mmWave ground-truth frame. Labels, P01-P09 teaching points, and mmWave
+/// connection status are intentionally excluded. The sealed setup hash binds
+/// firmware, exact CSI grids, TX-source identity, and other runtime facts
+/// separately.
 pub(crate) fn profile_context_sha256(document: &Value) -> Result<String, String> {
     let object = document
         .as_object()
@@ -61,6 +62,11 @@ pub(crate) fn profile_context_sha256(document: &Value) -> Result<String, String>
             "sensor": mmwave.get("sensor"),
             "mounting_position_m": mmwave.get("mounting_position_m"),
             "mounting_revision": mmwave.get("mounting_revision"),
+            "yaw_mdeg": mmwave.get("yaw_mdeg").cloned().unwrap_or_else(|| json!(0)),
+            "raw_x_inverted": mmwave
+                .get("raw_x_inverted")
+                .cloned()
+                .unwrap_or_else(|| json!(false)),
         })),
         "radio": object.get("radio"),
         "environment": object.get("environment"),
