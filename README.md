@@ -77,7 +77,6 @@ folgt.
 - [Dokumentation](#dokumentation)
 - [Lizenz](#lizenz)
 - [Credits](#credits)
-- [Dokumentationsregeln](#dokumentationsregeln)
 
 ## Schnelleinstieg
 
@@ -259,12 +258,3 @@ Lizenz- und Notice-Dateien unter [`software/ruview/`](software/ruview/).
 - Der filmische Prolog ist vom Intro der Serie
   [*Person of Interest*](https://warnertv.de/serie/sendungen/person-of-interest)
   inspiriert.
-
-## Dokumentationsregeln
-
-- Fehlversuche bleiben dokumentiert, weil sie technische und physikalische
-  Grenzen sichtbar machen.
-- Rohdaten werden erst veröffentlicht, wenn Umfang, Datenschutz und
-  Reproduzierbarkeit geprüft sind.
-- Geheimnisse, WLAN-Zugangsdaten und private Gerätekennungen gehören nicht in
-  die Veröffentlichung.
