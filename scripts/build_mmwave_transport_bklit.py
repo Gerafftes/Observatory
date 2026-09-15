@@ -16,7 +16,7 @@ from PIL import Image, ImageDraw, ImageFont
 
 
 PROJECT_DIR = Path(__file__).resolve().parent.parent
-OUTPUT_DIR = PROJECT_DIR / "results" / "2026-09-13_mmwave-transport_bklit"
+OUTPUT_DIR = PROJECT_DIR / "results" / "mmwave-transport_bklit"
 
 WIDTH, HEIGHT = 1876, 1294
 BACKGROUND = "#ffffff"
