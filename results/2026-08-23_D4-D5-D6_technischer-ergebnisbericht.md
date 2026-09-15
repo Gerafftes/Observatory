@@ -13,7 +13,7 @@ Diagramm-Render: 27. August 2026 mit den offiziellen `@bklitui/ui/charts`-Kompon
 - **D6 belegt technisch vollständige, setupgebundene Roh-CSI-Erfassung.** Alle fünf Aufnahmen sind `completed`, nicht unvollständig, haben 0 Recorder-Drops, keinen Writerfehler, RX1–RX4 und ein einheitliches Raster von 2.437 MHz / 1 Antenne / 64 Subcarriern. `empty-neutral-02` ist die beste Baseline-Kandidatin der aktuellen Setup-Serie.
 - **Keine Phase beweist zuverlässige Live-Positions- oder Personenerkennung.** D6 enthält keine Ground Truth; D4/D5 wurden nicht gegen einen unabhängigen mmWave-Pfad blind validiert. mmWave bleibt für Kalibrierung, Ground Truth, Synchronisation und Blindtests erforderlich.
 
-![Globaler D4/D5-Vergleich](D4-D5-D6_bklit/01_globaler_vergleich.png)
+![Globaler D4/D5-Vergleich](diagrams/D4-D5-D6_bklit/01_globaler_vergleich.png)
 
 ## Umfang und Nenner
 
@@ -61,7 +61,7 @@ Alle fünf verwendeten Läufe enthalten die vier Pflichtdateien, RX1–RX4 in je
 | Person E1b | 0/237 (0,0 %) | 172/237 (72,6 %) | 185/237 (78,1 %) | 0/237 (0,0 %) |
 | **Person gepoolt** | **0/474 (0,0 %)** | **191/474 (40,3 %)** | **356/474 (75,1 %)** | **92/474 (19,4 %)** |
 
-![D4-Leerraumstimmen pro RX](D4-D5-D6_bklit/02_D4_RX_leerraum_heatmap.png)
+![D4-Leerraumstimmen pro RX](diagrams/D4-D5-D6_bklit/02_D4_RX_leerraum_heatmap.png)
 
 Der auffällige Pfad ist nicht stabil: E0b wird von RX4 dominiert, E0d von RX2. Die mittige Mac-Position senkte RX4 von 84,8 % in E0b auf 0 % in E0c/E0d, entfernte aber die Ursache nicht; sie verlagerte sich. In E0b lagen beispielsweise die geglätteten P95-Werte bei RX1/RX2/RX3/RX4 bei 0,000026 / 0,051103 / 0,074513 / 0,093415. Die vollständigen Roh-, P95-, geglätteten und Baseline-Werte stehen im D4-RX-CSV.
 
@@ -89,7 +89,7 @@ Im ersten Personenpfad trugen vor allem RX3/RX4, im zweiten RX2/RX3. Das Replay 
 | D5 E1 Persistenz | 114 | 29,911 s | 3,8113 | 0 | 0 | 1 | 114 | 0 |
 | **Zusammen** | **350** | **89,657 s** | **3,9038** | **0 (0 % Recall)** | **0** | **1** | **114** | **87** |
 
-![D5-Live-Linkwechsel](D4-D5-D6_bklit/03_D5_live_RX_linkwechsel.png)
+![D5-Live-Linkwechsel](diagrams/D4-D5-D6_bklit/03_D5_live_RX_linkwechsel.png)
 
 Der informative Funkpfad wechselte von RX4 auf RX3. Da nie zwei RX gleichzeitig das Quorum erreichten, blieb die globale Klasse durchgehend `ABSENT`. Für diese reale Kalibrierung fehlt außerdem ein gepaarter Leerraum-Prüflauf; ihre Leerraum-FPR ist daher **unklar**, nicht 0 %.
 
@@ -132,7 +132,7 @@ Die Rohdateien wurden gegen ihre `.meta.json`-Sidecars geprüft: Framezahl, RX-V
 | preflight-neutral-02 | completed, vollständig | 2.701 / 608·675·752·666 | 24,903 s | 0 / null | einheitlich | setup-2beda… | **technisch gültig** |
 | empty-neutral-02 | completed, vollständig | 6.102 / 1436·1557·1635·1474 | 64,995 s | 0 / null | einheitlich | setup-2beda… | **Baseline verwendbar im selben Setup** |
 
-![D6-RX-Frameraten](D4-D5-D6_bklit/04_D6_RX_frameraten.png)
+![D6-RX-Frameraten](diagrams/D4-D5-D6_bklit/04_D6_RX_frameraten.png)
 
 Für alle fünf Dateien gilt:
 
