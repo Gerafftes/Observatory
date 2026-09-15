@@ -23,6 +23,8 @@ server processing latency, unique arrival rate, duplicates, and queue behavior
 improved. Median arrival spacing became 18.6% larger, and the remaining 13.1%
 sequence-loss ratio still blocks the loss-free radar preflight.
 
+![Ankunft und Verlust im Vorher-/Nachher-Vergleich](figures/01-ankunft-und-verlust.png)
+
 ## Important correction to the planned baseline
 
 The plan expected the old image to send to `192.168.4.3:5010` while the server
@@ -129,23 +131,20 @@ szeneabhängigen akzeptierten Rate getrennt.
 
 | Diagramm | Export |
 |---|---|
-| Ankunft und Verlust | [`01_ankunft_und_verlust.png`](diagrams/mmwave-transport_bklit/01_ankunft_und_verlust.png) |
-| Ankunftslatenz | [`02_ankunftslatenz.png`](diagrams/mmwave-transport_bklit/02_ankunftslatenz.png) |
-| Serververarbeitung | [`03_serververarbeitung.png`](diagrams/mmwave-transport_bklit/03_serververarbeitung.png) |
-| Redundanzvergleich | [`04_redundanzvergleich.png`](diagrams/mmwave-transport_bklit/04_redundanzvergleich.png) |
+| Ankunft und Verlust | [`01-ankunft-und-verlust.png`](figures/01-ankunft-und-verlust.png) |
+| Ankunftslatenz | [`02-ankunftslatenz.png`](figures/02-ankunftslatenz.png) |
+| Serververarbeitung | [`03-serververarbeitung.png`](figures/03-serververarbeitung.png) |
+| Redundanzvergleich | [`04-redundanzvergleich.png`](figures/04-redundanzvergleich.png) |
 
 Die Datenzuordnung und QA der PNGs ist in der
-[Bklit-Render-Spezifikation](2026-09-14_mmwave-transport_bklit-render-spec.md)
+[Bklit-Render-Spezifikation](rendering.md)
 dokumentiert.
 
 <table>
 <tr>
-<td><a href="diagrams/mmwave-transport_bklit/01_ankunft_und_verlust.png"><img src="diagrams/mmwave-transport_bklit/01_ankunft_und_verlust.png" alt="Ankunft und Verlust im Vorher-Nachher-Vergleich" width="480"></a><br><strong>Ankunft und Verlust</strong></td>
-<td><a href="diagrams/mmwave-transport_bklit/02_ankunftslatenz.png"><img src="diagrams/mmwave-transport_bklit/02_ankunftslatenz.png" alt="Ankunftsmedian und P95 im Vorher-Nachher-Vergleich" width="480"></a><br><strong>Ankunftslatenz</strong></td>
-</tr>
-<tr>
-<td><a href="diagrams/mmwave-transport_bklit/03_serververarbeitung.png"><img src="diagrams/mmwave-transport_bklit/03_serververarbeitung.png" alt="Serververarbeitung und Queue-Evidenz" width="480"></a><br><strong>Serververarbeitung</strong></td>
-<td><a href="diagrams/mmwave-transport_bklit/04_redundanzvergleich.png"><img src="diagrams/mmwave-transport_bklit/04_redundanzvergleich.png" alt="Vergleich einer und zweier UDP-Kopien" width="480"></a><br><strong>Redundanzvergleich</strong></td>
+<td><a href="figures/02-ankunftslatenz.png"><img src="figures/02-ankunftslatenz.png" alt="Ankunftsmedian und P95 im Vorher-Nachher-Vergleich" width="480"></a><br><strong>Ankunftslatenz</strong></td>
+<td><a href="figures/03-serververarbeitung.png"><img src="figures/03-serververarbeitung.png" alt="Serververarbeitung und Queue-Evidenz" width="480"></a><br><strong>Serververarbeitung</strong></td>
+<td><a href="figures/04-redundanzvergleich.png"><img src="figures/04-redundanzvergleich.png" alt="Vergleich einer und zweier UDP-Kopien" width="480"></a><br><strong>Redundanzvergleich</strong></td>
 </tr>
 </table>
 

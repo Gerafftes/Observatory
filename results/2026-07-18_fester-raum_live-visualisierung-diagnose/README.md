@@ -30,7 +30,7 @@ Verwendete RuView-Koordinaten:
 
 ## Bildnachweis
 
-![RuView Live WiFi Sensing mit fehlerhafter Punktwolke und Klassifikation](../skizzen/screenshots/2026-07-18_18-54-33_fixed-room-live-sensing-failure.png)
+![RuView Live WiFi Sensing mit fehlerhafter Punktwolke und Klassifikation](figures/01-live-visualisierung.png)
 
 SHA-256 des unveränderten Desktop-Originals und der Repository-Kopie:
 

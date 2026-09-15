@@ -198,8 +198,9 @@ die Trennung der Evidenzstufen ausführlicher.
 
 ## Belastbare Ergebnisse
 
-Die [Ergebnisübersicht](results/README.md) enthält die vier geprüften Diagramme,
-ihre kurzen Erklärungen, die Nachweisdateien und die vollständige Auswertung.
+Die [Ergebnisübersicht](results/README.md) enthält den vollständigen, neuesten
+zuerst sortierten Ergebniskatalog. Berichte, zugehörige Diagramme und
+tabellarische Ableitungen liegen jeweils im selben Ergebnispaket.
 
 > [!IMPORTANT]
 > D5-abs senkt die globale Leerraum-Fehlpräsenz von D4s `75,2 %` auf `0 %`, senkt aber zugleich den Still-Recall von `88,4 %` auf `0 %` und ist insgesamt **nicht bestanden**. D6 ist technisch vollständig und setupgebunden; daraus folgt keine Aussage über Erkennungs- oder Positionsgenauigkeit.

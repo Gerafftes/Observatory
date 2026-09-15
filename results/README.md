@@ -2,87 +2,71 @@
 
 [English](README.en.md)
 
-Diese Seite bündelt die geprüften D4/D5/D6-Ergebnisse, Diagramme und
-Nachweisdateien. Rohdaten und ausführliche Methodik bleiben in den jeweils
-verlinkten Berichten.
+Dieses Verzeichnis ist die kanonische, nach Datum sortierte Übersicht der
+gemessenen BLL-Ergebnisse. Jeder Eintrag ist ein eigenständiges Paket: Der
+Bericht liegt als `README.md` direkt neben seinen Diagrammen, Tabellen und
+Renderhinweisen.
 
 ## Quelle der Wahrheit
 
-Dieses Root-Verzeichnis ist die kanonische Quelle für gemessene
-BLL-Ergebnisse. `software/ruview/results/` bleibt ein historischer
-Software-Snapshot mit 29 übernommenen Dateien; acht gleichnamige Dateien
-weichen derzeit von der Root-Fassung ab. Sie werden nicht automatisch
-synchronisiert oder als aktuellere Messung interpretiert. Neue oder
-korrigierte Ergebnisnachweise gehören ausschließlich hierher.
+`results/` ist die einzige aktuelle Quelle für Ergebnisnachweise.
+`software/ruview/results/` bleibt ein historischer Software-Snapshot und wird
+weder automatisch synchronisiert noch als neuere Messung interpretiert.
 
-## Kurzfazit
+Die Pakete heißen `YYYY-MM-DD_<Serie>_<Ergebnistyp>`. Versuchskennungen wie
+`D4`, `E0` oder `RX` bleiben großgeschrieben; beschreibende Bestandteile sind
+kleingeschriebene ASCII-Slugs. Innerhalb eines Pakets gilt:
 
-- Die technische Discovery vom 9. August lieferte `2.612` Frames von RX1 bis
-  RX4 bei `0` Drops. Das belegt Transport, Bindung und Rasterstabilität, nicht
-  die Erkennungs- oder Positionsgüte.
-- Zwei historische versiegelte D6-Preflights bestanden mit `2.545`
-  beziehungsweise `2.701` Frames und jeweils `0` Drops.
-- Eine 65-Sekunden-Leerraumkalibrierung schrieb `6.102` Frames bei `0` Drops
-  und bestand die strikte Offline-Inspektion.
-- Der erste reale D5-Still-Livetest erreichte `0 %` Still-Recall. D5 bleibt
-  deshalb deaktiviert und experimentell.
-- Durch die spätere Ergänzung von ESP32-C3, PCB und mmWave-Hardware ist der
-  aktuelle physische Aufbau verändert und noch nicht als Setup v2 versiegelt.
+- `README.md`: Ergebnis, Grenzen und nächste Entscheidung
+- `figures/`: direkt eingebettete Diagramme oder Screenshots
+- `data/`: tabellarische Ableitungen, nicht die Rohaufnahmen
+- `chart-map.md` und `rendering.md`: Zuordnung, Herkunft und Render-QA
 
-> [!IMPORTANT]
-> D5-abs senkt die globale Leerraum-Fehlpräsenz von D4s `75,2 %` auf `0 %`, senkt aber zugleich den Still-Recall von `88,4 %` auf `0 %` und ist insgesamt **nicht bestanden**. D6 ist technisch vollständig und setupgebunden; daraus folgt keine Aussage über Erkennungs- oder Positionsgenauigkeit.
+Die Tabelle ist bewusst **neueste zuerst** sortiert. Ordnernamen allein sind
+auf GitHub und im Dateisystem meist aufsteigend sortiert und ersetzen diesen
+Index daher nicht.
 
-## D4/D5/D6-Ergebnisdiagramme
+## Ergebniskatalog
 
-Der [technische D4/D5/D6-Ergebnisbericht](2026-08-23_D4-D5-D6_technischer-ergebnisbericht.md)
-ist mit der [Laufübersicht über 25 Aufnahmen](2026-08-23_D4-D5-D6_laufuebersicht.csv),
-der [D4-RX-Diagnostik](2026-08-23_D4_RX_diagnostik.csv) und dem
-[Diagrammvertrag inklusive QA](2026-08-23_D4-D5-D6_chart-map.md) verknüpft.
-Die aktuellen Abbildungen wurden am 27. August 2026 mit den offiziellen
-Bklit-UI-Charts gerendert; die [Bklit-Render-Spezifikation](2026-08-27_D4-D5-D6_bklit-render-spec.md)
-dokumentiert Datenquelle, Komponentenwahl und QA. Der gepflegte Export liegt in
-`diagrams/D4-D5-D6_bklit/`; ein redundantes altes `..._figures`-Archiv wird
-nicht mehr parallel geführt.
+| Datum | Serie | Ergebnistyp | Evidenzklasse | Bewertung | Bericht | Primärdiagramm |
+|---|---|---|---|---|---|---|
+| 2026-09-13 | mmWave | Transportvergleich | drei kontrollierte Vorher-/Nachher-Läufe plus Redundanztest | **besser, aber nicht verlustfrei** | [Bericht](2026-09-13_mmwave_transport-vergleich/README.md) | [Ankunft und Verlust](2026-09-13_mmwave_transport-vergleich/figures/01-ankunft-und-verlust.png) |
+| 2026-08-30 | mmWave | Runtime-Audit | aufgezeichnete akzeptierte Pakete | **nicht bestanden**; Sequenzlücke | [Bericht](2026-08-30_mmwave_runtime-audit/README.md) | — |
+| 2026-08-23 | D4/D5/D6 | technischer Gesamtbericht | 25 Aufnahmen, Replay und setupgebundene Techniknachweise | D5-abs **nicht bestanden**; D6 nur technisch | [Bericht](2026-08-23_D4-D5-D6_technischer-bericht/README.md) | [Globaler Vergleich](2026-08-23_D4-D5-D6_technischer-bericht/figures/01-globaler-vergleich.png) |
+| 2026-08-09 | D6 | Sidecar-Fix, Neusiegelung und Preflight | Live-Runner plus strikte Offline-Inspektion | Recorder-Preflight und Leerraumkalibrierung **bestanden** | [Bericht](2026-08-09_D6_sidecar-fix-neusiegelung-und-preflight/README.md) | — |
+| 2026-08-09 | D6 | versiegelter Preflight | setupgebundener 25-Sekunden-Preflight | Recorder-Preflight **bestanden**; Live-Visualisierung nicht belegt | [Bericht](2026-08-09_D6_setup-siegel-und-preflight/README.md) | — |
+| 2026-08-09 | D6 | Setupaufnahme und TX-Identität | Read-only-Hardware- und Konfigurationsnachweis | vorbereitend; damaliger Aufbau noch nicht versiegelt | [Bericht](2026-08-09_D6_setupaufnahme-und-tx-firmwareidentitaet/README.md) | — |
+| 2026-07-26 | E0d/E1b | unabhängige Bestätigung | zweites Leerraum-/Still-Paar | RX4-Hypothese verworfen; RX3 nur vorläufig | [Bericht](2026-07-26_E0d-E1b_unabhaengige-bestaetigung/README.md) | — |
+| 2026-07-26 | E0c/E1 | Still-Person-Trennung | ein Leerraum-/Still-Paar | messbar, aber nicht unabhängig bestätigt | [Bericht](2026-07-26_E0c-E1_still-person-separation/README.md) | — |
+| 2026-07-26 | E0b/E0c | Mac-Positions-A/B-Test | ein räumlicher A/B-Wechsel | RX4-Effekt gestützt; keine allgemeine Distanzfunktion | [Bericht](2026-07-26_E0b-E0c_mac-position-ab-test/README.md) | — |
+| 2026-07-26 | D5 | realer Still-Livetest | physischer Livetest | **nicht bestanden** | [Bericht](2026-07-26_D5_still-livetest/README.md) | — |
+| 2026-07-26 | D5 | Offline-Replay und Präsenzkalibrierung | Softwaretests und Replay | Softwarepfad bestanden; reale Kalibrierung damals offen | [Bericht](2026-07-26_D5_offline-replay-und-praesenzkalibrierung/README.md) | — |
+| 2026-07-26 | D4/E0b | sauberer Leerraumtest | kontrollierter Leerraumlauf | **nicht bestanden** | [Bericht](2026-07-26_D4-E0b_sauberer-leerraum/README.md) | — |
+| 2026-07-26 | D4/E0 | Leerraum-Mischlauf | Lauf mit zwei unmarkierten Raumzutritten | **unklar**; keine gültige FPR | [Bericht](2026-07-26_D4-E0_leerraum/README.md) | — |
+| 2026-07-18 | fester Raum | Livevisualisierungs-Diagnose | Browser- und Laufbeobachtung | Datenpfad sichtbar; kein Positionsnachweis | [Bericht](2026-07-18_fester-raum_live-visualisierung-diagnose/README.md) | [Livevisualisierung](2026-07-18_fester-raum_live-visualisierung-diagnose/figures/01-live-visualisierung.png) |
+| 2026-06-28 | G2 | RX-Verteilungs-Qualitätscheck | Logger, Serverlog und Screenshot | Erfassung gut; Visualisierung unzuverlässig | [Bericht](2026-06-28_G2_rx-verteilung-qualitaetscheck/README.md) | [Livevisualisierung](2026-06-28_G2_rx-verteilung-qualitaetscheck/figures/01-live-visualisierung.png) |
+| 2026-06-28 | G1 | Guard-500-ms-Qualitätscheck | API-Samples und kurzer Serverlog | Workaround gestützt; physische Synchronität nicht belegt | [Bericht](2026-06-28_G1_guard500ms-qualitaetscheck/README.md) | — |
+| 2026-06-28 | A0–A3 | Qualitätscheck | vier frühe Messreihen | technisch brauchbar; Zuverlässigkeit noch offen | [Bericht](2026-06-28_A0-A3_qualitaetscheck/README.md) | — |
 
-<table>
-<tr>
-<td><a href="diagrams/D4-D5-D6_bklit/01_globaler_vergleich.png"><img src="diagrams/D4-D5-D6_bklit/01_globaler_vergleich.png" alt="Globaler Vergleich von D4 und D5-abs für Leerraum-Fehlpräsenz und Still-Recall" width="480"></a><br><strong>Globaler Vergleich</strong><br>D5-abs entfernt die Leerraum-Fehlpräsenz, verliert dabei aber den Still-Recall. Deshalb ist die Variante insgesamt nicht bestanden.</td>
-<td><a href="diagrams/D4-D5-D6_bklit/02_D4_RX_leerraum_heatmap.png"><img src="diagrams/D4-D5-D6_bklit/02_D4_RX_leerraum_heatmap.png" alt="D4-Leerraumstimmen als RX-Heatmap" width="480"></a><br><strong>D4-RX-Leerraum-Heatmap</strong><br>Die Fehlpräsenz entsteht lokal und wechselt zwischen den RX-Pfaden. Ein einzelner stabiler Verursacher ist nicht erkennbar.</td>
-</tr>
-<tr>
-<td><a href="diagrams/D4-D5-D6_bklit/03_D5_live_RX_linkwechsel.png"><img src="diagrams/D4-D5-D6_bklit/03_D5_live_RX_linkwechsel.png" alt="D5-Livetest mit RX-Linkwechseln" width="480"></a><br><strong>D5-Live-Linkwechsel</strong><br>Die Präsenzstimmen wechseln zwischen RX3 und RX4. Das Zwei-RX-Quorum bleibt dadurch aus, und die stille Person wird nicht erkannt.</td>
-<td><a href="diagrams/D4-D5-D6_bklit/04_D6_RX_frameraten.png"><img src="diagrams/D4-D5-D6_bklit/04_D6_RX_frameraten.png" alt="D6-RX-Frameraten über fünf Aufnahmen" width="480"></a><br><strong>D6-RX-Frameraten</strong><br>Alle vier RX sind in den fünf technischen Aufnahmen vertreten. Das belegt Erfassung und Transport, aber keine Positionsgenauigkeit.</td>
-</tr>
-</table>
+## Aktuelle Primärdiagramme
 
-## mmWave-Transport-OTA-Vergleich
+### mmWave-Transport
 
-Der [Vorher-/Nachher-Bericht](2026-09-13_mmwave-transport-ota-vergleich.md)
-enthält die kontrollierten 60-Sekunden-Läufe, die Redundanzentscheidung und die
-Grenzen der Interpretation. Die zugehörigen Bklit-Exporte liegen in
-[`diagrams/mmwave-transport_bklit/`](diagrams/mmwave-transport_bklit/); die
-[Render-Spezifikation](2026-09-14_mmwave-transport_bklit-render-spec.md)
-dokumentiert die Zuordnung und QA.
+[![Ankunft und Verlust im mmWave-Vorher-/Nachher-Vergleich](2026-09-13_mmwave_transport-vergleich/figures/01-ankunft-und-verlust.png)](2026-09-13_mmwave_transport-vergleich/README.md)
 
-<table>
-<tr>
-<td><a href="diagrams/mmwave-transport_bklit/01_ankunft_und_verlust.png"><img src="diagrams/mmwave-transport_bklit/01_ankunft_und_verlust.png" alt="Ankunft und Verlust im Vorher-Nachher-Vergleich" width="480"></a><br><strong>Ankunft und Verlust</strong></td>
-<td><a href="diagrams/mmwave-transport_bklit/02_ankunftslatenz.png"><img src="diagrams/mmwave-transport_bklit/02_ankunftslatenz.png" alt="Ankunftsmedian und P95 im Vorher-Nachher-Vergleich" width="480"></a><br><strong>Ankunftslatenz</strong></td>
-</tr>
-<tr>
-<td><a href="diagrams/mmwave-transport_bklit/03_serververarbeitung.png"><img src="diagrams/mmwave-transport_bklit/03_serververarbeitung.png" alt="Serververarbeitung und Queue-Evidenz" width="480"></a><br><strong>Serververarbeitung</strong></td>
-<td><a href="diagrams/mmwave-transport_bklit/04_redundanzvergleich.png"><img src="diagrams/mmwave-transport_bklit/04_redundanzvergleich.png" alt="Vergleich einer und zweier UDP-Kopien" width="480"></a><br><strong>Redundanzvergleich</strong></td>
-</tr>
-</table>
+Der Transport wurde insgesamt besser, ist mit `13,1 %` gemessener
+Sequenzverlustquote aber weiterhin nicht verlustfrei. Die drei weiteren
+Diagramme und die Render-QA stehen direkt im [Ergebnispaket](2026-09-13_mmwave_transport-vergleich/README.md).
 
-## Wichtige Nachweise
+### D4/D5/D6
 
-- [D5: Offline-Replay und experimentelle Präsenzkalibrierung](2026-07-26_D5_offline-replay-und-experimentelle-praesenzkalibrierung.md)
-- [D5: realer Still-Livetest](2026-07-26_D5_realer-still-livetest.md)
-- [D6: Setupaufnahme und TX-Firmwareidentität](2026-08-09_D6_setupaufnahme-und-TX-firmwareidentitaet.md)
-- [D6: Setup-Siegel und Preflight](2026-08-09_D6_setup-siegel-und-preflight.md)
-- [D6: Sidecar-Fix, Neusiegelung und Leerraumkalibrierung](2026-08-09_D6_sidecar-fix-neusiegelung-und-preflight.md)
+[![Globaler Vergleich von D4, D5 Replay und D5-abs](2026-08-23_D4-D5-D6_technischer-bericht/figures/01-globaler-vergleich.png)](2026-08-23_D4-D5-D6_technischer-bericht/README.md)
 
-Alle Summen, Sidecars, Replay-Ergebnisse, Diagramme und Qualitätsaussagen
-bleiben an die jeweilige Setup-Serie gebunden. Es wurden keine Schwellenwerte
-für diese Dokumentation verändert.
+D5-abs entfernt in den ausgewerteten Läufen die Leerraum-Fehlpräsenz, verliert
+aber zugleich den Still-Recall und ist insgesamt nicht bestanden. Alle vier
+Diagramme, CSV-Ableitungen und Herkunftshinweise stehen direkt im
+[Ergebnispaket](2026-08-23_D4-D5-D6_technischer-bericht/README.md).
+
+Alle Aussagen bleiben an ihre jeweilige Setup-Serie gebunden. Ein bestandener
+Transport- oder Recorder-Test ist kein Beleg für Erkennungs- oder
+Positionsgenauigkeit.

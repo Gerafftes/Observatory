@@ -198,8 +198,9 @@ in detail.
 
 ## Verified results
 
-The [results overview](results/README.en.md) contains the four checked figures,
-short explanations, evidence files, and the complete evaluation.
+The [results overview](results/README.en.md) contains the complete newest-first
+catalog. Reports, associated figures, and derived tables are colocated in each
+result package.
 
 > [!IMPORTANT]
 > D5-abs lowers D4's global empty-room false presence from `75.2%` to `0%`, but also lowers still recall from `88.4%` to `0%`, so it **failed overall**. D6 is technically complete and setup-bound; this does not establish detection or positioning accuracy.

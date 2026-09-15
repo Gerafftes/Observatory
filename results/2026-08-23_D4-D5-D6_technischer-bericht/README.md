@@ -13,11 +13,11 @@ Diagramm-Render: 27. August 2026 mit den offiziellen `@bklitui/ui/charts`-Kompon
 - **D6 belegt technisch vollständige, setupgebundene Roh-CSI-Erfassung.** Alle fünf Aufnahmen sind `completed`, nicht unvollständig, haben 0 Recorder-Drops, keinen Writerfehler, RX1–RX4 und ein einheitliches Raster von 2.437 MHz / 1 Antenne / 64 Subcarriern. `empty-neutral-02` ist die beste Baseline-Kandidatin der aktuellen Setup-Serie.
 - **Keine Phase beweist zuverlässige Live-Positions- oder Personenerkennung.** D6 enthält keine Ground Truth; D4/D5 wurden nicht gegen einen unabhängigen mmWave-Pfad blind validiert. mmWave bleibt für Kalibrierung, Ground Truth, Synchronisation und Blindtests erforderlich.
 
-![Globaler D4/D5-Vergleich](diagrams/D4-D5-D6_bklit/01_globaler_vergleich.png)
+![Globaler D4/D5-Vergleich](figures/01-globaler-vergleich.png)
 
 ## Umfang und Nenner
 
-Der [bereinigte Laufüberblick](2026-08-23_D4-D5-D6_laufuebersicht.csv) inventarisiert **25 Aufnahmen**: 20 API-/Klassifikationsläufe und 5 D6-Roh-CSI-Aufnahmen. Der [D4-RX-Diagnostikexport](2026-08-23_D4_RX_diagnostik.csv) enthält zusätzlich pro Lauf und RX die Stimmen sowie Mittelwert und P95 der rohen und geglätteten Bewegungsscores.
+Der [bereinigte Laufüberblick](data/laufuebersicht.csv) inventarisiert **25 Aufnahmen**: 20 API-/Klassifikationsläufe und 5 D6-Roh-CSI-Aufnahmen. Der [D4-RX-Diagnostikexport](data/d4-rx-diagnostik.csv) enthält zusätzlich pro Lauf und RX die Stimmen sowie Mittelwert und P95 der rohen und geglätteten Bewegungsscores.
 
 | Datengruppe | Läufe | Zulässige Verwendung |
 |---|---|---|
@@ -61,7 +61,7 @@ Alle fünf verwendeten Läufe enthalten die vier Pflichtdateien, RX1–RX4 in je
 | Person E1b | 0/237 (0,0 %) | 172/237 (72,6 %) | 185/237 (78,1 %) | 0/237 (0,0 %) |
 | **Person gepoolt** | **0/474 (0,0 %)** | **191/474 (40,3 %)** | **356/474 (75,1 %)** | **92/474 (19,4 %)** |
 
-![D4-Leerraumstimmen pro RX](diagrams/D4-D5-D6_bklit/02_D4_RX_leerraum_heatmap.png)
+![D4-Leerraumstimmen pro RX](figures/02-d4-rx-leerraum-heatmap.png)
 
 Der auffällige Pfad ist nicht stabil: E0b wird von RX4 dominiert, E0d von RX2. Die mittige Mac-Position senkte RX4 von 84,8 % in E0b auf 0 % in E0c/E0d, entfernte aber die Ursache nicht; sie verlagerte sich. In E0b lagen beispielsweise die geglätteten P95-Werte bei RX1/RX2/RX3/RX4 bei 0,000026 / 0,051103 / 0,074513 / 0,093415. Die vollständigen Roh-, P95-, geglätteten und Baseline-Werte stehen im D4-RX-CSV.
 
@@ -89,7 +89,7 @@ Im ersten Personenpfad trugen vor allem RX3/RX4, im zweiten RX2/RX3. Das Replay 
 | D5 E1 Persistenz | 114 | 29,911 s | 3,8113 | 0 | 0 | 1 | 114 | 0 |
 | **Zusammen** | **350** | **89,657 s** | **3,9038** | **0 (0 % Recall)** | **0** | **1** | **114** | **87** |
 
-![D5-Live-Linkwechsel](diagrams/D4-D5-D6_bklit/03_D5_live_RX_linkwechsel.png)
+![D5-Live-Linkwechsel](figures/03-d5-live-rx-linkwechsel.png)
 
 Der informative Funkpfad wechselte von RX4 auf RX3. Da nie zwei RX gleichzeitig das Quorum erreichten, blieb die globale Klasse durchgehend `ABSENT`. Für diese reale Kalibrierung fehlt außerdem ein gepaarter Leerraum-Prüflauf; ihre Leerraum-FPR ist daher **unklar**, nicht 0 %.
 
@@ -132,7 +132,7 @@ Die Rohdateien wurden gegen ihre `.meta.json`-Sidecars geprüft: Framezahl, RX-V
 | preflight-neutral-02 | completed, vollständig | 2.701 / 608·675·752·666 | 24,903 s | 0 / null | einheitlich | setup-2beda… | **technisch gültig** |
 | empty-neutral-02 | completed, vollständig | 6.102 / 1436·1557·1635·1474 | 64,995 s | 0 / null | einheitlich | setup-2beda… | **Baseline verwendbar im selben Setup** |
 
-![D6-RX-Frameraten](diagrams/D4-D5-D6_bklit/04_D6_RX_frameraten.png)
+![D6-RX-Frameraten](figures/04-d6-rx-frameraten.png)
 
 Für alle fünf Dateien gilt:
 
@@ -199,10 +199,10 @@ Nächste Reihenfolge ohne Schwellenwertänderung:
 
 ## Reproduzierbarkeit und Quellen
 
-- Generator: [`scripts/build_d4_d5_d6_results.py`](../scripts/build_d4_d5_d6_results.py)
-- D5-Replayer: [`scripts/evaluate_d5_replay.py`](../scripts/evaluate_d5_replay.py)
-- Laufübersicht: [`2026-08-23_D4-D5-D6_laufuebersicht.csv`](2026-08-23_D4-D5-D6_laufuebersicht.csv)
-- D4-RX-Diagnostik: [`2026-08-23_D4_RX_diagnostik.csv`](2026-08-23_D4_RX_diagnostik.csv)
-- Diagrammvertrag und QA: [`2026-08-23_D4-D5-D6_chart-map.md`](2026-08-23_D4-D5-D6_chart-map.md)
-- Bklit-Render-Spezifikation: [`2026-08-27_D4-D5-D6_bklit-render-spec.md`](2026-08-27_D4-D5-D6_bklit-render-spec.md)
-- Vorberichte: [`2026-07-26_D4-E0b_sauberer-leerraum.md`](2026-07-26_D4-E0b_sauberer-leerraum.md), [`2026-07-26_D5_offline-replay-und-experimentelle-praesenzkalibrierung.md`](2026-07-26_D5_offline-replay-und-experimentelle-praesenzkalibrierung.md), [`2026-07-26_D5_realer-still-livetest.md`](2026-07-26_D5_realer-still-livetest.md), [`2026-08-09_D6_setup-siegel-und-preflight.md`](2026-08-09_D6_setup-siegel-und-preflight.md), [`2026-08-09_D6_sidecar-fix-neusiegelung-und-preflight.md`](2026-08-09_D6_sidecar-fix-neusiegelung-und-preflight.md)
+- Daten-/Legacy-Abbildungs-Generator: [`scripts/build_d4_d5_d6_results.py`](../../scripts/build_d4_d5_d6_results.py)
+- D5-Replayer: [`scripts/evaluate_d5_replay.py`](../../scripts/evaluate_d5_replay.py)
+- Laufübersicht: [`data/laufuebersicht.csv`](data/laufuebersicht.csv)
+- D4-RX-Diagnostik: [`data/d4-rx-diagnostik.csv`](data/d4-rx-diagnostik.csv)
+- Diagrammvertrag und QA: [`chart-map.md`](chart-map.md)
+- Bklit-Render-Spezifikation: [`rendering.md`](rendering.md)
+- Vorberichte: [D4/E0b](../2026-07-26_D4-E0b_sauberer-leerraum/README.md), [D5 Offline-Replay](../2026-07-26_D5_offline-replay-und-praesenzkalibrierung/README.md), [D5 Still-Livetest](../2026-07-26_D5_still-livetest/README.md), [D6 Versiegelung](../2026-08-09_D6_setup-siegel-und-preflight/README.md), [D6 Sidecar-Fix](../2026-08-09_D6_sidecar-fix-neusiegelung-und-preflight/README.md)

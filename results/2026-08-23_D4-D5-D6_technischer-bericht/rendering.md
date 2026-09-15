@@ -9,7 +9,7 @@ Purpose: replace the four result figures with Bklit UI chart components without 
 - Rendered source revision: `c57f66bfa7c3198edb677b567ce08cbf364ae159`
 - Component package: `@bklitui/ui/charts`
 - Studio reference: <https://bklit.com/studio>
-- Data source: [`2026-08-23_D4-D5-D6_laufuebersicht.csv`](2026-08-23_D4-D5-D6_laufuebersicht.csv) and [`2026-08-23_D4_RX_diagnostik.csv`](2026-08-23_D4_RX_diagnostik.csv)
+- Data source: [`data/laufuebersicht.csv`](data/laufuebersicht.csv) and [`data/d4-rx-diagnostik.csv`](data/d4-rx-diagnostik.csv)
 
 The Bklit Studio uses generated demo data and has no CSV import. The figures therefore use the official component API directly with the already audited values. No new recording or threshold change was performed.
 
@@ -17,10 +17,10 @@ The Bklit Studio uses generated demo data and has no CSV import. The figures the
 
 | Output | Bklit component | Values retained |
 |---|---|---|
-| `01_globaler_vergleich.png` | `BarChart` + `Bar` + `BarXAxis` + `YAxis` + `Grid` | D4 pooled FPR 75.246%, recall 88.397%; D5-abs 0/0%; D5 replay 0/89.340% |
-| `02_D4_RX_leerraum_heatmap.png` | `HeatmapChart` + `HeatmapCells` | E0b/E0c/E0d × RX1–RX4 exact percentages, with table labels retained because Bklit heatmap levels are discrete |
-| `03_D5_live_RX_linkwechsel.png` | `LineChart` + `Line` + `YAxis` + `Grid` | E1 n=236 and Persistence n=114 per-RX vote percentages |
-| `04_D6_RX_frameraten.png` | `BarChart` + `Bar` + `BarXAxis` + `YAxis` + `Grid` | D6 per-RX raw-frame rates from actual host timestamp spans |
+| `figures/01-globaler-vergleich.png` | `BarChart` + `Bar` + `BarXAxis` + `YAxis` + `Grid` | D4 pooled FPR 75.246%, recall 88.397%; D5-abs 0/0%; D5 replay 0/89.340% |
+| `figures/02-d4-rx-leerraum-heatmap.png` | `HeatmapChart` + `HeatmapCells` | E0b/E0c/E0d × RX1–RX4 exact percentages, with table labels retained because Bklit heatmap levels are discrete |
+| `figures/03-d5-live-rx-linkwechsel.png` | `LineChart` + `Line` + `YAxis` + `Grid` | E1 n=236 and E1 Persistenz n=114 per-RX vote percentages |
+| `figures/04-d6-rx-frameraten.png` | `BarChart` + `Bar` + `BarXAxis` + `YAxis` + `Grid` | D6 per-RX raw-frame rates from actual host timestamp spans |
 
 ## QA
 
