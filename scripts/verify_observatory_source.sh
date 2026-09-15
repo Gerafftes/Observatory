@@ -3,7 +3,7 @@ set -eu
 
 repo_dir=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 source_dir="$repo_dir/software/ruview"
-expected_source_entries=15889
+expected_source_entries=15902
 
 required_paths='README.md
 LICENSE
@@ -11,6 +11,7 @@ ui/index.html
 ui/components/ObservatoryControlCenter.js
 ui/components/RoomGeometryEditor.js
 ui/components/MmwaveCalibrationAssistant.js
+ui/tests/api-contract-catalog.test.mjs
 v2/Cargo.toml
 v2/crates/wifi-densepose-sensing-server/Cargo.toml
 v2/crates/wifi-densepose-sensing-server/src/d5_presence.rs
@@ -18,6 +19,18 @@ v2/crates/wifi-densepose-sensing-server/src/d6_fingerprint.rs
 v2/crates/wifi-densepose-sensing-server/src/mmwave_calibration.rs
 v2/crates/wifi-densepose-sensing-server/src/calibration_dataset.rs
 v2/crates/wifi-densepose-sensing-server/src/experiment.rs
+v2/crates/wifi-densepose-sensing-server/src/model_routes.rs
+v2/crates/wifi-densepose-sensing-server/src/recording_routes.rs
+v2/crates/wifi-densepose-sensing-server/src/training_routes.rs
+v2/crates/wifi-densepose-sensing-server/src/observatory_routes.rs
+v2/crates/wifi-densepose-sensing-server/src/mmwave_routes.rs
+v2/crates/wifi-densepose-sensing-server/src/calibration_routes.rs
+v2/crates/wifi-densepose-sensing-server/src/sensing_routes.rs
+v2/crates/wifi-densepose-sensing-server/src/system_routes.rs
+v2/crates/wifi-densepose-sensing-server/src/route_support.rs
+v2/crates/wifi-densepose-sensing-server/src/state.rs
+v2/crates/wifi-densepose-sensing-server/src/protocol.rs
+v2/crates/wifi-densepose-sensing-server/src/runtime_tasks.rs
 firmware/esp32-csi-node/CMakeLists.txt
 firmware/esp32-mmwave-node/CMakeLists.txt
 archive/v1/src/sensing/ws_server.py

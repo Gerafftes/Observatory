@@ -83,6 +83,7 @@ Endpoints on port 8032:
 - `PUT /mode` with body `calibration` or `reference` (Bearer token)
 - `PUT /transform` with JSON `origin_x_mm`, `origin_z_mm`, `yaw_mdeg`, and
   `raw_x_inverted` (Bearer token)
+- `PUT /transport` with JSON `target_host` and `target_port` (Bearer token)
 - `POST /ota` with the app binary (Bearer token)
 
 Mode, transform, and OTA writes fail closed when no token was configured. The
@@ -94,6 +95,21 @@ The read-only status includes cumulative `uart_bytes_received`,
 `radar_frames_valid`, `udp_packets_sent`, and `udp_send_failures` counters. They
 separate an idle or incorrectly wired UART from parser failures and UDP delivery
 problems without changing the measurement packet schema.
+
+The default stream interval is 50 ms and one UDP copy per radar frame. The
+LD2450 itself normally reports at 10 Hz, so this interval is only an upper
+bound and cannot create additional radar measurements. WiFi
+modem sleep is disabled by default for the mains-powered node so DTIM wake-ups
+do not add receive latency. All three choices are configurable in **RuView
+mmWave node**. Redundant copies should only be enabled for a demonstrably
+lossy WLAN because they consume airtime and are deduplicated by the server.
+The server can use the authenticated `/transport` endpoint to repair a changed
+collector IP/port and persists that target in NVS.
+
+Disabling modem sleep increases power consumption. If it is re-enabled for a
+battery deployment, expect the access point's DTIM/listen interval to become a
+possible lower bound on receive latency; compare the server's transport delay
+and sequence-loss counters before choosing that trade-off.
 
 ## Record
 

@@ -32,6 +32,12 @@ def main() -> None:
         metavar=("ORIGIN_X_MM", "ORIGIN_Z_MM", "YAW_MDEG", "INVERT_RAW_X"),
         help="persist the room transform; INVERT_RAW_X is true or false",
     )
+    action.add_argument(
+        "--transport",
+        nargs=2,
+        metavar=("TARGET_HOST", "TARGET_PORT"),
+        help="persist the UDP collector IPv4 address and port",
+    )
     action.add_argument("--firmware")
     args = parser.parse_args()
     base_url = f"http://{args.host}:8032"
@@ -55,6 +61,21 @@ def main() -> None:
         }).encode()
         result = request(
             f"{base_url}/transform",
+            "PUT",
+            payload,
+            args.token,
+            "application/json",
+        )
+    elif args.transport:
+        if not args.token:
+            parser.error("--token is required for a transport change")
+        target_host, target_port = args.transport
+        payload = json.dumps({
+            "target_host": target_host,
+            "target_port": int(target_port),
+        }).encode()
+        result = request(
+            f"{base_url}/transport",
             "PUT",
             payload,
             args.token,

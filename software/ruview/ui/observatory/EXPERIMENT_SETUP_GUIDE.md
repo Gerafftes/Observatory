@@ -122,9 +122,9 @@ Der Run erhält eine eigene ID und übernimmt den Profil-Hash.
 Jede echte Änderung erzeugt dabei eine unveränderliche Profilversion; ein
 identisches erneutes Speichern erzeugt keine zusätzliche Version.
 
-### Schritt 3 — Run mit dem aktiven Setup-v2 versiegeln
+### Schritt 3 — Run mit dem aktiven versiegelten Setup verbinden
 
-Nach dem Speichern des CAD-Profils übernimmt **Setup-v2-Entwurf laden** Raum,
+Nach dem Speichern des CAD-Profils übernimmt **Entwurf für versiegeltes Setup laden** Raum,
 TX, RX1–RX4, mmWave-Montagepunkt, Kanal und Umgebungsrevisionen aus genau der
 gespeicherten Profilversion. Diese Werte müssen nicht ein zweites Mal
 eingetragen werden. Der Entwurf bleibt absichtlich nicht versiegelbar, bis die
@@ -132,7 +132,7 @@ verifizierten Firmware-, Grid-, TX-Filter-, Recording-Host- und
 mmWave-Transform-Identitäten ergänzt wurden.
 
 Der Button bleibt gesperrt, solange der Server ohne `--position-setup` läuft.
-Für einen echten Lauf zuerst eine vollständige Setup-v2-Spezifikation mit den
+Für einen echten Lauf zuerst eine vollständige Spezifikation des versiegelten Setups mit den
 verifizierten Firmware-, Grid-, TX-Filter-, mmWave- und Server-Identitäten
 erzeugen, mit demselben Server-Binary versiegeln und den Server mit genau
 diesem Artefakt neu starten. Danach im Guide Setup versiegeln klicken.
@@ -301,7 +301,7 @@ Wenn der Sensor angeschlossen wird, in dieser Reihenfolge vorgehen:
    müssen steigen.
 9. Im UI erst bei streaming mit Transform- und Raumprüfung fortfahren.
 10. Radar-Transform mit mehreren bekannten Bodenmarkierungen prüfen.
-11. Setup-v2 mit Node-ID, Raumkoordinaten und Transform versiegeln.
+11. Setup mit Node-ID, Raumkoordinaten und Transform versiegeln.
 12. CSI-RX-Nodes verbinden und TX-Bindung, CSI-Rate, Paketverlust und Sync
     prüfen.
 13. Danach Leerkalibrierung, mmWave-Kalibrierung, Blindtest und Evaluation
@@ -319,7 +319,7 @@ Layout-Flags. Off-Grid-Frames halten die Source-Binding-Attestierung frisch,
 werden aber vor Preflight, Aufnahme, D5/D6 und Live-Position verworfen. Der Pin
 ist nur eine reversible Vorstufe und kann nicht zusammen mit
 `--position-setup` verwendet werden; danach sind ausschließlich die im
-Setup-v2 versiegelten RX-Grids maßgeblich.
+versiegelten Setup hinterlegten RX-Grids maßgeblich.
 
 Ein erfolgreicher Flash oder ein erfolgreicher Parser-Test beweist weder
 WiFi-Transport noch Radar-Streaming oder Positionsgenauigkeit.

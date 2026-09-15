@@ -9,6 +9,7 @@
 
 #include "esp_log.h"
 #include "esp_system.h"
+#include "sdkconfig.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "lwip/inet.h"
@@ -17,8 +18,12 @@
 #include "coordinate_transform.h"
 
 static const char *TAG = "measurement_stream";
-#define UDP_REDUNDANT_COPIES 3
-#define UDP_COPY_DELAY_MS 5
+#ifndef CONFIG_MMWAVE_UDP_REDUNDANT_COPIES
+#define CONFIG_MMWAVE_UDP_REDUNDANT_COPIES 1
+#endif
+#ifndef CONFIG_MMWAVE_UDP_COPY_DELAY_MS
+#define CONFIG_MMWAVE_UDP_COPY_DELAY_MS 0
+#endif
 
 static bool append_json(char *buffer, size_t capacity, size_t *used,
                         const char *format, ...)
@@ -39,7 +44,6 @@ static bool append_json(char *buffer, size_t capacity, size_t *used,
 
 struct measurement_stream {
     int socket_fd;
-    struct sockaddr_in destination;
     const app_config_t *config;
     uint32_t sequence;
     uint32_t boot_id;
@@ -55,14 +59,12 @@ measurement_stream_t *measurement_stream_create(const app_config_t *config)
     stream->boot_id = esp_random();
     stream->socket_fd = socket(AF_INET, SOCK_DGRAM, IPPROTO_IP);
     if (stream->socket_fd < 0 ||
-        inet_pton(AF_INET, config->target_host, &stream->destination.sin_addr) != 1) {
+        !app_config_transport_valid(config->target_host, config->target_port)) {
         ESP_LOGE(TAG, "Cannot create UDP stream for %s:%u",
                  config->target_host, config->target_port);
         measurement_stream_destroy(stream);
         return NULL;
     }
-    stream->destination.sin_family = AF_INET;
-    stream->destination.sin_port = htons(config->target_port);
     return stream;
 }
 
@@ -83,6 +85,15 @@ bool measurement_stream_send(measurement_stream_t *stream,
 {
     app_config_t config;
     app_config_snapshot(stream->config, &config);
+    struct sockaddr_in destination = {
+        .sin_family = AF_INET,
+        .sin_port = htons(config.target_port),
+    };
+    if (inet_pton(AF_INET, config.target_host, &destination.sin_addr) != 1) {
+        ESP_LOGE(TAG, "Invalid UDP target %s:%u",
+                 config.target_host, config.target_port);
+        return false;
+    }
     char json[1152];
     struct timeval wall_time;
     gettimeofday(&wall_time, NULL);
@@ -130,21 +141,22 @@ bool measurement_stream_send(measurement_stream_t *stream,
     }
 
     // UDP success only confirms that lwIP accepted the datagram; it does not
-    // confirm delivery across the experiment WLAN. Send identical sequence
-    // numbers a few milliseconds apart. The server already deduplicates them
-    // before sequence validation, while temporal diversity prevents isolated
-    // WiFi loss from invalidating the 25-second calibration preflight.
+    // confirm delivery across the experiment WLAN. One copy is the normal
+    // low-latency mode. Optional redundancy remains available through
+    // menuconfig for noisy links, but it deliberately stays out of the fast
+    // path because duplicate datagrams consume airtime and server queue time.
     bool sent = false;
-    for (unsigned copy = 0; copy < UDP_REDUNDANT_COPIES; ++copy) {
+    for (unsigned copy = 0; copy < CONFIG_MMWAVE_UDP_REDUNDANT_COPIES; ++copy) {
         sent = sendto(stream->socket_fd, json, used, 0,
-                      (struct sockaddr *)&stream->destination,
-                      sizeof(stream->destination)) >= 0 || sent;
-        if (copy + 1 < UDP_REDUNDANT_COPIES) {
-            vTaskDelay(pdMS_TO_TICKS(UDP_COPY_DELAY_MS));
+                      (struct sockaddr *)&destination,
+                      sizeof(destination)) >= 0 || sent;
+        if (copy + 1 < CONFIG_MMWAVE_UDP_REDUNDANT_COPIES &&
+            CONFIG_MMWAVE_UDP_COPY_DELAY_MS > 0) {
+            vTaskDelay(pdMS_TO_TICKS(CONFIG_MMWAVE_UDP_COPY_DELAY_MS));
         }
     }
     if (!sent) {
-        ESP_LOGW(TAG, "All %u redundant UDP sends failed", UDP_REDUNDANT_COPIES);
+        ESP_LOGW(TAG, "All %u UDP sends failed", CONFIG_MMWAVE_UDP_REDUNDANT_COPIES);
     }
     return sent;
 }

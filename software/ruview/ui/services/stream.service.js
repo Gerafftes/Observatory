@@ -1,6 +1,6 @@
 // Stream Service for WiFi-DensePose UI
 
-import { API_CONFIG } from '../config/api.config.js';
+import { API_CONFIG, LEGACY_ENDPOINTS } from '../config/api.config.js';
 import { apiService } from './api.service.js';
 
 export class StreamService {
@@ -9,24 +9,24 @@ export class StreamService {
     return apiService.get(API_CONFIG.ENDPOINTS.STREAM.STATUS);
   }
 
-  // Start streaming (requires auth)
+  // Legacy compatibility method; the active stream starts on WebSocket connect.
   async start() {
-    return apiService.post(API_CONFIG.ENDPOINTS.STREAM.START);
+    return apiService.post(LEGACY_ENDPOINTS.STREAM.START);
   }
 
   // Stop streaming (requires auth)
   async stop() {
-    return apiService.post(API_CONFIG.ENDPOINTS.STREAM.STOP);
+    return apiService.post(LEGACY_ENDPOINTS.STREAM.STOP);
   }
 
   // Get connected clients (requires auth)
   async getClients() {
-    return apiService.get(API_CONFIG.ENDPOINTS.STREAM.CLIENTS);
+    return apiService.get(LEGACY_ENDPOINTS.STREAM.CLIENTS);
   }
 
   // Disconnect a client (requires auth)
   async disconnectClient(clientId) {
-    const endpoint = API_CONFIG.ENDPOINTS.STREAM.DISCONNECT_CLIENT.replace('{client_id}', clientId);
+    const endpoint = LEGACY_ENDPOINTS.STREAM.DISCONNECT_CLIENT.replace('{client_id}', clientId);
     return apiService.delete(endpoint);
   }
 
@@ -43,7 +43,7 @@ export class StreamService {
     );
 
     return apiService.post(
-      API_CONFIG.ENDPOINTS.STREAM.BROADCAST, 
+      LEGACY_ENDPOINTS.STREAM.BROADCAST,
       message,
       { params }
     );
@@ -51,7 +51,7 @@ export class StreamService {
 
   // Get streaming metrics
   async getMetrics() {
-    return apiService.get(API_CONFIG.ENDPOINTS.STREAM.METRICS);
+    return apiService.get(LEGACY_ENDPOINTS.STREAM.METRICS);
   }
 }
 

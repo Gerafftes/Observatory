@@ -24,6 +24,7 @@ path = "src/main.rs"
 axum = { workspace = true }
 tower-http = { version = "0.6", features = ["fs", "cors", "set-header"] }
 tokio = { workspace = true, features = ["full", "process"] }
+socket2 = "0.6"
 futures-util = "0.3"
 ruvector-mincut = { workspace = true }
 
