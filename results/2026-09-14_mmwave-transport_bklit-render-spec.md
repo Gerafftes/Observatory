@@ -47,7 +47,7 @@ no new sensor run or threshold change is hidden in the render step.
   category labels and legends use separate baselines, and no title, axis
   label, value, or footer text is clipped or covered.
 - The script is rerunnable and writes only to
-  `results/mmwave-transport_bklit/`.
+  `results/diagrams/mmwave-transport_bklit/`.
 
 ## Credit
 

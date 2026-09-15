@@ -39,17 +39,17 @@ is linked to the [25-capture run overview](2026-08-23_D4-D5-D6_laufuebersicht.cs
 The current figures were rendered on 27 August 2026 with the official Bklit UI
 charts; the [Bklit render specification](2026-08-27_D4-D5-D6_bklit-render-spec.md)
 documents the data source, component choices, and QA. The maintained export is
-in `D4-D5-D6_bklit/`; the redundant `..._figures` archive is no
+in `diagrams/D4-D5-D6_bklit/`; the redundant `..._figures` archive is no
 longer kept in the canonical `results/` directory.
 
 <table>
 <tr>
-<td><a href="D4-D5-D6_bklit/01_globaler_vergleich.png"><img src="D4-D5-D6_bklit/01_globaler_vergleich.png" alt="Global comparison of D4 and D5-abs empty-room false presence and still recall" width="480"></a><br><strong>Global comparison</strong><br>D5-abs removes empty-room false presence but loses still recall, so the variant fails overall.</td>
-<td><a href="D4-D5-D6_bklit/02_D4_RX_leerraum_heatmap.png"><img src="D4-D5-D6_bklit/02_D4_RX_leerraum_heatmap.png" alt="D4 empty-room votes shown as an RX heatmap" width="480"></a><br><strong>D4 RX empty-room heatmap</strong><br>False presence is local and shifts between RX paths; no single stable source is visible.</td>
+<td><a href="diagrams/D4-D5-D6_bklit/01_globaler_vergleich.png"><img src="diagrams/D4-D5-D6_bklit/01_globaler_vergleich.png" alt="Global comparison of D4 and D5-abs empty-room false presence and still recall" width="480"></a><br><strong>Global comparison</strong><br>D5-abs removes empty-room false presence but loses still recall, so the variant fails overall.</td>
+<td><a href="diagrams/D4-D5-D6_bklit/02_D4_RX_leerraum_heatmap.png"><img src="diagrams/D4-D5-D6_bklit/02_D4_RX_leerraum_heatmap.png" alt="D4 empty-room votes shown as an RX heatmap" width="480"></a><br><strong>D4 RX empty-room heatmap</strong><br>False presence is local and shifts between RX paths; no single stable source is visible.</td>
 </tr>
 <tr>
-<td><a href="D4-D5-D6_bklit/03_D5_live_RX_linkwechsel.png"><img src="D4-D5-D6_bklit/03_D5_live_RX_linkwechsel.png" alt="D5 live test with RX link changes" width="480"></a><br><strong>D5 live link changes</strong><br>Presence votes switch between RX3 and RX4, so the two-RX quorum is never reached and the still person is missed.</td>
-<td><a href="D4-D5-D6_bklit/04_D6_RX_frameraten.png"><img src="D4-D5-D6_bklit/04_D6_RX_frameraten.png" alt="D6 RX frame rates across five captures" width="480"></a><br><strong>D6 RX frame rates</strong><br>All four RX paths appear in the five technical captures. This verifies capture and transport, not positioning accuracy.</td>
+<td><a href="diagrams/D4-D5-D6_bklit/03_D5_live_RX_linkwechsel.png"><img src="diagrams/D4-D5-D6_bklit/03_D5_live_RX_linkwechsel.png" alt="D5 live test with RX link changes" width="480"></a><br><strong>D5 live link changes</strong><br>Presence votes switch between RX3 and RX4, so the two-RX quorum is never reached and the still person is missed.</td>
+<td><a href="diagrams/D4-D5-D6_bklit/04_D6_RX_frameraten.png"><img src="diagrams/D4-D5-D6_bklit/04_D6_RX_frameraten.png" alt="D6 RX frame rates across five captures" width="480"></a><br><strong>D6 RX frame rates</strong><br>All four RX paths appear in the five technical captures. This verifies capture and transport, not positioning accuracy.</td>
 </tr>
 </table>
 
@@ -58,18 +58,18 @@ longer kept in the canonical `results/` directory.
 The [before/after report](2026-09-13_mmwave-transport-ota-vergleich.md) contains
 the controlled 60-second runs, the redundancy decision, and the interpretation
 limits. Its Bklit exports are in
-[`mmwave-transport_bklit/`](mmwave-transport_bklit/); the
+[`diagrams/mmwave-transport_bklit/`](diagrams/mmwave-transport_bklit/); the
 [render specification](2026-09-14_mmwave-transport_bklit-render-spec.md)
 documents the mapping and QA.
 
 <table>
 <tr>
-<td><a href="mmwave-transport_bklit/01_ankunft_und_verlust.png"><img src="mmwave-transport_bklit/01_ankunft_und_verlust.png" alt="Before and after arrival and loss comparison" width="480"></a><br><strong>Arrival and loss</strong></td>
-<td><a href="mmwave-transport_bklit/02_ankunftslatenz.png"><img src="mmwave-transport_bklit/02_ankunftslatenz.png" alt="Before and after arrival median and P95" width="480"></a><br><strong>Arrival latency</strong></td>
+<td><a href="diagrams/mmwave-transport_bklit/01_ankunft_und_verlust.png"><img src="diagrams/mmwave-transport_bklit/01_ankunft_und_verlust.png" alt="Before and after arrival and loss comparison" width="480"></a><br><strong>Arrival and loss</strong></td>
+<td><a href="diagrams/mmwave-transport_bklit/02_ankunftslatenz.png"><img src="diagrams/mmwave-transport_bklit/02_ankunftslatenz.png" alt="Before and after arrival median and P95" width="480"></a><br><strong>Arrival latency</strong></td>
 </tr>
 <tr>
-<td><a href="mmwave-transport_bklit/03_serververarbeitung.png"><img src="mmwave-transport_bklit/03_serververarbeitung.png" alt="Server processing and queue evidence" width="480"></a><br><strong>Server processing</strong></td>
-<td><a href="mmwave-transport_bklit/04_redundanzvergleich.png"><img src="mmwave-transport_bklit/04_redundanzvergleich.png" alt="One-copy and two-copy UDP comparison" width="480"></a><br><strong>Redundancy comparison</strong></td>
+<td><a href="diagrams/mmwave-transport_bklit/03_serververarbeitung.png"><img src="diagrams/mmwave-transport_bklit/03_serververarbeitung.png" alt="Server processing and queue evidence" width="480"></a><br><strong>Server processing</strong></td>
+<td><a href="diagrams/mmwave-transport_bklit/04_redundanzvergleich.png"><img src="diagrams/mmwave-transport_bklit/04_redundanzvergleich.png" alt="One-copy and two-copy UDP comparison" width="480"></a><br><strong>Redundancy comparison</strong></td>
 </tr>
 </table>
 
