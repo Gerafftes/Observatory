@@ -40,17 +40,38 @@ der [D4-RX-Diagnostik](2026-08-23_D4_RX_diagnostik.csv) und dem
 [Diagrammvertrag inklusive QA](2026-08-23_D4-D5-D6_chart-map.md) verknüpft.
 Die aktuellen Abbildungen wurden am 27. August 2026 mit den offiziellen
 Bklit-UI-Charts gerendert; die [Bklit-Render-Spezifikation](2026-08-27_D4-D5-D6_bklit-render-spec.md)
-dokumentiert Datenquelle, Komponentenwahl und QA. Die ursprünglichen
-Diagramme bleiben im [Archivvergleich](2026-08-23_D4-D5-D6_figures/) erhalten.
+dokumentiert Datenquelle, Komponentenwahl und QA. Der gepflegte Export liegt in
+`D4-D5-D6_bklit/`; ein redundantes altes `..._figures`-Archiv wird
+nicht mehr parallel geführt.
 
 <table>
 <tr>
-<td><a href="2026-08-27_D4-D5-D6_bklit_figures/01_globaler_vergleich.png"><img src="2026-08-27_D4-D5-D6_bklit_figures/01_globaler_vergleich.png" alt="Globaler Vergleich von D4 und D5-abs für Leerraum-Fehlpräsenz und Still-Recall" width="480"></a><br><strong>Globaler Vergleich</strong><br>D5-abs entfernt die Leerraum-Fehlpräsenz, verliert dabei aber den Still-Recall. Deshalb ist die Variante insgesamt nicht bestanden.</td>
-<td><a href="2026-08-27_D4-D5-D6_bklit_figures/02_D4_RX_leerraum_heatmap.png"><img src="2026-08-27_D4-D5-D6_bklit_figures/02_D4_RX_leerraum_heatmap.png" alt="D4-Leerraumstimmen als RX-Heatmap" width="480"></a><br><strong>D4-RX-Leerraum-Heatmap</strong><br>Die Fehlpräsenz entsteht lokal und wechselt zwischen den RX-Pfaden. Ein einzelner stabiler Verursacher ist nicht erkennbar.</td>
+<td><a href="D4-D5-D6_bklit/01_globaler_vergleich.png"><img src="D4-D5-D6_bklit/01_globaler_vergleich.png" alt="Globaler Vergleich von D4 und D5-abs für Leerraum-Fehlpräsenz und Still-Recall" width="480"></a><br><strong>Globaler Vergleich</strong><br>D5-abs entfernt die Leerraum-Fehlpräsenz, verliert dabei aber den Still-Recall. Deshalb ist die Variante insgesamt nicht bestanden.</td>
+<td><a href="D4-D5-D6_bklit/02_D4_RX_leerraum_heatmap.png"><img src="D4-D5-D6_bklit/02_D4_RX_leerraum_heatmap.png" alt="D4-Leerraumstimmen als RX-Heatmap" width="480"></a><br><strong>D4-RX-Leerraum-Heatmap</strong><br>Die Fehlpräsenz entsteht lokal und wechselt zwischen den RX-Pfaden. Ein einzelner stabiler Verursacher ist nicht erkennbar.</td>
 </tr>
 <tr>
-<td><a href="2026-08-27_D4-D5-D6_bklit_figures/03_D5_live_RX_linkwechsel.png"><img src="2026-08-27_D4-D5-D6_bklit_figures/03_D5_live_RX_linkwechsel.png" alt="D5-Livetest mit RX-Linkwechseln" width="480"></a><br><strong>D5-Live-Linkwechsel</strong><br>Die Präsenzstimmen wechseln zwischen RX3 und RX4. Das Zwei-RX-Quorum bleibt dadurch aus, und die stille Person wird nicht erkannt.</td>
-<td><a href="2026-08-27_D4-D5-D6_bklit_figures/04_D6_RX_frameraten.png"><img src="2026-08-27_D4-D5-D6_bklit_figures/04_D6_RX_frameraten.png" alt="D6-RX-Frameraten über fünf Aufnahmen" width="480"></a><br><strong>D6-RX-Frameraten</strong><br>Alle vier RX sind in den fünf technischen Aufnahmen vertreten. Das belegt Erfassung und Transport, aber keine Positionsgenauigkeit.</td>
+<td><a href="D4-D5-D6_bklit/03_D5_live_RX_linkwechsel.png"><img src="D4-D5-D6_bklit/03_D5_live_RX_linkwechsel.png" alt="D5-Livetest mit RX-Linkwechseln" width="480"></a><br><strong>D5-Live-Linkwechsel</strong><br>Die Präsenzstimmen wechseln zwischen RX3 und RX4. Das Zwei-RX-Quorum bleibt dadurch aus, und die stille Person wird nicht erkannt.</td>
+<td><a href="D4-D5-D6_bklit/04_D6_RX_frameraten.png"><img src="D4-D5-D6_bklit/04_D6_RX_frameraten.png" alt="D6-RX-Frameraten über fünf Aufnahmen" width="480"></a><br><strong>D6-RX-Frameraten</strong><br>Alle vier RX sind in den fünf technischen Aufnahmen vertreten. Das belegt Erfassung und Transport, aber keine Positionsgenauigkeit.</td>
+</tr>
+</table>
+
+## mmWave-Transport-OTA-Vergleich
+
+Der [Vorher-/Nachher-Bericht](2026-09-13_mmwave-transport-ota-vergleich.md)
+enthält die kontrollierten 60-Sekunden-Läufe, die Redundanzentscheidung und die
+Grenzen der Interpretation. Die zugehörigen Bklit-Exporte liegen in
+[`2026-09-13_mmwave-transport_bklit/`](2026-09-13_mmwave-transport_bklit/); die
+[Render-Spezifikation](2026-09-14_mmwave-transport_bklit-render-spec.md)
+dokumentiert die Zuordnung und QA.
+
+<table>
+<tr>
+<td><a href="2026-09-13_mmwave-transport_bklit/01_ankunft_und_verlust.png"><img src="2026-09-13_mmwave-transport_bklit/01_ankunft_und_verlust.png" alt="Ankunft und Verlust im Vorher-Nachher-Vergleich" width="480"></a><br><strong>Ankunft und Verlust</strong></td>
+<td><a href="2026-09-13_mmwave-transport_bklit/02_ankunftslatenz.png"><img src="2026-09-13_mmwave-transport_bklit/02_ankunftslatenz.png" alt="Ankunftsmedian und P95 im Vorher-Nachher-Vergleich" width="480"></a><br><strong>Ankunftslatenz</strong></td>
+</tr>
+<tr>
+<td><a href="2026-09-13_mmwave-transport_bklit/03_serververarbeitung.png"><img src="2026-09-13_mmwave-transport_bklit/03_serververarbeitung.png" alt="Serververarbeitung und Queue-Evidenz" width="480"></a><br><strong>Serververarbeitung</strong></td>
+<td><a href="2026-09-13_mmwave-transport_bklit/04_redundanzvergleich.png"><img src="2026-09-13_mmwave-transport_bklit/04_redundanzvergleich.png" alt="Vergleich einer und zweier UDP-Kopien" width="480"></a><br><strong>Redundanzvergleich</strong></td>
 </tr>
 </table>
 
