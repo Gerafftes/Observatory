@@ -58,18 +58,18 @@ longer kept in the canonical `results/` directory.
 The [before/after report](2026-09-13_mmwave-transport-ota-vergleich.md) contains
 the controlled 60-second runs, the redundancy decision, and the interpretation
 limits. Its Bklit exports are in
-[`2026-09-13_mmwave-transport_bklit/`](2026-09-13_mmwave-transport_bklit/); the
+[`mmwave-transport_bklit/`](mmwave-transport_bklit/); the
 [render specification](2026-09-14_mmwave-transport_bklit-render-spec.md)
 documents the mapping and QA.
 
 <table>
 <tr>
-<td><a href="2026-09-13_mmwave-transport_bklit/01_ankunft_und_verlust.png"><img src="2026-09-13_mmwave-transport_bklit/01_ankunft_und_verlust.png" alt="Before and after arrival and loss comparison" width="480"></a><br><strong>Arrival and loss</strong></td>
-<td><a href="2026-09-13_mmwave-transport_bklit/02_ankunftslatenz.png"><img src="2026-09-13_mmwave-transport_bklit/02_ankunftslatenz.png" alt="Before and after arrival median and P95" width="480"></a><br><strong>Arrival latency</strong></td>
+<td><a href="mmwave-transport_bklit/01_ankunft_und_verlust.png"><img src="mmwave-transport_bklit/01_ankunft_und_verlust.png" alt="Before and after arrival and loss comparison" width="480"></a><br><strong>Arrival and loss</strong></td>
+<td><a href="mmwave-transport_bklit/02_ankunftslatenz.png"><img src="mmwave-transport_bklit/02_ankunftslatenz.png" alt="Before and after arrival median and P95" width="480"></a><br><strong>Arrival latency</strong></td>
 </tr>
 <tr>
-<td><a href="2026-09-13_mmwave-transport_bklit/03_serververarbeitung.png"><img src="2026-09-13_mmwave-transport_bklit/03_serververarbeitung.png" alt="Server processing and queue evidence" width="480"></a><br><strong>Server processing</strong></td>
-<td><a href="2026-09-13_mmwave-transport_bklit/04_redundanzvergleich.png"><img src="2026-09-13_mmwave-transport_bklit/04_redundanzvergleich.png" alt="One-copy and two-copy UDP comparison" width="480"></a><br><strong>Redundancy comparison</strong></td>
+<td><a href="mmwave-transport_bklit/03_serververarbeitung.png"><img src="mmwave-transport_bklit/03_serververarbeitung.png" alt="Server processing and queue evidence" width="480"></a><br><strong>Server processing</strong></td>
+<td><a href="mmwave-transport_bklit/04_redundanzvergleich.png"><img src="mmwave-transport_bklit/04_redundanzvergleich.png" alt="One-copy and two-copy UDP comparison" width="480"></a><br><strong>Redundancy comparison</strong></td>
 </tr>
 </table>
 
