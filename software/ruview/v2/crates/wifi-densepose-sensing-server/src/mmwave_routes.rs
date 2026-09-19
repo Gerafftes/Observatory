@@ -103,8 +103,21 @@ fn validate_mmwave_calibration_context(
 #[cfg(test)]
 mod mmwave_session_context_tests {
     use super::{
-        mmwave_calibration, validate_mmwave_calibration_context, MmwaveSessionStartRequest,
+        mmwave_calibration, mode_change_required, validate_mmwave_calibration_context,
+        MmwaveSessionStartRequest,
     };
+
+    #[test]
+    fn fixed_point_repeat_skips_redundant_calibration_mode_request() {
+        assert!(!mode_change_required(
+            Some(mmwave_calibration::MeasurementMode::Calibration),
+            mmwave_calibration::MeasurementMode::Calibration,
+        ));
+        assert!(mode_change_required(
+            Some(mmwave_calibration::MeasurementMode::Reference),
+            mmwave_calibration::MeasurementMode::Calibration,
+        ));
+    }
 
     #[test]
     fn calibration_session_requires_a_persisted_profile_context() {
@@ -178,6 +191,13 @@ fn expected_mmwave_mode(
             mmwave_calibration::MeasurementMode::Calibration
         }
     }
+}
+
+fn mode_change_required(
+    current: Option<mmwave_calibration::MeasurementMode>,
+    expected: mmwave_calibration::MeasurementMode,
+) -> bool {
+    current != Some(expected)
 }
 
 fn node_diagnostics_show_streaming(
@@ -255,6 +275,7 @@ mod mmwave_node_stream_advance_tests {
             radar_frames_valid: radar_frames,
             udp_packets_sent: udp_sent,
             udp_send_failures: udp_failures,
+            ..Default::default()
         }
     }
 
@@ -295,9 +316,8 @@ async fn wait_for_mmwave_mode_and_preflight(
         };
         let preflight_ready = match kind {
             mmwave_calibration::SessionKind::MmwaveOnly => status.radar_preflight_ready(),
-            mmwave_calibration::SessionKind::Calibration | mmwave_calibration::SessionKind::Blind => {
-                status.preflight_ready()
-            }
+            mmwave_calibration::SessionKind::Calibration
+            | mmwave_calibration::SessionKind::Blind => status.preflight_ready(),
         };
         if status.mode == Some(expected_mode) && preflight_ready {
             return Ok(());
@@ -612,53 +632,42 @@ async fn mmwave_session_start_endpoint(
     ))
 }
 
-async fn mmwave_fixed_points_start_endpoint(
-    State(state): State<SharedState>,
-) -> MmwaveApiResult {
-    let control = {
+async fn mmwave_fixed_points_start_endpoint(State(state): State<SharedState>) -> MmwaveApiResult {
+    let (control, current_mode) = {
         let state = state.read().await;
         state
             .mmwave
             .validate_fixed_point_start(server_clock::now().host_monotonic_ns)
             .map_err(|error| mmwave_api_error(StatusCode::CONFLICT, error))?;
-        state.mmwave.control()
+        let status = state.mmwave.status(server_clock::now().host_monotonic_ns);
+        (state.mmwave.control(), status.mode)
     };
-    if let Some(mode_control) = control {
-        tokio::task::spawn_blocking(move || {
-            mmwave_calibration::set_node_mode(
-                &mode_control,
-                mmwave_calibration::MeasurementMode::Calibration,
+    let expected_mode = mmwave_calibration::MeasurementMode::Calibration;
+    if mode_change_required(current_mode, expected_mode) {
+        let mode_control = control.ok_or_else(|| {
+            mmwave_api_error(
+                StatusCode::CONFLICT,
+                "mmWave is not in calibration mode and node control is unavailable",
             )
+        })?;
+        tokio::task::spawn_blocking(move || {
+            mmwave_calibration::set_node_mode(&mode_control, expected_mode)
         })
         .await
         .map_err(|error| mmwave_api_error(StatusCode::INTERNAL_SERVER_ERROR, error.to_string()))?
         .map_err(|error| mmwave_api_error(StatusCode::BAD_GATEWAY, error))?;
-        wait_for_mmwave_mode_and_radar_preflight(
-            &state,
-            mmwave_calibration::MeasurementMode::Calibration,
-        )
-        .await
-        .map_err(|error| mmwave_api_error(StatusCode::CONFLICT, error))?;
-    } else {
-        let mode = state
-            .read()
+        wait_for_mmwave_mode_and_radar_preflight(&state, expected_mode)
             .await
-            .mmwave
-            .status(server_clock::now().host_monotonic_ns)
-            .mode;
-        if mode != Some(mmwave_calibration::MeasurementMode::Calibration) {
-            return Err(mmwave_api_error(
-                StatusCode::CONFLICT,
-                "mmWave is not in calibration mode and node control is unavailable",
-            ));
-        }
+            .map_err(|error| mmwave_api_error(StatusCode::CONFLICT, error))?;
     }
     let mut state = state.write().await;
     let fixed_points = state
         .mmwave
         .start_fixed_point_calibration(server_clock::now().host_monotonic_ns)
         .map_err(|error| mmwave_api_error(StatusCode::CONFLICT, error))?;
-    Ok(Json(serde_json::json!({ "fixed_point_calibration": fixed_points })))
+    Ok(Json(
+        serde_json::json!({ "fixed_point_calibration": fixed_points }),
+    ))
 }
 
 async fn mmwave_fixed_points_check_endpoint(
@@ -671,10 +680,10 @@ async fn mmwave_fixed_points_check_endpoint(
             "tolerance_mm must be between 50 and 2000",
         ));
     }
-    if !(250..=5_000).contains(&request.window_ms) {
+    if !(250..=10_000).contains(&request.window_ms) {
         return Err(mmwave_api_error(
             StatusCode::BAD_REQUEST,
-            "window_ms must be between 250 and 5000",
+            "window_ms must be between 250 and 10000",
         ));
     }
     let fixed_points = {
@@ -682,11 +691,11 @@ async fn mmwave_fixed_points_check_endpoint(
         let fixed_points = state
             .mmwave
             .check_current_fixed_point(
-            request.tolerance_mm,
-            request.window_ms,
-            server_clock::now().host_monotonic_ns,
-        )
-        .map_err(|error| mmwave_api_error(StatusCode::CONFLICT, error))?;
+                request.tolerance_mm,
+                request.window_ms,
+                server_clock::now().host_monotonic_ns,
+            )
+            .map_err(|error| mmwave_api_error(StatusCode::CONFLICT, error))?;
         if fixed_points.state == "complete" {
             let data_dir = state.data_dir.clone();
             state
@@ -705,12 +714,12 @@ async fn mmwave_fixed_points_check_endpoint(
                 )
             })?
     };
-    Ok(Json(serde_json::json!({ "fixed_point_calibration": fixed_points })))
+    Ok(Json(
+        serde_json::json!({ "fixed_point_calibration": fixed_points }),
+    ))
 }
 
-async fn mmwave_fixed_points_cancel_endpoint(
-    State(state): State<SharedState>,
-) -> MmwaveApiResult {
+async fn mmwave_fixed_points_cancel_endpoint(State(state): State<SharedState>) -> MmwaveApiResult {
     let mut state = state.write().await;
     state.mmwave.cancel_fixed_point_calibration();
     let status = state.mmwave.status(server_clock::now().host_monotonic_ns);
@@ -749,8 +758,7 @@ async fn mmwave_known_point_check_endpoint(
         (request.expected_position_m[0] * 1_000.0).round() as i32,
         (request.expected_position_m[1] * 1_000.0).round() as i32,
     ];
-    let deadline = std::time::Instant::now()
-        + Duration::from_millis(request.window_ms.min(5_000));
+    let deadline = std::time::Instant::now() + Duration::from_millis(request.window_ms.min(5_000));
     loop {
         let now_ns = server_clock::now().host_monotonic_ns;
         let result = {

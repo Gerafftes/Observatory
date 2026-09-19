@@ -11,8 +11,8 @@
 
 mod adaptive_classifier;
 mod benchmark;
-mod calibration_persistence;
 mod calibration_dataset;
+mod calibration_persistence;
 mod calibration_routes;
 mod classification_evaluation;
 mod coarse_localization;
@@ -27,11 +27,12 @@ mod field_bridge;
 mod field_localize;
 mod mmwave_calibration;
 mod mmwave_connection;
+mod mmwave_discovery;
 mod mmwave_position_index;
 mod mmwave_routes;
 mod model_routes;
-mod observatory_routes;
 mod multistatic_bridge;
+mod observatory_routes;
 #[cfg(test)]
 pub mod pose;
 mod position_artifact;
@@ -50,6 +51,7 @@ mod routes;
 mod runtime_tasks;
 mod sensing_routes;
 mod server_clock;
+mod server_control;
 mod state;
 mod system_routes;
 mod tracker_bridge;
@@ -58,6 +60,8 @@ mod training_routes;
 pub mod types;
 
 // Training pipeline modules (exposed via lib.rs)
+#[cfg(test)]
+use wifi_densepose_sensing_server::rvf_container;
 use wifi_densepose_sensing_server::{
     dataset, embedding, error_response, graph_transformer, model_format, rufield_surface,
     rvf_container::{RvfBuilder, RvfContainerInfo, RvfReader, VitalSignConfig},
@@ -65,13 +69,11 @@ use wifi_densepose_sensing_server::{
     torso, trainer,
     vital_signs::{self, VitalSignDetector, VitalSigns},
 };
-#[cfg(test)]
-use wifi_densepose_sensing_server::rvf_container;
 
 use ruvector_mincut::{DynamicMinCut, MinCutBuilder};
 use std::collections::{BTreeMap, HashMap, VecDeque};
 use std::net::SocketAddr;
-use std::path::PathBuf;
+use std::path::{Path as FilePath, PathBuf};
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -90,28 +92,26 @@ use clap::{Parser, ValueEnum};
 use axum::http::HeaderValue;
 use serde::{Deserialize, Serialize};
 use tokio::net::UdpSocket;
-use tokio::sync::{broadcast, mpsc, Mutex, RwLock};
+use tokio::sync::{broadcast, mpsc, Mutex, Notify, RwLock};
 use tower_http::services::ServeDir;
 use tower_http::set_header::SetResponseHeaderLayer;
 use tracing::{debug, error, info, warn};
 
 #[cfg(test)]
 use calibration_routes::classification_decision_status;
+use protocol::{
+    esp32_csi_header_rx_id, has_esp32_csi_magic, parse_edge_fused_vitals, parse_esp32_frame,
+    parse_esp32_vitals, parse_wasm_output, Esp32Frame, Esp32VitalsPacket, WasmOutputPacket,
+};
 use runtime_tasks::{
     broadcast_tick_task, mmwave_receiver_task, probe_esp32, probe_windows_wifi,
     settle_recording_on_shutdown, simulated_data_task, spawn_mmwave_node_diagnostics_poller,
     spawn_mmwave_session_ticker, udp_receiver_task, windows_wifi_task,
 };
-use protocol::{
-    esp32_csi_header_rx_id, has_esp32_csi_magic, parse_edge_fused_vitals,
-    parse_esp32_frame, parse_esp32_vitals, parse_wasm_output, Esp32Frame, Esp32VitalsPacket,
-    WasmOutputPacket,
-};
 use state::*;
 #[cfg(test)]
 use system_routes::{
-    bool_metric, fleet_role_counts, public_node_summaries,
-    source_binding_consistent_across_nodes,
+    bool_metric, fleet_role_counts, public_node_summaries, source_binding_consistent_across_nodes,
 };
 
 // ADR-022 Phase 3: Multi-BSSID pipeline integration
@@ -416,10 +416,29 @@ struct Args {
     /// `GET /api/v1/edge/registry`. Use for air-gapped deployments.
     #[arg(long, env = "RUVIEW_NO_EDGE_REGISTRY")]
     no_edge_registry: bool,
+
+    /// Internal loopback helper for browser start/stop/restart controls.
+    #[arg(long, hide = true)]
+    server_control_daemon: bool,
+
+    /// Loopback port used by the browser server-control helper.
+    #[arg(long, hide = true, default_value_t = server_control::DEFAULT_PORT)]
+    server_control_port: u16,
+
+    /// Internal launch profile used by the browser server-control helper.
+    #[arg(long, hide = true)]
+    server_control_spec: Option<PathBuf>,
+
+    /// PID of the server process that initially launched the helper.
+    #[arg(long, hide = true)]
+    server_control_adopt_pid: Option<u32>,
+
+    /// HTTP port of the browser UI allowed to control the helper.
+    #[arg(long, hide = true, default_value_t = 8080)]
+    server_control_ui_port: u16,
 }
 
 // ── Data types ───────────────────────────────────────────────────────────────
-
 
 /// CSI fingerprint identity. Equal bin counts alone are not comparable across
 /// channels, antenna layouts, or PPDU training fields.
@@ -1271,8 +1290,6 @@ enum RecordingLifecyclePhase {
     Finalizing,
 }
 
-
-
 fn edge_vitals_classification(vitals: &Esp32VitalsPacket) -> ClassificationInfo {
     ClassificationInfo {
         motion_level: if vitals.motion {
@@ -1326,8 +1343,6 @@ fn public_edge_vitals_packet(
     }
     public
 }
-
-
 
 // ── Signal field generation ──────────────────────────────────────────────────
 
@@ -1517,14 +1532,14 @@ fn signal_field_from_localization(
     }
 }
 
-/// Clone a sensing update for public delivery and fail closed when the ESP32
-/// source has gone offline. Fixed deployment geometry remains configured in
+/// Clone a sensing update for public delivery and fail closed when the source
+/// has gone offline. Fixed deployment geometry remains configured in
 /// `tx_position` / `room_dimensions`, but stale measurements and detections are
 /// never rebroadcast as current evidence.
 fn public_sensing_update(update: &SensingUpdate, effective_source: &str) -> SensingUpdate {
     let mut public = update.clone();
     public.source = effective_source.to_string();
-    if effective_source != "esp32:offline" {
+    if !effective_source.ends_with(":offline") {
         return public;
     }
 
@@ -3251,11 +3266,11 @@ fn parse_netsh_interfaces_output(output: &str) -> Option<(f64, f64, String)> {
 /// class the project fights.
 ///
 /// The robust resolution: in `auto` mode **always bind the UDP receiver**
-/// regardless of the boot probe. If no real source is up yet, serve simulated
-/// data *and* keep the UDP receiver listening; the receiver promotes
-/// `source` → `esp32` the instant the first real frame lands (see
-/// `udp_receiver_task`, which sets `s.source = "esp32"`), mirroring the inverse
-/// `esp32 → esp32:offline` reversion already in `effective_source()`.
+/// regardless of the boot probe. If no real source is up yet, keep the server
+/// explicitly offline while listening; the receiver promotes `source` →
+/// `esp32` the instant the first real frame lands (see `udp_receiver_task`,
+/// which sets `s.source = "esp32"`), mirroring the inverse `esp32 →
+/// esp32:offline` reversion already in `effective_source()`.
 ///
 /// Explicit `--source simulated` is a hard override for offline demos: it does
 /// NOT bind UDP, so no promotion ever happens.
@@ -3263,9 +3278,9 @@ fn parse_netsh_interfaces_output(output: &str) -> Option<(f64, f64, String)> {
 struct SourcePlan {
     /// The `AppStateInner.source` value to start with.
     initial_source: String,
-    /// Bind the UDP :5005 receiver (and thus allow simulate→esp32 promotion).
+    /// Bind the UDP :5005 receiver (and thus allow offline→esp32 promotion).
     bind_udp: bool,
-    /// Run the simulated-data generator (serves poses until a real frame arrives).
+    /// Run the simulated-data generator for an explicit offline demo.
     run_simulator: bool,
     /// Run the Windows WiFi capture task.
     run_wifi: bool,
@@ -3296,13 +3311,13 @@ fn plan_source(requested: &str, esp32_detected: bool, wifi_detected: bool) -> So
                     run_wifi: true,
                 }
             } else {
-                // No real source *yet*. Serve simulated data, but ALSO bind UDP
-                // so the receiver can promote to esp32 when the first real
-                // frame arrives (issue #1004). Never latch on simulate.
+                // No real source *yet*. Stay offline, but bind UDP so the
+                // receiver can promote to esp32 when the first real frame
+                // arrives (issue #1004). Never show synthetic frames in auto.
                 SourcePlan {
-                    initial_source: "simulated".to_string(),
+                    initial_source: "esp32".to_string(),
                     bind_udp: true,
-                    run_simulator: true,
+                    run_simulator: false,
                     run_wifi: false,
                 }
             }
@@ -3346,27 +3361,25 @@ mod issue_1004_source_plan_tests {
     //! hard-exited (#937), never picking up CSI that started after launch.
     //!
     //! New behavior (`plan_source`): in `auto` the UDP receiver is ALWAYS bound,
-    //! simulated data is served only until the first real frame, then
-    //! `udp_receiver_task` promotes `source` → "esp32". These tests pin the
-    //! resolution/promotion state machine directly (no sockets bound).
+    //! no synthetic data is served while waiting, and
+    //! `udp_receiver_task` promotes the offline `source` → "esp32" on the first
+    //! real frame. These tests pin the resolution/promotion state machine
+    //! directly (no sockets bound).
     use super::*;
 
     // FAILS ON OLD CODE: the old `auto`-with-no-source path bound no UDP
     // receiver (it spawned only `simulated_data_task`, or exited). This asserts
     // UDP IS bound even when the boot probe finds no source.
     #[test]
-    fn auto_with_no_boot_source_still_binds_udp_and_simulates() {
+    fn auto_with_no_boot_source_still_binds_udp_without_synthetic_data() {
         let plan = plan_source("auto", false, false);
         assert!(
             plan.bind_udp,
             "auto must bind UDP :5005 even with no boot source (#1004)"
         );
-        assert!(
-            plan.run_simulator,
-            "auto must serve simulated data until real CSI arrives"
-        );
+        assert!(!plan.run_simulator, "auto must not emit synthetic frames");
         assert!(!plan.run_wifi);
-        assert_eq!(plan.initial_source, "simulated");
+        assert_eq!(plan.initial_source, "esp32");
     }
 
     #[test]
@@ -3419,11 +3432,11 @@ mod issue_1004_source_plan_tests {
     // promotion direction the simulator/receiver rely on, without binding a
     // socket — it exercises the same `source` field the UDP task writes.
     #[test]
-    fn effective_source_promotes_from_simulated_to_esp32_on_real_frame() {
-        // Start as the auto/simulate plan would: source = "simulated".
-        let mut src = "simulated".to_string();
-        // effective_source() logic for the simulate state: stays "simulated".
-        assert_eq!(promote_view(&src, None), "simulated");
+    fn effective_source_promotes_from_offline_to_esp32_on_real_frame() {
+        // Start as the auto/no-source plan does: source = "esp32", with no
+        // received frame yet, so effective_source() is explicitly offline.
+        let mut src = "esp32".to_string();
+        assert_eq!(promote_view(&src, None), "esp32:offline");
         // First real frame arrives → udp_receiver_task sets source = "esp32".
         src = "esp32".to_string();
         let fresh = Some(std::time::Duration::from_millis(10));
@@ -3496,7 +3509,6 @@ async fn health(State(state): State<SharedState>) -> Json<serde_json::Value> {
         "clients": s.tx.receiver_count(),
     }))
 }
-
 
 /// Generate WiFi-derived pose keypoints from sensing data.
 ///
@@ -4593,22 +4605,21 @@ mod position_readiness_tests {
 async fn health_system(State(state): State<SharedState>) -> Json<serde_json::Value> {
     let s = state.read().await;
     let uptime = s.start_time.elapsed().as_secs();
+    let source = s.effective_source();
+    let source_offline = source.ends_with(":offline");
     Json(serde_json::json!({
-        "status": "healthy",
+        "status": if source_offline { "degraded" } else { "healthy" },
         "components": {
             "api": { "status": "healthy", "message": "Rust Axum server" },
             "hardware": {
-                "status": if s.effective_source().ends_with(":offline") { "degraded" } else { "healthy" },
-                "message": format!("Source: {}", s.effective_source())
+                "status": if source_offline { "degraded" } else { "healthy" },
+                "message": format!("Source: {}", source)
             },
             "pose": { "status": "healthy", "message": "WiFi-derived pose estimation" },
             "stream": { "status": if s.tx.receiver_count() > 0 { "healthy" } else { "idle" },
                         "message": format!("{} client(s)", s.tx.receiver_count()) },
         },
         "metrics": {
-            "cpu_percent": 2.5,
-            "memory_percent": 1.8,
-            "disk_percent": 15.0,
             "uptime_seconds": uptime,
         }
     }))
@@ -4625,11 +4636,6 @@ async fn health_version() -> Json<serde_json::Value> {
 async fn health_metrics(State(state): State<SharedState>) -> Json<serde_json::Value> {
     let s = state.read().await;
     Json(serde_json::json!({
-        "system_metrics": {
-            "cpu": { "percent": 2.5 },
-            "memory": { "percent": 1.8, "used_mb": 5 },
-            "disk": { "percent": 15.0 },
-        },
         "tick": s.tick,
     }))
 }
@@ -4638,19 +4644,10 @@ async fn api_info(State(state): State<SharedState>) -> Json<serde_json::Value> {
     let s = state.read().await;
     Json(serde_json::json!({
         "version": env!("CARGO_PKG_VERSION"),
-        "environment": "production",
         "backend": "rust",
         "source": s.effective_source(),
-        "features": {
-            "wifi_sensing": true,
-            "pose_estimation": true,
-            "signal_processing": true,
-            "ruvector": true,
-            "streaming": true,
-        }
     }))
 }
-
 
 fn create_private_recording_file(path: &std::path::Path) -> std::io::Result<std::fs::File> {
     let mut options = std::fs::OpenOptions::new();
@@ -5372,6 +5369,39 @@ fn coalesce_ui_path(initial: std::path::PathBuf) -> std::path::PathBuf {
         }
     }
     initial
+}
+
+/// Keep persisted sensing data next to the UI project instead of depending on
+/// whichever directory happened to launch the binary. This matters for the
+/// browser control helper, which restarts the server without changing cwd.
+fn data_dir_for_ui(ui_path: &FilePath) -> PathBuf {
+    ui_path
+        .parent()
+        .filter(|parent| !parent.as_os_str().is_empty())
+        .map(|parent| parent.join("data"))
+        .unwrap_or_else(|| PathBuf::from("data"))
+}
+
+#[cfg(test)]
+mod data_dir_tests {
+    use super::*;
+
+    #[test]
+    fn data_dir_follows_the_ui_project() {
+        assert_eq!(
+            data_dir_for_ui(FilePath::new("/project/software/ruview/ui")),
+            PathBuf::from("/project/software/ruview/data")
+        );
+        assert_eq!(
+            data_dir_for_ui(FilePath::new("../ui")),
+            PathBuf::from("../data")
+        );
+    }
+
+    #[test]
+    fn bare_ui_path_keeps_the_current_directory_fallback() {
+        assert_eq!(data_dir_for_ui(FilePath::new("ui")), PathBuf::from("data"));
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -6167,6 +6197,25 @@ async fn main() {
 
     let mut args = Args::parse();
 
+    if args.server_control_daemon {
+        let Some(spec_path) = args.server_control_spec.take() else {
+            eprintln!("Server-Control-Daemon benötigt --server-control-spec");
+            std::process::exit(2);
+        };
+        if let Err(error) = server_control::run_daemon(server_control::DaemonConfig {
+            control_port: args.server_control_port,
+            ui_port: args.server_control_ui_port,
+            spec_path,
+            adopt_pid: args.server_control_adopt_pid,
+        })
+        .await
+        {
+            eprintln!("Browser-Serversteuerung fehlgeschlagen: {error}");
+            std::process::exit(1);
+        }
+        return;
+    }
+
     let position_offline_mode = match requested_position_offline_mode(&args) {
         Ok(mode) => mode,
         Err(error) => {
@@ -6230,6 +6279,9 @@ async fn main() {
     if let Err(error) = validate_position_setup_server_mode(&args) {
         eprintln!("Position setup usage error: {error}");
         std::process::exit(2);
+    }
+    if let Err(error) = server_control::ensure_daemon(args.server_control_port, args.http_port) {
+        warn!(%error, "Browser-Serversteuerung konnte nicht aktiviert werden");
     }
     if let Some(grid_pin) = args.csi_grid_pin {
         info!(
@@ -6349,6 +6401,7 @@ async fn main() {
     }
 
     args.ui_path = coalesce_ui_path(args.ui_path);
+    let data_dir = data_dir_for_ui(&args.ui_path);
 
     // Handle --benchmark mode: run vital sign benchmark and exit
     if args.benchmark {
@@ -6905,17 +6958,11 @@ async fn main() {
 
     // Resolve the data source into a concrete task plan (issue #1004).
     //
-    // Issue #937 (prior fix): `auto` must never serve fake CSI *tagged as
-    // production telemetry*. We keep that guarantee — in the gap before real
-    // CSI arrives, `source` is the honest string "simulated" (downstream
-    // `/api/v1/sensing/latest`, `/ws/sensing` see `source: "simulated"`, not a
-    // production tag). What #937's hard-exit got wrong: at boot the firmware and
-    // server race, so CSI usually is NOT flowing during the 2 s probe. Exiting
-    // (or latching on simulate) meant the server could never pick up CSI that
-    // started seconds later. The robust resolution (see `plan_source`): in
-    // `auto` always bind the UDP :5005 receiver; serve simulated until the first
-    // real frame; then `udp_receiver_task` promotes `source` → "esp32". Explicit
-    // `--source simulated` stays a hard, UDP-free override for offline demos.
+    // Issue #937/#1004: `auto` must not serve fake CSI while waiting for the
+    // firmware/server startup race to settle. It always binds the UDP receiver,
+    // reports `esp32:offline` until the first real frame, and then promotes
+    // `source` → "esp32". Explicit `--source simulated` remains a hard,
+    // UDP-free override for offline demos.
     let normalized = if args.source == "simulate" {
         "simulated"
     } else {
@@ -6938,11 +6985,9 @@ async fn main() {
             info!("  Windows WiFi detected");
         } else {
             warn!(
-                "No real CSI source at boot — serving SIMULATED data (tagged as \
-                 'simulated', not production) while the UDP :{} receiver stays bound. \
-                 The server promotes to live the instant a real frame arrives (issue \
-                 #1004). For an offline demo with no live promotion, pass \
-                 --source simulated explicitly.",
+                "No real CSI source at boot — staying offline while the UDP :{} receiver \
+                 remains bound. The server promotes to live on the first real frame; \
+                 pass --source simulated explicitly for synthetic demo data.",
                 args.udp_port
             );
         }
@@ -7085,7 +7130,6 @@ async fn main() {
     );
 
     // ADR-044 §5.3: load persisted runtime config from the data directory.
-    let data_dir = std::path::PathBuf::from("data");
     let runtime_config = load_runtime_config(&data_dir);
     info!(
         "Loaded runtime config: dedup_factor={:.2}",
@@ -7120,32 +7164,30 @@ async fn main() {
             .await
         {
             Ok(Some(bundle)) => match store.get_profile(&bundle.profile_id).await {
-                Ok(Some(profile)) => match calibration_persistence::profile_context_sha256(
-                    &profile.document,
-                ) {
-                    Ok(context) if context == bundle.profile_context_sha256 => {
-                        info!(
-                            "Restored persisted D5/D6 calibration {} for setup {}",
-                            bundle.calibration_id,
-                            setup.setup_id()
-                        );
-                        Some(Arc::new(bundle))
-                    }
-                    Ok(_) => {
-                        info!(
+                Ok(Some(profile)) => {
+                    match calibration_persistence::profile_context_sha256(&profile.document) {
+                        Ok(context) if context == bundle.profile_context_sha256 => {
+                            info!(
+                                "Restored persisted D5/D6 calibration {} for setup {}",
+                                bundle.calibration_id,
+                                setup.setup_id()
+                            );
+                            Some(Arc::new(bundle))
+                        }
+                        Ok(_) => {
+                            info!(
                             "Persisted D5/D6 calibration is stale for the current setup profile; new empty-room calibration required"
                         );
-                        None
+                            None
+                        }
+                        Err(error) => {
+                            warn!("Could not derive current profile calibration context: {error}");
+                            None
+                        }
                     }
-                    Err(error) => {
-                        warn!("Could not derive current profile calibration context: {error}");
-                        None
-                    }
-                },
+                }
                 Ok(None) => {
-                    warn!(
-                        "Persisted D5/D6 calibration references a missing profile; ignoring it"
-                    );
+                    warn!("Persisted D5/D6 calibration references a missing profile; ignoring it");
                     None
                 }
                 Err(error) => {
@@ -7162,9 +7204,7 @@ async fn main() {
     } else {
         None
     };
-    let restored_calibration_context = restored_calibration
-        .as_ref()
-        .map(|bundle| bundle.context());
+    let restored_calibration_context = restored_calibration.as_ref().map(|bundle| bundle.context());
     let mut initial_d5_presence = d5_presence::PresenceFusionState::default();
     if restored_calibration.is_some() {
         initial_d5_presence.restore_ready(std::time::Instant::now());
@@ -7255,8 +7295,7 @@ async fn main() {
     // ADR-262 P3: build the live RuField surface with a provisioned ed25519
     // signer. A missing or malformed seed is a startup error: live events must
     // never be signed with a publicly recoverable fallback key.
-    let field_surface: rufield_surface::FieldState = match
-        rufield_surface::FieldSurface::from_env()
+    let field_surface: rufield_surface::FieldState = match rufield_surface::FieldSurface::from_env()
     {
         Ok(surface) => Arc::new(RwLock::new(surface)),
         Err(error) => {
@@ -7310,6 +7349,18 @@ async fn main() {
             }),
         position_setup.as_deref().and_then(|setup| {
             setup.mmwave()?;
+            let receiver_positions_m = setup.receiver_positions_m();
+            let calibration_receiver_positions_m = setup.receiver_calibration_positions_m();
+            let calibration_rx_positions_m = calibration_receiver_positions_m
+                .iter()
+                .any(|position| position.is_some())
+                .then(|| {
+                    calibration_receiver_positions_m
+                        .into_iter()
+                        .zip(receiver_positions_m)
+                        .map(|(calibration, device)| calibration.unwrap_or(device))
+                        .collect()
+                });
             Some(mmwave_calibration::ExperimentContext {
                 setup_id: setup.setup_id().to_string(),
                 setup_sha256: setup.setup_sha256().to_string(),
@@ -7317,15 +7368,14 @@ async fn main() {
                 geometry: position_capture::PositionCaptureGeometry {
                     room_dimensions_m: setup.room_dimensions_m(),
                     tx_position_m: setup.transmitter_position_m(),
-                    rx_positions_m: setup.receiver_positions_m().to_vec(),
+                    rx_positions_m: receiver_positions_m.to_vec(),
                 },
+                calibration_tx_position_m: setup.transmitter_calibration_position_m(),
+                calibration_rx_positions_m,
             })
         }),
     );
-    mmwave_manager.set_node_control_configuration(
-        mmwave_url_configured,
-        mmwave_token_configured,
-    );
+    mmwave_manager.set_node_control_configuration(mmwave_url_configured, mmwave_token_configured);
     if position_setup.is_none() {
         if let Some(store) = &experiment_store {
             match store.list_profiles().await {
@@ -7345,6 +7395,7 @@ async fn main() {
         warn!("Could not restore mmWave session manifests: {error}");
     }
 
+    let shutdown = Arc::new(Notify::new());
     let state: SharedState = Arc::new(RwLock::new(AppStateInner {
         latest_update: None,
         rssi_history: VecDeque::new(),
@@ -7479,11 +7530,9 @@ async fn main() {
 
     // Start background tasks from the resolved plan (issue #1004).
     //
-    // In `auto` mode with no boot source, `bind_udp` AND `run_simulator` are
-    // both true: the UDP receiver is bound so real CSI can promote the source,
-    // and the simulator serves poses in the meantime (it self-suspends once
-    // promoted — see `simulated_data_task`). Explicit `--source simulated` has
-    // `bind_udp = false`, so it serves simulated data only, with no live binding.
+    // In `auto` mode with no boot source, the UDP receiver is bound and the
+    // source stays explicitly offline until a real frame promotes it. Only
+    // explicit `--source simulated` starts the synthetic data task.
     if plan.bind_udp {
         tokio::spawn(udp_receiver_task(state.clone(), args.udp_port));
         tokio::spawn(broadcast_tick_task(state.clone(), args.tick_ms));
@@ -7500,6 +7549,11 @@ async fn main() {
         args.mmwave_receive_buffer_bytes,
         args.mmwave_reorder_hold_ms,
     ));
+    mmwave_discovery::spawn_listener(
+        mmwave_discovery::DEFAULT_DISCOVERY_PORT,
+        args.mmwave_udp_port,
+        mmwave_token.clone(),
+    );
     spawn_mmwave_node_diagnostics_poller(state.clone(), args.mmwave_node_url.clone(), mmwave_token);
     spawn_mmwave_session_ticker(state.clone());
 
@@ -7646,23 +7700,19 @@ async fn main() {
             axum::http::header::CACHE_CONTROL,
             HeaderValue::from_static("no-cache, no-store, must-revalidate"),
         ))
-        // Bearer-token auth on `/api/v1/*` (#443). It is optional only for a
-        // loopback-bound server; routable binds are rejected above without a
-        // configured token. `/health*` and `/ui/*` remain public, while live
-        // WebSockets require the same token and pass the browser-origin boundary.
+        .with_state(state.clone())
+        // ADR-262 P3: additive RuField surface (`/api/field` + `/ws/field`).
+        // Merged AFTER `.with_state` (so http_app is already `Router<()>` and
+        // can absorb the field router's own `FieldState`).
+        .merge(rufield_surface::router(field_surface.clone()))
+        // Bearer-token auth on `/api/v1/*`, `/api/field`, and every live
+        // WebSocket (#443). Apply it after the RuField merge so the additive
+        // routes share the same reader-authorization boundary. It is optional
+        // only for a loopback-bound server; `/health*` and `/ui/*` stay public.
         .layer(axum::middleware::from_fn_with_state(
             bearer_auth_state.clone(),
             wifi_densepose_sensing_server::bearer_auth::require_bearer,
         ))
-        .with_state(state.clone())
-        // ADR-262 P3: additive RuField surface (`/api/field` + `/ws/field`).
-        // Merged AFTER `.with_state` (so http_app is already `Router<()>` and
-        // can absorb the field router's own `FieldState`). These routes sit
-        // OUTSIDE `/api/v1/*` so they are not bearer-gated, but the
-        // host-validation layer below still applies (it is added last, so it
-        // runs first, over the whole merged router). The surface's own §10
-        // egress gate is what keeps above-policy classes off the wire.
-        .merge(rufield_surface::router(field_surface.clone()))
         // Reject foreign browser Origins on state-changing `/api/v1/*`
         // requests and every live WebSocket route. The Host layer below still
         // provides the DNS-rebinding defense.
@@ -7692,11 +7742,32 @@ async fn main() {
 
     // Run the HTTP server with graceful shutdown support
     let shutdown_state = state.clone();
-    let server = axum::serve(http_listener, http_app).with_graceful_shutdown(async {
-        tokio::signal::ctrl_c()
-            .await
-            .expect("failed to install CTRL+C handler");
-        info!("Shutdown signal received");
+    let shutdown_signal = shutdown.clone();
+    let server = axum::serve(http_listener, http_app).with_graceful_shutdown(async move {
+        #[cfg(unix)]
+        {
+            let mut terminate =
+                tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())
+                    .expect("failed to install SIGTERM handler");
+            tokio::select! {
+                result = tokio::signal::ctrl_c() => {
+                    result.expect("failed to install CTRL+C handler");
+                    info!("Shutdown signal received");
+                }
+                _ = terminate.recv() => info!("SIGTERM received; shutting down"),
+                _ = shutdown_signal.notified() => info!("Browser shutdown requested"),
+            }
+        }
+        #[cfg(not(unix))]
+        {
+            tokio::select! {
+                result = tokio::signal::ctrl_c() => {
+                    result.expect("failed to install CTRL+C handler");
+                    info!("Shutdown signal received");
+                }
+                _ = shutdown_signal.notified() => info!("Browser shutdown requested"),
+            }
+        }
     });
 
     server.await.unwrap();
@@ -8338,7 +8409,6 @@ mod novelty_tests {
     }
 }
 
-
 // ── Unit tests: RollingP95 ─────────────────────────────────────────────────────
 
 #[cfg(test)]
@@ -8702,6 +8772,12 @@ mod observatory_persons_field_position_tests {
         assert!(public.persons.is_none());
         assert!(public.estimated_persons.is_none());
         assert!(public.vital_signs.is_none());
+
+        let wifi_public = public_sensing_update(&update, "wifi:offline");
+        assert_eq!(wifi_public.source, "wifi:offline");
+        assert!(wifi_public.nodes.is_empty());
+        assert!(!wifi_public.classification.presence);
+        assert!(wifi_public.persons.is_none());
     }
 
     #[test]

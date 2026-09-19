@@ -78,24 +78,11 @@ jobs:
           # whole workspace fails to resolve before any bench is built.
           submodules: recursive
 
-      # The workspace pulls in `wifi-densepose-desktop` (Tauri v2) whose -sys
-      # crates need the GTK/WebKit/serial dev libraries via pkg-config, exactly
-      # as ci.yml's rust-tests job documents. A `--workspace` bench build links
-      # the whole graph, so these are required here too.
-      - name: Install Tauri / GTK / serial system dev libraries
+      - name: Install serial / TLS system dev libraries
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
-            libglib2.0-dev \
-            libgtk-3-dev \
-            libsoup-3.0-dev \
-            libjavascriptcoregtk-4.1-dev \
-            libwebkit2gtk-4.1-dev \
-            libayatana-appindicator3-dev \
-            librsvg2-dev \
-            libxdo-dev \
             libudev-dev \
-            libdbus-1-dev \
             libssl-dev \
             pkg-config
 

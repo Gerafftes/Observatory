@@ -289,7 +289,8 @@ pub async fn ws_field(ws: WebSocketUpgrade, State(state): State<FieldState>) -> 
         let s = state.read().await;
         s.subscribe()
     };
-    ws.on_upgrade(move |socket| handle_ws_field_client(socket, rx))
+    ws.protocols([crate::bearer_auth::WS_PROTOCOL])
+        .on_upgrade(move |socket| handle_ws_field_client(socket, rx))
 }
 
 async fn handle_ws_field_client(mut socket: WebSocket, mut rx: broadcast::Receiver<String>) {

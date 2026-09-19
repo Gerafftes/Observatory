@@ -1,8 +1,14 @@
 # ADR-053: UI Design System — Dark Professional + Unity-Inspired Interface
 
+> **Historical record — retired 2026-09-18.** This ADR describes the former
+> desktop UI design surface. It remains for design provenance only; it is not a
+> current desktop build or runtime specification. The supported surface is the
+> browser UI plus the loopback `wifi-densepose-control` helper ([software
+> overview](../../README.md), [UI README](../../ui/README.md)).
+
 | Field | Value |
 |-------|-------|
-| Status | Accepted |
+| Status | Retired — historical desktop design (2026-09-18) |
 | Date | 2026-03-06 |
 | Deciders | ruv |
 | Depends on | ADR-052 (Tauri Desktop Frontend) |

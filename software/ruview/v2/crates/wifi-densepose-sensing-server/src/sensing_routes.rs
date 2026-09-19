@@ -200,7 +200,13 @@ async fn handle_ws_pose_client(mut socket: WebSocket, state: SharedState) {
                                     sensing.pose_keypoints.is_some(),
                                 );
 
-                                let persons = if model_inference {
+                                let source_offline = sensing.source.ends_with(":offline");
+                                let persons = if source_offline {
+                                    // Offline rebroadcasts contain only the server's
+                                    // liveness state. Never derive a person from stale
+                                    // features while the source is offline.
+                                    Vec::new()
+                                } else if model_inference {
                                     // When a trained model is loaded, prefer its keypoints if present.
                                     sensing.pose_keypoints.as_ref().map(|kps| {
                                         let kp_names = [
@@ -333,9 +339,16 @@ async fn pose_current(State(state): State<SharedState>) -> Json<serde_json::Valu
 
 async fn pose_stats(State(state): State<SharedState>) -> Json<serde_json::Value> {
     let s = state.read().await;
+    let average_confidence = s.latest_update.as_ref().and_then(|update| {
+        let public = public_sensing_update(update, &s.effective_source());
+        let persons = public.persons?;
+        (!persons.is_empty()).then(|| {
+            persons.iter().map(|person| person.confidence).sum::<f64>() / persons.len() as f64
+        })
+    });
     Json(serde_json::json!({
         "total_detections": s.total_detections,
-        "average_confidence": 0.87,
+        "average_confidence": average_confidence,
         "frames_processed": s.tick,
         "source": s.effective_source(),
     }))
@@ -344,31 +357,37 @@ async fn pose_stats(State(state): State<SharedState>) -> Json<serde_json::Value>
 async fn pose_zones_summary(State(state): State<SharedState>) -> Json<serde_json::Value> {
     let s = state.read().await;
     let effective_source = s.effective_source();
-    let presence = s
-        .latest_update
-        .as_ref()
-        .map(|update| {
-            public_sensing_update(update, &effective_source)
-                .classification
-                .presence
-        })
-        .unwrap_or(false);
-    Json(serde_json::json!({
-        "zones": {
-            "zone_1": { "person_count": if presence { 1 } else { 0 }, "status": "monitored" },
-            "zone_2": { "person_count": 0, "status": "clear" },
-            "zone_3": { "person_count": 0, "status": "clear" },
-            "zone_4": { "person_count": 0, "status": "clear" },
+    let mut counts = std::collections::BTreeMap::<String, usize>::new();
+    if let Some(update) = s.latest_update.as_ref() {
+        if let Some(persons) = public_sensing_update(update, &effective_source).persons {
+            for person in persons {
+                *counts.entry(person.zone).or_default() += 1;
+            }
         }
+    }
+    let zones = counts
+        .into_iter()
+        .map(|(zone, person_count)| {
+            (
+                zone,
+                serde_json::json!({
+                    "person_count": person_count,
+                    "status": if person_count > 0 { "occupied" } else { "clear" },
+                }),
+            )
+        })
+        .collect::<serde_json::Map<String, serde_json::Value>>();
+    Json(serde_json::json!({
+        "zones": zones,
     }))
 }
 
 async fn stream_status(State(state): State<SharedState>) -> Json<serde_json::Value> {
     let s = state.read().await;
+    let clients = s.tx.receiver_count();
     Json(serde_json::json!({
-        "active": true,
-        "clients": s.tx.receiver_count(),
-        "fps": if s.tick > 1 { 10u64 } else { 0u64 },
+        "active": clients > 0,
+        "clients": clients,
         "source": s.effective_source(),
     }))
 }

@@ -662,13 +662,16 @@
 .occ-cad-rulers line { stroke: var(--occ-ink); stroke-width: 1; vector-effect: non-scaling-stroke; }
 .occ-cad-rulers text { fill: var(--occ-muted); font: 9px var(--font-family-mono); }
 .occ-cad-rulers .occ-cad-axis-label { fill: var(--occ-ink); font-size: 8px; font-weight: 650; letter-spacing: .08em; }
+.occ-cad-room-title { fill: var(--occ-ink); font: 650 12px var(--font-family-mono); letter-spacing: .04em; pointer-events: none; }
+.occ-cad-setup-source { font: 650 9px var(--font-family-mono); letter-spacing: .04em; pointer-events: none; }
+.occ-cad-setup-source.is-fallback { fill: #91531e; }
+.occ-cad-setup-source.is-sqlite { fill: #1d5d4f; }
 .occ-cad-axis { stroke: var(--occ-signal); stroke-width: 2; vector-effect: non-scaling-stroke; }
 .occ-cad-axis-caption { fill: var(--occ-signal); font: 650 10px var(--font-family-mono); }
 .occ-cad-axis-height { stroke: var(--occ-muted); stroke-dasharray: 4 3; }
 .occ-cad-axis-height-caption { fill: var(--occ-muted); }
 .occ-cad-selection-line-backdrop { stroke: #f4f4f0; stroke-width: 9; stroke-linecap: round; vector-effect: non-scaling-stroke; pointer-events: none; }
 .occ-cad-selection-line { stroke: var(--occ-signal); stroke-width: 3; stroke-linecap: round; stroke-dasharray: 10 7; vector-effect: non-scaling-stroke; pointer-events: none; }
-.occ-cad-room-label { fill: var(--occ-ink); font: 650 10px var(--font-family-mono); letter-spacing: .03em; }
 .occ-cad-marker { cursor: grab; outline: none; }
 .occ-cad-marker:active { cursor: grabbing; }
 .occ-cad-marker-hit { fill: transparent; stroke: transparent; }
@@ -679,6 +682,8 @@
 .occ-cad-marker-rx3 .occ-cad-marker-core { fill: #aa681f; }
 .occ-cad-marker-rx4 .occ-cad-marker-core { fill: #6b7787; }
 .occ-cad-marker-mmwave .occ-cad-marker-core { fill: #6f4c1e; }
+.occ-cad-marker-calibration .occ-cad-marker-core { fill: var(--occ-paper); stroke: var(--occ-ink); stroke-width: 1.5; }
+.occ-cad-marker-calibration.is-fallback { opacity: .52; }
 .occ-cad-marker text { fill: var(--occ-ink); font: 650 10px var(--font-family-mono); paint-order: stroke; stroke: #f4f4f0; stroke-width: 4px; stroke-linejoin: round; }
 .occ-cad-marker.is-selected .occ-cad-marker-core { stroke: var(--occ-ink); stroke-width: 3; }
 .occ-cad-marker:focus-visible .occ-cad-marker-hit { fill: rgba(229, 28, 35, .12); stroke: var(--occ-signal); stroke-width: 2; vector-effect: non-scaling-stroke; }
@@ -3602,6 +3607,214 @@ canvas {
   box-sizing: border-box;
 }
 
+/* Browser-only sensing-server process controls. The control helper stays on
+   loopback so these actions never become a LAN process-management endpoint. */
+.server-control-panel {
+  margin: 0 0 var(--space-16);
+  padding: var(--space-16);
+  border: 1px solid var(--color-card-border);
+  border-left: 3px solid var(--color-primary);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+}
+
+.server-control-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-16);
+}
+
+.server-control-kicker {
+  color: var(--color-text-secondary);
+  font: 600 10px/1.2 var(--font-family-mono);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.server-control-panel h3 {
+  margin: 5px 0 4px;
+  color: var(--color-text-primary);
+  font-size: var(--font-size-lg);
+}
+
+.server-control-panel header p {
+  margin: 0;
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
+}
+
+.server-control-state {
+  flex: 0 0 auto;
+  padding: 7px 9px;
+  border: 1px solid var(--color-card-border);
+  color: var(--color-text-secondary);
+  font: 650 10px/1 var(--font-family-mono);
+  letter-spacing: 0.06em;
+  white-space: nowrap;
+}
+
+.server-control-state.is-running {
+  border-color: #00cc88;
+  color: #00cc88;
+}
+
+.server-control-state.is-stopped,
+.server-control-state.is-offline {
+  border-color: var(--color-warning);
+  color: var(--color-warning);
+}
+
+.server-control-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-8);
+  margin-top: var(--space-16);
+}
+
+.server-control-button {
+  min-height: 34px;
+  padding: 8px 11px;
+  border: 1px solid var(--color-card-border);
+  border-radius: var(--radius-base);
+  background: transparent;
+  color: var(--color-text-primary);
+  cursor: pointer;
+  font: 650 11px/1 var(--font-family-mono);
+}
+
+.server-control-button.is-primary {
+  border-color: var(--color-primary);
+  background: var(--color-primary);
+  color: #fff;
+}
+
+.server-control-button.is-danger {
+  border-color: var(--color-error);
+  color: var(--color-error);
+}
+
+.server-control-button.is-quiet {
+  color: var(--color-text-secondary);
+}
+
+.server-control-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.server-control-button:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+.server-control-feedback {
+  margin-top: var(--space-12);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
+}
+
+.server-control-feedback.is-error {
+  color: var(--color-error);
+}
+
+.server-control-hint {
+  margin: var(--space-12) 0 0;
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-xs);
+  line-height: 1.5;
+}
+
+.server-control-hint code {
+  font-family: var(--font-family-mono);
+}
+
+.local-control-columns {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.local-control-columns > div {
+  min-width: 0;
+  padding: .85rem;
+  border: 1px solid var(--color-border);
+  background: var(--color-secondary);
+}
+
+.local-control-columns p {
+  margin: .45rem 0 0;
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.hardware-node-panel {
+  margin-top: var(--space-16);
+  padding: var(--space-16);
+  border: 1px solid var(--color-card-border);
+  background: var(--color-surface);
+}
+
+.hardware-node-panel h3 {
+  margin: 0 0 var(--space-4);
+}
+
+.hardware-node-status,
+.hardware-node-empty {
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
+}
+
+.hardware-node-list {
+  display: grid;
+  gap: var(--space-8);
+  margin-top: var(--space-12);
+}
+
+.hardware-node-row {
+  padding: var(--space-12);
+  border: 1px solid var(--color-card-border);
+  background: var(--color-secondary);
+}
+
+.hardware-node-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-12);
+  color: var(--color-text-primary);
+  font-weight: var(--font-weight-semibold);
+}
+
+.hardware-node-state {
+  color: var(--color-text-secondary);
+  font: 650 var(--font-size-xs)/1 var(--font-family-mono);
+}
+
+.hardware-node-state.is-active {
+  color: #00cc88;
+}
+
+.hardware-node-state.is-stale {
+  color: var(--color-warning);
+}
+
+.hardware-node-details {
+  margin-top: var(--space-8);
+  color: var(--color-text-secondary);
+  font: var(--font-weight-normal) var(--font-size-xs)/1.5 var(--font-family-mono);
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 720px) {
+  .local-control-columns {
+    grid-template-columns: 1fr;
+  }
+}
+
 .sensing-source-live {
   background: rgba(0, 204, 136, 0.15);
   border: 1px solid #00cc88;
@@ -3631,18 +3844,6 @@ canvas {
   background: rgba(145, 83, 30, 0.12);
   border: 1px solid #91531e;
   color: #91531e;
-}
-
-.sensing-source-simulated {
-  background: rgba(255, 60, 60, 0.12);
-  border: 1px solid var(--color-error);
-  color: var(--color-error);
-}
-
-/* Health indicator for server-simulated data */
-.health-sim {
-  color: #ffa500;
-  font-weight: 600;
 }
 
 /* Big RSSI value */
@@ -6165,12 +6366,8 @@ label,
   font-size: var(--font-size-sm);
 }
 
-.live-status-panel { grid-column: 1 / 8; }
-.system-metrics-panel { grid-column: 8 / 13; }
-.features-panel { grid-column: 1 / 6; }
-.live-stats-panel { grid-column: 6 / 13; }
-.key-benefits,
-.system-stats,
+.live-status-panel,
+.live-stats-panel,
 .error-container { grid-column: 1 / -1; }
 
 .card,
@@ -6463,8 +6660,6 @@ button:active {
 
   .hero-section > *,
   .live-status-panel,
-  .system-metrics-panel,
-  .features-panel,
   .live-stats-panel {
     grid-column: 1 / -1;
   }

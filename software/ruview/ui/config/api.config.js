@@ -25,6 +25,7 @@ export const API_CONFIG = {
     INFO: '/api/v1/info',
     STATUS: '/api/v1/status',
     METRICS: '/api/v1/metrics',
+    NODES: '/api/v1/nodes',
     
     // Health
     HEALTH: {

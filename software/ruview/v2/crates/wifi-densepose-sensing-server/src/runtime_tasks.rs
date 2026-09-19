@@ -460,18 +460,68 @@ pub(crate) fn spawn_mmwave_node_diagnostics_poller(
             })
             .await;
             if let Ok(mut probe) = probe {
-                let mut state = state.write().await;
-                state
-                    .mmwave
-                    .discovered_control(probe.status.node_url.clone(), token.clone());
-                if !probe.status.reachable {
-                    // Keep the established identity across outages so discovery
-                    // cannot silently substitute a different physical radar.
-                    probe.status.node_id = state.mmwave_connection.node_id.clone();
-                    probe.status.node_url = state.mmwave_connection.node_url.clone();
+                let (pending_transform, control, sync_required) = {
+                    let mut state = state.write().await;
+                    if !probe.status.reachable {
+                        // Keep the established identity across outages so discovery
+                        // cannot silently substitute a different physical radar.
+                        probe.status.node_id = state.mmwave_connection.node_id.clone();
+                        probe.status.node_url = configured_url
+                            .clone()
+                            .or_else(|| state.mmwave_connection.node_url.clone());
+
+                        let diagnostics_still_fresh = state
+                            .mmwave_node_diagnostics
+                            .status(probe.status.node_url.is_some(), token.is_some())
+                            .reachable
+                            == Some(true);
+                        if diagnostics_still_fresh && state.mmwave_connection.reachable {
+                            probe.status = state.mmwave_connection.clone();
+                        }
+                    }
+                    state
+                        .mmwave
+                        .discovered_control(probe.status.node_url.clone(), token.clone());
+                    state.mmwave_node_diagnostics.record(probe.diagnostics);
+                    state.mmwave_connection = probe.status;
+                    (
+                        state.mmwave.pending_cad_transform_sync(),
+                        state.mmwave.control(),
+                        state.mmwave.transform_sync_required(),
+                    )
+                };
+                let Some(transform) = pending_transform else {
+                    continue;
+                };
+                let Some(control) = control else {
+                    if sync_required {
+                        state.write().await.mmwave.mark_cad_profile_sync_failed(
+                            "mmWave node control is not available; check MMWAVE_NODE_URL and its bearer token"
+                                .to_string(),
+                        );
+                    }
+                    continue;
+                };
+                let transform_for_sync = transform.clone();
+                let result = tokio::task::spawn_blocking(move || {
+                    mmwave_calibration::set_node_transform(&control, &transform_for_sync)
+                })
+                .await;
+                match result {
+                    Ok(Ok(())) => state
+                        .write()
+                        .await
+                        .mmwave
+                        .mark_cad_profile_sync_succeeded(transform),
+                    Ok(Err(error)) => state
+                        .write()
+                        .await
+                        .mmwave
+                        .mark_cad_profile_sync_failed(error),
+                    Err(error) => state.write().await.mmwave.mark_cad_profile_sync_failed(
+                        format!("mmWave transform sync task failed: {error}"),
+                    ),
                 }
-                state.mmwave_node_diagnostics.record(probe.diagnostics);
-                state.mmwave_connection = probe.status;
             }
         }
     });
@@ -495,11 +545,20 @@ pub(crate) fn spawn_mmwave_session_ticker(state: SharedState) {
 const MMWAVE_SESSION_TICK_INTERVAL: Duration = Duration::from_millis(100);
 pub(crate) const DEFAULT_MMWAVE_REORDER_HOLD_MS: u64 = 20;
 pub(crate) const DEFAULT_MMWAVE_RECEIVE_BUFFER_BYTES: usize = 256 * 1024;
+const MMWAVE_ACK_MAGIC: u32 = 0x5256_414b;
 
 #[derive(Debug, Clone, Copy, Deserialize)]
 struct MmwavePacketOrder {
     boot_id: u32,
     sequence: u32,
+}
+
+fn mmwave_ack(order: MmwavePacketOrder) -> [u8; 12] {
+    let mut ack = [0_u8; 12];
+    ack[..4].copy_from_slice(&MMWAVE_ACK_MAGIC.to_be_bytes());
+    ack[4..8].copy_from_slice(&order.boot_id.to_be_bytes());
+    ack[8..].copy_from_slice(&order.sequence.to_be_bytes());
+    ack
 }
 
 struct QueuedMmwaveDatagram {
@@ -641,9 +700,8 @@ pub(crate) async fn mmwave_receiver_task(
     tokio::spawn(async move {
         let mut batch = Vec::new();
         let mut last_forwarded = None;
-        let mut flush_interval = tokio::time::interval(Duration::from_millis(
-            reorder_hold_ms.max(1),
-        ));
+        let mut flush_interval =
+            tokio::time::interval(Duration::from_millis(reorder_hold_ms.max(1)));
         flush_interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
         flush_interval.tick().await;
         loop {
@@ -683,11 +741,17 @@ pub(crate) async fn mmwave_receiver_task(
                     source,
                     server_clock::now(),
                 );
+                let order = packet.order;
                 transport_metrics.note_received();
                 if packet_tx.send(packet).is_err() {
                     transport_metrics.note_dequeued();
                     error!("mmWave processor stopped; UDP receiver is shutting down");
                     return;
+                }
+                if let Some(order) = order {
+                    if let Err(error) = socket.send_to(&mmwave_ack(order), source).await {
+                        warn!("Could not acknowledge mmWave packet from {source}: {error}");
+                    }
                 }
             }
             Err(error) => warn!("mmWave UDP receive failed: {error}"),
@@ -697,7 +761,20 @@ pub(crate) async fn mmwave_receiver_task(
 
 #[cfg(test)]
 mod mmwave_udp_order_tests {
-    use super::{compare_mmwave_sequence, mmwave_sequence_is_newer};
+    use super::{compare_mmwave_sequence, mmwave_ack, mmwave_sequence_is_newer, MmwavePacketOrder};
+
+    #[test]
+    fn acknowledgement_matches_firmware_wire_contract() {
+        assert_eq!(
+            mmwave_ack(MmwavePacketOrder {
+                boot_id: 0x1234_5678,
+                sequence: 0x9abc_def0,
+            }),
+            [
+                0x52, 0x56, 0x41, 0x4b, 0x12, 0x34, 0x56, 0x78, 0x9a, 0xbc, 0xde, 0xf0,
+            ]
+        );
+    }
 
     #[test]
     fn sequence_order_repairs_short_udp_reordering() {
@@ -1854,13 +1931,9 @@ pub(crate) async fn simulated_data_task(state: SharedState, tick_ms: u64) {
 
         let mut s = state.write().await;
 
-        // Issue #1004: in `auto` mode this task runs alongside `udp_receiver_task`.
-        // Once a real frame promotes `source` → "esp32", stop emitting synthetic
-        // frames so we never clobber live CSI with simulated poses. (For an
-        // explicit `--source simulated` demo, `source` stays "simulated" and the
-        // simulator keeps running — that path never binds UDP, so it is never
-        // promoted.) The task stays alive so it can resume serving if the real
-        // source later ages out to "esp32:offline".
+        // Explicit `--source simulated` keeps `source` at "simulated" and never
+        // binds UDP, so this task remains a clearly labelled offline demo. The
+        // auto/real-source paths do not start this task at all.
         if s.effective_source() == "esp32" {
             continue;
         }

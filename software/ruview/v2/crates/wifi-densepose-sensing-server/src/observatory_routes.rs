@@ -59,6 +59,92 @@ struct SetupProfileRequest {
     document: serde_json::Value,
 }
 
+async fn sync_saved_mmwave_transform(
+    state: &SharedState,
+    profile: &experiment::SetupProfile,
+) -> serde_json::Value {
+    let Some(transform) = mmwave_calibration::transform_request_from_profile(profile) else {
+        return serde_json::json!({
+            "status": "skipped",
+            "reason": "the saved profile has no complete mmWave mounting geometry",
+        });
+    };
+    let (control, sync_required) = {
+        let state = state.read().await;
+        if !state.mmwave.transform_reconfiguration_allowed() {
+            return serde_json::json!({
+                "status": "skipped",
+                "reason": "an active sealed setup or calibration session keeps its immutable geometry; create a new setup for this profile",
+            });
+        }
+        (
+            state.mmwave.control(),
+            state.mmwave.transform_sync_required(),
+        )
+    };
+    let Some(control) = control else {
+        if sync_required {
+            state.write().await.mmwave.mark_cad_profile_sync_failed(
+                "mmWave node control is not available; check MMWAVE_NODE_URL and its bearer token"
+                    .to_string(),
+            );
+        }
+        return serde_json::json!({
+            "status": "skipped",
+            "reason": "mmWave node control is not configured",
+        });
+    };
+    let transform_for_response = transform.clone();
+    match tokio::task::spawn_blocking(move || {
+        mmwave_calibration::set_node_transform(&control, &transform)
+    })
+    .await
+    {
+        Ok(Ok(())) => {
+            let mut state = state.write().await;
+            state
+                .mmwave
+                .mark_cad_profile_sync_succeeded(transform_for_response.clone());
+            serde_json::json!({
+                "status": "synced",
+                "transform": transform_for_response,
+            })
+        }
+        Ok(Err(error)) => {
+            state
+                .write()
+                .await
+                .mmwave
+                .mark_cad_profile_sync_failed(error.clone());
+            serde_json::json!({
+                "status": "failed",
+                "error": error,
+            })
+        }
+        Err(error) => {
+            let error = format!("mmWave transform sync task failed: {error}");
+            state
+                .write()
+                .await
+                .mmwave
+                .mark_cad_profile_sync_failed(error.clone());
+            serde_json::json!({
+                "status": "failed",
+                "error": error,
+            })
+        }
+    }
+}
+
+fn setup_profile_response(
+    profile: &experiment::SetupProfile,
+    mmwave_transform_sync: serde_json::Value,
+) -> Json<serde_json::Value> {
+    let mut response = serde_json::to_value(profile).expect("setup profile is serializable");
+    response["mmwave_transform_sync"] = mmwave_transform_sync;
+    Json(response)
+}
+
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct SetupProfileDraftQuery {
@@ -299,17 +385,22 @@ async fn setup_profile_create(
             "SQLite persistence is unavailable; setup profiles cannot be saved.",
         );
     };
-    let mut state = state.write().await;
-    match store
+    let profile = match store
         .create_profile(&request.label, &request.document)
         .await
     {
-        Ok(profile) => {
-            state.mmwave.apply_cad_profile(&profile);
-            (StatusCode::CREATED, Json(serde_json::json!(profile))).into_response()
+        Ok(profile) => profile,
+        Err(error) => {
+            return experiment_api_error(StatusCode::BAD_REQUEST, "INVALID_PROFILE", error)
         }
-        Err(error) => experiment_api_error(StatusCode::BAD_REQUEST, "INVALID_PROFILE", error),
-    }
+    };
+    state.write().await.mmwave.apply_cad_profile(&profile);
+    let mmwave_transform_sync = sync_saved_mmwave_transform(&state, &profile).await;
+    (
+        StatusCode::CREATED,
+        setup_profile_response(&profile, mmwave_transform_sync),
+    )
+        .into_response()
 }
 
 async fn setup_profile_update(
@@ -325,20 +416,21 @@ async fn setup_profile_update(
             "SQLite persistence is unavailable; setup profiles cannot be saved.",
         );
     };
-    let mut state = state.write().await;
-    match store
+    let profile = match store
         .update_profile(&id, &request.label, &request.document)
         .await
     {
-        Ok(profile) => {
-            state.mmwave.apply_cad_profile(&profile);
-            Json(serde_json::json!(profile)).into_response()
-        }
+        Ok(profile) => profile,
         Err(error) if error == "setup profile not found" => {
-            experiment_api_error(StatusCode::NOT_FOUND, "PROFILE_NOT_FOUND", error)
+            return experiment_api_error(StatusCode::NOT_FOUND, "PROFILE_NOT_FOUND", error)
         }
-        Err(error) => experiment_api_error(StatusCode::BAD_REQUEST, "INVALID_PROFILE", error),
-    }
+        Err(error) => {
+            return experiment_api_error(StatusCode::BAD_REQUEST, "INVALID_PROFILE", error)
+        }
+    };
+    state.write().await.mmwave.apply_cad_profile(&profile);
+    let mmwave_transform_sync = sync_saved_mmwave_transform(&state, &profile).await;
+    setup_profile_response(&profile, mmwave_transform_sync).into_response()
 }
 
 async fn setup_profile_v2_draft(

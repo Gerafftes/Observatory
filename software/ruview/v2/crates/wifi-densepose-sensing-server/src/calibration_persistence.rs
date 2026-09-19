@@ -39,6 +39,7 @@ pub(crate) fn profile_context_sha256(document: &Value) -> Result<String, String>
             json!({
                 "id": receiver.get("id"),
                 "position_m": receiver.get("position_m"),
+                "calibration_position_m": receiver.get("calibration_position_m"),
             })
         })
         .collect();
@@ -56,6 +57,7 @@ pub(crate) fn profile_context_sha256(document: &Value) -> Result<String, String>
         "transmitter": {
             "id": transmitter.get("id"),
             "position_m": transmitter.get("position_m"),
+            "calibration_position_m": transmitter.get("calibration_position_m"),
         },
         "receivers": receiver_context,
         "mmwave": object.get("mmwave").map(|mmwave| json!({

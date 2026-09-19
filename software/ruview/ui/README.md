@@ -18,16 +18,20 @@ ui/
 │   ├── websocket.service.js  # WebSocket connection manager
 │   ├── websocket-client.js   # Low-level WebSocket client
 │   ├── pose.service.js       # Pose estimation API wrapper
-│   ├── sensing.service.js    # WiFi sensing data service (live + simulation fallback)
+│   ├── sensing.service.js    # WiFi sensing data service (server frames only)
 │   ├── health.service.js     # Health monitoring API wrapper
 │   ├── stream.service.js     # Streaming API wrapper
+│   ├── server-control.service.js # Browser client for the loopback server helper
+│   ├── control-helper.service.js # Browser client for local hardware control
 │   └── data-processor.js     # Signal data processing utilities
 ├── components/
 │   ├── TabManager.js         # Tab navigation component
-│   ├── DashboardTab.js       # Dashboard with live system metrics
+│   ├── DashboardTab.js       # Dashboard with health and live pose statistics
 │   ├── SensingTab.js         # WiFi sensing visualization (3D signal field, metrics)
-│   ├── LiveDemoTab.js        # Live pose detection with setup guide
-│   ├── HardwareTab.js        # Hardware configuration
+│   ├── LiveDemoTab.js        # Live pose detection and session diagnostics
+│   ├── HardwareTab.js        # Reported node data and local control entrypoint
+│   ├── LocalControlPanel.js   # Browser discovery and serial-port controls
+│   ├── ServerControlPanel.js  # Browser start/stop/status controls
 │   ├── SettingsPanel.js      # Settings panel
 │   ├── PoseDetectionCanvas.js # Canvas-based pose skeleton renderer
 │   ├── gaussian-splats.js    # 3D Gaussian splat signal field renderer (Three.js)
@@ -52,45 +56,57 @@ ui/
 - 3D Gaussian-splat signal field visualization (Three.js)
 - Real-time RSSI, variance, motion band, breathing band metrics
 - Presence/motion classification with confidence scores
-- **Data source banner**: green "LIVE - ESP32", yellow "RECONNECTING...", or red "SIMULATED DATA"
+- **Data source banner**: green "LIVE - ESP32", yellow "RECONNECTING...", red "WIFI/CSI OFFLINE", or an explicit orange server simulation label
 - Sparkline RSSI history graph
-- "About This Data" card explaining CSI capabilities per sensor count
+- Empty values remain `--` until a current server frame provides them
 
 ### Live Demo Tab
 - WebSocket-based real-time pose skeleton rendering
 - **Estimation Mode badge**: green "Signal-Derived" or blue "Model Inference"
-- **Setup Guide panel** showing what each ESP32 count provides:
-  - 1 ESP32: presence, breathing, gross motion
-  - 2-3 ESP32s: body localization, motion direction
-  - 4+ ESP32s + trained model: individual limb tracking, full pose
 - Debug mode with log export
-- Zone selection and force-reconnect controls
-- Performance metrics sidebar (frames, uptime, errors)
+- Session diagnostics (frames, uptime, errors) for the current browser session
+- Only the explicit server data source is shown; the browser has no offline demo button
 
 ### Dashboard
 - Live system health monitoring
 - Real-time pose detection statistics
-- Zone occupancy tracking
-- System metrics (CPU, memory, disk)
 - API status indicators
+- Values are populated from the active API/WebSocket; unavailable values remain empty
 
-### Hardware Configuration
-- Interactive antenna array visualization
-- Real-time CSI data display
-- Configuration panels
-- Hardware status monitoring
+### Hardware
+- Node rows sourced from `GET /api/v1/nodes` (status, RSSI, frame rate, packet loss, and last-seen age)
+- Loopback Control Helper entrypoint for local node discovery and serial-port listing
+- No illustrative antenna array or synthetic CSI amplitude/phase values
+
+## Possible Applications
+
+These are documented directions for the project, not validated product
+capabilities. They require a measured setup, appropriate consent and privacy
+review, and application-specific validation before use:
+
+- Room-level presence and movement monitoring
+- Research on privacy-preserving WiFi sensing
+- Smart-building occupancy experiments
+- Assistive interfaces based on coarse movement signals
+- AR/VR or robotics research with a trained, validated pose model
+
+The current browser UI does not claim medical monitoring, emergency detection,
+security surveillance, full-body tracking, or production accuracy.
 
 ## Data Sources
 
-The sensing service (`sensing.service.js`) supports three connection states:
+The sensing service (`sensing.service.js`) distinguishes the following states:
 
 | State | Banner Color | Description |
 |-------|-------------|-------------|
 | **LIVE - ESP32** | Green | Connected to the Rust sensing server receiving real CSI data |
 | **RECONNECTING** | Yellow (pulsing) | WebSocket disconnected, retrying (up to 20 attempts) |
-| **SIMULATED DATA** | Red | Fallback to client-side simulation after 5+ failed reconnects |
+| **WIFI/CSI OFFLINE** | Red | Server is reachable, but no fresh ESP32 frame is available |
+| **SERVER SIMULATION** | Orange | The server was explicitly started with `--source simulated` |
 
-Simulated frames include a `_simulated: true` marker so code can detect synthetic data.
+The browser never generates fallback frames. If the server is unavailable or
+the source is unknown, the UI clears live readouts and keeps retrying. Synthetic
+frames are available only when the server is explicitly run in simulation mode.
 
 ## Backends
 
@@ -118,7 +134,7 @@ Blindtest und Hardware-Abnahme steht in
 ```bash
 cd docker/
 
-# Default: auto-detects ESP32 on UDP 5005, falls back to simulation
+# Default: auto-detects the available source; with no live source it stays offline
 docker-compose up
 
 # Force real ESP32 data
@@ -135,12 +151,33 @@ cd v2
 cargo build -p wifi-densepose-sensing-server --no-default-features
 
 # Run with simulated data
-../../target/debug/sensing-server --source simulated --tick-ms 100 --ui-path ../../ui --http-port 3000
+target/debug/sensing-server --source simulated --tick-ms 100 --ui-path ../ui --http-port 3000
 
 # Run with real ESP32
-../../target/debug/sensing-server --source esp32 --tick-ms 100 --ui-path ../../ui --http-port 3000
+target/debug/sensing-server --source esp32 --tick-ms 100 --ui-path ../ui --http-port 3000
 ```
 Open http://localhost:3000/ui/index.html
+
+### Browser plus local Control Helper
+
+The active application surface is the browser. Native operations that a normal
+webpage cannot perform (mDNS/UDP discovery and USB serial access) live in the
+small loopback-only `ruview-control` helper:
+
+```bash
+cd v2
+cargo build -p wifi-densepose-control --no-default-features
+```
+
+When the helper binary is placed beside `sensing-server`, the sensing server
+starts it automatically for the browser control surface. It listens only on
+`127.0.0.1:8090` and accepts mutating requests only from the local UI origin.
+The browser's Hardware tab then exposes `Nodes suchen` and `Ports laden`.
+
+The helper cannot be cold-started by a webpage when both processes are stopped;
+that is an operating-system permission boundary. Start the sensing server once
+(or register `ruview-control` as a user service) and subsequent control stays
+in the browser.
 
 ### With Python HTTP server (legacy)
 ```bash
@@ -155,10 +192,10 @@ Open http://localhost:3000
 
 ## Pose Estimation Modes
 
-| Mode | Badge | Requirements | Accuracy |
+| Mode | Badge | Condition | What the UI can verify |
 |------|-------|-------------|----------|
-| **Signal-Derived** | Green | 1+ ESP32, no model needed | Presence, breathing, gross motion |
-| **Model Inference** | Blue | 4+ ESP32s + trained `.rvf` model | Full 17-keypoint COCO pose |
+| **Signal-Derived** | Green | Current CSI frame with aggregate features | Signal-derived output; no accuracy claim |
+| **Model Inference** | Blue | Loaded `.rvf` model with model output in the frame | Model-produced keypoints are present |
 
 To use model inference, start the server with a trained model:
 ```bash

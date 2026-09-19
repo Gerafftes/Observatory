@@ -1,5 +1,10 @@
 # ADR Corpus Gap Analysis — Five-Lens Findings
 
+> **Historical analysis note (2026-09-18).** References to the Tauri desktop
+> surface in these findings describe the ADR corpus before its retirement. They
+> remain as evidence for the analysis and are not current implementation
+> requirements.
+
 Research notes backing ADR-164. Each lens output is reproduced verbatim. Census: 162 ADR entries across 156 distinct files (6 duplicate-number collisions verified on disk).
 
 ---

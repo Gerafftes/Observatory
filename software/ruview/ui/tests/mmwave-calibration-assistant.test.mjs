@@ -233,8 +233,10 @@ test('phase one advances in server order and only then offers phase two', async 
   };
   const originalFetch = globalThis.fetch;
   let call = 0;
-  globalThis.fetch = async () => {
+  const requestBodies = [];
+  globalThis.fetch = async (_url, options) => {
     call += 1;
+    requestBodies.push(JSON.parse(options.body));
     const complete = call === 2;
     return {
       ok: true,
@@ -271,7 +273,34 @@ test('phase one advances in server order and only then offers phase two', async 
   }
 
   assert.equal(assistant.calibrationPlan.phase, 'phase_two_ready');
+  assert.deepEqual(requestBodies.map((body) => body.window_ms), [10_000, 10_000]);
   assert.match(assistant._calibrationPreparationMarkup(), /Phase 2 starten/);
+});
+
+test('a brief stale radar status does not hide an active phase-one measurement', () => {
+  const assistant = new MmwaveCalibrationAssistant({});
+  assistant.status = {
+    state: 'stale',
+    reason: 'The last mmWave packet is stale.',
+    zones: [],
+    fixed_point_calibration: {
+      state: 'active',
+      current_anchor_id: 'RX3',
+      anchors: [{ id: 'RX3', state: 'current', check: null }],
+    },
+  };
+  assistant.calibrationPlan = {
+    phase: 'anchor_measuring',
+    anchorId: 'RX3',
+    startsAtMs: Date.now() + 5_000,
+    displaySeconds: 5,
+  };
+
+  const html = assistant._guidance(mmwaveAssistantViewModel(assistant.status));
+
+  assert.match(html, /PHASE 1 · MESSUNG/);
+  assert.match(html, /RX3/);
+  assert.doesNotMatch(html, /Warte auf Radar/);
 });
 
 test('yaw result compares every RX and TX point before phase two', () => {
@@ -308,6 +337,178 @@ test('completed yaw calibration remains repeatable from the alignment details', 
   assert.match(source, /data-mmwave-action="repeat-yaw-calibration"/);
   assert.match(source, />Winkel neu kalibrieren</);
   assert.match(source, /this\.busy \|\| this\.status\?\.session \? 'disabled' : ''/);
+});
+
+test('repeat yaw calibration returns to the standard view and hides the old result after refresh', async () => {
+  const assistant = new MmwaveCalibrationAssistant({});
+  assistant._render = () => {};
+  assistant.status = {
+    state: 'valid',
+    configured: true,
+    setup_sealed: true,
+    fixed_point_calibration: { state: 'complete' },
+    yaw_calibration: { optimized_yaw_mdeg: 217400 },
+    fixed_point_preflight: { ready: true, gates: [] },
+    radar_preflight: { ready: true, gates: [] },
+    zones: [],
+  };
+  assistant.calibrationPlan = { phase: 'phase_two_ready' };
+  const originalFetch = globalThis.fetch;
+  const requests = [];
+  globalThis.fetch = async (url, options = {}) => {
+    requests.push({ url, method: options.method || 'GET' });
+    return {
+      ok: true,
+      async json() {
+        return {
+          ...assistant.status,
+          ...(options.method === 'POST'
+            ? { fixed_point_calibration: null, yaw_calibration: null }
+            : { fixed_point_calibration: { state: 'complete' }, yaw_calibration: { optimized_yaw_mdeg: 217400 } }),
+        };
+      },
+    };
+  };
+
+  try {
+    await assistant._onClick({
+      target: {
+        closest(selector) {
+          return selector === '[data-mmwave-action]'
+            ? { dataset: { mmwaveAction: 'repeat-yaw-calibration' } }
+            : null;
+        },
+      },
+    });
+    assert.deepEqual(requests, [{
+      url: '/api/v1/mmwave/fixed-points/cancel',
+      method: 'POST',
+    }]);
+    assert.equal(assistant.calibrationPlan, null);
+    assert.equal(assistant.status.yaw_calibration, null);
+    assert.equal(assistant.status.fixed_point_calibration, null);
+    await assistant.refresh();
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+
+  assert.deepEqual(requests, [
+    { url: '/api/v1/mmwave/fixed-points/cancel', method: 'POST' },
+    { url: '/api/v1/mmwave/status', method: 'GET' },
+  ]);
+  assert.equal(assistant.calibrationPlan, null);
+  assert.equal(assistant.status.yaw_calibration, null);
+  assert.equal(assistant.status.fixed_point_calibration, null);
+  const html = assistant._guidance(mmwaveAssistantViewModel(assistant.status));
+  assert.match(html, /data-mmwave-action="prepare-calibration"/);
+  assert.doesNotMatch(html, /PHASE 1 ABGESCHLOSSEN|KORREKTUR AKTIV/);
+});
+
+test('repeat dismissal survives assistant recreation until a fresh phase-one start', async () => {
+  const storage = {
+    value: null,
+    getItem() { return this.value; },
+    setItem(_key, value) { this.value = value; },
+    removeItem() { this.value = null; },
+  };
+  const previousStorage = globalThis.sessionStorage;
+  Object.defineProperty(globalThis, 'sessionStorage', { configurable: true, value: storage });
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async (_url, options = {}) => ({
+    ok: true,
+    async json() {
+      return options.method === 'POST'
+        ? { fixed_point_calibration: null, yaw_calibration: null }
+        : {
+          state: 'valid',
+          zones: [],
+          fixed_point_calibration: { state: 'complete' },
+          yaw_calibration: { optimized_yaw_mdeg: 217400 },
+        };
+    },
+  });
+
+  try {
+    const first = new MmwaveCalibrationAssistant({});
+    first._render = () => {};
+    first.status = {
+      state: 'valid',
+      fixed_point_calibration: { state: 'complete' },
+      yaw_calibration: { optimized_yaw_mdeg: 217400 },
+    };
+    await first._onClick({
+      target: {
+        closest(selector) {
+          return selector === '[data-mmwave-action]'
+            ? { dataset: { mmwaveAction: 'repeat-yaw-calibration' } }
+            : null;
+        },
+      },
+    });
+
+    const recreated = new MmwaveCalibrationAssistant({});
+    recreated._render = () => {};
+    await recreated.refresh();
+
+    assert.equal(storage.value, 'true');
+    assert.equal(recreated.status.fixed_point_calibration, null);
+    assert.equal(recreated.status.yaw_calibration, null);
+  } finally {
+    globalThis.fetch = originalFetch;
+    if (previousStorage === undefined) delete globalThis.sessionStorage;
+    else Object.defineProperty(globalThis, 'sessionStorage', { configurable: true, value: previousStorage });
+  }
+});
+
+test('a fresh phase-one start re-enables server fixed-point status after the reset', async () => {
+  const assistant = new MmwaveCalibrationAssistant({});
+  assistant._render = () => {};
+  assistant.fixedPointResultDismissed = true;
+  assistant.calibrationPlan = {
+    phase: 'phase_one_starting', durationSeconds: 65, leadSeconds: 5, toleranceMm: 350,
+  };
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async () => ({
+    ok: true,
+    async json() {
+      return {
+        fixed_point_calibration: {
+          state: 'active', current_anchor_id: 'RX1', anchors: [],
+        },
+      };
+    },
+  });
+
+  try {
+    await assistant._startFixedPointPhase();
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+
+  assert.equal(assistant.fixedPointResultDismissed, false);
+  assert.equal(assistant.status.fixed_point_calibration.state, 'active');
+  assert.equal(assistant.calibrationPlan.phase, 'anchor_waiting');
+});
+
+test('a completed server snapshot does not replace an already prepared repeat form', async () => {
+  const assistant = new MmwaveCalibrationAssistant({});
+  assistant._render = () => {};
+  assistant.calibrationPlan = assistant._defaultCalibrationPlan();
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async () => ({
+    ok: true,
+    async json() {
+      return { state: 'valid', zones: [], fixed_point_calibration: { state: 'complete' } };
+    },
+  });
+
+  try {
+    await assistant.refresh();
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+
+  assert.equal(assistant.calibrationPlan.phase, 'form');
 });
 
 test('status refresh requests are serialized to prevent stale UI snapshots', async () => {

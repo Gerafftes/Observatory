@@ -25,8 +25,7 @@ test('session token is scoped to UI host and protected routes, with explicit cle
   setApiToken('remote-token', 'https://other.example');
   assert.deepEqual(sensingProtocols('wss://other.example/ws/sensing'), websocketProtocols('remote-token'));
   assert.equal(getApiToken('wss://sensing.example/ws/sensing'), 'secret');
-  assert.deepEqual(sensingProtocols('wss://sensing.example/ws/field'), []);
-  for (const path of ['/ws/sensing', '/ws/introspection', '/api/v1/stream/pose']) {
+  for (const path of ['/ws/sensing', '/ws/introspection', '/ws/field', '/api/v1/stream/pose']) {
     assert.deepEqual(sensingProtocols(`wss://sensing.example${path}`), websocketProtocols('secret'));
   }
   setApiToken('');

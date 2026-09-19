@@ -87,6 +87,10 @@ cargo build -p wifi-densepose-sensing-server
 # Run with default settings (HTTP :8080, UDP :5005, WS :8765)
 cargo run -p wifi-densepose-sensing-server
 
+# `auto` listens for real sources and stays offline until one is available.
+# Synthetic data requires an explicit demo mode:
+cargo run -p wifi-densepose-sensing-server -- --source simulated
+
 # Run with custom ports
 cargo run -p wifi-densepose-sensing-server -- \
     --http-port 9000 \
@@ -397,6 +401,13 @@ cargo run -p wifi-densepose-sensing-server --bin sensing-server -- \
   --mmwave-token-env MMWAVE_NODE_TOKEN \
   --position-setup ../data/position-setup-v2.json
 ```
+
+The server also listens on UDP `5011` for authenticated mmWave collector
+discovery. `--mmwave-node-url` remains useful for read-only diagnostics and
+control, but it is not required for the UDP target handshake. The ESP32 node
+must use the same bearer token as `MMWAVE_NODE_TOKEN`. With the Mac's WLAN
+IPv4 configuration set to DHCP once, the node can learn a changed Mac address
+automatically and persist it without a manual `/transport` update.
 
 The setup must use schema version 2 and seal the node ID, firmware artifact,
 mounting revision, and room-coordinate transform. Transform changes are

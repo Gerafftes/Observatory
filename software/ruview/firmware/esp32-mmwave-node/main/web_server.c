@@ -61,7 +61,9 @@ static esp_err_t status_handler(httpd_req_t *request)
         "\"mode\":\"%s\",\"uart\":{\"rx_gpio\":20,\"tx_gpio\":21,"
         "\"baud\":256000},\"diagnostics\":{"
         "\"uart_bytes_received\":%llu,\"radar_frames_valid\":%llu,"
-        "\"udp_packets_sent\":%llu,\"udp_send_failures\":%llu},"
+        "\"udp_packets_sent\":%llu,\"udp_send_failures\":%llu,"
+        "\"udp_packets_acked\":%llu,\"udp_retransmissions\":%llu,"
+        "\"udp_ack_timeouts\":%llu},"
         "\"target\":\"%s:%u\","
         "\"running_partition\":\"%s\",\"next_partition\":\"%s\","
         "\"ota_authenticated\":%s,"
@@ -72,6 +74,9 @@ static esp_err_t status_handler(httpd_req_t *request)
         (unsigned long long)diagnostics.radar_frames_valid,
         (unsigned long long)diagnostics.udp_packets_sent,
         (unsigned long long)diagnostics.udp_send_failures,
+        (unsigned long long)diagnostics.udp_packets_acked,
+        (unsigned long long)diagnostics.udp_retransmissions,
+        (unsigned long long)diagnostics.udp_ack_timeouts,
         config.target_host, config.target_port,
         running ? running->label : "unknown", next ? next->label : "none",
         config.ota_psk[0] != '\0' ? "true" : "false",

@@ -491,6 +491,7 @@ const sourceTab = new SensingTab({
   },
 });
 const previousDataSource = sensingService._dataSource;
+const previousServerSource = sensingService._serverSource;
 try {
   sensingService._dataSource = 'server-offline';
   sourceTab._latestMmwaveStatus = {
@@ -504,6 +505,17 @@ try {
   assert.equal(sourceBanner.className, 'sensing-source-banner sensing-source-mixed');
 } finally {
   sensingService._dataSource = previousDataSource;
+}
+
+try {
+  sensingService._applyServerSource('wifi:CSI-LAB');
+  assert.equal(sensingService.dataSource, 'live');
+  sensingService._applyServerSource('untrusted-source');
+  assert.equal(sensingService.dataSource, 'server-offline');
+  assert.equal(typeof sensingService._generateSimulatedData, 'undefined');
+} finally {
+  sensingService._dataSource = previousDataSource;
+  sensingService._serverSource = previousServerSource;
 }
 
 let rendererInvalidationState = null;

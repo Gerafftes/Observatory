@@ -5,6 +5,11 @@
 **Orchestrator:** QE Queen Coordinator (ADR-001)  
 **Domains Activated:** test-generation, coverage-analysis, quality-assessment, security-compliance, defect-intelligence  
 
+> **Historical report note (2026-09-18).** This report predates retirement of
+> the `wifi-densepose-desktop` crate. Desktop rows and release-file counts are
+> historical inventory, not current source, package or release claims. Use the
+> active Cargo workspace and browser/helper documentation for current status.
+
 ---
 
 ## 1. Project Scope and Quality Posture Overview

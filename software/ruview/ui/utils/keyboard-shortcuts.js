@@ -17,11 +17,8 @@ export class KeyboardShortcuts {
     this.register('1', 'Switch to Dashboard tab', () => this.switchTab('dashboard'));
     this.register('2', 'Switch to Hardware tab', () => this.switchTab('hardware'));
     this.register('3', 'Switch to Live Demo tab', () => this.switchTab('demo'));
-    this.register('4', 'Switch to Architecture tab', () => this.switchTab('architecture'));
-    this.register('5', 'Switch to Performance tab', () => this.switchTab('performance'));
-    this.register('6', 'Switch to Applications tab', () => this.switchTab('applications'));
-    this.register('7', 'Switch to Sensing tab', () => this.switchTab('sensing'));
-    this.register('8', 'Switch to Training tab', () => this.switchTab('training'));
+    this.register('4', 'Switch to Sensing tab', () => this.switchTab('sensing'));
+    this.register('5', 'Switch to Training tab', () => this.switchTab('training'));
     this.register('p', 'Toggle performance monitor', () => this.togglePerfMonitor());
     this.register('t', 'Toggle dark/light theme', () => this.toggleTheme());
   }
@@ -98,7 +95,7 @@ export class KeyboardShortcuts {
       {
         title: 'Navigation',
         items: Array.from(this.shortcuts.entries())
-          .filter(([key]) => /^[1-8]$/.test(key))
+          .filter(([key]) => /^[1-5]$/.test(key))
       },
       {
         title: 'Actions',
@@ -108,7 +105,7 @@ export class KeyboardShortcuts {
       {
         title: 'General',
         items: Array.from(this.shortcuts.entries())
-          .filter(([key]) => !/^[1-8a-z]$/.test(key))
+          .filter(([key]) => !/^[1-5a-z]$/.test(key))
       }
     ];
 

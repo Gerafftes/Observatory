@@ -1,8 +1,13 @@
 # ADR-178: `wifi-densepose-desktop` IPC Injection Fix + Capability Least-Privilege
 
+> **Historical security record — retired 2026-09-18.** This review covers the
+> former Tauri desktop crate. The reviewed crate and its IPC surface were
+> removed from the active workspace; the findings and fixes remain here as
+> historical security evidence, not as current build or runtime instructions.
+
 | Field | Value |
 |-------|-------|
-| **Status** | Accepted — 2 real MODERATE bugs fixed + pinned (MEASURED on Windows) |
+| **Status** | Retired historical security record — 2 real MODERATE bugs fixed + pinned (MEASURED on Windows) |
 | **Date** | 2026-06-15 |
 | **Deciders** | ruv |
 | **Codename** | **DESK-LOCKDOWN** |

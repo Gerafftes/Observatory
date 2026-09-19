@@ -1,5 +1,12 @@
 # ADR-167 Appendix: DDD Bounded Contexts — Tauri Desktop Frontend
 
+> **Historical record — retired 2026-09-18.** This appendix models the former
+> Tauri desktop surface. It is retained to preserve architectural provenance,
+> but its contexts, paths and test strategy are not active implementation
+> requirements. The supported surface is the browser UI plus the loopback
+> `wifi-densepose-control` helper ([software overview](../../README.md), [UI
+> README](../../ui/README.md)).
+
 > Appendix to [ADR-052](ADR-052-tauri-desktop-frontend.md). Renumbered from ADR-052
 > to ADR-167 to resolve the ADR-052 duplicate-number collision (per ADR-164 Gap Register
 > G1); the parent decision remains ADR-052.

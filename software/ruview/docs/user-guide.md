@@ -77,7 +77,9 @@ WiFi DensePose turns commodity WiFi signals into real-time human pose estimation
 | Intel 5300 / Atheros AR9580 | $50-100 | Full CSI with 3x3 MIMO (Linux only) |
 | Any WiFi laptop | $0 | RSSI-only: coarse presence and motion detection |
 
-No hardware? The system runs in **simulated mode** with synthetic CSI data.
+No hardware? The default `auto` mode stays **offline** until a real source is
+available. Use `CSI_SOURCE=simulated` (or `--source simulated`) only for an
+explicit synthetic demo.
 
 ---
 
@@ -97,7 +99,7 @@ Multi-architecture image (amd64 + arm64). Works on Intel/AMD and Apple Silicon M
 
 | Value | Description |
 |-------|-------------|
-| `auto` | (default) Probe for ESP32 on UDP 5005, fall back to simulation |
+| `auto` | (default) Probe for live sources and stay offline until real data arrives |
 | `esp32` | Receive real CSI frames from ESP32 devices over UDP |
 | `simulated` | Generate synthetic CSI frames (no hardware required) |
 | `wifi` | Host Wi-Fi RSSI (not available inside containers) |
@@ -106,19 +108,18 @@ Example: `docker run -e CSI_SOURCE=esp32 -p 3000:3000 -p 5005:5005/udp ruvnet/wi
 
 ### From Source (Rust)
 
-On Debian/Ubuntu-based Linux systems, install the native desktop prerequisites before the first Rust release build:
+On Debian/Ubuntu-based Linux systems, install the Rust, serial and TLS build
+dependencies before the first release build:
 
 ```bash
 sudo apt update
 sudo apt install -y \
   build-essential pkg-config \
-  libglib2.0-dev libgtk-3-dev \
-  libsoup-3.0-dev \
-  libjavascriptcoregtk-4.1-dev \
-  libwebkit2gtk-4.1-dev
+  libudev-dev libssl-dev
 ```
 
-This prepares the native GTK/WebKit dependencies used by the desktop/Tauri crates in this workspace.
+These are the native dependencies used by the current sensing-server and local
+control-helper workspace.
 
 ```bash
 git clone https://github.com/ruvnet/RuView.git
@@ -312,12 +313,12 @@ The `--source` flag controls where CSI data comes from.
 
 ### Simulated Mode (No Hardware)
 
-Default in Docker. Generates synthetic CSI data exercising the full pipeline.
+Explicit demo mode only. Generates synthetic CSI data exercising the full
+pipeline; it is never selected implicitly by `auto`.
 
 ```bash
 # Docker
-docker run -p 3000:3000 ruvnet/wifi-densepose:latest
-# (--source auto is the default; falls back to simulate when no hardware detected)
+docker run -e CSI_SOURCE=simulated -p 3000:3000 ruvnet/wifi-densepose:latest
 
 # From source
 ./target/release/sensing-server --source simulate --http-port 3000 --ws-port 3001
@@ -1090,7 +1091,7 @@ The Rust sensing server binary accepts the following flags:
 
 | Flag | Default | Description |
 |------|---------|-------------|
-| `--source` | `auto` | Data source: `auto`, `simulate`, `wifi`, `esp32` |
+| `--source` | `auto` | Data source: `auto`, `wifi`, `esp32`, or explicit `simulated` demo |
 | `--http-port` | `8080` | HTTP port for REST API and UI |
 | `--ws-port` | `8765` | WebSocket port |
 | `--udp-port` | `5005` | UDP port for ESP32 CSI frames |
@@ -2387,18 +2388,16 @@ rustup update stable
 rustc --version
 ```
 
-### Build: Linux native desktop prerequisites
+### Build: Linux native dependencies
 
-If you are compiling the Rust workspace on a Debian/Ubuntu-based Linux system, install the native desktop development packages first:
+If you are compiling the Rust workspace on a Debian/Ubuntu-based Linux system,
+install the Rust, serial and TLS development packages first:
 
 ```bash
 sudo apt update
 sudo apt install -y \
   build-essential pkg-config \
-  libglib2.0-dev libgtk-3-dev \
-  libsoup-3.0-dev \
-  libjavascriptcoregtk-4.1-dev \
-  libwebkit2gtk-4.1-dev
+  libudev-dev libssl-dev
 ```
 
 Then rerun:
@@ -2407,7 +2406,9 @@ Then rerun:
 cargo build --release
 ```
 
-This is the same Linux pre-step referenced in the Rust source build section and covers the common GTK/WebKit `pkg-config` requirements used by the desktop build.
+This is the same Linux pre-step referenced in the Rust source build section and
+covers the current serial/TLS `pkg-config` requirements; no desktop/Tauri
+runtime is required.
 
 ### Windows: RSSI mode shows no data
 

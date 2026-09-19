@@ -1,7 +1,7 @@
 // RuView Service Worker - Offline caching for the dashboard shell
 // Strategy: Network-first with cache fallback so local UI updates are visible.
 
-const CACHE_NAME = 'ruview-v6-mmwave-placement-ui';
+const CACHE_NAME = 'ruview-v10-browser-shell';
 const scopeUrl = self.registration.scope;
 const SHELL_ASSETS = [
   '',
@@ -12,6 +12,8 @@ const SHELL_ASSETS = [
   'components/TabManager.js',
   'components/DashboardTab.js',
   'components/HardwareTab.js',
+  'components/LocalControlPanel.js',
+  'components/ServerControlPanel.js',
   'components/LiveDemoTab.js',
   'components/SensingTab.js',
   'components/ObservatoryControlCenter.js',
@@ -24,6 +26,8 @@ const SHELL_ASSETS = [
   'services/websocket.service.js',
   'services/health.service.js',
   'services/sensing.service.js',
+  'services/server-control.service.js',
+  'services/control-helper.service.js',
   'services/ws-auth.js',
   'utils/auth-controls.js',
   'services/pose.service.js',

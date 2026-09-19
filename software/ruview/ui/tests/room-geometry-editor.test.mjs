@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import test from 'node:test';
 
 import {
@@ -20,6 +21,26 @@ import {
   wallPairDistance,
 } from '../components/RoomGeometryEditor.js';
 import { defaultSetupProfileDocument } from '../components/ObservatoryControlCenter.js';
+
+test('CAD room-size title does not capture clicks intended for markers behind it', () => {
+  const stylesheet = readFileSync(new URL('../style.css', import.meta.url), 'utf8');
+
+  assert.match(stylesheet, /\.occ-cad-room-title\s*\{[^}]*pointer-events:\s*none/);
+});
+
+test('CAD room dimensions are a title above the X axis label', () => {
+  const container = { innerHTML: '' };
+  const editor = new RoomGeometryEditor(container, {
+    document: defaultSetupProfileDocument(),
+    setupSource: 'sqlite',
+  });
+
+  editor.render();
+
+  assert.match(container.innerHTML, /<text class="occ-cad-room-title"[^>]*>RAUM · 4\.02 × 3\.44 m · H 2\.59 m<\/text>/);
+  assert.match(container.innerHTML, /<text class="occ-cad-setup-source is-sqlite"[^>]*>SQLITE-SETUP GELADEN<\/text>/);
+  assert.ok(container.innerHTML.indexOf('occ-cad-room-title') < container.innerHTML.indexOf('X \/ LÄNGE \(m\)'));
+});
 
 test('CAD geometry editor exposes TX, all four RX markers, and the mmWave mount', () => {
   const profile = defaultSetupProfileDocument();
@@ -131,6 +152,59 @@ test('CAD view renders an editable mmWave marker, view cone, and orientation ins
   assert.match(container.innerHTML, /data-cad-mmwave-yaw/);
   assert.match(container.innerHTML, /data-cad-mmwave-raw-x/);
   assert.match(container.innerHTML, /120° Sichtfeld/);
+});
+
+test('CAD view renders optional floor markers for every TX/RX calibration standpoint', () => {
+  const container = { innerHTML: '' };
+  const editor = new RoomGeometryEditor(container, { document: defaultSetupProfileDocument() });
+
+  editor.render();
+
+  assert.match(container.innerHTML, /·K = Kalibrierstandpunkt/);
+  assert.match(container.innerHTML, /data-calibration-id="RX1_CALIBRATION"/);
+  assert.match(container.innerHTML, /occ-cad-marker-calibration/);
+  assert.match(container.innerHTML, /is-fallback/);
+});
+
+test('CAD calibration floor markers keep explicit positions separate from device positions', () => {
+  const profile = defaultSetupProfileDocument();
+  profile.receivers[0].calibration_position_m = [1.25, 0, 2.75];
+  const container = { innerHTML: '' };
+  const editor = new RoomGeometryEditor(container, { document: profile, selectedIds: ['RX1_CALIBRATION'] });
+
+  editor.render();
+
+  const marker = container.innerHTML.match(/<g class="[^"]*occ-cad-marker-calibration[^"]*"\s+data-calibration-handle data-calibration-id="RX1_CALIBRATION"[^>]*>/)?.[0];
+  assert.ok(marker);
+  assert.doesNotMatch(marker, /is-fallback/);
+  assert.match(container.innerHTML, /RX1 · optionaler Ground Truth/);
+  assert.match(container.innerHTML, /Geräteposition wieder als Fallback verwenden/);
+  assert.match(container.innerHTML, /value="1\.25"/);
+});
+
+test('CAD coordinate editing writes a calibration position without moving the receiver', () => {
+  const profile = defaultSetupProfileDocument();
+  const container = { innerHTML: '' };
+  let changed = null;
+  const editor = new RoomGeometryEditor(container, {
+    document: profile,
+    selectedIds: ['RX1_CALIBRATION'],
+    onChange: (document) => { changed = document; },
+  });
+
+  editor._handleFormChange({
+    target: {
+      value: '1.23',
+      closest(selector) {
+        return selector === '[data-cad-coordinate]'
+          ? { dataset: { cadCoordinate: 'RX1_CALIBRATION.0' } }
+          : null;
+      },
+    },
+  });
+
+  assert.deepEqual(changed.receivers[0].position_m, profile.receivers[0].position_m);
+  assert.deepEqual(changed.receivers[0].calibration_position_m, [1.23, 0.5, 0.28]);
 });
 
 test('CAD view shows the setup-bound calibrated yaw without overwriting the base angle', () => {
@@ -373,6 +447,16 @@ test('CAD geometry validation rejects out-of-room and duplicate receiver positio
   assert.equal(validation.valid, false);
   assert.match(validation.errors.join(' '), /TX: Außenradius/);
   assert.match(validation.errors.join(' '), /RX-Positionen müssen eindeutig sein/);
+});
+
+test('CAD geometry validation rejects an explicit calibration standpoint outside the room', () => {
+  const profile = defaultSetupProfileDocument();
+  profile.transmitter.calibration_position_m = [profile.room_dimensions_m[0] + 0.01, 0, 1];
+
+  const validation = validateGeometryDraft(profile);
+
+  assert.equal(validation.valid, false);
+  assert.match(validation.errors.join(' '), /TX Kalibrierstandpunkt: Position liegt außerhalb des Raums/);
 });
 
 test('CAD geometry allows horizontal exterior mounts only within the configured radius', () => {

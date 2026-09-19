@@ -1,7 +1,14 @@
 # ADR-055: Integrated Sensing Server in Desktop App
 
+> **Historical record — retired 2026-09-18.** This ADR describes bundling the
+> sensing server into the former desktop app. That packaging path was removed
+> and is not a current distribution requirement. Keep this document for
+> provenance only. The supported surface is the browser UI plus the loopback
+> `wifi-densepose-control` helper ([software overview](../../README.md), [UI
+> README](../../ui/README.md)).
+
 ## Status
-Accepted
+Retired — desktop packaging path removed on 2026-09-18
 
 ## Context
 The RuView Desktop application (ADR-054) requires the WiFi sensing server to provide real-time CSI data, activity detection, and vital signs monitoring. Currently, the sensing server is a separate binary (`wifi-densepose-sensing-server`) that must be installed separately and found in the system PATH.

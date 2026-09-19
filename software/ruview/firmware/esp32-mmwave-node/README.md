@@ -92,19 +92,31 @@ the firmware. The transport is plain HTTP on
 the isolated experiment LAN; do not expose port 8032 to the internet.
 
 The read-only status includes cumulative `uart_bytes_received`,
-`radar_frames_valid`, `udp_packets_sent`, and `udp_send_failures` counters. They
-separate an idle or incorrectly wired UART from parser failures and UDP delivery
-problems without changing the measurement packet schema.
+`radar_frames_valid`, `udp_packets_sent`, `udp_send_failures`,
+`udp_packets_acked`, `udp_retransmissions`, and `udp_ack_timeouts` counters.
+They separate an idle or incorrectly wired UART, local `sendto()` failures, and
+loss after local queueing without changing the measurement packet schema.
 
-The default stream interval is 50 ms and one UDP copy per radar frame. The
-LD2450 itself normally reports at 10 Hz, so this interval is only an upper
-bound and cannot create additional radar measurements. WiFi
-modem sleep is disabled by default for the mains-powered node so DTIM wake-ups
-do not add receive latency. All three choices are configurable in **RuView
-mmWave node**. Redundant copies should only be enabled for a demonstrably
-lossy WLAN because they consume airtime and are deduplicated by the server.
+The default stream interval is 50 ms. The LD2450 itself normally reports at
+10 Hz, so this interval is only an upper bound and cannot create additional
+radar measurements. WiFi modem sleep is disabled by default for the
+mains-powered node so DTIM wake-ups do not add receive latency. Each packet is
+acknowledged by the collector; an unacknowledged packet is retried with the
+same boot ID and sequence up to eight times with a 50 ms timeout. The server
+deduplicates a retransmission if only the ACK was lost. The attempt limit and
+timeout are configurable in **RuView mmWave node**.
 The server can use the authenticated `/transport` endpoint to repair a changed
 collector IP/port and persists that target in NVS.
+
+The node also keeps its WiFi interface in the normal DHCP-client mode. While
+radar frames are streaming it broadcasts an authenticated collector-discovery
+request on UDP port `5011` every two seconds. A RuView sensing server answers
+with the current collector address and UDP port, authenticated with the same
+OTA token. The node accepts the answer only for its own node ID and outstanding
+nonce, then persists the new target in NVS. This means the Mac can stay on
+DHCP: its address may change without manually editing the node target. The
+discovery listener is enabled when the server has `MMWAVE_NODE_TOKEN`
+configured; it is deliberately disabled without the shared secret.
 
 Disabling modem sleep increases power consumption. If it is re-enabled for a
 battery deployment, expect the access point's DTIM/listen interval to become a
