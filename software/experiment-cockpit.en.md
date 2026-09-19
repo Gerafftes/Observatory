@@ -11,7 +11,7 @@ The assistant guides the operator through connection, alignment, coverage,
 zones, training, blind testing, and results. The screenshot shows the tested
 `Server unreachable` error state with HTTP 502, not a connected radar capture.
 
-<img src="../images/ui/mmwave-calibration-server-unreachable.png" alt="Seven-step mmWave calibration assistant showing an unreachable server and HTTP 502 status" width="900">
+<img src="../project-media/ui/mmwave-calibration-server-unreachable.png" alt="Seven-step mmWave calibration assistant showing an unreachable server and HTTP 502 status" width="900">
 
 ## Experiment cockpit
 
@@ -19,11 +19,11 @@ The cockpit keeps the setup profile, WiFi workflow, recordings, and the
 separate mmWave reference visible in one place. The screenshots come from a
 simulated run with no sensors connected.
 
-<img src="../images/ui/experiment-cockpit-setup.png" alt="Experiment cockpit with setup profile, status overview, and simulated hardware state" width="900">
+<img src="../project-media/ui/experiment-cockpit-setup.png" alt="Experiment cockpit with setup profile, status overview, and simulated hardware state" width="900">
 
-<img src="../images/ui/experiment-cockpit-guide.png" alt="Experiment cockpit showing room, TX, and RX positions while the mmWave reference waits" width="900">
+<img src="../project-media/ui/experiment-cockpit-guide.png" alt="Experiment cockpit showing room, TX, and RX positions while the mmWave reference waits" width="900">
 
-<img src="../images/ui/experiment-cockpit-workflow-guide.png" alt="Experiment cockpit workflow guide with ten locked or ready phases" width="900">
+<img src="../project-media/ui/experiment-cockpit-workflow-guide.png" alt="Experiment cockpit workflow guide with ten locked or ready phases" width="900">
 
 ## Short guide
 

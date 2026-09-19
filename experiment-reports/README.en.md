@@ -8,7 +8,7 @@ associated figures, tables, and rendering notes.
 
 ## Source of truth
 
-`results/` is the only current source for result evidence.
+`experiment-reports/` is the only current source for result evidence.
 `software/ruview/results/` remains a historical software snapshot. It is not
 synchronized automatically and is not interpreted as a newer measurement.
 

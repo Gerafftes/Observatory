@@ -10,7 +10,7 @@ Befestigungsteile und die zusätzlichen mmWave-Bauteile.
 
 - [Breadboard-Body.stl](Breadboard-Body.stl) — CAD-Datei für den Breadboard-Körper
 
-<img src="../../images/mmwave-breadboard-setup.jpeg" alt="Vorläufiger Breadboard-Aufbau mit HLK-LD2450 und ESP32-C3" width="700">
+<img src="../../project-media/mmwave-breadboard-setup.jpeg" alt="Vorläufiger Breadboard-Aufbau mit HLK-LD2450 und ESP32-C3" width="700">
 
 Das Foto dokumentiert den provisorischen Aufbau mit HLK-LD2450 und ESP32-C3.
 Die Druckorientierung, das Material und die Passprobe sind noch nicht

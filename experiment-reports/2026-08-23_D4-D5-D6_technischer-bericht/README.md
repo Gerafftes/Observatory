@@ -199,8 +199,8 @@ Nächste Reihenfolge ohne Schwellenwertänderung:
 
 ## Reproduzierbarkeit und Quellen
 
-- Daten-/Legacy-Abbildungs-Generator: [`scripts/build_d4_d5_d6_results.py`](../../scripts/build_d4_d5_d6_results.py)
-- D5-Replayer: [`scripts/evaluate_d5_replay.py`](../../scripts/evaluate_d5_replay.py)
+- Daten-/Legacy-Abbildungs-Generator: [`project_tools/build_d4_d5_d6_results.py`](../../project_tools/build_d4_d5_d6_results.py)
+- D5-Replayer: [`project_tools/evaluate_d5_replay.py`](../../project_tools/evaluate_d5_replay.py)
 - Laufübersicht: [`data/laufuebersicht.csv`](data/laufuebersicht.csv)
 - D4-RX-Diagnostik: [`data/d4-rx-diagnostik.csv`](data/d4-rx-diagnostik.csv)
 - Diagrammvertrag und QA: [`chart-map.md`](chart-map.md)

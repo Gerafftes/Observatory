@@ -457,7 +457,7 @@ ohne vorher einen noch gar nicht existierenden realen Index zu benötigen.
 Für reale Aufnahmen existiert jetzt ein kontrollierter Runner:
 
 ```text
-python3 scripts/capture_position_run.py \
+python3 project_tools/capture_position_run.py \
   --kind <discovery|preflight|empty|position> \
   --recording-id <NEUTRALE_ID>
 ```
@@ -1021,7 +1021,7 @@ kaschiert. Dann werden die Fehler nach Punkt, RX und Merkmal ausgewertet.
   binding-aware 25-Sekunden-Preflight ausführen
 
 Detailnachweis:
-[results/2026-08-09_D6_setupaufnahme-und-tx-firmwareidentitaet/README.md](results/2026-08-09_D6_setupaufnahme-und-tx-firmwareidentitaet/README.md)
+[experiment-reports/2026-08-09_D6_setupaufnahme-und-tx-firmwareidentitaet/README.md](experiment-reports/2026-08-09_D6_setupaufnahme-und-tx-firmwareidentitaet/README.md)
 
 ### 2026-08-09 — Setup-Siegel und versiegelter Preflight bestanden
 
@@ -1058,7 +1058,7 @@ Detailnachweis:
   Bestätigung `Raum leer`
 
 Detailnachweis:
-[results/2026-08-09_D6_setup-siegel-und-preflight/README.md](results/2026-08-09_D6_setup-siegel-und-preflight/README.md)
+[experiment-reports/2026-08-09_D6_setup-siegel-und-preflight/README.md](experiment-reports/2026-08-09_D6_setup-siegel-und-preflight/README.md)
 
 ### 2026-08-09 — Sidecar-Fix, Neusiegelung und neuer Preflight
 
@@ -1082,7 +1082,7 @@ Detailnachweis:
   Bestätigung, dass der Raum vollständig ohne Person bleibt
 
 Detailnachweis:
-[results/2026-08-09_D6_sidecar-fix-neusiegelung-und-preflight/README.md](results/2026-08-09_D6_sidecar-fix-neusiegelung-und-preflight/README.md)
+[experiment-reports/2026-08-09_D6_sidecar-fix-neusiegelung-und-preflight/README.md](experiment-reports/2026-08-09_D6_sidecar-fix-neusiegelung-und-preflight/README.md)
 
 ### 2026-08-09 — Neue 65-Sekunden-Leerraumkalibrierung bestanden
 
