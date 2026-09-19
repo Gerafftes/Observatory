@@ -5,6 +5,7 @@ idf_component_register(
         "coordinate_transform.c"
         "ld2450_parser.c"
         "measurement_stream.c"
+        "mmwave_discovery.c"
         "node_diagnostics.c"
         "web_server.c"
     INCLUDE_DIRS "."
@@ -20,5 +21,6 @@ idf_component_register(
         esp_timer
         esp_wifi
         lwip
+        mbedtls
         nvs_flash
 )

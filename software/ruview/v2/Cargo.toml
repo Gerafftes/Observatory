@@ -10,7 +10,7 @@ members = [
     # functionality they would provide is covered today by:
     #   - REST/WS: `wifi-densepose-sensing-server` (Axum)
     #   - Config:  per-crate config + CLI args in `wifi-densepose-sensing-server`
-    #             and `wifi-densepose-desktop`
+    #             and `wifi-densepose-control`
     #   - DB:      no persistent state; system is real-time
     # If we ever need any of these as a published surface, they can be
     # reintroduced with a real implementation.
@@ -23,7 +23,7 @@ members = [
     "crates/wifi-densepose-wifiscan",
     "crates/wifi-densepose-vitals",
     "crates/wifi-densepose-ruvector",
-    "crates/wifi-densepose-desktop",
+    "crates/wifi-densepose-control",
     "crates/wifi-densepose-pointcloud",
     # geo + worldgraph extracted to ruvnet/worldgraph submodule (see crates/worldgraph)
     "crates/wifi-densepose-engine",      # ADR-135..146 integration/composition layer

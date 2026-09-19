@@ -14,6 +14,11 @@ import {
 import { mmwaveStatusSummary, ObservatoryControlCenter } from './ObservatoryControlCenter.js';
 import { MmwaveCalibrationAssistant } from './MmwaveCalibrationAssistant.js';
 import { MmwaveDebugView, MMWAVE_STATUS_ENDPOINT } from './MmwaveDebugView.js';
+import { ServerControlPanel } from './ServerControlPanel.js';
+
+function finiteNumber(value) {
+  return typeof value === 'number' && Number.isFinite(value) ? value : null;
+}
 
 export class SensingTab {
   /** @param {HTMLElement} container - the #sensing section element */
@@ -32,6 +37,7 @@ export class SensingTab {
     this.controlCenter = null;
     this.mmwaveAssistant = null;
     this.mmwaveDebugView = null;
+    this.serverControlPanel = null;
     this._mmwaveStatusTimer = null;
     this._mmwaveStatusPollInFlight = false;
     this._mmwaveStatusPollGeneration = 0;
@@ -90,6 +96,8 @@ export class SensingTab {
         VERBINDE …
       </div>
 
+      <div id="sensingServerControl"></div>
+
       <div id="observatoryControlCenter"></div>
 
       <div id="mmwaveCalibrationAssistant"></div>
@@ -126,22 +134,22 @@ export class SensingTab {
               <div class="sensing-meter">
                 <label>Variance</label>
                 <div class="sensing-bar"><div class="sensing-bar-fill" id="barVariance"></div></div>
-                <span class="sensing-meter-val" id="valVariance">0</span>
+                <span class="sensing-meter-val" id="valVariance">--</span>
               </div>
               <div class="sensing-meter">
                 <label>Bewegung</label>
                 <div class="sensing-bar"><div class="sensing-bar-fill motion" id="barMotion"></div></div>
-                <span class="sensing-meter-val" id="valMotion">0</span>
+                <span class="sensing-meter-val" id="valMotion">--</span>
               </div>
               <div class="sensing-meter">
                 <label>Atmung</label>
                 <div class="sensing-bar"><div class="sensing-bar-fill breath" id="barBreath"></div></div>
-                <span class="sensing-meter-val" id="valBreath">0</span>
+                <span class="sensing-meter-val" id="valBreath">--</span>
               </div>
               <div class="sensing-meter">
                 <label>Spektrum</label>
                 <div class="sensing-bar"><div class="sensing-bar-fill spectral" id="barSpectral"></div></div>
-                <span class="sensing-meter-val" id="valSpectral">0</span>
+                <span class="sensing-meter-val" id="valSpectral">--</span>
               </div>
             </div>
           </div>
@@ -150,11 +158,11 @@ export class SensingTab {
           <div class="sensing-card">
             <div class="sensing-card-title">Classification</div>
             <div class="sensing-classification" id="sensingClassification">
-              <div class="sensing-class-label" id="classLabel">ABSENT</div>
+              <div class="sensing-class-label unknown" id="classLabel">UNKNOWN</div>
               <div class="sensing-confidence">
                 <label>Confidence</label>
                 <div class="sensing-bar"><div class="sensing-bar-fill confidence" id="barConfidence"></div></div>
-                <span class="sensing-meter-val" id="valConfidence">0%</span>
+                <span class="sensing-meter-val" id="valConfidence">--</span>
               </div>
             </div>
           </div>
@@ -182,9 +190,9 @@ export class SensingTab {
           <div class="sensing-card">
             <div class="sensing-card-title">Daten</div>
             <p class="sensing-about-text">
-              CSI von <strong><span id="sensingNodeCount">0</span> ESP32</strong>: Präsenz, Atmung und Bewegung.
-              Die Körperwolke erscheint nur bei geprüfter Position. Das Farbfeld zeigt Linkaktivität,
-              keine Personenposition.
+              Empfangene CSI-Frames und Feature-Werte werden nur bei einer gültigen
+              Datenquelle angezeigt. Das Farbfeld zeigt Linkaktivität, keine
+              Personenposition.
             </p>
           </div>
 
@@ -199,13 +207,13 @@ export class SensingTab {
             <div class="sensing-card-title">Details</div>
             <div class="sensing-details">
               <div class="sensing-detail-row">
-                <span>Frequenz</span><span id="valDomFreq">0 Hz</span>
+                <span>Frequenz</span><span id="valDomFreq">--</span>
               </div>
               <div class="sensing-detail-row">
-                <span>Sprünge</span><span id="valChangePoints">0</span>
+                <span>Sprünge</span><span id="valChangePoints">--</span>
               </div>
               <div class="sensing-detail-row">
-                <span>Rate</span><span id="valSampleRate">--</span>
+                <span>Quelle</span><span id="valSampleRate">--</span>
               </div>
             </div>
           </div>
@@ -225,6 +233,16 @@ export class SensingTab {
       () => this.controlCenter.calibrationContextRequest(),
     );
     this.mmwaveAssistant.mount();
+
+    this.serverControlPanel = new ServerControlPanel(
+      this.container.querySelector('#sensingServerControl'),
+      {
+        onServerAction: (action) => ['start', 'restart'].includes(action)
+          ? this.controlCenter?.refreshAfterServerStart()
+          : undefined,
+      },
+    );
+    this.serverControlPanel.mount();
   }
 
   // ---- Three.js loading --------------------------------------------------
@@ -312,7 +330,6 @@ export class SensingTab {
       'server-simulated':  { text: 'SIMULATION · SERVER', cls: 'sensing-source-server-sim' },
       'server-offline':    { text: 'WIFI/CSI OFFLINE', cls: 'sensing-source-offline' },
       'reconnecting':      { text: 'VERBINDE …', cls: 'sensing-source-reconnecting' },
-      'simulated':         { text: 'OFFLINE · SIMULATION', cls: 'sensing-source-simulated' },
     };
     let cfg = bannerConfig[dataSource] || bannerConfig.reconnecting;
     if (dataSource === 'server-offline') {
@@ -337,7 +354,6 @@ export class SensingTab {
         connecting:   'Verbinde …',
         connected:    'Verbunden',
         reconnecting: 'Verbinde …',
-        simulated:    'Simulation',
       };
       dot.className = 'sensing-dot ' + state;
       text.textContent = stateLabels[state] || state;
@@ -345,7 +361,10 @@ export class SensingTab {
 
     this._updateSourceBanner?.();
 
-    if (['disconnected', 'connecting', 'reconnecting'].includes(state)) {
+    if (
+      ['disconnected', 'connecting', 'reconnecting'].includes(state) ||
+      sensingService.dataSource === 'server-offline'
+    ) {
       this._invalidateLiveReadout();
     }
     this.mmwaveDebugView?.setConnectionState(state);
@@ -403,12 +422,15 @@ export class SensingTab {
 
     this._setText('sensingRssi', '-- dBm');
     this._setText('sensingSource', '');
-    this._setText('sensingNodeCount', '0');
+    this._setText('sensingNodeCount', '--');
     this._setBar('barVariance', 0, 1, 'valVariance', '--');
     this._setBar('barMotion', 0, 1, 'valMotion', '--');
     this._setBar('barBreath', 0, 1, 'valBreath', '--');
     this._setBar('barSpectral', 0, 1, 'valSpectral', '--');
-    this._setBar('barConfidence', 0, 1, 'valConfidence', '0%');
+    this._setBar('barConfidence', null, 1, 'valConfidence', '--');
+    this._setText('valDomFreq', '--');
+    this._setText('valChangePoints', '--');
+    this._setText('valSampleRate', '--');
 
     const label = this.container.querySelector('#classLabel');
     if (label) {
@@ -431,13 +453,14 @@ export class SensingTab {
     const c = data.classification || {};
 
     // Node count
-    const nodeCount = (data.nodes || []).length;
+    const nodeCount = Array.isArray(data.nodes) ? data.nodes.length : null;
     const countEl = this.container.querySelector('#sensingNodeCount');
-    if (countEl) countEl.textContent = String(nodeCount);
+    if (countEl) countEl.textContent = nodeCount == null ? '--' : String(nodeCount);
 
     // RSSI
-    this._setText('sensingRssi', `${(f.mean_rssi || -80).toFixed(1)} dBm`);
-    this._setText('sensingSource', data.source || '');
+    const meanRssi = finiteNumber(f.mean_rssi);
+    this._setText('sensingRssi', meanRssi == null ? '-- dBm' : `${meanRssi.toFixed(1)} dBm`);
+    this._setText('sensingSource', data.source || '--');
 
     // Bars (scale to 0-100%)
     this._setBar('barVariance', f.variance, 10, 'valVariance', f.variance);
@@ -448,20 +471,26 @@ export class SensingTab {
     // Classification
     const label = this.container.querySelector('#classLabel');
     if (label) {
-      const level = (c.motion_level || 'absent').toUpperCase();
+      const motionLevel = typeof c.motion_level === 'string' ? c.motion_level : 'unknown';
+      const level = motionLevel.toUpperCase();
       label.textContent = level;
-      label.className = 'sensing-class-label ' + (c.motion_level || 'absent');
+      label.className = 'sensing-class-label ' + motionLevel;
     }
 
-    const confPct = ((c.confidence || 0) * 100).toFixed(0);
-    this._setBar('barConfidence', c.confidence, 1.0, 'valConfidence', confPct + '%');
+    const confidence = finiteNumber(c.confidence);
+    const confPct = confidence == null ? '--' : `${(confidence * 100).toFixed(0)}%`;
+    this._setBar('barConfidence', confidence, 1.0, 'valConfidence', confPct);
 
     this._renderPositionEstimate(data);
 
     // Details
-    this._setText('valDomFreq', (f.dominant_freq_hz || 0).toFixed(3) + ' Hz');
-    this._setText('valChangePoints', String(f.change_points || 0));
-    const srcLabel = (data.source === 'simulated' || data.source === 'simulate') ? 'sim' : data.source || 'live';
+    const dominantFrequency = finiteNumber(f.dominant_freq_hz);
+    const changePoints = finiteNumber(f.change_points);
+    this._setText('valDomFreq', dominantFrequency == null ? '--' : `${dominantFrequency.toFixed(3)} Hz`);
+    this._setText('valChangePoints', changePoints == null ? '--' : String(changePoints));
+    const srcLabel = data.source === 'simulated' || data.source === 'simulate'
+      ? 'server-simulated'
+      : data.source || '--';
     this._setText('valSampleRate', srcLabel);
 
     // Sparkline
@@ -501,14 +530,25 @@ export class SensingTab {
   }
 
   _setBar(barId, value, maxVal, valId, displayVal) {
+    const numericValue = finiteNumber(value);
     const bar = this.container.querySelector('#' + barId);
     if (bar) {
-      const pct = Math.min(100, Math.max(0, ((value || 0) / maxVal) * 100));
+      const pct = numericValue == null
+        ? 0
+        : Math.min(100, Math.max(0, (numericValue / maxVal) * 100));
       bar.style.width = pct + '%';
     }
-    if (valId && displayVal != null) {
+    if (valId) {
       const el = this.container.querySelector('#' + valId);
-      if (el) el.textContent = typeof displayVal === 'number' ? displayVal.toFixed(3) : displayVal;
+      if (el) {
+        if (numericValue == null) {
+          el.textContent = '--';
+        } else if (typeof displayVal === 'number') {
+          el.textContent = displayVal.toFixed(3);
+        } else {
+          el.textContent = displayVal ?? '--';
+        }
+      }
     }
   }
 
@@ -557,7 +597,9 @@ export class SensingTab {
     const NODE_COLORS = ['#00ccff', '#ff6600', '#00ff88', '#ff00cc', '#ffcc00', '#8800ff', '#00ffcc', '#ff0044'];
     container.textContent = '';
     for (const nf of nodeFeatures) {
-      const color = NODE_COLORS[nf.node_id % NODE_COLORS.length];
+      const nodeId = nf.node_id;
+      const nodeIndex = Number(nodeId);
+      const color = NODE_COLORS[Number.isFinite(nodeIndex) ? nodeIndex % NODE_COLORS.length : 0];
       const statusColor = nf.stale ? '#888' : '#0f0';
 
       const row = document.createElement('div');
@@ -576,19 +618,24 @@ export class SensingTab {
 
       const metricsCol = document.createElement('div');
       metricsCol.style.cssText = 'flex:1;font-size:10px;color:#aaa;';
+      const rssi = finiteNumber(nf.rssi_dbm);
+      const variance = finiteNumber(nf.features?.variance);
       const d6Ratio = Number(nf.d6_fingerprint?.anomaly_ratio);
       const d6Text = Number.isFinite(d6Ratio) ? ` · D6 ${d6Ratio.toFixed(2)}×` : ' · D6 --';
-      metricsCol.textContent =
-        (nf.rssi_dbm || -80).toFixed(0) +
-        ' dBm · var ' +
-        (nf.features?.variance || 0).toFixed(1) +
-        d6Text;
+      metricsCol.textContent = [
+        rssi == null ? 'RSSI --' : `${rssi.toFixed(0)} dBm`,
+        variance == null ? 'var --' : `var ${variance.toFixed(1)}`,
+        d6Text.slice(3),
+      ].join(' · ');
 
       const classCol = document.createElement('div');
       classCol.style.cssText = 'font-size:10px;font-weight:600;color:#ccc;';
-      const motion = (nf.classification?.motion_level || 'absent').toUpperCase();
-      const conf = ((nf.classification?.confidence || 0) * 100).toFixed(0);
-      classCol.textContent = motion + ' ' + conf + '%';
+      const motion = typeof nf.classification?.motion_level === 'string'
+        ? nf.classification.motion_level.toUpperCase()
+        : 'UNKNOWN';
+      const confidence = finiteNumber(nf.classification?.confidence);
+      const conf = confidence == null ? '--' : `${(confidence * 100).toFixed(0)}%`;
+      classCol.textContent = motion + ' ' + conf;
 
       row.appendChild(idCol);
       row.appendChild(metricsCol);
@@ -649,6 +696,10 @@ export class SensingTab {
     if (this.controlCenter) {
       this.controlCenter.dispose();
       this.controlCenter = null;
+    }
+    if (this.serverControlPanel) {
+      this.serverControlPanel.dispose();
+      this.serverControlPanel = null;
     }
     if (this._serviceStarted) {
       sensingService.stop();

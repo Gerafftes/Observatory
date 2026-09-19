@@ -26,6 +26,6 @@ export function websocketProtocols(token) {
 
 export function sensingProtocols(url, token = getApiToken(url)) {
   const path = new URL(url, globalThis.location?.href).pathname;
-  return ['/ws/sensing', '/ws/introspection', '/api/v1/stream/pose'].includes(path)
+  return ['/ws/sensing', '/ws/introspection', '/ws/field', '/api/v1/stream/pose'].includes(path)
     ? websocketProtocols(token) : [];
 }

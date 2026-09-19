@@ -78,6 +78,8 @@ pub(crate) struct PositionSetupDefinition {
 #[serde(deny_unknown_fields)]
 struct TransmitterDefinition {
     position_mm: [u32; 3],
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    calibration_position_mm: Option<[u32; 3]>,
     firmware: FirmwareIdentity,
 }
 
@@ -86,6 +88,8 @@ struct TransmitterDefinition {
 struct ReceiverDefinition {
     rx_id: u8,
     position_mm: [u32; 3],
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    calibration_position_mm: Option<[u32; 3]>,
     firmware: FirmwareIdentity,
     expected_grid: ExpectedGridIdentity,
 }
@@ -217,9 +221,24 @@ impl SealedPositionSetup {
         millimetres_to_metres(self.definition.transmitter.position_mm)
     }
 
+    pub(crate) fn transmitter_calibration_position_m(&self) -> Option<[f64; 3]> {
+        self.definition
+            .transmitter
+            .calibration_position_mm
+            .map(millimetres_to_metres)
+    }
+
     pub(crate) fn receiver_positions_m(&self) -> [[f64; 3]; 4] {
         std::array::from_fn(|index| {
             millimetres_to_metres(self.definition.receivers[index].position_mm)
+        })
+    }
+
+    pub(crate) fn receiver_calibration_positions_m(&self) -> [Option<[f64; 3]>; 4] {
+        std::array::from_fn(|index| {
+            self.definition.receivers[index]
+                .calibration_position_mm
+                .map(millimetres_to_metres)
         })
     }
 
@@ -256,6 +275,16 @@ impl SealedPositionSetup {
                     .to_string(),
             );
         }
+        if optional_profile_triplet_mm(
+            transmitter.get("calibration_position_m"),
+            "transmitter.calibration_position_m",
+        )? != self.definition.transmitter.calibration_position_mm
+        {
+            return Err(
+                "setup profile transmitter calibration position does not match the active sealed setup"
+                    .to_string(),
+            );
+        }
 
         let receivers = document
             .get("receivers")
@@ -286,6 +315,16 @@ impl SealedPositionSetup {
             {
                 return Err(format!(
                     "setup profile {expected_id} position does not match the active sealed setup"
+                ));
+            }
+            let calibration_field = format!("{expected_id}.calibration_position_m");
+            if optional_profile_triplet_mm(
+                profile_receiver.get("calibration_position_m"),
+                &calibration_field,
+            )? != sealed_receiver.calibration_position_mm
+            {
+                return Err(format!(
+                    "setup profile {expected_id} calibration position does not match the active sealed setup"
                 ));
             }
         }
@@ -562,6 +601,13 @@ pub(crate) fn observatory_profile_setup_draft(
         "transmitter.position_m",
     )?;
     validate_position("transmitter.position_mm", transmitter_position, room)?;
+    let transmitter_calibration_position = optional_profile_triplet_mm(
+        transmitter.get("calibration_position_m"),
+        "transmitter.calibration_position_m",
+    )?;
+    if let Some(position) = transmitter_calibration_position {
+        validate_position("transmitter.calibration_position_mm", position, room)?;
+    }
 
     let receivers = document
         .get("receivers")
@@ -587,9 +633,22 @@ pub(crate) fn observatory_profile_setup_draft(
             let field = format!("receivers[{index}].position_m");
             let position = profile_triplet_mm(receiver.get("position_m"), &field)?;
             validate_position(&format!("{expected_id}.position_mm"), position, room)?;
+            let calibration_field = format!("{expected_id}.calibration_position_m");
+            let calibration_position = optional_profile_triplet_mm(
+                receiver.get("calibration_position_m"),
+                &calibration_field,
+            )?;
+            if let Some(position) = calibration_position {
+                validate_position(
+                    &format!("{expected_id}.calibration_position_mm"),
+                    position,
+                    room,
+                )?;
+            }
             Ok(serde_json::json!({
                 "rx_id": rx_id,
                 "position_mm": position,
+                "calibration_position_mm": calibration_position,
                 "firmware": null,
                 "expected_grid": null,
             }))
@@ -646,6 +705,7 @@ pub(crate) fn observatory_profile_setup_draft(
             "room_dimensions_mm": room,
             "transmitter": {
                 "position_mm": transmitter_position,
+                "calibration_position_mm": transmitter_calibration_position,
                 "firmware": null,
             },
             "receivers": receiver_drafts,
@@ -699,6 +759,16 @@ fn profile_triplet_mm(
         result[index] = rounded as u32;
     }
     Ok(result)
+}
+
+fn optional_profile_triplet_mm(
+    value: Option<&serde_json::Value>,
+    field: &str,
+) -> Result<Option<[u32; 3]>, String> {
+    match value {
+        None | Some(serde_json::Value::Null) => Ok(None),
+        Some(value) => profile_triplet_mm(Some(value), field).map(Some),
+    }
 }
 
 fn profile_public_identifier(
@@ -871,6 +941,13 @@ fn validate_definition(definition: &PositionSetupDefinition) -> Result<(), Strin
         definition.transmitter.position_mm,
         definition.room_dimensions_mm,
     )?;
+    if let Some(position) = definition.transmitter.calibration_position_mm {
+        validate_position(
+            "transmitter.calibration_position_mm",
+            position,
+            definition.room_dimensions_mm,
+        )?;
+    }
     validate_firmware("transmitter.firmware", &definition.transmitter.firmware)?;
 
     let receiver_ids: Vec<u8> = definition
@@ -890,6 +967,13 @@ fn validate_definition(definition: &PositionSetupDefinition) -> Result<(), Strin
             receiver.position_mm,
             definition.room_dimensions_mm,
         )?;
+        if let Some(position) = receiver.calibration_position_mm {
+            validate_position(
+                &format!("RX{}.calibration_position_mm", receiver.rx_id),
+                position,
+                definition.room_dimensions_mm,
+            )?;
+        }
         if !receiver_positions.insert(receiver.position_mm) {
             return Err("receiver positions must be unique".to_string());
         }

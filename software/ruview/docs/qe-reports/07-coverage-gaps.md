@@ -5,6 +5,10 @@
 **Analyst:** QE Coverage Specialist (V3)
 **Scope:** Python v1, Rust workspace (17 crates + ruv-neural), Mobile (React Native), Firmware (ESP32 C)
 
+> **Historical report note (2026-09-18).** This coverage snapshot predates
+> retirement of the Tauri desktop crate. Desktop rows and file paths are
+> historical inventory only; they are not current coverage gaps.
+
 ---
 
 ## Executive Summary

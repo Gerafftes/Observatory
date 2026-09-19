@@ -1,0 +1,35 @@
+[package]
+name = "wifi-densepose-control"
+version.workspace = true
+edition.workspace = true
+description = "Local loopback control helper for the RuView browser UI"
+license.workspace = true
+authors.workspace = true
+
+[[bin]]
+name = "ruview-control"
+path = "src/main.rs"
+
+[dependencies]
+axum = { workspace = true, features = ["multipart"] }
+chrono = { version = "0.4", features = ["serde"] }
+clap = { workspace = true }
+flume = "0.11"
+futures = "0.3"
+hex = "0.4"
+hmac = "0.12"
+mdns-sd = "0.11"
+reqwest = { version = "0.12", default-features = false, features = ["json", "multipart", "native-tls"] }
+serde = { workspace = true }
+serde_json = { workspace = true }
+serialport = { workspace = true }
+sha2 = { workspace = true }
+tokio = { workspace = true }
+tokio-serial = "5.4"
+tower-http = { workspace = true, features = ["cors", "limit", "trace"] }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+uuid = { version = "1.0", features = ["v4", "serde"] }
+
+[target.'cfg(unix)'.dependencies]
+libc = { workspace = true }

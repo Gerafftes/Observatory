@@ -1,7 +1,14 @@
 # ADR-054: RuView Desktop Full Implementation
 
+> **Historical record — retired 2026-09-18.** This implementation plan belongs
+> to the former Tauri desktop surface. The desktop crate and its commands were
+> removed from the active workspace, so the plan is not an outstanding runtime
+> task. Keep it only as historical provenance. The supported surface is the
+> browser UI plus the loopback `wifi-densepose-control` helper ([software
+> overview](../../README.md), [UI README](../../ui/README.md)).
+
 ## Status
-**Accepted** — Implementation in progress
+**Retired** — Desktop implementation path removed on 2026-09-18
 
 ## Context
 

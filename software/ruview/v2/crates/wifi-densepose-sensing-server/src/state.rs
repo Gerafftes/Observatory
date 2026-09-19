@@ -914,6 +914,7 @@ mod mmwave_node_diagnostics_cache_tests {
             radar_frames_valid: 1,
             udp_packets_sent: 1,
             udp_send_failures: 0,
+            ..Default::default()
         }
     }
 
@@ -934,6 +935,7 @@ mod mmwave_node_diagnostics_cache_tests {
             radar_frames_valid: 10,
             udp_packets_sent: 10,
             udp_send_failures: 2_733,
+            ..Default::default()
         }));
         assert_eq!(cache.snapshot().unwrap().udp_send_failures_delta, 0);
 
@@ -942,6 +944,7 @@ mod mmwave_node_diagnostics_cache_tests {
             radar_frames_valid: 20,
             udp_packets_sent: 20,
             udp_send_failures: 2_733,
+            ..Default::default()
         }));
         let window = cache.snapshot().unwrap();
         assert_eq!(window.uart_bytes_delta, 10);
@@ -954,6 +957,7 @@ mod mmwave_node_diagnostics_cache_tests {
             radar_frames_valid: 30,
             udp_packets_sent: 30,
             udp_send_failures: 2_734,
+            ..Default::default()
         }));
         assert_eq!(cache.snapshot().unwrap().udp_send_failures_delta, 1);
     }

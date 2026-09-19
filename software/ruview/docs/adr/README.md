@@ -2,6 +2,16 @@
 
 This folder contains 45 Architecture Decision Records (ADRs) that document every significant technical choice in the RuView / WiFi-DensePose project.
 
+> [!IMPORTANT]
+> **Retired desktop decision set (2026-09-18).** ADR-052, ADR-053, ADR-054,
+> ADR-055, ADR-056, ADR-167, ADR-178 and `.issue-177-body.md` describe the
+> former Tauri desktop surface. The desktop crate, release workflow and bundle
+> are no longer part of the active workspace. These files remain as historical
+> provenance and security records only; their package names, paths, commands
+> and measurements are not current instructions. The supported control surface
+> is the browser UI plus the loopback `wifi-densepose-control` helper; see the
+> [software overview](../../README.md) and [UI README](../../ui/README.md).
+
 ## Why ADRs?
 
 Building a system that turns WiFi signals into human pose estimation involves hundreds of non-obvious decisions: which signal processing algorithms to use, how to bridge ESP32 firmware to a Rust pipeline, whether to run inference on-device or on a server, how to handle multi-person separation with limited subcarriers.

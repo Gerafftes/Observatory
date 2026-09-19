@@ -69,8 +69,10 @@ struct gained a field; the bench was never updated. **Fixed** in the same change
   crates' own workflows. `wasm-edge/process_frame_bench` — workspace-excluded.
 
 Conventions mirror existing workflows: `submodules: recursive` (the workspace
-path-deps `vendor/rufield`), Swatinem/rust-cache `workspaces: v2`, Tauri/GTK apt
-deps (a `--workspace` bench link pulls the whole graph), path-filtered triggers.
+path-deps `vendor/rufield`), Swatinem/rust-cache `workspaces: v2`, serial/TLS
+system development packages (a `--workspace` bench link pulls the whole graph),
+and path-filtered triggers. No Tauri or GTK dependency is part of the active
+bench workflow.
 
 ## Validation
 

@@ -146,7 +146,7 @@ export class LiveDemoTab {
       // Create enhanced structure if it doesn't exist
       const enhancedHTML = `
         <div class="live-demo-enhanced">
-          <!-- Data source banner — prominent indicator for live vs simulated -->
+          <!-- Data source banner — prominent indicator for live vs server-simulated -->
           <div id="demo-source-banner" class="demo-source-banner demo-source-unknown" role="status" aria-live="polite">
             Detecting data source...
           </div>
@@ -162,13 +162,7 @@ export class LiveDemoTab {
             <div class="demo-controls">
               <button class="btn btn--primary" id="start-enhanced-demo">Start Detection</button>
               <button class="btn btn--secondary" id="stop-enhanced-demo" disabled>Stop Detection</button>
-              <button class="btn btn--accent" id="run-offline-demo">Demo</button>
               <button class="btn btn--primary" id="toggle-debug">Debug Mode</button>
-              <select class="zone-select" id="zone-selector">
-                <option value="zone_1">Zone 1</option>
-                <option value="zone_2">Zone 2</option>
-                <option value="zone_3">Zone 3</option>
-              </select>
             </div>
           </div>
           
@@ -179,7 +173,7 @@ export class LiveDemoTab {
             
             <div class="demo-sidebar">
               <div class="metrics-panel">
-                <h4>Performance Metrics</h4>
+                <h4>Session Diagnostics</h4>
                 <div class="metric">
                   <label>Connection Status:</label>
                   <span id="connection-status">Disconnected</span>
@@ -253,38 +247,6 @@ export class LiveDemoTab {
                   <button class="btn-ld btn-ld-accent" id="open-training-panel-btn">Open Training Panel</button>
                   <button class="btn-ld btn-ld-muted" id="quick-record-btn">Record 60s</button>
                 </div>
-              </div>
-
-              <div class="setup-guide-panel">
-                <h4>Setup Guide</h4>
-                <div class="setup-levels">
-                  <div class="setup-level">
-                    <span class="setup-level-icon">1x</span>
-                    <div class="setup-level-info">
-                      <strong>1 ESP32 + 1 AP</strong>
-                      <p>Presence, breathing, gross motion</p>
-                    </div>
-                  </div>
-                  <div class="setup-level">
-                    <span class="setup-level-icon">3x</span>
-                    <div class="setup-level-info">
-                      <strong>2-3 ESP32s</strong>
-                      <p>Body localization, motion direction</p>
-                    </div>
-                  </div>
-                  <div class="setup-level">
-                    <span class="setup-level-icon">4x+</span>
-                    <div class="setup-level-info">
-                      <strong>4+ ESP32s + trained model</strong>
-                      <p>Individual limb tracking, full pose</p>
-                    </div>
-                  </div>
-                </div>
-                <p class="setup-note">
-                  Signal-Derived mode uses aggregate CSI features.
-                  For per-limb tracking, load a trained <code>.rvf</code> model
-                  with <code>--model path.rvf</code> and use 4+ sensors.
-                </p>
               </div>
 
               <div class="health-panel">
@@ -1025,7 +987,6 @@ export class LiveDemoTab {
     const startBtn = this.container.querySelector('#start-enhanced-demo');
     const stopBtn = this.container.querySelector('#stop-enhanced-demo');
     const debugBtn = this.container.querySelector('#toggle-debug');
-    const zoneSelector = this.container.querySelector('#zone-selector');
 
     if (startBtn) {
       startBtn.addEventListener('click', () => this.startDemo());
@@ -1035,23 +996,8 @@ export class LiveDemoTab {
       stopBtn.addEventListener('click', () => this.stopDemo());
     }
 
-    // Offline demo button — runs client-side animated demo (no server needed)
-    const offlineDemoBtn = this.container.querySelector('#run-offline-demo');
-    if (offlineDemoBtn) {
-      offlineDemoBtn.addEventListener('click', () => {
-        if (this.components.poseCanvas) {
-          this.components.poseCanvas.toggleDemo();
-        }
-      });
-    }
-
     if (debugBtn) {
       debugBtn.addEventListener('click', () => this.toggleDebugMode());
-    }
-
-    if (zoneSelector) {
-      zoneSelector.addEventListener('change', (e) => this.changeZone(e.target.value));
-      zoneSelector.value = this.state.currentZone;
     }
 
     // Debug controls
@@ -1318,7 +1264,7 @@ export class LiveDemoTab {
     const ds = sensingService.dataSource;
     if (ds === 'live') return 'Active \u2014 ESP32 Live';
     if (ds === 'server-simulated') return 'Active \u2014 Simulated Data';
-    if (ds === 'simulated') return 'Active \u2014 Offline Simulation';
+    if (ds === 'server-offline') return 'Offline \u2014 No fresh frames';
     return 'Connecting...';
   }
 
@@ -1330,8 +1276,8 @@ export class LiveDemoTab {
     const config = {
       'live':             { text: 'LIVE \u2014 ESP32 Hardware Connected',           cls: 'demo-source-live' },
       'server-simulated': { text: 'SIMULATED DATA \u2014 No Hardware Detected',     cls: 'demo-source-sim' },
+      'server-offline':   { text: 'OFFLINE \u2014 No fresh hardware frame',         cls: 'demo-source-offline' },
       'reconnecting':     { text: 'RECONNECTING TO SERVER...',                      cls: 'demo-source-reconnecting' },
-      'simulated':        { text: 'OFFLINE \u2014 Server Unreachable, Local Sim',   cls: 'demo-source-offline' },
     };
     const cfg = config[ds] || config['reconnecting'];
     banner.textContent = cfg.text;
@@ -1341,7 +1287,6 @@ export class LiveDemoTab {
   updateControls() {
     const startBtn = this.container.querySelector('#start-enhanced-demo');
     const stopBtn = this.container.querySelector('#stop-enhanced-demo');
-    const zoneSelector = this.container.querySelector('#zone-selector');
     
     if (startBtn) {
       startBtn.disabled = this.state.isActive;
@@ -1351,9 +1296,6 @@ export class LiveDemoTab {
       stopBtn.disabled = !this.state.isActive;
     }
     
-    if (zoneSelector) {
-      zoneSelector.disabled = this.state.isActive;
-    }
   }
 
   updateMetricsDisplay() {
@@ -1370,15 +1312,15 @@ export class LiveDemoTab {
       const dsLabels = {
         'live':              'Connected \u2014 ESP32',
         'server-simulated':  'Connected \u2014 Simulated',
+        'server-offline':    'Offline \u2014 No fresh frame',
         'reconnecting':      'Reconnecting...',
-        'simulated':         'Offline \u2014 Simulated',
       };
       const label = dsLabels[ds] || this.state.connectionState;
       elements.connectionStatus.textContent = label;
-      const cls = ds === 'live' ? 'good'
-        : ds === 'server-simulated' ? 'sim'
-        : ds === 'simulated' ? 'bad'
-        : this.getHealthClass(this.state.connectionState);
+      let cls = this.getHealthClass(this.state.connectionState);
+      if (ds === 'live') cls = 'good';
+      if (ds === 'server-simulated') cls = 'sim';
+      if (ds === 'server-offline') cls = 'bad';
       elements.connectionStatus.className = `health-${cls}`;
     }
 

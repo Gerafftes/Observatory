@@ -28,6 +28,25 @@ test('default setup profile keeps the legacy point grid only for schema compatib
   assert.equal(profile.mmwave_status, 'NOT_CONNECTED');
 });
 
+test('fallback setup is labelled until a stored SQLite profile is selected', () => {
+  const container = { innerHTML: '' };
+  const controlCenter = new ObservatoryControlCenter(container);
+  controlCenter._mounted = true;
+  controlCenter.connectionState = 'offline';
+
+  controlCenter._render();
+
+  assert.equal(controlCenter.profileSource, 'fallback');
+  controlCenter._selectProfile({
+    id: 'profile-sqlite',
+    label: 'Gespeicherter Raum',
+    document: defaultSetupProfileDocument(),
+  });
+  controlCenter._render();
+
+  assert.equal(controlCenter.profileSource, 'sqlite');
+});
+
 test('geometry snapshot exposes the same CAD mmWave, TX, and RX positions', () => {
   const controlCenter = new ObservatoryControlCenter(null);
   controlCenter.profileDraft = defaultSetupProfileDocument();
@@ -55,6 +74,29 @@ test('profile reads the CAD mmWave exterior policy together with form coordinate
   const profile = controlCenter._readProfileFromForm(form);
 
   assert.equal(profile.mmwave.allow_exterior, false);
+});
+
+test('profile form edits preserve optional calibration standpoints', () => {
+  const controlCenter = new ObservatoryControlCenter(null);
+  controlCenter.profileDraft = defaultSetupProfileDocument();
+  controlCenter.profileDraft.transmitter.calibration_position_m = [1.2, 0, 2.2];
+  controlCenter.profileDraft.receivers[0].calibration_position_m = [0.6, 0, 1.1];
+  const form = {
+    querySelector(selector) {
+      if (selector.includes('transmitter.position_m.0')) return { value: '1.51' };
+      if (selector.includes('transmitter.position_m.1')) return { value: '1.19' };
+      if (selector.includes('transmitter.position_m.2')) return { value: '0.39' };
+      if (selector.includes('receiver.RX1.0')) return { value: '0' };
+      if (selector.includes('receiver.RX1.1')) return { value: '0.5' };
+      if (selector.includes('receiver.RX1.2')) return { value: '0.28' };
+      return { value: '0' };
+    },
+  };
+
+  const profile = controlCenter._readProfileFromForm(form);
+
+  assert.deepEqual(profile.transmitter.calibration_position_m, [1.2, 0, 2.2]);
+  assert.deepEqual(profile.receivers[0].calibration_position_m, [0.6, 0, 1.1]);
 });
 
 test('optional point generator follows edited room dimensions', () => {
@@ -178,6 +220,7 @@ test('direct CAD profile save uses the editor document without a profile form', 
       label: payload.label,
       document: payload.document,
       profile_sha256: 'a'.repeat(64),
+      mmwave_transform_sync: { status: 'synced' },
     };
   };
 
@@ -190,6 +233,7 @@ test('direct CAD profile save uses the editor document without a profile form', 
   assert.equal(submitted.label, 'CAD test');
   assert.deepEqual(submitted.document.mmwave.mounting_position_m, [3.95, 1.41, 3.35]);
   assert.notEqual(submitted.document, document);
+  assert.match(controlCenter.message, /mmWave-Sensor synchronisiert/);
 });
 
 test('profile save translates a fetch failure into an actionable server hint', async () => {

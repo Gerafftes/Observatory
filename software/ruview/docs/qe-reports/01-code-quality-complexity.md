@@ -5,6 +5,10 @@
 **Analyzer:** QE Code Complexity Analyzer v3
 **Scope:** Full codebase -- Rust, Python, C firmware, TypeScript/React Native
 
+> **Historical report note (2026-09-18).** This report predates retirement of
+> the Tauri desktop crate. Desktop rows are historical inventory only and must
+> not be read as evidence that the crate still exists in the active workspace.
+
 ---
 
 ## Executive Summary

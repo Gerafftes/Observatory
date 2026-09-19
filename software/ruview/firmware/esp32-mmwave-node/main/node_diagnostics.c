@@ -19,13 +19,22 @@ void node_diagnostics_record_radar_frame(void)
     portEXIT_CRITICAL(&s_lock);
 }
 
-void node_diagnostics_record_udp_send(bool sent)
+void node_diagnostics_record_udp_send(bool sent, bool acknowledged,
+                                      uint8_t attempts)
 {
     portENTER_CRITICAL(&s_lock);
     if (sent) {
         s_diagnostics.udp_packets_sent += 1;
     } else {
         s_diagnostics.udp_send_failures += 1;
+    }
+    if (acknowledged) {
+        s_diagnostics.udp_packets_acked += 1;
+    } else {
+        s_diagnostics.udp_ack_timeouts += 1;
+    }
+    if (attempts > 1) {
+        s_diagnostics.udp_retransmissions += attempts - 1;
     }
     portEXIT_CRITICAL(&s_lock);
 }

@@ -1512,7 +1512,7 @@ graph TB
 
 | Flag | Description |
 |------|-------------|
-| `--source` | Data source: `auto`, `wifi`, `esp32`, `simulate` |
+| `--source` | Data source: `auto`, `wifi`, `esp32`, or explicit `simulated` demo |
 | `--http-port` | HTTP port for UI and REST API (default: 8080) |
 | `--ws-port` | WebSocket port (default: 8765) |
 | `--udp-port` | UDP port for ESP32 CSI frames (default: 5005) |
@@ -1865,4 +1865,3 @@ Complete Rust sensing server, SOTA signal processing, WiFi-Mat disaster response
 </details>
 
 ---
-

@@ -1,5 +1,9 @@
 # ADR-179: `wifi-densepose-occworld-candle` Checkpoint-Load Hardening
 
+> **Historical-evidence note (2026-09-18).** The validation paragraph below
+> retains the old workspace's desktop test name as provenance for that run. It
+> refers to a removed crate and is not a current package or validation gate.
+
 | Field | Value |
 |-------|-------|
 | **Status** | Accepted — 1 HIGH + 2 LOW bugs fixed + pinned (MEASURED on Windows) |

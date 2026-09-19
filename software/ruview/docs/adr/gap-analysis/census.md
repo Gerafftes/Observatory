@@ -2,6 +2,10 @@
 
 Full per-ADR census underpinning ADR-164. **162 ADR entries across 156 distinct files** (the 5 duplicate-number collisions / 6 displaced files have been RESOLVED — displaced files renumbered to ADR-166…171 per ADR-164 G1; the ADR-134 identity split is tracked separately under G3). Source of truth for the gap-analysis lenses. Where the census is uncertain it is marked *needs verification*.
 
+> **Historical census note (2026-09-18).** Desktop/Tauri entries in this census
+> describe the pre-retirement ADR corpus. They are retained to explain the
+> historical gap analysis and are not active package or architecture claims.
+
 | ADR | Title | Status | impl_state | Flags |
 |-----|-------|--------|-----------|-------|
 | ADR-001 | WiFi-Mat Disaster Detection Architecture | Accepted | implemented | data/hardware-gated (rubble-penetration unproven without field hardware) |

@@ -3,6 +3,7 @@
 
 #include "../main/coordinate_transform.h"
 #include "../main/ld2450_parser.h"
+#include "../main/measurement_ack.h"
 
 static void test_official_example(void)
 {
@@ -94,12 +95,25 @@ static void test_room_coordinate_transform(void)
     assert(room_z == 2900);
 }
 
+static void test_measurement_ack_contract(void)
+{
+    const uint8_t ack[MMWAVE_ACK_SIZE] = {
+        0x52, 0x56, 0x41, 0x4B,
+        0x12, 0x34, 0x56, 0x78,
+        0x9A, 0xBC, 0xDE, 0xF0,
+    };
+    assert(mmwave_ack_matches(ack, sizeof(ack), 0x12345678, 0x9ABCDEF0));
+    assert(!mmwave_ack_matches(ack, sizeof(ack), 0x12345678, 0x9ABCDEEF));
+    assert(!mmwave_ack_matches(ack, sizeof(ack) - 1, 0x12345678, 0x9ABCDEF0));
+}
+
 int main(void)
 {
     test_official_example();
     test_stream_resynchronizes();
     test_corrupt_frame_keeps_nested_header();
     test_room_coordinate_transform();
+    test_measurement_ack_contract();
     puts("ld2450 parser tests passed");
     return 0;
 }

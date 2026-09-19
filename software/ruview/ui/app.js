@@ -159,11 +159,6 @@ class WiFiDensePoseApp {
     // Training tab - lazy load to avoid breaking other tabs if import fails
     this.initTrainingTab();
 
-    // Architecture tab - static content, no component needed
-
-    // Performance tab - static content, no component needed
-
-    // Applications tab - static content, no component needed
   }
 
   // Lazy-load Training tab panels (dynamic import so failures don't break other tabs)
@@ -292,7 +287,7 @@ class WiFiDensePoseApp {
   // Register service worker for offline capability
   registerServiceWorker() {
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('./sw.js').then(reg => {
+      navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' }).then(reg => {
         console.info('Service worker registered:', reg.scope);
       }).catch(err => {
         console.warn('Service worker registration failed:', err);

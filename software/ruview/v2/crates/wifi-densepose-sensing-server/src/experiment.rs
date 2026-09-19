@@ -1465,6 +1465,11 @@ fn normalize_profile_document(document: &Value) -> Result<Value, String> {
     if !within_sensor_bounds(tx_position, dimensions, sensor_mount_radius) {
         return Err("transmitter.position_m must be inside room_dimensions_m or sensor_mount_radius_m".to_string());
     }
+    validate_calibration_position(
+        transmitter.get("calibration_position_m"),
+        "transmitter.calibration_position_m",
+        dimensions,
+    )?;
     let receivers = object
         .get("receivers")
         .and_then(Value::as_array)
@@ -1487,6 +1492,12 @@ fn normalize_profile_document(document: &Value) -> Result<Value, String> {
         if !within_sensor_bounds(position, dimensions, sensor_mount_radius) {
             return Err(format!("{expected_id}.position_m must be inside room_dimensions_m or sensor_mount_radius_m"));
         }
+        let calibration_field = format!("{expected_id}.calibration_position_m");
+        validate_calibration_position(
+            receiver.get("calibration_position_m"),
+            &calibration_field,
+            dimensions,
+        )?;
     }
 
     if let Some(value) = object.get("mmwave") {
@@ -1608,6 +1619,28 @@ fn within_sensor_bounds(position: [f64; 3], dimensions: [f64; 3], radius: f64) -
     position[1] >= 0.0
         && position[1] <= dimensions[1]
         && horizontal_outside_distance(position, dimensions) <= radius + f64::EPSILON
+}
+
+fn within_room_bounds(position: [f64; 3], dimensions: [f64; 3]) -> bool {
+    position
+        .iter()
+        .zip(dimensions)
+        .all(|(value, maximum)| *value >= 0.0 && *value <= maximum)
+}
+
+fn validate_calibration_position(
+    value: Option<&Value>,
+    field: &str,
+    dimensions: [f64; 3],
+) -> Result<(), String> {
+    let Some(value) = value else {
+        return Ok(());
+    };
+    let position = finite_triplet(Some(value), field)?;
+    if !within_room_bounds(position, dimensions) {
+        return Err(format!("{field} must be inside room_dimensions_m"));
+    }
+    Ok(())
 }
 
 fn deterministic_profile_bytes(document: &Value) -> Result<Vec<u8>, String> {

@@ -7,13 +7,9 @@ const translations = {
     'nav.dashboard': 'Dashboard',
     'nav.hardware': 'Hardware',
     'nav.demo': 'Live Demo',
-    'nav.architecture': 'Architecture',
-    'nav.performance': 'Performance',
-    'nav.applications': 'Applications',
     'nav.sensing': 'Sensing',
     'nav.training': 'Training',
     'nav.more': 'More',
-    'nav.moreExplore': 'Explore',
     'nav.moreTools': 'Tools',
     'nav.poseFusion': 'Pose Fusion',
     'nav.observatory': 'Observatory',
@@ -23,13 +19,10 @@ const translations = {
     'dashboard.subtitle': 'WiFi sensing through walls',
     'dashboard.description': 'Track movement through walls with WiFi—no camera needed.',
     'dashboard.status': 'System Status',
-    'dashboard.metrics': 'System Metrics',
-    'dashboard.features': 'Features',
     'dashboard.liveStats': 'Live Statistics',
     'dashboard.activePersons': 'Active Persons',
     'dashboard.avgConfidence': 'Avg Confidence',
     'dashboard.totalDetections': 'Total Detections',
-    'dashboard.zoneOccupancy': 'Zone Occupancy',
 
     // Status
     'status.apiServer': 'API Server',
@@ -37,27 +30,6 @@ const translations = {
     'status.inference': 'Inference',
     'status.streaming': 'Streaming',
     'status.dataSource': 'Data Source',
-
-    // Metrics
-    'metrics.cpu': 'CPU Usage',
-    'metrics.memory': 'Memory Usage',
-    'metrics.disk': 'Disk Usage',
-
-    // Benefits
-    'benefit.throughWalls': 'Through Walls',
-    'benefit.throughWallsDesc': 'Works through solid barriers with no line of sight required',
-    'benefit.privacy': 'Privacy-Preserving',
-    'benefit.privacyDesc': 'No cameras or visual recording - just WiFi signal analysis',
-    'benefit.realtime': 'Real-Time',
-    'benefit.realtimeDesc': 'Maps 24 body regions in real-time at 100Hz sampling rate',
-    'benefit.lowCost': 'Low Cost',
-    'benefit.lowCostDesc': 'Built using $30 commercial WiFi hardware',
-
-    // Stats
-    'stat.bodyRegions': 'Body Regions',
-    'stat.samplingRate': 'Sampling Rate',
-    'stat.accuracy': 'Accuracy (AP@50)',
-    'stat.hardwareCost': 'Hardware Cost',
 
     // Actions
     'action.startDetection': 'Start Detection',
@@ -105,13 +77,9 @@ const translations = {
     'nav.dashboard': 'Dashboard',
     'nav.hardware': 'Hardware',
     'nav.demo': 'Live-Demo',
-    'nav.architecture': 'Architektur',
-    'nav.performance': 'Leistung',
-    'nav.applications': 'Anwendungen',
     'nav.sensing': 'Sensing',
     'nav.training': 'Training',
     'nav.more': 'Mehr',
-    'nav.moreExplore': 'Übersicht',
     'nav.moreTools': 'Werkzeuge',
     'nav.poseFusion': 'Pose Fusion',
     'nav.observatory': 'Observatory',
@@ -121,13 +89,10 @@ const translations = {
     'dashboard.subtitle': 'WiFi-Sensorik durch Wände',
     'dashboard.description': 'Bewegung per WiFi erfassen – ohne Kamera.',
     'dashboard.status': 'Systemstatus',
-    'dashboard.metrics': 'Systemmetriken',
-    'dashboard.features': 'Funktionen',
     'dashboard.liveStats': 'Live-Statistiken',
     'dashboard.activePersons': 'Aktive Personen',
     'dashboard.avgConfidence': 'Durchschnittliche Konfidenz',
     'dashboard.totalDetections': 'Detektionen gesamt',
-    'dashboard.zoneOccupancy': 'Zonenbelegung',
 
     // Status
     'status.apiServer': 'API-Server',
@@ -135,27 +100,6 @@ const translations = {
     'status.inference': 'Inferenz',
     'status.streaming': 'Streaming',
     'status.dataSource': 'Datenquelle',
-
-    // Metrics
-    'metrics.cpu': 'CPU-Auslastung',
-    'metrics.memory': 'Speicherauslastung',
-    'metrics.disk': 'Festplattenauslastung',
-
-    // Benefits
-    'benefit.throughWalls': 'Durch Wände',
-    'benefit.throughWallsDesc': 'Funktioniert ohne direkte Sichtverbindung durch feste Barrieren.',
-    'benefit.privacy': 'Privatsphäre',
-    'benefit.privacyDesc': 'Keine Kameras oder Videoaufnahmen — nur WiFi-Signalanalyse.',
-    'benefit.realtime': 'Echtzeit',
-    'benefit.realtimeDesc': 'Erfasst Körperregionen während des laufenden Streams.',
-    'benefit.lowCost': 'Geringe Kosten',
-    'benefit.lowCostDesc': 'Auf Basis handelsüblicher WiFi-Hardware.',
-
-    // Stats
-    'stat.bodyRegions': 'Körperregionen',
-    'stat.samplingRate': 'Abtastrate',
-    'stat.accuracy': 'Genauigkeit (AP@50)',
-    'stat.hardwareCost': 'Hardwarekosten',
 
     // Actions
     'action.startDetection': 'Detektion starten',
@@ -203,13 +147,9 @@ const translations = {
     'nav.dashboard': 'Panel',
     'nav.hardware': 'Sprzet',
     'nav.demo': 'Demo na zywo',
-    'nav.architecture': 'Architektura',
-    'nav.performance': 'Wydajnosc',
-    'nav.applications': 'Aplikacje',
     'nav.sensing': 'Czujniki',
     'nav.training': 'Trening',
     'nav.more': 'Wiecej',
-    'nav.moreExplore': 'Przegladaj',
     'nav.moreTools': 'Narzedzia',
     'nav.poseFusion': 'Pose Fusion',
     'nav.observatory': 'Observatory',
@@ -219,13 +159,10 @@ const translations = {
     'dashboard.subtitle': 'Sensing WiFi przez sciany',
     'dashboard.description': 'Ruch przez sciany — bez kamery.',
     'dashboard.status': 'Status systemu',
-    'dashboard.metrics': 'Metryki systemu',
-    'dashboard.features': 'Funkcje',
     'dashboard.liveStats': 'Statystyki na zywo',
     'dashboard.activePersons': 'Aktywne osoby',
     'dashboard.avgConfidence': 'Srednia pewnosc',
     'dashboard.totalDetections': 'Laczne detekcje',
-    'dashboard.zoneOccupancy': 'Zajecie stref',
 
     // Status
     'status.apiServer': 'Serwer API',
@@ -233,27 +170,6 @@ const translations = {
     'status.inference': 'Wnioskowanie',
     'status.streaming': 'Streaming',
     'status.dataSource': 'Zrodlo danych',
-
-    // Metrics
-    'metrics.cpu': 'Uzycie CPU',
-    'metrics.memory': 'Uzycie pamieci',
-    'metrics.disk': 'Uzycie dysku',
-
-    // Benefits
-    'benefit.throughWalls': 'Przez sciany',
-    'benefit.throughWallsDesc': 'Dziala przez przeszkody stale bez linii wzroku',
-    'benefit.privacy': 'Ochrona prywatnosci',
-    'benefit.privacyDesc': 'Brak kamer i nagrywania - tylko analiza sygnalow WiFi',
-    'benefit.realtime': 'Czas rzeczywisty',
-    'benefit.realtimeDesc': 'Mapuje 24 regiony ciala w czasie rzeczywistym przy 100Hz',
-    'benefit.lowCost': 'Niski koszt',
-    'benefit.lowCostDesc': 'Zbudowany z komercyjnego sprzetu WiFi za $30',
-
-    // Stats
-    'stat.bodyRegions': 'Regiony ciala',
-    'stat.samplingRate': 'Czestotliwosc',
-    'stat.accuracy': 'Dokladnosc (AP@50)',
-    'stat.hardwareCost': 'Koszt sprzetu',
 
     // Actions
     'action.startDetection': 'Rozpocznij detekcje',

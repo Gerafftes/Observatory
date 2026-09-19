@@ -515,7 +515,7 @@ pub(crate) fn public_node_summaries(
                     .source_binding_observation
                     .as_ref()
                     .is_some_and(|binding| binding.matches_setup);
-            let rssi = ns.rssi_history.back().copied().unwrap_or(-90.0);
+            let rssi = ns.rssi_history.back().copied();
             let classification = classifications.get(&id);
             let motion_level = classification
                 .map(|classification| classification.motion_level.as_str())

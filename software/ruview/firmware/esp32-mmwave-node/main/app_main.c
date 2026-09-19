@@ -130,8 +130,10 @@ static void radar_task(void *argument)
                 int64_t now_us = esp_timer_get_time();
                 if (last_stream_time_us == 0 ||
                     now_us - last_stream_time_us >= RADAR_STREAM_INTERVAL_US) {
-                    bool sent = measurement_stream_send(stream, &frame, now_us);
-                    node_diagnostics_record_udp_send(sent);
+                    measurement_stream_result_t result =
+                        measurement_stream_send(stream, &frame, now_us);
+                    node_diagnostics_record_udp_send(
+                        result.sent, result.acknowledged, result.attempts);
                     last_stream_time_us = now_us;
                 }
             }

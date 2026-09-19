@@ -274,7 +274,8 @@ export class ObservatoryControlCenter {
     this.selectedProfile = null;
     this.selectedRun = null;
     this.profileDraft = defaultSetupProfileDocument();
-    this.profileLabel = 'Fixed room / WiFi-only';
+    this.profileSource = 'fallback';
+    this.profileLabel = 'Fallback-Setup';
     this.workflowLabel = 'WiFi-only position experiment';
     this.trainingPoint = 'P01';
     this.blindPoint = 'P01';
@@ -346,9 +347,19 @@ export class ObservatoryControlCenter {
       this.models = models;
       this.benchmarkCatalog = benchmarkCatalog;
       if (this.selectedProfile) {
-        this.selectedProfile = profiles.find((profile) => profile.id === this.selectedProfile.id) || null;
+        const storedProfile = profiles.find((profile) => profile.id === this.selectedProfile.id) || null;
+        if (storedProfile) {
+          this._selectProfile(storedProfile);
+        } else {
+          this.selectedProfile = null;
+        }
       }
       if (!this.selectedProfile && profiles[0]) this._selectProfile(profiles[0]);
+      if (!this.selectedProfile && !profiles.length) {
+        this.profileSource = 'fallback';
+        this.profileLabel = 'Fallback-Setup';
+        this.profileDraft = defaultSetupProfileDocument();
+      }
       if (this.selectedRun) {
         this.selectedRun = runs.find((run) => run.id === this.selectedRun.id) || this.selectedRun;
       }
@@ -384,10 +395,17 @@ export class ObservatoryControlCenter {
 
   _selectProfile(profile) {
     this.selectedProfile = profile;
+    this.profileSource = 'sqlite';
     this.profileLabel = profile.label;
     this.profileDraft = typeof structuredClone === 'function'
       ? structuredClone(profile.document)
       : JSON.parse(JSON.stringify(profile.document));
+  }
+
+  async refreshAfterServerStart() {
+    this._nextRetryAt = 0;
+    await this.refresh({ quiet: true, allowWhileBusy: true });
+    if (this.connectionState !== 'ready') this._nextRetryAt = 0;
   }
 
   _calibrationContextRequest() {
@@ -599,6 +617,7 @@ export class ObservatoryControlCenter {
         },
         onSave: (document) => this._saveGeometryDocument(document),
         saveDisabled: experimentActionsDisabled,
+        setupSource: this.profileSource,
         yawCalibration: this.status?.mmwave?.yaw_calibration || null,
       });
       this.geometryEditor.mount();
@@ -1540,6 +1559,8 @@ export class ObservatoryControlCenter {
   _readProfileFromForm(form = this.container.querySelector('#occProfileForm')) {
     const read = (prefix) => [0, 1, 2].map((index) => numberValue(form.querySelector(`[data-occ-field="${prefix}.${index}"]`)?.value));
     const existingMmwave = this.profileDraft?.mmwave || {};
+    const existingTransmitter = this.profileDraft?.transmitter || {};
+    const existingReceivers = this.profileDraft?.receivers || [];
     const yawDegrees = numberValue(
       form.querySelector('[data-occ-field="mmwave.yaw_deg"]')?.value,
       mmwaveYawMdeg({ mmwave: existingMmwave }) / 1000,
@@ -1560,8 +1581,17 @@ export class ObservatoryControlCenter {
       profile_kind: 'ruview.setup-profile',
       room_dimensions_m: read('room_dimensions_m'),
       sensor_mount_radius_m: this.profileDraft?.sensor_mount_radius_m ?? DEFAULT_SENSOR_MOUNT_RADIUS_M,
-      transmitter: { id: 'TX', position_m: read('transmitter.position_m') },
-      receivers: ['RX1', 'RX2', 'RX3', 'RX4'].map((id) => ({ id, role: 'receiver', position_m: read(`receiver.${id}`) })),
+      transmitter: {
+        ...existingTransmitter,
+        id: 'TX',
+        position_m: read('transmitter.position_m'),
+      },
+      receivers: ['RX1', 'RX2', 'RX3', 'RX4'].map((id) => ({
+        ...(existingReceivers.find((receiver) => receiver.id === id) || {}),
+        id,
+        role: 'receiver',
+        position_m: read(`receiver.${id}`),
+      })),
       mmwave: {
         ...existingMmwave,
         sensor: existingMmwave.sensor || MMWAVE_SENSOR,
@@ -1609,7 +1639,14 @@ export class ObservatoryControlCenter {
         ? await experimentService.updateProfile(this.selectedProfile.id, { label, document })
         : await experimentService.createProfile({ label, document });
       this._selectProfile(profile);
-      this.message = `Profile gespeichert: ${profile.profile_sha256.slice(0, 16)}…`;
+      const transformSync = profile.mmwave_transform_sync;
+      this.message = transformSync?.status === 'synced'
+        ? `Profile gespeichert und mmWave-Sensor synchronisiert: ${profile.profile_sha256.slice(0, 16)}…`
+        : transformSync?.status === 'failed'
+          ? `Profile gespeichert, mmWave-Sensor nicht synchronisiert: ${transformSync.error || 'Fehler beim Schreiben'}`
+          : transformSync?.status === 'skipped' && transformSync.reason
+            ? `Profile gespeichert; mmWave-Sensor nicht synchronisiert: ${transformSync.reason}`
+          : `Profile gespeichert: ${profile.profile_sha256.slice(0, 16)}…`;
       await this.refresh({ quiet: true, allowWhileBusy: true });
     } catch (error) {
       this.message = '';

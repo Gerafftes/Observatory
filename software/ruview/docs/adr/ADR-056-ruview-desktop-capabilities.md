@@ -1,7 +1,13 @@
 # ADR-056: RuView Desktop Complete Capabilities Reference
 
+> **Historical record — retired 2026-09-18.** This capability inventory
+> describes the former desktop application and is no longer a product or build
+> specification. Keep it for provenance only. The supported surface is the
+> browser UI plus the loopback `wifi-densepose-control` helper ([software
+> overview](../../README.md), [UI README](../../ui/README.md)).
+
 ## Status
-Accepted
+Retired — historical desktop capability inventory (2026-09-18)
 
 ## Context
 RuView Desktop is a comprehensive WiFi-based sensing platform that combines hardware management, real-time signal processing, neural network inference, and intelligent monitoring. This ADR documents all integrated capabilities across the desktop application and underlying crates.

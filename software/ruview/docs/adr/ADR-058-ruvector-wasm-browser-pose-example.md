@@ -329,7 +329,7 @@ No new Rust crates are needed. The example is pure HTML/JS consuming existing WA
 - **Through-wall capability**: CSI mode shows pose estimation where cameras cannot reach
 - **Zero-install**: Anyone with a browser can try it
 - **Training data collection**: Can record paired (video, CSI) data for offline model training
-- **Reusable**: JS modules embed directly in the Tauri desktop app's webview
+- **Reusable**: JS modules run directly in the browser UI
 
 ### Negative
 

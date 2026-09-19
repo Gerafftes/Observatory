@@ -6,6 +6,11 @@
 **Scope:** Full wifi-densepose system -- Rust workspace (18 crates, 153k LoC), Python v1 (105 files, 39k LoC), ESP32 firmware (48 files, 1.6k LoC), CI/CD pipelines (8 workflows)
 **Test Count:** 2,618 Rust `#[test]` functions + 33 Python test files
 
+> **Historical report note (2026-09-18).** This assessment predates retirement
+> of the Tauri desktop surface. Its deployment-target and desktop questions are
+> historical; the supported application surface is now the browser UI plus the
+> local control helper.
+
 ---
 
 ## Executive Summary

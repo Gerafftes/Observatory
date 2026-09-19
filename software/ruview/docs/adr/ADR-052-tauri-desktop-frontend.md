@@ -1,8 +1,15 @@
 # ADR-052: Tauri Desktop Frontend — RuView Hardware Management & Visualization
 
+> **Historical record — retired 2026-09-18.** This ADR describes the former
+> Tauri desktop surface. Its crate and release path were removed from the
+> active workspace. Keep this document for provenance only; its package names,
+> paths and commands are not current instructions. The supported surface is
+> the browser UI plus the loopback `wifi-densepose-control` helper ([software
+> overview](../../README.md), [UI README](../../ui/README.md)).
+
 | Field | Value |
 |-------|-------|
-| Status | Proposed |
+| Status | Retired — superseded by browser UI + local control helper (2026-09-18) |
 | Date | 2026-03-06 |
 | Deciders | ruv |
 | Depends on | ADR-012 (ESP32 CSI Mesh), ADR-039 (Edge Intelligence), ADR-040 (WASM Programmable Sensing), ADR-044 (Provisioning Enhancements), ADR-166 (Security Hardening, renumbered from ADR-050), ADR-051 (Server Decomposition) |

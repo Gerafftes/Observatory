@@ -25,9 +25,6 @@ export class CommandPalette {
       { id: 'dashboard', label: 'Dashboard', icon: 'grid' },
       { id: 'hardware', label: 'Hardware', icon: 'cpu' },
       { id: 'demo', label: 'Live Demo', icon: 'play' },
-      { id: 'architecture', label: 'Architecture', icon: 'layers' },
-      { id: 'performance', label: 'Performance', icon: 'zap' },
-      { id: 'applications', label: 'Applications', icon: 'box' },
       { id: 'sensing', label: 'Sensing', icon: 'wifi' },
       { id: 'training', label: 'Training', icon: 'database' },
     ];

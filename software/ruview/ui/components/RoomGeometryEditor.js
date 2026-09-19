@@ -13,8 +13,10 @@ export const DEFAULT_MMWAVE_POSITION_M = Object.freeze([0.0, 1.2, 1.72]);
 export const MMWAVE_HORIZONTAL_FOV_DEG = 120;
 export const MMWAVE_MAX_RANGE_M = 6;
 const EDITABLE_IDS = ['TX', 'RX1', 'RX2', 'RX3', 'RX4', MMWAVE_ID];
+const CALIBRATION_DEVICE_IDS = ['TX', 'RX1', 'RX2', 'RX3', 'RX4'];
+const CALIBRATION_IDS = CALIBRATION_DEVICE_IDS.map((id) => `${id}_CALIBRATION`);
 const WALL_IDS = ['WALL_X0', 'WALL_XMAX', 'WALL_Z0', 'WALL_ZMAX'];
-const SELECTABLE_IDS = [...EDITABLE_IDS, ...WALL_IDS];
+const SELECTABLE_IDS = [...EDITABLE_IDS, ...CALIBRATION_IDS, ...WALL_IDS];
 const PLACEMENT_EPSILON = 0.000001;
 
 const WALL_LABELS = Object.freeze({
@@ -66,6 +68,40 @@ export function mmwaveMountingPosition(document) {
   return vector3(document?.mmwave?.mounting_position_m, defaultMmwavePosition(document));
 }
 
+function calibrationDeviceId(id) {
+  return CALIBRATION_IDS.includes(id) ? id.replace(/_CALIBRATION$/, '') : null;
+}
+
+function calibrationPositionValue(document, deviceId) {
+  if (deviceId === 'TX') return document?.transmitter?.calibration_position_m;
+  return document?.receivers?.find((receiver) => receiver.id === deviceId)?.calibration_position_m;
+}
+
+function hasCalibrationPosition(document, deviceId) {
+  return finitePosition(calibrationPositionValue(document, deviceId));
+}
+
+function calibrationPosition(document, deviceId) {
+  const devicePosition = entityPosition(document, deviceId);
+  const explicit = calibrationPositionValue(document, deviceId);
+  return hasCalibrationPosition(document, deviceId) ? vector3(explicit) : devicePosition;
+}
+
+function calibrationEntities(document) {
+  return CALIBRATION_DEVICE_IDS.map((deviceId) => ({
+    id: `${deviceId}_CALIBRATION`,
+    deviceId,
+    role: 'calibration',
+    explicit: hasCalibrationPosition(document, deviceId),
+    position_m: calibrationPosition(document, deviceId),
+  }));
+}
+
+function selectableLabel(id) {
+  const deviceId = calibrationDeviceId(id);
+  return deviceId ? `${deviceId} Kalibrierstandpunkt` : wallLabel(id);
+}
+
 export function sensorMountRadius(document) {
   const value = Number(document?.sensor_mount_radius_m);
   return Number.isFinite(value) && value >= 0
@@ -103,6 +139,8 @@ function sensorPositionWithinBounds(position, room, radius) {
 }
 
 function entityPosition(document, id) {
+  const deviceId = calibrationDeviceId(id);
+  if (deviceId) return calibrationPosition(document, deviceId);
   if (id === 'TX') return vector3(document?.transmitter?.position_m);
   if (id === MMWAVE_ID) return mmwaveMountingPosition(document);
   return vector3(document?.receivers?.find((receiver) => receiver.id === id)?.position_m);
@@ -110,7 +148,17 @@ function entityPosition(document, id) {
 
 function updateEntityPosition(document, id, position) {
   const next = clone(document || {});
-  if (id === 'TX') {
+  const deviceId = calibrationDeviceId(id);
+  if (deviceId === 'TX') {
+    next.transmitter = {
+      ...(next.transmitter || { id: 'TX' }),
+      calibration_position_m: [...position],
+    };
+  } else if (deviceId) {
+    next.receivers = (next.receivers || []).map((receiver) => receiver.id === deviceId
+      ? { ...receiver, calibration_position_m: [...position] }
+      : receiver);
+  } else if (id === 'TX') {
     next.transmitter = {
       ...(next.transmitter || { id: 'TX' }),
       position_m: [...position],
@@ -440,7 +488,7 @@ function wallEntities() {
 }
 
 function selectableEntities(document) {
-  return [...geometryEntities(document), ...wallEntities()];
+  return [...geometryEntities(document), ...calibrationEntities(document), ...wallEntities()];
 }
 
 export function setMarkerWallDistance(document, markerId, wallId, requestedDistance) {
@@ -531,6 +579,17 @@ export function validateGeometryDraft(document) {
     errors.push('RX-Positionen müssen eindeutig sein.');
   }
 
+  if (room.every((value) => Number.isFinite(value) && value > 0)) {
+    for (const entity of calibrationEntities(document)) {
+      if (!entity.explicit) continue;
+      if (entity.position_m.some((value) => !Number.isFinite(value))) {
+        errors.push(`${entity.deviceId} Kalibrierstandpunkt: Koordinaten müssen endlich sein.`);
+      } else if (entity.position_m.some((value, index) => value < 0 || value > room[index])) {
+        errors.push(`${entity.deviceId} Kalibrierstandpunkt: Position liegt außerhalb des Raums.`);
+      }
+    }
+  }
+
   return { valid: errors.length === 0, errors, room, entities };
 }
 
@@ -575,22 +634,30 @@ function svgToWorld(x, y, room, radius = DEFAULT_SENSOR_MOUNT_RADIUS_M) {
 function markerMarkup(entity, room, selectedIds, radius) {
   const point = worldToSvg(entity.position_m, room, radius);
   const selected = selectedIds.includes(entity.id);
+  const calibration = entity.role === 'calibration';
   let kind = 'rx';
   if (entity.role === 'transmitter') kind = 'tx';
   else if (entity.role === 'mmwave') kind = 'mmwave';
+  else if (calibration) kind = 'calibration';
   const colorClass = entity.id.toLowerCase();
   let markerRadius = 7;
   if (kind === 'tx') markerRadius = 9;
   else if (kind === 'mmwave') markerRadius = 8;
+  else if (calibration) markerRadius = 5;
+  const handleAttributes = calibration
+    ? `data-calibration-handle data-calibration-id="${escapeHTML(entity.id)}"`
+    : `data-geometry-handle data-geometry-id="${escapeHTML(entity.id)}"`;
+  const markerLabel = calibration ? `${entity.deviceId} Kalibrierstandpunkt` : entity.id;
+  const markerText = calibration ? `${entity.deviceId}·K` : entity.id;
   return `
-    <g class="occ-cad-marker occ-cad-marker-${kind} occ-cad-marker-${colorClass} ${selected ? 'is-selected' : ''}"
-       data-geometry-handle data-geometry-id="${escapeHTML(entity.id)}"
-       tabindex="0" role="button" aria-label="${escapeHTML(`${entity.id} bei ${formatNumber(entity.position_m[0])} x ${formatNumber(entity.position_m[2])} m`)}"
-       transform="translate(${point.x.toFixed(2)} ${point.y.toFixed(2)})">
-      <circle class="occ-cad-marker-hit" r="18"></circle>
-      <circle class="occ-cad-marker-core" r="${markerRadius}"></circle>
-      <text x="14" y="-10">${escapeHTML(entity.id)}</text>
-    </g>`;
+    <g class="occ-cad-marker occ-cad-marker-${kind} occ-cad-marker-${colorClass} ${entity.explicit === false ? 'is-fallback' : ''} ${selected ? 'is-selected' : ''}"
+       ${handleAttributes}
+       tabindex="0" role="button" aria-label="${escapeHTML(`${markerLabel} bei ${formatNumber(entity.position_m[0])} x ${formatNumber(entity.position_m[2])} m`)}"
+      transform="translate(${point.x.toFixed(2)} ${point.y.toFixed(2)})">
+     <circle class="occ-cad-marker-hit" r="18"></circle>
+     <circle class="occ-cad-marker-core" r="${markerRadius}"></circle>
+      <text x="14" y="-10">${escapeHTML(markerText)}</text>
+   </g>`;
 }
 
 function effectiveMmwaveYawMdeg(document, yawCalibration) {
@@ -736,6 +803,13 @@ function rulerMarkup(room, radius) {
   return `<g class="occ-cad-rulers"><g>${xTicks.join('')}</g><g>${zTicks.join('')}</g><text class="occ-cad-axis-label" x="${VIEWBOX.plot.x + VIEWBOX.plot.width / 2}" y="${VIEWBOX.plot.y - 39}" text-anchor="middle">X / LÄNGE (m)</text><text class="occ-cad-axis-label" x="${VIEWBOX.plot.x - 62}" y="${VIEWBOX.plot.y + VIEWBOX.plot.height / 2}" text-anchor="middle" transform="rotate(-90 ${VIEWBOX.plot.x - 62} ${VIEWBOX.plot.y + VIEWBOX.plot.height / 2})">Z / BREITE (m)</text></g>`;
 }
 
+function roomTitleMarkup(room, setupSource = 'fallback') {
+  const sourceLabel = setupSource === 'fallback' ? 'FALLBACK-SETUP' : 'SQLITE-SETUP GELADEN';
+  const sourceClass = setupSource === 'fallback' ? 'is-fallback' : 'is-sqlite';
+  const titleY = VIEWBOX.plot.y - 49;
+  return `<text class="occ-cad-room-title" x="${VIEWBOX.plot.x + VIEWBOX.plot.width / 2}" y="${titleY}" text-anchor="middle">RAUM · ${formatNumber(room[0])} × ${formatNumber(room[2])} m · H ${formatNumber(room[1])} m</text><text class="occ-cad-setup-source ${sourceClass}" x="${VIEWBOX.width - 14}" y="${titleY}" text-anchor="end">${sourceLabel}</text>`;
+}
+
 function gridMarkup(room, radius) {
   const xStep = gridStep(room[0]);
   const zStep = gridStep(room[2]);
@@ -784,13 +858,14 @@ function inspectorInput(label, value, attributeName) {
 }
 
 export class RoomGeometryEditor {
-  constructor(container, { document, onChange, onSelect, onSave, saveDisabled = false, selectedIds, yawCalibration = null } = {}) {
+  constructor(container, { document, onChange, onSelect, onSave, saveDisabled = false, selectedIds, setupSource = 'fallback', yawCalibration = null } = {}) {
     this.container = container;
     this.document = clone(document || {});
     this.onChange = onChange;
     this.onSelect = onSelect;
     this.onSave = onSave;
     this.saveDisabled = saveDisabled || typeof onSave !== 'function';
+    this.setupSource = setupSource;
     this.yawCalibration = yawCalibration;
     this.selectedIds = (Array.isArray(selectedIds) ? selectedIds : ['TX'])
       .filter((id) => SELECTABLE_IDS.includes(id))
@@ -846,6 +921,21 @@ export class RoomGeometryEditor {
 
   _emitChange() {
     if (typeof this.onChange === 'function') this.onChange(clone(this.document));
+  }
+
+  _clearCalibrationPosition(id) {
+    const deviceId = calibrationDeviceId(id);
+    if (!deviceId) return;
+    const next = clone(this.document);
+    if (deviceId === 'TX') {
+      if (next.transmitter) delete next.transmitter.calibration_position_m;
+    } else {
+      const receiver = next.receivers?.find((candidate) => candidate.id === deviceId);
+      if (receiver) delete receiver.calibration_position_m;
+    }
+    this.document = next;
+    this.render();
+    this._emitChange();
   }
 
   _select(id, additive = false) {
@@ -906,9 +996,19 @@ export class RoomGeometryEditor {
       this._aimMmwaveAtReceiver('RX1');
       return;
     }
+    if (action === 'clear-calibration-position') {
+      event.preventDefault();
+      this._clearCalibrationPosition(this.selectedId);
+      return;
+    }
     const yawHandle = event.target.closest?.('[data-cad-yaw-handle]');
     if (yawHandle) {
       this._select(MMWAVE_ID);
+      return;
+    }
+    const calibrationHandle = event.target.closest?.('[data-calibration-handle]');
+    if (calibrationHandle) {
+      this._select(calibrationHandle.dataset.calibrationId);
       return;
     }
     const handle = event.target.closest?.('[data-geometry-handle]');
@@ -932,6 +1032,15 @@ export class RoomGeometryEditor {
       event.preventDefault();
       this._select(MMWAVE_ID);
       this.drag = { kind: 'yaw', pointerId: event.pointerId };
+      this.container.querySelector('[data-cad-svg]')?.setPointerCapture?.(event.pointerId);
+      return;
+    }
+    const calibrationHandle = event.target.closest?.('[data-calibration-handle]');
+    if (calibrationHandle && event.button === 0) {
+      event.preventDefault();
+      const id = calibrationHandle.dataset.calibrationId;
+      this._select(id);
+      this.drag = { kind: 'calibration-position', id, pointerId: event.pointerId };
       this.container.querySelector('[data-cad-svg]')?.setPointerCapture?.(event.pointerId);
       return;
     }
@@ -969,6 +1078,21 @@ export class RoomGeometryEditor {
     if (!point) return;
     const room = roomDimensions(this.document);
     const radius = sensorMountRadius(this.document);
+    if (this.drag.kind === 'calibration-position') {
+      let position = svgToWorld(point.x, point.y, room, radius);
+      position[0] = Math.min(room[0], Math.max(0, position[0]));
+      position[2] = Math.min(room[2], Math.max(0, position[2]));
+      if (this.snap) {
+        position[0] = Math.round(position[0] / 0.05) * 0.05;
+        position[2] = Math.round(position[2] / 0.05) * 0.05;
+      }
+      position[0] = Math.min(room[0], Math.max(0, position[0]));
+      position[2] = Math.min(room[2], Math.max(0, position[2]));
+      this.document = updateEntityPosition(this.document, this.drag.id, position);
+      this._updateLiveMarker(this.drag.id);
+      this._updateInspector();
+      return;
+    }
     if (this.drag.kind === 'yaw') {
       const position = svgToWorld(point.x, point.y, room, radius);
       const yawMdeg = mmwaveYawToPointMdeg(this.document, position);
@@ -1018,6 +1142,24 @@ export class RoomGeometryEditor {
       this.document = updateMmwaveOrientation(this.document, { yaw_mdeg: next });
       this.placementRecommendation = null;
       this.placementError = '';
+      this.render();
+      this._emitChange();
+      return;
+    }
+    const calibrationHandle = event.target.closest?.('[data-calibration-handle]');
+    if (calibrationHandle && ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(event.key)) {
+      event.preventDefault();
+      const id = calibrationHandle.dataset.calibrationId;
+      const current = entityPosition(this.document, id);
+      const step = this.snap ? 0.05 : 0.01;
+      if (event.key === 'ArrowUp') current[2] -= step;
+      if (event.key === 'ArrowDown') current[2] += step;
+      if (event.key === 'ArrowLeft') current[0] -= step;
+      if (event.key === 'ArrowRight') current[0] += step;
+      const room = roomDimensions(this.document);
+      current[0] = Math.min(room[0], Math.max(0, current[0]));
+      current[2] = Math.min(room[2], Math.max(0, current[2]));
+      this.document = updateEntityPosition(this.document, id, current);
       this.render();
       this._emitChange();
       return;
@@ -1112,7 +1254,7 @@ export class RoomGeometryEditor {
     if (coordinate) {
       const [id, indexText] = coordinate.split('.');
       const index = Number(indexText);
-      if (EDITABLE_IDS.includes(id) && [0, 1, 2].includes(index)) {
+      if ((EDITABLE_IDS.includes(id) || CALIBRATION_IDS.includes(id)) && [0, 1, 2].includes(index)) {
         const position = entityPosition(this.document, id);
         position[index] = numberValue(event.target.value, position[index]);
         this.document = updateEntityPosition(this.document, id, position);
@@ -1238,11 +1380,16 @@ export class RoomGeometryEditor {
   }
 
   _updateLiveMarker(id) {
-    const marker = this.container.querySelector(`[data-geometry-id="${CSS.escape(id)}"]`);
+    const calibration = Boolean(calibrationDeviceId(id));
+    const selector = calibration
+      ? `[data-calibration-id="${CSS.escape(id)}"]`
+      : `[data-geometry-id="${CSS.escape(id)}"]`;
+    const marker = this.container.querySelector(selector);
     if (!marker) return;
     const point = worldToSvg(entityPosition(this.document, id), roomDimensions(this.document), sensorMountRadius(this.document));
     marker.setAttribute('transform', `translate(${point.x.toFixed(2)} ${point.y.toFixed(2)})`);
-    marker.setAttribute('aria-label', `${id} bei ${formatNumber(entityPosition(this.document, id)[0])} x ${formatNumber(entityPosition(this.document, id)[2])} m`);
+    const label = calibration ? `${calibrationDeviceId(id)} Kalibrierstandpunkt` : id;
+    marker.setAttribute('aria-label', `${label} bei ${formatNumber(entityPosition(this.document, id)[0])} x ${formatNumber(entityPosition(this.document, id)[2])} m`);
     this._updateSelectionLine();
     if (id === MMWAVE_ID) this._updateMmwaveOrientation();
   }
@@ -1286,8 +1433,8 @@ export class RoomGeometryEditor {
     });
   }
 
-  _updateInspector() {
-    const entity = geometryEntities(this.document).find((candidate) => candidate.id === this.selectedId);
+ _updateInspector() {
+    const entity = selectableEntities(this.document).find((candidate) => candidate.id === this.selectedId);
     if (!entity) return;
     const ownerDocument = this.container.ownerDocument ?? globalThis.document;
     [0, 1, 2].forEach((index) => {
@@ -1307,9 +1454,9 @@ export class RoomGeometryEditor {
       rawXInput.checked = this.document?.mmwave?.raw_x_inverted === true;
     }
     const selection = this.container.querySelector('[data-cad-selection]');
-    if (selection) selection.textContent = this.selectedIds.map((id) => wallLabel(id)).join(' · ');
-    this._updateValidation();
-  }
+    if (selection) selection.textContent = this.selectedIds.map((id) => selectableLabel(id)).join(' · ');
+   this._updateValidation();
+ }
 
   _updateValidation() {
     const validation = this._validationState();
@@ -1336,10 +1483,13 @@ export class RoomGeometryEditor {
 
   render() {
     if (!this.container) return;
-    const room = roomDimensions(this.document);
-    const radius = sensorMountRadius(this.document);
-    const allowMmwaveExterior = mmwaveExteriorAllowed(this.document);
-    const entities = geometryEntities(this.document);
+   const room = roomDimensions(this.document);
+   const radius = sensorMountRadius(this.document);
+   const allowMmwaveExterior = mmwaveExteriorAllowed(this.document);
+   const entities = geometryEntities(this.document);
+    const calibrationMarkers = calibrationEntities(this.document);
+    const markersMarkup = entities.map((entity) => markerMarkup(entity, room, this.selectedIds, radius)).join('')
+      + calibrationMarkers.map((entity) => markerMarkup(entity, room, this.selectedIds, radius)).join('');
     this.selectedIds = (Array.isArray(this.selectedIds) ? this.selectedIds : [])
       .filter((id) => SELECTABLE_IDS.includes(id))
       .slice(0, 2);
@@ -1375,9 +1525,9 @@ export class RoomGeometryEditor {
     const coordinateMarker = selectedMarker || (selectedEntities.length === 1 && selectedEntities[0].role !== 'wall' ? selectedEntities[0] : null);
     const selectedPosition = coordinateMarker?.position_m || [0, 0, 0];
     const selectionLabel = this.selectedIds.length
-      ? this.selectedIds.map((id) => wallLabel(id)).join(' · ')
+      ? this.selectedIds.map((id) => selectableLabel(id)).join(' · ')
       : 'Keine Auswahl';
-    const pairLabel = selectedPair?.map((entity) => entity.role === 'wall' ? entity.label : entity.id).join(' · ');
+    const pairLabel = selectedPair?.map((entity) => entity.role === 'wall' ? entity.label : selectableLabel(entity.id)).join(' · ');
     const distanceBounds = wallPair
       ? 'min="0.1"'
       : pairWall
@@ -1393,6 +1543,10 @@ export class RoomGeometryEditor {
     const coordinateMarkup = coordinateMarker
       ? `<div class="occ-cad-inspector-section"><span class="occ-cad-section-label">${escapeHTML(coordinateMarker.id)} [x / y / z] m</span><div class="occ-cad-dimension-grid">${inspectorInput('x', selectedPosition[0], `${coordinateMarker.id}.0`)}${inspectorInput('y', selectedPosition[1], `${coordinateMarker.id}.1`)}${inspectorInput('z', selectedPosition[2], `${coordinateMarker.id}.2`)}</div></div>`
       : `<div class="occ-cad-inspector-section"><span class="occ-cad-section-label">${escapeHTML(selectionLabel)}</span><p class="occ-cad-helper">Shift: TX, RX oder mmWave + Wand für Abstand; oder zwei gegenüberliegende Wände für den Raumabstand.</p></div>`;
+    const calibrationDevice = calibrationDeviceId(coordinateMarker?.id);
+    const calibrationMarkup = calibrationDevice
+      ? `<div class="occ-cad-inspector-section"><span class="occ-cad-section-label">${escapeHTML(calibrationDevice)} · optionaler Ground Truth</span><p class="occ-cad-helper">Die kleine Bodenmarkierung beschreibt deinen tatsächlichen Standpunkt. Ohne eigene Position wird die Geräteposition verwendet.</p>${hasCalibrationPosition(this.document, calibrationDevice) ? '<button type="button" class="occ-button occ-button-quiet" data-cad-action="clear-calibration-position">Geräteposition wieder als Fallback verwenden</button>' : '<p class="occ-cad-helper">Aktuell: Geräteposition als Fallback. Ziehe die Markierung, um den Standpunkt festzulegen.</p>'}</div>`
+      : '';
     const mmwaveOrientationInspector = coordinateMarker?.id === MMWAVE_ID
       ? `<div class="occ-cad-inspector-section" data-cad-mmwave-orientation><span class="occ-cad-section-label">Blickrichtung</span><label class="occ-cad-input"><span>Basis-Yaw (°)</span><input type="number" min="-360" max="360" step="0.1" data-cad-mmwave-yaw value="${escapeHTML(mmwaveYawMdeg(this.document) / 1000)}"></label><button type="button" class="occ-button occ-button-quiet" data-cad-action="aim-mmwave-rx1">Auf RX1 ausrichten</button><label class="occ-cad-checkbox"><input type="checkbox" data-cad-mmwave-raw-x ${this.document?.mmwave?.raw_x_inverted === true ? 'checked' : ''}><span>Radar-Links/Rechts spiegeln</span></label>${this.yawCalibration && Number(this.yawCalibration.base_yaw_mdeg) === mmwaveYawMdeg(this.document) ? `<p class="occ-cad-helper"><strong>Kalibriert wirksam: ${(Number(this.yawCalibration.optimized_yaw_mdeg) / 1000).toFixed(1)}°</strong> · Korrektur ${(Number(this.yawCalibration.correction_mdeg) / 1000).toFixed(1)}° aus ${escapeHTML(this.yawCalibration.point_count)} RX/TX-Punkten.</p>` : ''}<p class="occ-cad-helper">Linie = wirksame Blickrichtung · Fläche = ${MMWAVE_HORIZONTAL_FOV_DEG}° Sichtfeld · Griff ziehen oder Basiswinkel exakt eingeben. Eine manuelle Änderung ersetzt die angezeigte Kalibrierkorrektur im Entwurf. Die Spiegelung bleibt unabhängig vom Winkel.</p></div>`
       : '';
@@ -1403,7 +1557,7 @@ export class RoomGeometryEditor {
         : '';
     this.container.innerHTML = `
       <div class="occ-cad-toolbar">
-          <div><span class="occ-cad-kicker">CAD / TOPPLAN</span><strong>Raum</strong><small>Klick: Auswahl · Leer: löschen · Shift: zweites Element · Drag: x/z · y: Höhe</small><div class="occ-cad-legend">${['TX', 'RX1', 'RX2', 'RX3', 'RX4', MMWAVE_ID].map((id) => `<span class="occ-cad-legend-item"><i class="occ-cad-swatch occ-cad-swatch-${id.toLowerCase()}" aria-hidden="true"></i>${id}</span>`).join('')}</div></div>
+          <div><span class="occ-cad-kicker">CAD / TOPPLAN</span><strong>Raum</strong><small>Klick: Auswahl · Leer: löschen · Shift: zweites Element · Drag: x/z · y: Höhe</small><div class="occ-cad-legend">${['TX', 'RX1', 'RX2', 'RX3', 'RX4', MMWAVE_ID].map((id) => `<span class="occ-cad-legend-item"><i class="occ-cad-swatch occ-cad-swatch-${id.toLowerCase()}" aria-hidden="true"></i>${id}</span>`).join('')}<span class="occ-cad-legend-item">·K = Kalibrierstandpunkt</span></div></div>
         <div class="occ-cad-toolbar-actions"><span data-cad-validation class="occ-cad-validation ${validation.valid ? 'is-valid' : 'is-invalid'}">${validation.valid ? 'GEOMETRIE GÜLTIG' : `${validation.errors.length} BLOCKER`}</span><button type="button" class="occ-button occ-button-primary" data-cad-action="calculate-mmwave-placement">mmWave-Position berechnen</button><button type="button" class="occ-button occ-button-primary" data-cad-action="save-positions" ${this.saveDisabled ? 'disabled' : ''}>Geometrie speichern</button><button type="button" class="occ-button occ-button-quiet" data-cad-action="toggle-snap">Rasterfang ${this.snap ? 'AN' : 'AUS'}</button></div>
       </div>
       <div class="occ-cad-layout">
@@ -1413,6 +1567,7 @@ export class RoomGeometryEditor {
             <rect class="occ-cad-surface" x="0" y="0" width="${VIEWBOX.width}" height="${VIEWBOX.height}"></rect>
             ${sensorZoneMarkup(radius)}
             <rect class="occ-cad-minor-grid" x="${VIEWBOX.plot.x}" y="${VIEWBOX.plot.y}" width="${VIEWBOX.plot.width}" height="${VIEWBOX.plot.height}" fill="url(#occCadMinorGrid)"></rect>
+            ${roomTitleMarkup(room, this.setupSource)}
             <g class="occ-cad-grid-lines">${gridMarkup(room, radius)}</g>
             ${rulerMarkup(room, radius)}
             ${roomRectMarkup(room, radius)}
@@ -1420,8 +1575,7 @@ export class RoomGeometryEditor {
             <g class="occ-cad-walls">${wallMarkup(room, this.selectedIds, radius)}</g>
             ${axisMarkup(room, radius)}
             ${selectionLine}
-            <g class="occ-cad-markers">${entities.map((entity) => markerMarkup(entity, room, this.selectedIds, radius)).join('')}</g>
-            <text class="occ-cad-room-label" x="${worldToSvg([0, 0, 0], room, radius).x + 12}" y="${worldToSvg([0, 0, 0], room, radius).y + 24}">${formatNumber(room[0])} × ${formatNumber(room[2])} m · H ${formatNumber(room[1])} m</text>
+            <g class="occ-cad-markers">${markersMarkup}</g>
           </svg>
         </div>
         <aside class="occ-cad-inspector" aria-label="CAD Inspector">
@@ -1431,6 +1585,7 @@ export class RoomGeometryEditor {
           <div class="occ-cad-inspector-section"><span class="occ-cad-section-label">Sensorzone</span><label class="occ-cad-input"><span>Außenradius (m)</span><input type="number" min="0" max="${MAX_SENSOR_MOUNT_RADIUS_M}" step="0.05" data-cad-sensor-radius value="${escapeHTML(formatNumber(radius))}"></label><label class="occ-cad-checkbox"><input type="checkbox" data-cad-mmwave-exterior ${allowMmwaveExterior ? 'checked' : ''}><span>mmWave darf außerhalb des Raums montiert werden</span></label><p class="occ-cad-helper">${allowMmwaveExterior ? 'TX, RX und mmWave dürfen den eingestellten Außenradius nutzen; Y bleibt im Raum.' : 'Innenraum-only: mmWave muss vollständig innerhalb der Raumgrenzen liegen. TX/RX behalten den Außenradius.'}</p></div>
           ${selectedPair ? `<div class="occ-cad-inspector-section occ-cad-distance-section"><span class="occ-cad-section-label">${wallPair ? 'Abstand zwischen Wänden' : pairWall ? 'Abstand zur Wand' : 'Abstand in der Draufsicht'}</span>${pairDistanceMarkup}</div>` : ''}
           ${coordinateMarkup}
+          ${calibrationMarkup}
           ${mmwaveOrientationInspector}
           ${placementMarkup}
           <p class="occ-cad-helper">Ziehen/Pfeile. Raster 5 cm. Speichern übernimmt.</p>

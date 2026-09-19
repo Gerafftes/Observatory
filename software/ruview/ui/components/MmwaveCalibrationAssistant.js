@@ -10,8 +10,27 @@ const EMPTY_REFERENCE_MIN_SECONDS = 60;
 const EMPTY_REFERENCE_DEFAULT_SECONDS = 65;
 const CALIBRATION_MIN_LEAD_SECONDS = 5;
 const CALIBRATION_DEFAULT_LEAD_SECONDS = 5;
-const FIXED_POINT_MEASUREMENT_MS = 1500;
+const FIXED_POINT_MEASUREMENT_MS = 10_000;
 const CALIBRATION_TIMER_MS = 250;
+const REPEAT_RESET_SESSION_KEY = 'ruview.mmwave.fixed-point-repeat-reset';
+let repeatResetActive = false;
+
+function repeatResetStored() {
+  try {
+    return globalThis.sessionStorage?.getItem(REPEAT_RESET_SESSION_KEY) === 'true';
+  } catch {
+    return false;
+  }
+}
+
+function storeRepeatReset(value) {
+  try {
+    if (value) globalThis.sessionStorage?.setItem(REPEAT_RESET_SESSION_KEY, 'true');
+    else globalThis.sessionStorage?.removeItem(REPEAT_RESET_SESSION_KEY);
+  } catch {
+    // Private browsing or a disabled storage area must not block calibration.
+  }
+}
 
 export function mmwaveAssistantViewModel(status) {
   const rawSession = status?.session || null;
@@ -175,6 +194,7 @@ export class MmwaveCalibrationAssistant {
     this.actionError = '';
     this.statusError = '';
     this.calibrationPlan = null;
+    this.fixedPointResultDismissed = repeatResetActive || repeatResetStored();
     this.calibrationTimer = null;
     this.pointCheck = null;
   }
@@ -277,7 +297,14 @@ export class MmwaveCalibrationAssistant {
       if (!response.ok) {
         throw new Error(payload.error || `Statusabfrage: HTTP ${response.status}`);
       }
-      this.status = payload;
+      if (payload?.fixed_point_calibration?.state === 'active') {
+        repeatResetActive = false;
+        this.fixedPointResultDismissed = false;
+        storeRepeatReset(false);
+      }
+      this.status = this.fixedPointResultDismissed
+        ? { ...payload, fixed_point_calibration: null, yaw_calibration: null }
+        : payload;
       const session = this.status?.session;
       if (session?.lifecycle && session.lifecycle !== 'active') {
         this.calibrationPlan = null;
@@ -285,9 +312,10 @@ export class MmwaveCalibrationAssistant {
         this.calibrationPlan = null;
       } else if (!this.status?.session && ['phase_two_starting', 'collecting'].includes(this.calibrationPlan?.phase)) {
         this.calibrationPlan = null;
-      } else if (!session && this.status?.fixed_point_calibration?.state === 'complete') {
+      } else if (!session && !this.calibrationPlan
+        && this.status?.fixed_point_calibration?.state === 'complete') {
         this.calibrationPlan = {
-          ...(this.calibrationPlan || this._defaultCalibrationPlan()),
+          ...this._defaultCalibrationPlan(),
           phase: 'phase_two_ready',
         };
       } else if (!session && this.status?.fixed_point_calibration?.state === 'active'
@@ -330,7 +358,7 @@ export class MmwaveCalibrationAssistant {
       return;
     }
     if (action === 'repeat-yaw-calibration') {
-      this._prepareCalibration();
+      await this._repeatYawCalibration();
       return;
     }
     const requests = {
@@ -385,6 +413,42 @@ export class MmwaveCalibrationAssistant {
     this.calibrationPlan = this._defaultCalibrationPlan();
     this._clearActionError();
     this._render();
+  }
+
+  async _repeatYawCalibration() {
+    this._clearCalibrationTimer();
+    this._clearActionError();
+    repeatResetActive = true;
+    this.fixedPointResultDismissed = true;
+    storeRepeatReset(true);
+    this.status = this.status
+      ? { ...this.status, fixed_point_calibration: null, yaw_calibration: null }
+      : this.status;
+    this.calibrationPlan = null;
+    this.busy = true;
+    this._render();
+    try {
+      const response = await fetch(MM_WAVE_FIXED_POINTS_CANCEL_ENDPOINT, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: '{}',
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(payload.error || `Zurücksetzen fehlgeschlagen: HTTP ${response.status}`);
+      }
+      this.status = {
+        ...this.status,
+        ...payload,
+        fixed_point_calibration: null,
+        yaw_calibration: null,
+      };
+    } catch (error) {
+      this._setActionError(error.message || 'Die alte Winkelmessung konnte nicht zurückgesetzt werden.');
+    } finally {
+      this.busy = false;
+      this._render();
+    }
   }
 
   _defaultCalibrationPlan() {
@@ -524,7 +588,7 @@ export class MmwaveCalibrationAssistant {
         <div class="mmwave-preparation">
           <div class="mmwave-eyebrow">ZWEI PHASEN</div>
           <h4>Zuerst RX1–RX4 und TX, danach CSI</h4>
-          <p>Vor jedem festen Punkt läuft derselbe Vorlauf. Danach bitte kurz stillstehen. Aus allen fünf Messpunkten berechnet der Server gemeinsam den Winkel mit dem kleinsten Gesamtfehler.</p>
+          <p>Vor jedem festen Punkt läuft derselbe Vorlauf. Danach bitte 10 Sekunden stillstehen. Aus allen fünf Messpunkten berechnet der Server gemeinsam den Winkel mit dem kleinsten Gesamtfehler.</p>
           <form id="mmwaveCalibrationPrepareForm" class="mmwave-preparation-form">
             <label><span>Wegezeit je Punkt (Sekunden)</span><input name="lead_seconds" type="number" min="${CALIBRATION_MIN_LEAD_SECONDS}" step="1" value="${plan.leadSeconds}" required></label>
             <label><span>Punkttoleranz (mm)</span><input name="tolerance_mm" type="number" min="50" max="2000" step="10" value="${plan.toleranceMm}" required></label>
@@ -544,7 +608,7 @@ export class MmwaveCalibrationAssistant {
         <div class="mmwave-preparation">
           <div class="mmwave-eyebrow">PHASE 1 · FESTE PUNKTE</div>
           <h4>Als Nächstes: ${escapeHTML(fixed?.current_anchor_id || '--')}</h4>
-          <p>Starte den Vorlauf, gehe zu diesem Gerät und bleibe anschließend für die Messung ruhig stehen.</p>
+          <p>Starte den Vorlauf, gehe zum markierten Kalibrierstandpunkt <strong>${escapeHTML(fixed?.current_anchor_id || '--')}</strong> und bleibe anschließend für die 10-sekündige Messung ruhig stehen.</p>
           ${anchorProgress}
           <div class="mmwave-preparation-actions">
             <button type="button" data-mmwave-action="start-anchor-countdown" class="mmwave-primary-button">${escapeHTML(fixed?.current_anchor_id || 'Punkt')} starten</button>
@@ -557,16 +621,16 @@ export class MmwaveCalibrationAssistant {
         <div class="mmwave-preparation is-countdown">
           <div class="mmwave-eyebrow">PHASE 1 · ${escapeHTML(fixed?.current_anchor_id || plan.anchorId || '')}</div>
           <h4>Noch ${this._calibrationRemainingSeconds()} s bis zur Messung</h4>
-          <p>Gehe jetzt zu ${escapeHTML(fixed?.current_anchor_id || plan.anchorId || 'dem Punkt')}.</p>
+          <p>Gehe jetzt zum markierten Kalibrierstandpunkt ${escapeHTML(fixed?.current_anchor_id || plan.anchorId || 'dem Punkt')}.</p>
           ${anchorProgress}
           <button type="button" data-mmwave-action="cancel-calibration-preparation" class="mmwave-secondary-button">Phase 1 abbrechen</button>
         </div>`;
     }
     if (plan?.phase === 'anchor_measuring') {
-      return `<div class="mmwave-preparation is-countdown"><div class="mmwave-eyebrow">PHASE 1 · MESSUNG</div><h4>Bei ${escapeHTML(fixed?.current_anchor_id || plan.anchorId || '')} stillstehen …</h4><p>Radar-Samples werden jetzt gesammelt.</p>${anchorProgress}</div>`;
+      return `<div class="mmwave-preparation is-countdown"><div class="mmwave-eyebrow">PHASE 1 · MESSUNG</div><h4>Bei ${escapeHTML(fixed?.current_anchor_id || plan.anchorId || '')} noch ${this._calibrationRemainingSeconds()} s stillstehen</h4><p>Radar-Samples werden jetzt gesammelt.</p>${anchorProgress}</div>`;
     }
     if (plan?.phase === 'anchor_failed') {
-      return `<div class="mmwave-preparation"><div class="mmwave-eyebrow">PHASE 1 · KEINE MESSUNG</div><h4>${escapeHTML(fixed?.current_anchor_id || plan?.anchorId || '')} erneut messen</h4><p>Im Messfenster wurde kein frisches einzelnes Radarziel erfasst. Bleibe allein und ruhig am Punkt und wiederhole den Vorlauf.</p>${anchorProgress}<div class="mmwave-preparation-actions"><button type="button" data-mmwave-action="retry-anchor" class="mmwave-primary-button">Erneut versuchen</button><button type="button" data-mmwave-action="cancel-calibration-preparation" class="mmwave-secondary-button">Phase 1 abbrechen</button></div></div>`;
+      return `<div class="mmwave-preparation"><div class="mmwave-eyebrow">PHASE 1 · KEINE MESSUNG</div><h4>${escapeHTML(fixed?.current_anchor_id || plan?.anchorId || '')} erneut messen</h4><p>Im Messfenster wurde kein frisches einzelnes Radarziel erfasst. Bleibe allein und ruhig am markierten Kalibrierstandpunkt und wiederhole den Vorlauf.</p>${anchorProgress}<div class="mmwave-preparation-actions"><button type="button" data-mmwave-action="retry-anchor" class="mmwave-primary-button">Erneut versuchen</button><button type="button" data-mmwave-action="cancel-calibration-preparation" class="mmwave-secondary-button">Phase 1 abbrechen</button></div></div>`;
     }
     if (plan?.phase === 'phase_two_ready') {
       return `<div class="mmwave-preparation"><div class="mmwave-eyebrow">PHASE 1 ABGESCHLOSSEN</div><h4>Phase 2 · CSI-Kalibrierung</h4><p>RX1–RX4 und TX wurden einzeln erfasst. Die gemeinsame Winkelkorrektur gilt jetzt für alle weiteren Radarpositionen. Phase 2 erstellt zuerst die CSI-Leerreferenz; danach gehst du langsam durch alle Bereiche des Raums.</p>${anchorProgress}${this._yawCalibrationMarkup(fixed?.yaw_calibration || this.status?.yaw_calibration)}<div class="mmwave-preparation-actions"><button type="button" data-mmwave-action="start-phase-two" class="mmwave-primary-button" ${this.status?.preflight?.ready && !this.busy ? '' : 'disabled'}>Phase 2 starten</button><button type="button" data-mmwave-action="repeat-yaw-calibration" class="mmwave-secondary-button" ${this.busy ? 'disabled' : ''}>Winkelmessung wiederholen</button></div>${this._startRequirement(this.status)}</div>`;
@@ -591,7 +655,10 @@ export class MmwaveCalibrationAssistant {
       });
       const payload = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(payload.error || `Phase 1 konnte nicht starten: HTTP ${response.status}`);
-      this.status = { ...this.status, ...payload };
+      repeatResetActive = false;
+      this.fixedPointResultDismissed = false;
+      storeRepeatReset(false);
+      this.status = { ...this.status, ...payload, yaw_calibration: null };
       this.calibrationPlan = { ...this.calibrationPlan, phase: 'anchor_waiting' };
     } catch (error) {
       this._setActionError(error.message || 'Phase 1 konnte nicht gestartet werden.');
@@ -861,6 +928,9 @@ export class MmwaveCalibrationAssistant {
           <button data-mmwave-action="stop" class="mmwave-secondary-button" ${this.busy ? 'disabled' : ''}>Stoppen</button>
         `;
       }
+    }
+    if (this.calibrationPlan && this.calibrationPlan.phase !== 'form') {
+      return this._calibrationPreparationMarkup();
     }
     if (!model.connected) {
       return `

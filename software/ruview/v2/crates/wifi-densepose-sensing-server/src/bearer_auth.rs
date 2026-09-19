@@ -8,7 +8,8 @@
 //! keeps local development convenient without leaving a LAN API open by
 //! default.
 //!
-//! `/ws/sensing` and `/ws/introspection` require the same token when configured.
+//! `/api/field`, `/ws/sensing`, `/ws/introspection`, and `/ws/field` require
+//! the same token when configured.
 //! Browsers may offer `ruview.v1` and `ruview.bearer.<hex UTF-8 token>` in
 //! Sec-WebSocket-Protocol. Only `ruview.v1` is negotiated back to the client;
 //! the credential is never echoed. Health probes and static UI remain public.
@@ -43,8 +44,12 @@ const WS_TOKEN_PREFIX: &str = "ruview.bearer.";
 fn is_live_websocket(path: &str) -> bool {
     matches!(
         path,
-        "/ws/sensing" | "/ws/introspection" | "/api/v1/stream/pose"
+        "/ws/sensing" | "/ws/introspection" | "/ws/field" | "/api/v1/stream/pose"
     )
+}
+
+fn is_protected_path(path: &str) -> bool {
+    path.starts_with(PROTECTED_PREFIX) || path == "/api/field" || is_live_websocket(path)
 }
 
 fn websocket_token_matches(headers: &HeaderMap, expected: &str) -> bool {
@@ -133,8 +138,9 @@ pub async fn require_bearer(
     let Some(expected) = auth.token.clone() else {
         return next.run(request).await;
     };
-    let websocket = is_live_websocket(request.uri().path());
-    if !websocket && !request.uri().path().starts_with(PROTECTED_PREFIX) {
+    let path = request.uri().path();
+    let websocket = is_live_websocket(path);
+    if !is_protected_path(path) {
         return next.run(request).await;
     }
     let supplied = request
@@ -186,7 +192,9 @@ mod tests {
         Router::new()
             .route("/ws/sensing", get(|| async { "ok" }))
             .route("/ws/introspection", get(|| async { "ok" }))
+            .route("/ws/field", get(|| async { "ok" }))
             .route("/api/v1/stream/pose", get(|| async { "ok" }))
+            .route("/api/field", get(|| async { "ok" }))
             .route("/health", get(|| async { "ok" }))
             .route("/api/v1/info", get(|| async { "ok" }))
             .route("/api/v1/sensitive", axum::routing::post(|| async { "ok" }))
@@ -207,7 +215,12 @@ mod tests {
             .collect();
         let valid = format!("ruview.v1, ruview.bearer.{encoded}");
         let duplicate = format!("{valid}, ruview.bearer.{encoded}");
-        for path in ["/ws/sensing", "/ws/introspection", "/api/v1/stream/pose"] {
+        for path in [
+            "/ws/sensing",
+            "/ws/introspection",
+            "/ws/field",
+            "/api/v1/stream/pose",
+        ] {
             for (protocol, expected) in [
                 (None, StatusCode::UNAUTHORIZED),
                 (Some("ruview.v1"), StatusCode::UNAUTHORIZED),
@@ -313,6 +326,14 @@ mod tests {
             StatusCode::OK
         );
         assert_eq!(
+            status(r.clone(), "GET", "/api/field", None).await,
+            StatusCode::OK
+        );
+        assert_eq!(
+            status(r.clone(), "GET", "/ws/field", None).await,
+            StatusCode::OK
+        );
+        assert_eq!(
             status(r, "GET", "/ui/index.html", None).await,
             StatusCode::OK
         );
@@ -326,7 +347,11 @@ mod tests {
             StatusCode::UNAUTHORIZED
         );
         assert_eq!(
-            status(r, "POST", "/api/v1/sensitive", None).await,
+            status(r.clone(), "POST", "/api/v1/sensitive", None).await,
+            StatusCode::UNAUTHORIZED
+        );
+        assert_eq!(
+            status(r, "GET", "/api/field", None).await,
             StatusCode::UNAUTHORIZED
         );
     }
@@ -372,7 +397,11 @@ mod tests {
         req.headers_mut()
             .insert(AUTHORIZATION, "Basic s3cr3t".parse().unwrap());
         assert_eq!(
-            r.oneshot(req).await.unwrap().status(),
+            r.clone().oneshot(req).await.unwrap().status(),
+            StatusCode::UNAUTHORIZED
+        );
+        assert_eq!(
+            status(r, "GET", "/api/field", Some("nope")).await,
             StatusCode::UNAUTHORIZED
         );
     }
@@ -385,7 +414,11 @@ mod tests {
             StatusCode::OK
         );
         assert_eq!(
-            status(r, "POST", "/api/v1/sensitive", Some("s3cr3t")).await,
+            status(r.clone(), "POST", "/api/v1/sensitive", Some("s3cr3t")).await,
+            StatusCode::OK
+        );
+        assert_eq!(
+            status(r, "GET", "/api/field", Some("s3cr3t")).await,
             StatusCode::OK
         );
     }
@@ -471,7 +504,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn enabled_never_gates_paths_outside_api_v1() {
+    async fn enabled_leaves_public_paths_ungated() {
         let r = wrap(AuthState::from_token("s3cr3t"));
         // Even with auth ON, `/health` and `/ui/*` are reachable without a token:
         // orchestrator probes and the local UI need to load unchallenged.

@@ -57,13 +57,12 @@ export class HealthService {
 
     // Initial check (silent on failure — DensePose API may not be running)
     this.getSystemHealth().catch(() => {
-      // DensePose API not running — sensing-only mode, skip polling
-      this._backendUnavailable = true;
+      // The periodic check below can recover after a transient outage.
     });
 
-    // Set up periodic checks only if backend was reachable
+    // Keep polling after failures so a transient server restart can recover in
+    // the browser without a page reload.
     this.healthCheckInterval = setInterval(() => {
-      if (this._backendUnavailable) return;
       this.getSystemHealth().catch(error => {
         this.notifySubscribers({
           status: 'error',

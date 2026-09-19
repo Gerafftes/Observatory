@@ -759,10 +759,10 @@ Rejected. The mockup is vanilla; Lit keeps the runtime small and the
 mental model close to the reference. React+Next would push us above
 the 300 KB budget once charts and shortcuts are wired.
 
-### 13.2 Tauri desktop app
-Rejected for V1. The user explicitly asked for Vite + GitHub Pages.
-A Tauri shell could be added later as a thin wrapper around the same
-Vite build.
+### 13.2 Native shell wrapper
+Rejected for V1 and not pursued later. The supported deployment is the browser
+UI with the sensing server and loopback control helper; a native shell would
+duplicate the retired desktop surface.
 
 ### 13.3 Server-only (no WASM)
 Rejected. WASM mode is the GitHub-Pages "instant demo" path. A

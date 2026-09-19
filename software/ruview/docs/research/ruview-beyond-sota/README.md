@@ -8,6 +8,12 @@ Produced by a 5-agent hierarchical research swarm (system reviewer, SOTA
 surveyor, architect, benchmark methodologist, performance analyst) plus a
 validation pass run against the working tree.
 
+> **Historical snapshot note (2026-09-18).** This report predates retirement of
+> the `wifi-densepose-desktop` crate. The excluded-desktop command and metrics
+> below describe that earlier workspace; the current workspace has no desktop
+> package. The current equivalent workspace gate is
+> `cargo test --workspace --no-default-features`.
+
 ## Documents
 
 | Doc | Scope | One-line takeaway |

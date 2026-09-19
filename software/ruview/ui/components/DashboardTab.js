@@ -4,434 +4,205 @@ import { healthService } from '../services/health.service.js';
 import { poseService } from '../services/pose.service.js';
 import { sensingService } from '../services/sensing.service.js';
 
+const LIVE_DATA_SOURCES = new Set(['live', 'server-simulated']);
+
 export class DashboardTab {
   constructor(containerElement) {
     this.container = containerElement;
-    this.statsElements = {};
     this.healthSubscription = null;
     this.statsInterval = null;
   }
 
-  // Initialize component
   async init() {
-    this.cacheElements();
     await this.loadInitialData();
     this.startMonitoring();
   }
 
-  // Cache DOM elements
-  cacheElements() {
-    // System stats
-    const statsContainer = this.container.querySelector('.system-stats');
-    if (statsContainer) {
-      this.statsElements = {
-        bodyRegions: statsContainer.querySelector('[data-stat="body-regions"] .stat-value'),
-        samplingRate: statsContainer.querySelector('[data-stat="sampling-rate"] .stat-value'),
-        accuracy: statsContainer.querySelector('[data-stat="accuracy"] .stat-value'),
-        hardwareCost: statsContainer.querySelector('[data-stat="hardware-cost"] .stat-value')
-      };
-    }
-
-    // Status indicators
-    this.statusElements = {
-      apiStatus: this.container.querySelector('.api-status'),
-      streamStatus: this.container.querySelector('.stream-status'),
-      hardwareStatus: this.container.querySelector('.hardware-status')
-    };
-  }
-
-  // Load initial data
   async loadInitialData() {
     try {
-      // Get API info
       const info = await healthService.getApiInfo();
       this.updateApiInfo(info);
-
-      // Get current stats
-      const stats = await poseService.getStats(1);
-      this.updateStats(stats);
-
     } catch (error) {
-      // DensePose API may not be running (sensing-only mode) — fail silently
-      console.log('Dashboard: DensePose API not available (sensing-only mode)');
+      console.log('Dashboard: API info not available');
     }
   }
 
-  // Start monitoring
   startMonitoring() {
-    // Subscribe to health updates
-    this.healthSubscription = healthService.subscribeToHealth(health => {
+    this.healthSubscription = healthService.subscribeToHealth((health) => {
       this.updateHealthStatus(health);
     });
 
-    // Subscribe to sensing service state changes for data source indicator
     this._sensingUnsub = sensingService.onStateChange(() => {
       this.updateDataSourceIndicator();
     });
-    // Also update on data — catches source changes mid-stream
     this._sensingDataUnsub = sensingService.onData(() => {
       this.updateDataSourceIndicator();
     });
-    // Initial update
     this.updateDataSourceIndicator();
 
-    // Start periodic stats updates
     this.statsInterval = setInterval(() => {
       this.updateLiveStats();
     }, 5000);
 
-    // Start health monitoring
     healthService.startHealthMonitoring(30000);
   }
 
-  // Update the data source indicator on the dashboard
   updateDataSourceIndicator() {
-    const el = this.container.querySelector('#dashboard-datasource');
-    if (!el) return;
-    const ds = sensingService.dataSource;
-    const statusText = el.querySelector('.status-text');
-    const statusMsg  = el.querySelector('.status-message');
+    const element = this.container.querySelector('#dashboard-datasource');
+    if (!element) return;
+
+    const statusText = element.querySelector('.status-text');
+    const statusMessage = element.querySelector('.status-message');
     const config = {
-      'live':              { text: 'ESP32',     status: 'healthy', msg: 'Real hardware connected' },
-      'server-simulated':  { text: 'SIMULATED', status: 'warning', msg: 'Server running without hardware' },
-      'reconnecting':      { text: 'RECONNECTING', status: 'degraded', msg: 'Attempting to connect...' },
-      'simulated':         { text: 'OFFLINE',   status: 'unhealthy', msg: 'Server unreachable, local fallback' },
+      live: {
+        text: 'ESP32',
+        status: 'healthy',
+        message: 'Real hardware connected',
+      },
+      'server-simulated': {
+        text: 'SIMULATED',
+        status: 'warning',
+        message: 'Server is providing synthetic data',
+      },
+      'server-offline': {
+        text: 'OFFLINE',
+        status: 'unhealthy',
+        message: 'Server reachable, no fresh hardware frame',
+      },
+      reconnecting: {
+        text: 'RECONNECTING',
+        status: 'degraded',
+        message: 'Attempting to connect…',
+      },
     };
-    const cfg = config[ds] || config['reconnecting'];
-    el.className = `component-status status-${cfg.status}`;
-    if (statusText) statusText.textContent = cfg.text;
-    if (statusMsg)  statusMsg.textContent = cfg.msg;
+    const state = config[sensingService.dataSource] || config.reconnecting;
+
+    element.className = `component-status status-${state.status}`;
+    if (statusText) statusText.textContent = state.text;
+    if (statusMessage) statusMessage.textContent = state.message;
   }
 
-  // Update API info display
   updateApiInfo(info) {
-    // Update version
     const versionElement = this.container.querySelector('.api-version');
-    if (versionElement && info.version) {
+    if (versionElement && info?.version) {
       versionElement.textContent = `v${info.version}`;
     }
-
-    // Update environment
-    const envElement = this.container.querySelector('.api-environment');
-    if (envElement && info.environment) {
-      envElement.textContent = info.environment;
-      envElement.className = `api-environment env-${info.environment}`;
-    }
-
-    // Update features status
-    if (info.features) {
-      this.updateFeatures(info.features);
-    }
   }
 
-  // Update features display
-  updateFeatures(features) {
-    const featuresContainer = this.container.querySelector('.features-status');
-    if (!featuresContainer) return;
-
-    featuresContainer.innerHTML = '';
-    
-    Object.entries(features).forEach(([feature, enabled]) => {
-      const featureElement = document.createElement('div');
-      featureElement.className = `feature-item ${enabled ? 'enabled' : 'disabled'}`;
-      
-      // Use textContent instead of innerHTML to prevent XSS
-      const featureNameSpan = document.createElement('span');
-      featureNameSpan.className = 'feature-name';
-      featureNameSpan.textContent = this.formatFeatureName(feature);
-      
-      const featureStatusSpan = document.createElement('span');
-      featureStatusSpan.className = 'feature-status';
-      featureStatusSpan.textContent = enabled ? '✓' : '✗';
-      
-      featureElement.appendChild(featureNameSpan);
-      featureElement.appendChild(featureStatusSpan);
-      featuresContainer.appendChild(featureElement);
-    });
-  }
-
-  // Update health status
   updateHealthStatus(health) {
     if (!health) return;
 
-    // Update overall status
     const overallStatus = this.container.querySelector('.overall-health');
-    if (overallStatus) {
+    if (overallStatus && health.status) {
       overallStatus.className = `overall-health status-${health.status}`;
       overallStatus.textContent = health.status.toUpperCase();
     }
 
-    // Update component statuses
-    if (health.components) {
-      Object.entries(health.components).forEach(([component, status]) => {
-        this.updateComponentStatus(component, status);
-      });
-    }
-
-    // Update metrics
-    if (health.metrics) {
-      this.updateSystemMetrics(health.metrics);
-    }
+    Object.entries(health.components || {}).forEach(([component, status]) => {
+      this.updateComponentStatus(component, status);
+    });
   }
 
-  // Update component status
   updateComponentStatus(component, status) {
-    // Map backend component names to UI component names
     const componentMap = {
-      'pose': 'inference',
-      'stream': 'streaming',
-      'hardware': 'hardware'
+      pose: 'inference',
+      stream: 'streaming',
+      hardware: 'hardware',
     };
-    
-    const uiComponent = componentMap[component] || component;
-    const element = this.container.querySelector(`[data-component="${uiComponent}"]`);
-    
-    if (element) {
-      element.className = `component-status status-${status.status}`;
-      const statusText = element.querySelector('.status-text');
-      const statusMessage = element.querySelector('.status-message');
-      
-      if (statusText) {
-        statusText.textContent = status.status.toUpperCase();
-      }
-      
-      if (statusMessage && status.message) {
-        statusMessage.textContent = status.message;
-      }
-    }
-    
-    // Also update API status based on overall health
-    if (component === 'hardware') {
-      const apiElement = this.container.querySelector(`[data-component="api"]`);
-      if (apiElement) {
-        apiElement.className = `component-status status-healthy`;
-        const apiStatusText = apiElement.querySelector('.status-text');
-        const apiStatusMessage = apiElement.querySelector('.status-message');
-        
-        if (apiStatusText) {
-          apiStatusText.textContent = 'HEALTHY';
-        }
-        
-        if (apiStatusMessage) {
-          apiStatusMessage.textContent = 'API server is running normally';
-        }
-      }
-    }
+    const element = this.container.querySelector(
+      `[data-component="${componentMap[component] || component}"]`,
+    );
+    if (!element) return;
+
+    const state = status?.status || 'unknown';
+    element.className = `component-status status-${state}`;
+    const statusText = element.querySelector('.status-text');
+    const statusMessage = element.querySelector('.status-message');
+    if (statusText) statusText.textContent = state.toUpperCase();
+    if (statusMessage) statusMessage.textContent = status?.message || '';
   }
 
-  // Update system metrics
-  updateSystemMetrics(metrics) {
-    // Handle both flat and nested metric structures
-    // Backend returns system_metrics.cpu.percent, mock returns metrics.cpu.percent
-    const systemMetrics = metrics.system_metrics || metrics;
-    const cpuPercent = systemMetrics.cpu?.percent || systemMetrics.cpu_percent;
-    const memoryPercent = systemMetrics.memory?.percent || systemMetrics.memory_percent;
-    const diskPercent = systemMetrics.disk?.percent || systemMetrics.disk_percent;
-
-    // CPU usage
-    const cpuElement = this.container.querySelector('.cpu-usage');
-    if (cpuElement && cpuPercent !== undefined) {
-      cpuElement.textContent = `${cpuPercent.toFixed(1)}%`;
-      this.updateProgressBar('cpu', cpuPercent);
-    }
-
-    // Memory usage
-    const memoryElement = this.container.querySelector('.memory-usage');
-    if (memoryElement && memoryPercent !== undefined) {
-      memoryElement.textContent = `${memoryPercent.toFixed(1)}%`;
-      this.updateProgressBar('memory', memoryPercent);
-    }
-
-    // Disk usage
-    const diskElement = this.container.querySelector('.disk-usage');
-    if (diskElement && diskPercent !== undefined) {
-      diskElement.textContent = `${diskPercent.toFixed(1)}%`;
-      this.updateProgressBar('disk', diskPercent);
-    }
-  }
-
-  // Update progress bar
-  updateProgressBar(type, percent) {
-    const progressBar = this.container.querySelector(`.progress-bar[data-type="${type}"]`);
-    if (progressBar) {
-      const fill = progressBar.querySelector('.progress-fill');
-      if (fill) {
-        fill.style.width = `${percent}%`;
-        fill.className = `progress-fill ${this.getProgressClass(percent)}`;
-      }
-    }
-  }
-
-  // Get progress class based on percentage
-  getProgressClass(percent) {
-    if (percent >= 90) return 'critical';
-    if (percent >= 75) return 'warning';
-    return 'normal';
-  }
-
-  // Update live statistics
   async updateLiveStats() {
+    if (!LIVE_DATA_SOURCES.has(sensingService.dataSource)) {
+      this.clearLiveStats();
+      return;
+    }
+
     try {
-      // Get current pose data
-      const currentPose = await poseService.getCurrentPose();
+      const [currentPose, stats] = await Promise.all([
+        poseService.getCurrentPose(),
+        poseService.getStats(1),
+      ]);
       this.updatePoseStats(currentPose);
-
-      // Get zones summary
-      const zonesSummary = await poseService.getZonesSummary();
-      this.updateZonesDisplay(zonesSummary);
-
+      this.updateStats(stats);
     } catch (error) {
+      this.clearLiveStats();
       console.error('Failed to update live stats:', error);
     }
   }
 
-  // Update pose statistics
   updatePoseStats(poseData) {
-    if (!poseData) return;
+    if (!poseData) {
+      this.clearLiveStats();
+      return;
+    }
 
-    // Update person count
+    const persons = Array.isArray(poseData.persons) ? poseData.persons : null;
     const personCount = this.container.querySelector('.person-count');
     if (personCount) {
-      const count = poseData.persons ? poseData.persons.length : (poseData.total_persons || 0);
-      personCount.textContent = count;
+      const count = persons ? persons.length : poseData.total_persons;
+      personCount.textContent = Number.isFinite(count) ? String(count) : '--';
     }
 
-    // Update average confidence
     const avgConfidence = this.container.querySelector('.avg-confidence');
-    if (avgConfidence && poseData.persons && poseData.persons.length > 0) {
-      const confidences = poseData.persons.map(p => p.confidence);
-      const avg = confidences.length > 0
-        ? (confidences.reduce((a, b) => a + b, 0) / confidences.length * 100).toFixed(1)
-        : 0;
-      avgConfidence.textContent = `${avg}%`;
-    } else if (avgConfidence) {
-      avgConfidence.textContent = '0%';
-    }
-
-    // Update total detections from stats if available
-    const detectionCount = this.container.querySelector('.detection-count');
-    if (detectionCount && poseData.total_detections !== undefined) {
-      detectionCount.textContent = this.formatNumber(poseData.total_detections);
+    if (avgConfidence) {
+      const confidences = (persons || [])
+        .map((person) => person.confidence)
+        .filter((confidence) => typeof confidence === 'number' && Number.isFinite(confidence));
+      avgConfidence.textContent = confidences.length
+        ? `${(confidences.reduce((sum, confidence) => sum + confidence, 0) / confidences.length * 100).toFixed(1)}%`
+        : '--';
     }
   }
 
-  // Update zones display
-  updateZonesDisplay(zonesSummary) {
-    const zonesContainer = this.container.querySelector('.zones-summary');
-    if (!zonesContainer) return;
+  updateStats(stats) {
+    const detectionCount = this.container.querySelector('.detection-count');
+    if (!detectionCount) return;
 
-    zonesContainer.innerHTML = '';
-    
-    // Handle different zone summary formats
-    let zones = {};
-    if (zonesSummary && zonesSummary.zones) {
-      zones = zonesSummary.zones;
-    } else if (zonesSummary && typeof zonesSummary === 'object') {
-      zones = zonesSummary;
-    }
-    
-    // If no zones data, show default zones
-    if (Object.keys(zones).length === 0) {
-      ['zone_1', 'zone_2', 'zone_3', 'zone_4'].forEach(zoneId => {
-        const zoneElement = document.createElement('div');
-        zoneElement.className = 'zone-item';
-        
-        // Use textContent instead of innerHTML to prevent XSS
-        const zoneNameSpan = document.createElement('span');
-        zoneNameSpan.className = 'zone-name';
-        zoneNameSpan.textContent = zoneId;
-        
-        const zoneCountSpan = document.createElement('span');
-        zoneCountSpan.className = 'zone-count';
-        zoneCountSpan.textContent = 'undefined';
-        
-        zoneElement.appendChild(zoneNameSpan);
-        zoneElement.appendChild(zoneCountSpan);
-        zonesContainer.appendChild(zoneElement);
-      });
-      return;
-    }
-    
-    Object.entries(zones).forEach(([zoneId, data]) => {
-      const zoneElement = document.createElement('div');
-      zoneElement.className = 'zone-item';
-      const count = typeof data === 'object' ? (data.person_count || data.count || 0) : data;
-      
-      // Use textContent instead of innerHTML to prevent XSS
-      const zoneNameSpan = document.createElement('span');
-      zoneNameSpan.className = 'zone-name';
-      zoneNameSpan.textContent = zoneId;
-      
-      const zoneCountSpan = document.createElement('span');
-      zoneCountSpan.className = 'zone-count';
-      zoneCountSpan.textContent = String(count);
-      
-      zoneElement.appendChild(zoneNameSpan);
-      zoneElement.appendChild(zoneCountSpan);
-      zonesContainer.appendChild(zoneElement);
+    detectionCount.textContent = Number.isFinite(stats?.total_detections)
+      ? this.formatNumber(stats.total_detections)
+      : '--';
+  }
+
+  clearLiveStats() {
+    ['.person-count', '.avg-confidence', '.detection-count'].forEach((selector) => {
+      const element = this.container.querySelector(selector);
+      if (element) element.textContent = '--';
     });
   }
 
-  // Update statistics
-  updateStats(stats) {
-    if (!stats) return;
-
-    // Update detection count
-    const detectionCount = this.container.querySelector('.detection-count');
-    if (detectionCount && stats.total_detections !== undefined) {
-      detectionCount.textContent = this.formatNumber(stats.total_detections);
-    }
-
-    // Update accuracy if available
-    if (this.statsElements.accuracy && stats.average_confidence !== undefined) {
-      this.statsElements.accuracy.textContent = `${(stats.average_confidence * 100).toFixed(1)}%`;
-    }
+  formatNumber(number) {
+    if (number >= 1000000) return `${(number / 1000000).toFixed(1)}M`;
+    if (number >= 1000) return `${(number / 1000).toFixed(1)}K`;
+    return String(number);
   }
 
-  // Format feature name
-  formatFeatureName(name) {
-    return name.replace(/_/g, ' ')
-      .split(' ')
-      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-      .join(' ');
-  }
-
-  // Format large numbers
-  formatNumber(num) {
-    if (num >= 1000000) {
-      return `${(num / 1000000).toFixed(1)}M`;
-    }
-    if (num >= 1000) {
-      return `${(num / 1000).toFixed(1)}K`;
-    }
-    return num.toString();
-  }
-
-  // Show error message
   showError(message) {
     const errorContainer = this.container.querySelector('.error-container');
-    if (errorContainer) {
-      errorContainer.textContent = message;
-      errorContainer.style.display = 'block';
-      
-      setTimeout(() => {
-        errorContainer.style.display = 'none';
-      }, 5000);
-    }
+    if (!errorContainer) return;
+
+    errorContainer.textContent = message;
+    errorContainer.style.display = 'block';
+    setTimeout(() => {
+      errorContainer.style.display = 'none';
+    }, 5000);
   }
 
-  // Clean up
   dispose() {
-    if (this.healthSubscription) {
-      this.healthSubscription();
-    }
-    if (this._sensingUnsub) this._sensingUnsub();
-    if (this._sensingDataUnsub) this._sensingDataUnsub();
-
-    if (this.statsInterval) {
-      clearInterval(this.statsInterval);
-    }
-
+    this.healthSubscription?.();
+    this._sensingUnsub?.();
+    this._sensingDataUnsub?.();
+    if (this.statsInterval) clearInterval(this.statsInterval);
     healthService.stopHealthMonitoring();
   }
 }

@@ -1,174 +1,118 @@
 // Hardware Tab Component
 
+import { API_CONFIG } from '../config/api.config.js';
+import { apiService } from '../services/api.service.js';
+import { LocalControlPanel } from './LocalControlPanel.js';
+
+const NODE_REFRESH_INTERVAL_MS = 5000;
+
+function finiteNumber(value) {
+  return typeof value === 'number' && Number.isFinite(value) ? value : null;
+}
+
 export class HardwareTab {
   constructor(containerElement) {
     this.container = containerElement;
-    this.antennas = [];
-    this.csiUpdateInterval = null;
-    this.isActive = false;
+    this.controlPanel = null;
+    this.nodeRefreshInterval = null;
+    this.nodeRequestInFlight = false;
   }
 
-  // Initialize component
   init() {
-    this.setupAntennas();
-    this.startCSISimulation();
+    const helperContainer = this.container?.querySelector('#localControlHelper');
+    if (helperContainer) {
+      this.controlPanel = new LocalControlPanel(helperContainer);
+      this.controlPanel.mount();
+    }
+
+    this.refreshNodes();
+    this.nodeRefreshInterval = setInterval(
+      () => this.refreshNodes(),
+      NODE_REFRESH_INTERVAL_MS,
+    );
   }
 
-  // Set up antenna interactions
-  setupAntennas() {
-    this.antennas = Array.from(this.container.querySelectorAll('.antenna'));
-    
-    this.antennas.forEach(antenna => {
-      antenna.addEventListener('click', () => {
-        antenna.classList.toggle('active');
-        this.updateCSIDisplay();
-      });
-    });
+  async refreshNodes() {
+    if (!this.container || this.nodeRequestInFlight) return;
+    this.nodeRequestInFlight = true;
+    try {
+      const payload = await apiService.get(API_CONFIG.ENDPOINTS.NODES);
+      this.renderNodes(payload);
+    } catch (error) {
+      this.renderNodes({ error: error instanceof Error ? error.message : String(error) });
+    } finally {
+      this.nodeRequestInFlight = false;
+    }
   }
 
-  // Start CSI simulation
-  startCSISimulation() {
-    // Initial update
-    this.updateCSIDisplay();
-    
-    // Set up periodic updates
-    this.csiUpdateInterval = setInterval(() => {
-      if (this.hasActiveAntennas()) {
-        this.updateCSIDisplay();
-      }
-    }, 1000);
-  }
+  renderNodes(payload = {}) {
+    const status = this.container?.querySelector('#hardware-node-status');
+    const list = this.container?.querySelector('#hardware-node-list');
+    if (!status || !list) return;
 
-  // Check if any antennas are active
-  hasActiveAntennas() {
-    return this.antennas.some(antenna => antenna.classList.contains('active'));
-  }
-
-  // Update CSI display
-  updateCSIDisplay() {
-    const activeAntennas = this.antennas.filter(a => a.classList.contains('active'));
-    const isActive = activeAntennas.length > 0;
-    
-    // Get display elements
-    const amplitudeFill = this.container.querySelector('.csi-fill.amplitude');
-    const phaseFill = this.container.querySelector('.csi-fill.phase');
-    const amplitudeValue = this.container.querySelector('.csi-row:first-child .csi-value');
-    const phaseValue = this.container.querySelector('.csi-row:last-child .csi-value');
-    
-    if (!isActive) {
-      // Set to zero when no antennas active
-      if (amplitudeFill) amplitudeFill.style.width = '0%';
-      if (phaseFill) phaseFill.style.width = '0%';
-      if (amplitudeValue) amplitudeValue.textContent = '0.00';
-      if (phaseValue) phaseValue.textContent = '0.0π';
+    list.replaceChildren();
+    if (payload.error) {
+      status.textContent = 'Node-Daten nicht verfügbar';
+      const message = document.createElement('p');
+      message.className = 'hardware-node-empty';
+      message.textContent = payload.error;
+      list.appendChild(message);
       return;
     }
-    
-    // Generate realistic CSI values based on active antennas
-    const txCount = activeAntennas.filter(a => a.classList.contains('tx')).length;
-    const rxCount = activeAntennas.filter(a => a.classList.contains('rx')).length;
-    
-    // Amplitude increases with more active antennas
-    const baseAmplitude = 0.3 + (txCount * 0.1) + (rxCount * 0.05);
-    const amplitude = Math.min(0.95, baseAmplitude + (Math.random() * 0.1 - 0.05));
-    
-    // Phase varies more with multiple antennas
-    const phaseVariation = 0.5 + (activeAntennas.length * 0.1);
-    const phase = 0.5 + Math.random() * phaseVariation;
-    
-    // Update display
-    if (amplitudeFill) {
-      amplitudeFill.style.width = `${amplitude * 100}%`;
-      amplitudeFill.style.transition = 'width 0.5s ease';
+
+    const nodes = Array.isArray(payload.nodes) ? payload.nodes : [];
+    status.textContent = nodes.length
+      ? `${nodes.length} Node${nodes.length === 1 ? '' : 's'} vom Sensing-Server gemeldet`
+      : 'Keine Nodes vom Sensing-Server gemeldet';
+
+    if (nodes.length === 0) {
+      const message = document.createElement('p');
+      message.className = 'hardware-node-empty';
+      message.textContent = 'Es liegen noch keine empfangenen Node-Daten vor.';
+      list.appendChild(message);
+      return;
     }
-    
-    if (phaseFill) {
-      phaseFill.style.width = `${phase * 50}%`;
-      phaseFill.style.transition = 'width 0.5s ease';
-    }
-    
-    if (amplitudeValue) {
-      amplitudeValue.textContent = amplitude.toFixed(2);
-    }
-    
-    if (phaseValue) {
-      phaseValue.textContent = `${phase.toFixed(1)}π`;
-    }
-    
-    // Update antenna array visualization
-    this.updateAntennaArray(activeAntennas);
+
+    nodes.forEach((node) => list.appendChild(this.createNodeRow(node)));
   }
 
-  // Update antenna array visualization
-  updateAntennaArray(activeAntennas) {
-    const arrayStatus = this.container.querySelector('.array-status');
-    if (!arrayStatus) return;
-    
-    const txActive = activeAntennas.filter(a => a.classList.contains('tx')).length;
-    const rxActive = activeAntennas.filter(a => a.classList.contains('rx')).length;
-    
-    // Clear and rebuild using safe DOM methods to prevent XSS
-    arrayStatus.innerHTML = '';
-    
-    const createInfoDiv = (label, value) => {
-      const div = document.createElement('div');
-      div.className = 'array-info';
-      
-      const labelSpan = document.createElement('span');
-      labelSpan.className = 'info-label';
-      labelSpan.textContent = label;
-      
-      const valueSpan = document.createElement('span');
-      valueSpan.className = 'info-value';
-      valueSpan.textContent = value;
-      
-      div.appendChild(labelSpan);
-      div.appendChild(valueSpan);
-      return div;
-    };
-    
-    arrayStatus.appendChild(createInfoDiv('Active TX:', `${txActive}/3`));
-    arrayStatus.appendChild(createInfoDiv('Active RX:', `${rxActive}/6`));
-    arrayStatus.appendChild(createInfoDiv('Signal Quality:', `${this.calculateSignalQuality(txActive, rxActive)}%`));
+  createNodeRow(node) {
+    const row = document.createElement('article');
+    row.className = 'hardware-node-row';
+
+    const title = document.createElement('div');
+    title.className = 'hardware-node-title';
+    title.textContent = node.display_name || `RX${node.node_id ?? '—'}`;
+
+    const state = document.createElement('span');
+    state.className = `hardware-node-state ${node.status === 'active' ? 'is-active' : 'is-stale'}`;
+    state.textContent = String(node.status || 'unknown').toUpperCase();
+    title.appendChild(state);
+
+    const details = document.createElement('div');
+    details.className = 'hardware-node-details';
+    details.textContent = [
+      `RSSI ${this.formatMetric(node.rssi_dbm, ' dBm', 1)}`,
+      `Frames ${this.formatMetric(node.frame_rate_hz, ' Hz', 1)}`,
+      `Verlust ${this.formatMetric(node.packet_loss_percent, '%', 1)}`,
+      `Zuletzt ${this.formatMetric(node.last_seen_ms, ' ms', 0)}`,
+    ].join(' · ');
+
+    row.append(title, details);
+    return row;
   }
 
-  // Calculate signal quality based on active antennas
-  calculateSignalQuality(txCount, rxCount) {
-    if (txCount === 0 || rxCount === 0) return 0;
-    
-    const txRatio = txCount / 3;
-    const rxRatio = rxCount / 6;
-    const quality = (txRatio * 0.4 + rxRatio * 0.6) * 100;
-    
-    return Math.round(quality);
+  formatMetric(value, suffix, decimals) {
+    const number = finiteNumber(value);
+    return number === null ? '--' : `${number.toFixed(decimals)}${suffix}`;
   }
 
-  // Toggle all antennas
-  toggleAllAntennas(active) {
-    this.antennas.forEach(antenna => {
-      antenna.classList.toggle('active', active);
-    });
-    this.updateCSIDisplay();
-  }
-
-  // Reset antenna configuration
-  resetAntennas() {
-    // Set default configuration (all active)
-    this.antennas.forEach(antenna => {
-      antenna.classList.add('active');
-    });
-    this.updateCSIDisplay();
-  }
-
-  // Clean up
   dispose() {
-    if (this.csiUpdateInterval) {
-      clearInterval(this.csiUpdateInterval);
-      this.csiUpdateInterval = null;
+    if (this.nodeRefreshInterval) {
+      clearInterval(this.nodeRefreshInterval);
+      this.nodeRefreshInterval = null;
     }
-    
-    this.antennas.forEach(antenna => {
-      antenna.removeEventListener('click', this.toggleAntenna);
-    });
+    this.controlPanel?.dispose();
+    this.controlPanel = null;
   }
 }
