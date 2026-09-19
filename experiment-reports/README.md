@@ -9,7 +9,7 @@ Renderhinweisen.
 
 ## Quelle der Wahrheit
 
-`results/` ist die einzige aktuelle Quelle für Ergebnisnachweise.
+`experiment-reports/` ist die einzige aktuelle Quelle für Ergebnisnachweise.
 `software/ruview/results/` bleibt ein historischer Software-Snapshot und wird
 weder automatisch synchronisiert noch als neuere Messung interpretiert.
 

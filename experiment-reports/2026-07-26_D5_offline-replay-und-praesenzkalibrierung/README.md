@@ -61,7 +61,7 @@ Der wichtige Pfadwechsel wird abgefangen: Im ersten Personenlauf reagierten vor 
 Der Offline-Replayer liegt unter:
 
 ```text
-scripts/evaluate_d5_replay.py
+project_tools/evaluate_d5_replay.py
 ```
 
 Er gibt eine maschinenlesbare JSON-Auswertung sowie eine kurze deutsche Zusammenfassung aus. Sieben Python-Tests prüfen unter anderem:

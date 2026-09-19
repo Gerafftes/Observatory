@@ -29,7 +29,7 @@ The Bklit Studio uses generated demo data and has no CSV import. The figures the
 - The D5 live panel explicitly preserves the unpaired-FPR caveat.
 - D6 `empty-neutral-01` and `empty-neutral-02` remain separate setup series.
 - The former duplicate `..._figures` archive was removed from the canonical
-  `results/` directory; this Bklit set is the maintained export linked from the
+  `experiment-reports/` directory; this Bklit set is the maintained export linked from the
   technical report.
 
 ## Credits

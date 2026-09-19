@@ -2,7 +2,7 @@
 """Render the mmWave transport comparison in the repository's Bklit style.
 
 The values are copied from the checked before/after and redundancy tables in
-``results/2026-09-13_mmwave_transport-vergleich/README.md``. This renderer is a
+``experiment-reports/2026-09-13_mmwave_transport-vergleich/README.md``. This renderer is a
 deterministic static export: it keeps the Bklit chart vocabulary (neutral
 palette, rounded columns, zero-based grids, direct labels) while preserving
 the different units in separate panels instead of inventing a combined score.
@@ -16,7 +16,12 @@ from PIL import Image, ImageDraw, ImageFont
 
 
 PROJECT_DIR = Path(__file__).resolve().parent.parent
-OUTPUT_DIR = PROJECT_DIR / "results" / "2026-09-13_mmwave_transport-vergleich" / "figures"
+OUTPUT_DIR = (
+    PROJECT_DIR
+    / "experiment-reports"
+    / "2026-09-13_mmwave_transport-vergleich"
+    / "figures"
+)
 
 WIDTH, HEIGHT = 1876, 1294
 BACKGROUND = "#ffffff"

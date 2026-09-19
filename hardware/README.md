@@ -7,14 +7,14 @@ ESP32-C3-Board bindet den HLK-LD2450 als unabhängigen mmWave-Referenzsensor an.
 
 ## Referenzsensor
 
-<img src="../images/hlk-ld2450-mmwave-sensor.jpeg" alt="HLK-LD2450 24G mmWave-Referenzsensor" width="560">
+<img src="../project-media/hlk-ld2450-mmwave-sensor.jpeg" alt="HLK-LD2450 24G mmWave-Referenzsensor" width="560">
 
 ## Platinen
 
 PCB-01 verbindet den ESP32-C3 mit dem mmWave-Referenzpfad. Die folgende
 Fertigungsvorschau dokumentiert den früheren Platinenstand:
 
-<img src="../images/pcb-01-preview.webp" alt="Fertigungsvorschau von PCB-01 mit ESP32-C3-Footprint, C1, C2 und Anschluss U2" width="560">
+<img src="../project-media/pcb-01-preview.webp" alt="Fertigungsvorschau von PCB-01 mit ESP32-C3-Footprint, C1, C2 und Anschluss U2" width="560">
 
 Die [Gerber- und Bohrdaten von PCB-01](pcb-01/) liegen mit SHA-256 und
 Fertigungshinweis im Repository.
@@ -40,7 +40,7 @@ vorläufigen Breadboard-Aufbau:
 <table>
 <tr>
 <td><img src="pcb-03/preview/PCB-03-top.png" alt="PCB-03-Top-Ansicht mit ANT KEEP CLEAR, USB-Anschluss, U1, C1 und C2" width="460"><br><strong>PCB-03 — aktuelle Revision</strong><br>Diese finale Platine ist für den aktuellen mmWave-Aufbau zu verwenden.</td>
-<td><img src="../images/mmwave-breadboard-setup.jpeg" alt="Vorläufiger Breadboard-Aufbau mit HLK-LD2450 und ESP32-C3" width="460"><br><strong>Vorläufiger Breadboard-Aufbau</strong><br>Das Foto dokumentiert den provisorischen mmWave-Aufbau auf dem Breadboard.</td>
+<td><img src="../project-media/mmwave-breadboard-setup.jpeg" alt="Vorläufiger Breadboard-Aufbau mit HLK-LD2450 und ESP32-C3" width="460"><br><strong>Vorläufiger Breadboard-Aufbau</strong><br>Das Foto dokumentiert den provisorischen mmWave-Aufbau auf dem Breadboard.</td>
 </tr>
 </table>
 

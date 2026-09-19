@@ -7,14 +7,14 @@ connects the HLK-LD2450 as an independent mmWave reference sensor.
 
 ## Reference sensor
 
-<img src="../images/hlk-ld2450-mmwave-sensor.jpeg" alt="HLK-LD2450 24 GHz mmWave reference sensor" width="560">
+<img src="../project-media/hlk-ld2450-mmwave-sensor.jpeg" alt="HLK-LD2450 24 GHz mmWave reference sensor" width="560">
 
 ## PCBs
 
 PCB-01 connects the ESP32-C3 to the mmWave reference path. The following
 manufacturing preview documents the earlier board revision:
 
-<img src="../images/pcb-01-preview.webp" alt="PCB-01 manufacturing preview with ESP32-C3 footprint, C1, C2, and connector U2" width="560">
+<img src="../project-media/pcb-01-preview.webp" alt="PCB-01 manufacturing preview with ESP32-C3 footprint, C1, C2, and connector U2" width="560">
 
 The [PCB-01 Gerber and drill files](pcb-01/) are available with a SHA-256
 checksum and manufacturing note.
@@ -39,7 +39,7 @@ breadboard setup:
 <table>
 <tr>
 <td><img src="pcb-03/preview/PCB-03-top.png" alt="PCB-03 top view with ANT KEEP CLEAR, USB connector, U1, C1, and C2" width="460"><br><strong>PCB-03 — current revision</strong><br>This final board is the one to use for the current mmWave setup.</td>
-<td><img src="../images/mmwave-breadboard-setup.jpeg" alt="Temporary breadboard setup with HLK-LD2450 and ESP32-C3" width="460"><br><strong>Temporary breadboard setup</strong><br>The photo documents the provisional mmWave wiring on the breadboard.</td>
+<td><img src="../project-media/mmwave-breadboard-setup.jpeg" alt="Temporary breadboard setup with HLK-LD2450 and ESP32-C3" width="460"><br><strong>Temporary breadboard setup</strong><br>The photo documents the provisional mmWave wiring on the breadboard.</td>
 </tr>
 </table>
 

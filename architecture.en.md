@@ -16,6 +16,30 @@ The mmWave sensor is used only as an independent calibration and blind-test
 reference. This prevents the WiFi CSI predictor from indirectly receiving the
 correct answer during evaluation.
 
+## Current mmWave connection
+
+The mmWave node sends each radar observation over UDP with its `node_id`,
+`boot_id`, `sequence`, and raw local coordinates. The server acknowledges the
+specific `boot_id`/`sequence` with a compact ACK. If that ACK is missing, the
+node retries the same measurement identity, allowing the server to deduplicate
+the packet safely. The ACK timeout starts at 150 ms, adapts to observed round
+trips, and is capped at 2000 ms.
+
+The node is no longer the current source of truth for the room transform. The
+server applies the sealed Setup-v2 transform matching the `node_id` to the raw
+coordinates. Already transformed packet fields remain only for older
+collectors and standalone diagnostics.
+
+The following Bklit-style diagrams document those implemented contracts. They
+deliberately contain no new measurements and prove neither loss-free transport
+nor positioning accuracy.
+
+![ACK connection flow from the LD2450 to the sensing server](project-media/diagrams/mmwave-connection/01-ack-verbindungsfluss.png)
+
+![Adaptive timeout and retry model](project-media/diagrams/mmwave-connection/02-timeout-und-retry.png)
+
+![Server ownership of the room-coordinate transform](project-media/diagrams/mmwave-connection/03-transform-verantwortung.png)
+
 ```text
 physical setup
 → setup seal

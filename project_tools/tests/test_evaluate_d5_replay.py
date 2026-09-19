@@ -5,7 +5,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from scripts.evaluate_d5_replay import (
+from project_tools.evaluate_d5_replay import (
     LabeledRun,
     ReplayConfig,
     RunSample,

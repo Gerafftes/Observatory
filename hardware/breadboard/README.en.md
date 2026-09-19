@@ -10,7 +10,7 @@ hardware, and additional mmWave components.
 
 - [Breadboard-Body.stl](Breadboard-Body.stl) — CAD file for the breadboard body
 
-<img src="../../images/mmwave-breadboard-setup.jpeg" alt="Provisional breadboard setup with HLK-LD2450 and ESP32-C3" width="700">
+<img src="../../project-media/mmwave-breadboard-setup.jpeg" alt="Provisional breadboard setup with HLK-LD2450 and ESP32-C3" width="700">
 
 The photo documents the provisional setup with the HLK-LD2450 and ESP32-C3.
 Print orientation, material, and fit have not yet been validated.

@@ -7,7 +7,7 @@ __pycache__/
 .venv/
 
 # Private measurement and runtime data stay local. Public reports and
-# aggregate CSV files belong under results/ instead.
+# aggregate CSV files belong under experiment-reports/ instead.
 data/raw/
 logs/
 **/data/recordings/

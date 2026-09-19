@@ -50,10 +50,10 @@ for relative_path in $required_paths; do
   fi
 done
 
-required_reports='results/2026-07-26_D4-E0_leerraum/README.md
-results/2026-07-26_D5_still-livetest/README.md
-results/2026-08-09_D6_setup-siegel-und-preflight/README.md
-results/2026-08-23_D4-D5-D6_technischer-bericht/README.md'
+required_reports='experiment-reports/2026-07-26_D4-E0_leerraum/README.md
+experiment-reports/2026-07-26_D5_still-livetest/README.md
+experiment-reports/2026-08-09_D6_setup-siegel-und-preflight/README.md
+experiment-reports/2026-08-23_D4-D5-D6_technischer-bericht/README.md'
 
 for relative_path in $required_reports; do
   if [ ! -e "$repo_dir/$relative_path" ]; then

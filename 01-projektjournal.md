@@ -502,7 +502,7 @@ Der 4RX-Aufbau lieferte stabil Node-IDs `1`, `2`, `3` und `4`. Anschließend wur
 
 **Durchführung / Änderung**
 
-Die Messdaten wurden automatisch als `raw_sensing.jsonl`, `summary.csv`, `metadata.json` und `errors.log` unter `data/raw/` gespeichert. Zusätzlich wurde ein Qualitätscheck unter `results/2026-06-28_A0-A3_qualitaetscheck/README.md` erstellt.
+Die Messdaten wurden automatisch als `raw_sensing.jsonl`, `summary.csv`, `metadata.json` und `errors.log` unter `data/raw/` gespeichert. Zusätzlich wurde ein Qualitätscheck unter `experiment-reports/2026-06-28_A0-A3_qualitaetscheck/README.md` erstellt.
 
 **Beobachtung**
 
@@ -548,7 +548,7 @@ G1 enthält 60 CSV-Samples und 60 JSONL-Samples ohne Logger-Fehler. Alle Samples
 
 **Erfolg**
 
-Die 4RX-Datenerfassung blieb auch mit größerem Guard-Intervall stabil. Der Qualitätscheck wurde unter `results/2026-06-28_G1_guard500ms-qualitaetscheck/README.md` gespeichert.
+Die 4RX-Datenerfassung blieb auch mit größerem Guard-Intervall stabil. Der Qualitätscheck wurde unter `experiment-reports/2026-06-28_G1_guard500ms-qualitaetscheck/README.md` gespeichert.
 
 **Problem / Fehlschlag**
 
@@ -635,7 +635,7 @@ Vor neuen Bewegungsversuchen wird die RX-Firmware auf Absender-MAC-, Pakettyp- u
 
 Der Versuch trennt technische Konnektivität von Messvalidität: Vier empfangende Nodes, reale Geometrie und eine Live-Punktwolke reichen nicht aus, wenn die verwendeten CSI-Frames zeitlich oder nach Paketquelle nicht vergleichbar sind. Der negative Befund ist deshalb ein wichtiger Teil der Methodik- und Grenzendiskussion.
 
-Ausführliche Diagnose und Bildnachweis: [results/2026-07-18_fester-raum_live-visualisierung-diagnose/README.md](results/2026-07-18_fester-raum_live-visualisierung-diagnose/README.md)
+Ausführliche Diagnose und Bildnachweis: [experiment-reports/2026-07-18_fester-raum_live-visualisierung-diagnose/README.md](experiment-reports/2026-07-18_fester-raum_live-visualisierung-diagnose/README.md)
 
 ### 2026-07-26 — D4-Bewegungsmetrik und kontaminierter E0-Versuch
 
@@ -667,7 +667,7 @@ Als nächstes wird unter unverändertem Aufbau zuerst ein vollständig ununterbr
 
 Der Lauf zeigt, dass die Korrektur einer Signalmetrik grobe Fehlbewegung beseitigen kann, ohne automatisch eine zuverlässige Anwesenheitserkennung zu liefern. Einzel-RX-Klassifikation und globale Aggregation müssen getrennt bewertet werden.
 
-Ausführliche Auswertung: [results/2026-07-26_D4-E0_leerraum/README.md](results/2026-07-26_D4-E0_leerraum/README.md)
+Ausführliche Auswertung: [experiment-reports/2026-07-26_D4-E0_leerraum/README.md](experiment-reports/2026-07-26_D4-E0_leerraum/README.md)
 
 ### 2026-07-26 — Gültige E0b-Wiederholung im leeren Raum
 
@@ -699,7 +699,7 @@ Vor einer Änderung von Schwelle oder Quorum wird ein gleich langer Positivlauf 
 
 Der Lauf trennt erfolgreich reduzierte Bewegungs-Fehlalarme von weiterhin unzuverlässiger Anwesenheitserkennung. Er zeigt außerdem, dass eine globale ODER-Verknüpfung mehrerer Empfänger die False-Positive-Rate stark erhöhen kann.
 
-Ausführliche Auswertung: [results/2026-07-26_D4-E0b_sauberer-leerraum/README.md](results/2026-07-26_D4-E0b_sauberer-leerraum/README.md)
+Ausführliche Auswertung: [experiment-reports/2026-07-26_D4-E0b_sauberer-leerraum/README.md](experiment-reports/2026-07-26_D4-E0b_sauberer-leerraum/README.md)
 
 ### 2026-07-26 — E0c A/B-Test mit mittigem Mac
 
@@ -731,7 +731,7 @@ Der Mac bleibt mittig. E0c wird als aktuelle Leerraum-Referenz verwendet. Als n�
 
 Der Befund zeigt, dass nicht nur Personen, sondern auch Positionen aktiver Rechner und leitender Gegenstände das CSI-Muster einzelner Links stark verändern können. Eine stabile Versuchsanordnung muss deshalb auch den Auswerterechner und seine Kabel räumlich festlegen.
 
-Ausführliche Auswertung: [results/2026-07-26_E0b-E0c_mac-position-ab-test/README.md](results/2026-07-26_E0b-E0c_mac-position-ab-test/README.md)
+Ausführliche Auswertung: [experiment-reports/2026-07-26_E0b-E0c_mac-position-ab-test/README.md](experiment-reports/2026-07-26_E0b-E0c_mac-position-ab-test/README.md)
 
 ### 2026-07-26 — E1: still sitzende Person bei mittigem Mac
 
@@ -765,7 +765,7 @@ Die künftige Präsenzlogik sollte per-RX-Leerraumreferenzen und eine Fusion der
 
 Der Versuch zeigt, dass stille Anwesenheit grundsätzlich in einem einzelnen geeigneten CSI-Link sichtbar sein kann, während andere Links am selben Aufbau keine oder widersprüchliche Reaktion zeigen. Sensorgeometrie und link-spezifische Kalibrierung sind deshalb zentral.
 
-Ausführliche Auswertung: [results/2026-07-26_E0c-E1_still-person-separation/README.md](results/2026-07-26_E0c-E1_still-person-separation/README.md)
+Ausführliche Auswertung: [experiment-reports/2026-07-26_E0c-E1_still-person-separation/README.md](experiment-reports/2026-07-26_E0c-E1_still-person-separation/README.md)
 
 ### 2026-07-26 — E0d/E1b widerlegt feste RX4-Schwelle
 
@@ -797,7 +797,7 @@ Die neue Logik muss per-RX-Leerraumreferenzen, längere Zeitfenster und eine Zuv
 
 Der Versuch zeigt die Bedeutung unabhängiger Wiederholungen: Eine sehr gute Trennung in einem Laufpaar kann durch kleine Änderungen der Körperposition oder des Multipfadfeldes verschwinden. Reproduzierbarkeit ist daher wichtiger als ein einzelner hoher Kennwert.
 
-Ausführliche Auswertung: [results/2026-07-26_E0d-E1b_unabhaengige-bestaetigung/README.md](results/2026-07-26_E0d-E1b_unabhaengige-bestaetigung/README.md)
+Ausführliche Auswertung: [experiment-reports/2026-07-26_E0d-E1b_unabhaengige-bestaetigung/README.md](experiment-reports/2026-07-26_E0d-E1b_unabhaengige-bestaetigung/README.md)
 
 ### 2026-07-26 — D5-Offline-Replay und experimentelle Präsenzkalibrierung
 
@@ -858,7 +858,7 @@ Der finale Release wurde mit denselben Ports, Raummaßen und TX-/RX-Positionen n
 
 D5 zeigt methodisch, wie aus negativen Wiederholungen eine überprüfbare Regel entsteht: nicht den besten Einzelsensor auswählen, sondern link-spezifische Referenzen, robuste Statistik, Zeitfenster und ein vorab festgelegtes Quorum verwenden. Gleichzeitig bleibt die kleine Stichprobe ausdrücklich als Grenze dokumentiert.
 
-Ausführliche Auswertung: [results/2026-07-26_D5_offline-replay-und-praesenzkalibrierung/README.md](results/2026-07-26_D5_offline-replay-und-praesenzkalibrierung/README.md)
+Ausführliche Auswertung: [experiment-reports/2026-07-26_D5_offline-replay-und-praesenzkalibrierung/README.md](experiment-reports/2026-07-26_D5_offline-replay-und-praesenzkalibrierung/README.md)
 
 ### 2026-07-26 — Reale D5-Kalibrierung und fehlgeschlagener Still-Livetest
 
@@ -890,7 +890,7 @@ D5 wird nicht als Standard aktiviert. Das Quorum wird nicht isoliert anhand dies
 
 Der Test zeigt, dass robuste Fusion zwei Fehler gleichzeitig vermeiden muss: einzelne driftende RX dürfen keinen Leerraumalarm erzeugen, wechselnde einzeln informative Links dürfen aber auch nicht zu vollständigen False Negatives führen. Offline-Erfolg auf wenigen Laufpaaren ersetzt keinen neuen Livetest.
 
-Ausführliche Auswertung: [results/2026-07-26_D5_still-livetest/README.md](results/2026-07-26_D5_still-livetest/README.md)
+Ausführliche Auswertung: [experiment-reports/2026-07-26_D5_still-livetest/README.md](experiment-reports/2026-07-26_D5_still-livetest/README.md)
 
 ## Vorlage für neue Journaleinträge
 
@@ -1473,7 +1473,7 @@ Als Nächstes wird das USB-Datenkabel entfernt, der TX wieder ausschließlich
 mit Strom versorgt und erst dann das endgültige Setup erzeugt.
 
 Ausführlicher Nachweis:
-[results/2026-08-09_D6_setupaufnahme-und-tx-firmwareidentitaet/README.md](results/2026-08-09_D6_setupaufnahme-und-tx-firmwareidentitaet/README.md)
+[experiment-reports/2026-08-09_D6_setupaufnahme-und-tx-firmwareidentitaet/README.md](experiment-reports/2026-08-09_D6_setupaufnahme-und-tx-firmwareidentitaet/README.md)
 
 ### 2026-08-09 — Setup versiegelt und 25-Sekunden-Preflight bestanden
 
@@ -1523,7 +1523,7 @@ erst nach ausdrücklicher Bestätigung, dass der Raum während der vollständige
 Dauer leer bleibt.
 
 Ausführlicher Nachweis:
-[results/2026-08-09_D6_setup-siegel-und-preflight/README.md](results/2026-08-09_D6_setup-siegel-und-preflight/README.md)
+[experiment-reports/2026-08-09_D6_setup-siegel-und-preflight/README.md](experiment-reports/2026-08-09_D6_setup-siegel-und-preflight/README.md)
 
 ### 2026-08-09 — Offline-Sidecar-Fix und neu versiegelter Preflight
 
@@ -1545,7 +1545,7 @@ P01 muss nun unter diesem neuen Siegel eine neue bestätigte
 65-Sekunden-Leerraumkalibrierung erfolgen.
 
 Ausführlicher Nachweis:
-[results/2026-08-09_D6_sidecar-fix-neusiegelung-und-preflight/README.md](results/2026-08-09_D6_sidecar-fix-neusiegelung-und-preflight/README.md)
+[experiment-reports/2026-08-09_D6_sidecar-fix-neusiegelung-und-preflight/README.md](experiment-reports/2026-08-09_D6_sidecar-fix-neusiegelung-und-preflight/README.md)
 
 ### 2026-08-09 — Neue Leerraumkalibrierung bestanden
 

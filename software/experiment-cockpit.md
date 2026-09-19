@@ -11,7 +11,7 @@ Der Assistent führt durch Verbindung, Ausrichtung, Abdeckung, Zonen, Training,
 Blindtest und Ergebnis. Der Screenshot zeigt den geprüften Fehlerzustand
 `Server nicht erreichbar` mit HTTP 502, nicht eine verbundene Radaraufnahme.
 
-<img src="../images/ui/mmwave-calibration-server-unreachable.png" alt="Siebenstufiger mmWave-Kalibrierungsassistent mit nicht erreichbarem Server und HTTP-502-Status" width="900">
+<img src="../project-media/ui/mmwave-calibration-server-unreachable.png" alt="Siebenstufiger mmWave-Kalibrierungsassistent mit nicht erreichbarem Server und HTTP-502-Status" width="900">
 
 ## Experiment-Cockpit
 
@@ -19,11 +19,11 @@ Das Cockpit hält Setup-Profil, WiFi-Workflow, Aufnahmen und die getrennte
 mmWave-Referenz in einer Ansicht. Die Aufnahmen stammen aus einem simulierten
 Lauf ohne angeschlossene Sensoren.
 
-<img src="../images/ui/experiment-cockpit-setup.png" alt="Experiment-Cockpit mit Setup-Profil, Statusübersicht und simuliertem Hardwarezustand" width="900">
+<img src="../project-media/ui/experiment-cockpit-setup.png" alt="Experiment-Cockpit mit Setup-Profil, Statusübersicht und simuliertem Hardwarezustand" width="900">
 
-<img src="../images/ui/experiment-cockpit-guide.png" alt="Experiment-Cockpit mit Raum-, TX- und RX-Positionen sowie wartender mmWave-Referenz" width="900">
+<img src="../project-media/ui/experiment-cockpit-guide.png" alt="Experiment-Cockpit mit Raum-, TX- und RX-Positionen sowie wartender mmWave-Referenz" width="900">
 
-<img src="../images/ui/experiment-cockpit-workflow-guide.png" alt="Experiment-Cockpit mit Workflow-Guide und zehn gesperrten beziehungsweise freigeschalteten Phasen" width="900">
+<img src="../project-media/ui/experiment-cockpit-workflow-guide.png" alt="Experiment-Cockpit mit Workflow-Guide und zehn gesperrten beziehungsweise freigeschalteten Phasen" width="900">
 
 ## Kurzanleitung
 

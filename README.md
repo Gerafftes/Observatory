@@ -10,7 +10,7 @@
   <a href="https://stardance.hackclub.com/projects/25673">Stardance</a> ·
   <a href="#schnelleinstieg">Schnellstart</a> ·
   <a href="#was-observatory-kann">Features</a> ·
-  <a href="results/README.md">Ergebnisse</a> ·
+  <a href="experiment-reports/README.md">Ergebnisse</a> ·
   <a href="hardware/README.md">Hardware</a> ·
   <a href="README.en.md">English</a>
 </p>
@@ -24,11 +24,11 @@
 <table>
   <tr>
     <td align="center" width="50%">
-      <a href="images/esp32-s3-boards.jpeg"><img src="images/esp32-s3-boards.jpeg" alt="Die fünf beschrifteten ESP32-S3-Boards des Observatory-Aufbaus: RX1 bis RX4 und TX" width="100%"></a><br>
+      <a href="project-media/esp32-s3-boards.jpeg"><img src="project-media/esp32-s3-boards.jpeg" alt="Die fünf beschrifteten ESP32-S3-Boards des Observatory-Aufbaus: RX1 bis RX4 und TX" width="100%"></a><br>
       <sub>ESP32-S3-Boards: RX1 bis RX4 und TX</sub>
     </td>
     <td align="center" width="50%">
-      <a href="images/mmwave-breadboard-setup.jpeg"><img src="images/mmwave-breadboard-setup-hero.jpeg" alt="Vorläufiger Breadboard-Aufbau mit HLK-LD2450 und ESP32-C3" width="100%"></a><br>
+      <a href="project-media/mmwave-breadboard-setup.jpeg"><img src="project-media/mmwave-breadboard-setup-hero.jpeg" alt="Vorläufiger Breadboard-Aufbau mit HLK-LD2450 und ESP32-C3" width="100%"></a><br>
       <sub>Vorläufiger mmWave-Breadboard-Aufbau</sub>
     </td>
   </tr>
@@ -72,7 +72,7 @@ folgt.
 - [Aktueller Validierungsstand](#aktueller-validierungsstand)
 - [Benutzeroberfläche](software/experiment-cockpit.md)
 - [Wie es funktioniert](architecture.md)
-- [Belastbare Ergebnisse](results/README.md)
+- [Belastbare Ergebnisse](experiment-reports/README.md)
 - [Hardware](hardware/README.md)
 - [Dokumentation](#dokumentation)
 - [Lizenz](#lizenz)
@@ -108,7 +108,7 @@ Die wichtigsten Einstiegspunkte sind:
 
 1. [UI, Backend und Firmware](software/README.md)
 2. [Aktueller D6-/mmWave-Arbeitsstand](08-aktueller-arbeitsstand-d6-und-position.md)
-3. [Ergebnisberichte](results/)
+3. [Ergebnisberichte](experiment-reports/)
 4. [PCB-01-Fertigungsdaten](hardware/pcb-01/)
 5. [PCB-03-Fertigungsdaten und KiCad-Quellen](hardware/pcb-03/)
 
@@ -141,11 +141,11 @@ im Repository enthalten. Herkunft und festgeschriebene Quellstände stehen in
 Der enthaltene Softwarestand lässt sich aus dem Repository heraus prüfen:
 
 ```bash
-sh scripts/verify_observatory_source.sh
+sh project_tools/verify_observatory_source.sh
 node --test software/ruview/ui/tests/*.test.mjs
 cargo check --manifest-path software/ruview/v2/Cargo.toml \
   -p wifi-densepose-sensing-server --no-default-features
-python3 -m unittest scripts/tests/test_evaluate_d5_replay.py
+python3 -m unittest project_tools/tests/test_evaluate_d5_replay.py
 ```
 
 > [!WARNING]
@@ -183,7 +183,7 @@ Experiment-Cockpit für Setup-Profil, WiFi-Workflow, Blindaufnahmen und
 Evaluation. Die Screenshots und die vollständige Kurzanleitung stehen auf der
 [separaten Cockpit-Seite](software/experiment-cockpit.md).
 
-<a href="software/experiment-cockpit.md"><img src="images/ui/experiment-cockpit-setup.png" alt="Experiment-Cockpit mit Setup-Profil, Statusübersicht und simuliertem Hardwarezustand" width="760"></a>
+<a href="software/experiment-cockpit.md"><img src="project-media/ui/experiment-cockpit-setup.png" alt="Experiment-Cockpit mit Setup-Profil, Statusübersicht und simuliertem Hardwarezustand" width="760"></a>
 
 > [!NOTE]
 > Die UI-Abbildungen und der Demo-Ablauf zeigen Softwarezustände ohne angeschlossene Sensoren. Sie sind kein Nachweis realer CSI-, Radar- oder Positionsdaten.
@@ -197,7 +197,7 @@ die Trennung der Evidenzstufen ausführlicher.
 
 ## Belastbare Ergebnisse
 
-Die [Ergebnisübersicht](results/README.md) enthält den vollständigen, neuesten
+Die [Ergebnisübersicht](experiment-reports/README.md) enthält den vollständigen, neuesten
 zuerst sortierten Ergebniskatalog. Berichte, zugehörige Diagramme und
 tabellarische Ableitungen liegen jeweils im selben Ergebnispaket.
 
@@ -235,8 +235,11 @@ Befestigungs- und mmWave-Bauteile, Bilder und Gehäusehinweise.
 | [`hardware/README.md`](hardware/README.md) | Hardwareübersicht, Platinen, Breadboard-CAD und Befestigungsteile |
 | [`software/experiment-cockpit.md`](software/experiment-cockpit.md) | UI-Screenshots und Experiment-Workflow |
 | [`software/`](software/README.md) | Vollständiger UI-, Backend- und Firmware-Quellstand mit Herkunftsnachweis |
-| [`results/`](results/) | Ausführliche Ergebnisberichte |
-| [`templates/messblatt.md`](templates/messblatt.md) | Vorlage für neue Messungen |
+| [`experiment-reports/`](experiment-reports/) | Ausführliche Ergebnisberichte |
+| [`project-media/`](project-media/) | Kuratierte Projektfotos, UI-Abbildungen und technische Diagramme |
+| [`project_tools/`](project_tools/) | Projektweite Prüf-, Auswertungs- und Rendering-Werkzeuge |
+| [`historical-screenshots/`](historical-screenshots/) | Zeitgestempelte historische Screenshots als qualitative Nachweise |
+| [`measurement-templates/messblatt.md`](measurement-templates/messblatt.md) | Vorlage für neue Messungen |
 
 ## Lizenz
 

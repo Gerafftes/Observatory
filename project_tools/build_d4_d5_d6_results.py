@@ -3,7 +3,7 @@
 
 The script is deliberately read-only with respect to recordings. It derives the
 inventory from the archived JSONL/metadata files and writes the associated CSVs
-plus legacy figures below ``results/2026-08-23_D4-D5-D6_technischer-bericht``.
+plus legacy figures below ``experiment-reports/2026-08-23_D4-D5-D6_technischer-bericht``.
 """
 
 from __future__ import annotations
@@ -23,7 +23,7 @@ PROJECT_DIR = Path(__file__).resolve().parent.parent
 BLL_DIR = PROJECT_DIR.parent
 API_DATA_DIR = BLL_DIR / "wifi-csi-dokumentation" / "data" / "raw"
 D6_DATA_DIR = BLL_DIR / "data" / "recordings"
-RESULTS_DIR = PROJECT_DIR / "results" / "2026-08-23_D4-D5-D6_technischer-bericht"
+RESULTS_DIR = PROJECT_DIR / "experiment-reports" / "2026-08-23_D4-D5-D6_technischer-bericht"
 FIGURES_DIR = RESULTS_DIR / "archive" / "legacy-generated"
 INVENTORY_PATH = RESULTS_DIR / "data" / "laufuebersicht.csv"
 D4_RX_PATH = RESULTS_DIR / "data" / "d4-rx-diagnostik.csv"

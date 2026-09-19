@@ -41,7 +41,7 @@ Capture `/api/v1/mmwave/status` immediately before and after the same 25-second
 preflight/session, then run:
 
 ```bash
-python3 scripts/audit_mmwave_runtime.py \
+python3 project_tools/audit_mmwave_runtime.py \
   --recording data/mmwave/<SESSION>.mmwave.jsonl \
   --setup /absolute/path/to/sealed-setup.json \
   --status-before /tmp/mmwave-status-before.json \
