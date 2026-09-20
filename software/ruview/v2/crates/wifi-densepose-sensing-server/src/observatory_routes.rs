@@ -59,81 +59,19 @@ struct SetupProfileRequest {
     document: serde_json::Value,
 }
 
-async fn sync_saved_mmwave_transform(
-    state: &SharedState,
-    profile: &experiment::SetupProfile,
-) -> serde_json::Value {
-    let Some(transform) = mmwave_calibration::transform_request_from_profile(profile) else {
+async fn map_saved_mmwave_profile(state: &SharedState) -> serde_json::Value {
+    let state = state.read().await;
+    if !state.mmwave.transform_reconfiguration_allowed() {
         return serde_json::json!({
             "status": "skipped",
-            "reason": "the saved profile has no complete mmWave mounting geometry",
+            "reason": "an active sealed setup or calibration session keeps its immutable geometry; create a new setup for this profile",
         });
-    };
-    let (control, sync_required) = {
-        let state = state.read().await;
-        if !state.mmwave.transform_reconfiguration_allowed() {
-            return serde_json::json!({
-                "status": "skipped",
-                "reason": "an active sealed setup or calibration session keeps its immutable geometry; create a new setup for this profile",
-            });
-        }
-        (
-            state.mmwave.control(),
-            state.mmwave.transform_sync_required(),
-        )
-    };
-    let Some(control) = control else {
-        if sync_required {
-            state.write().await.mmwave.mark_cad_profile_sync_failed(
-                "mmWave node control is not available; check MMWAVE_NODE_URL and its bearer token"
-                    .to_string(),
-            );
-        }
-        return serde_json::json!({
-            "status": "skipped",
-            "reason": "mmWave node control is not configured",
-        });
-    };
-    let transform_for_response = transform.clone();
-    match tokio::task::spawn_blocking(move || {
-        mmwave_calibration::set_node_transform(&control, &transform)
-    })
-    .await
-    {
-        Ok(Ok(())) => {
-            let mut state = state.write().await;
-            state
-                .mmwave
-                .mark_cad_profile_sync_succeeded(transform_for_response.clone());
-            serde_json::json!({
-                "status": "synced",
-                "transform": transform_for_response,
-            })
-        }
-        Ok(Err(error)) => {
-            state
-                .write()
-                .await
-                .mmwave
-                .mark_cad_profile_sync_failed(error.clone());
-            serde_json::json!({
-                "status": "failed",
-                "error": error,
-            })
-        }
-        Err(error) => {
-            let error = format!("mmWave transform sync task failed: {error}");
-            state
-                .write()
-                .await
-                .mmwave
-                .mark_cad_profile_sync_failed(error.clone());
-            serde_json::json!({
-                "status": "failed",
-                "error": error,
-            })
-        }
     }
+    serde_json::json!({
+        "status": "server_mapped",
+        "node_ids": state.mmwave.node_ids(),
+        "reason": "the server applies the saved room transform by packet node_id; no ESP transform write is required",
+    })
 }
 
 fn setup_profile_response(
@@ -395,7 +333,7 @@ async fn setup_profile_create(
         }
     };
     state.write().await.mmwave.apply_cad_profile(&profile);
-    let mmwave_transform_sync = sync_saved_mmwave_transform(&state, &profile).await;
+    let mmwave_transform_sync = map_saved_mmwave_profile(&state).await;
     (
         StatusCode::CREATED,
         setup_profile_response(&profile, mmwave_transform_sync),
@@ -429,7 +367,7 @@ async fn setup_profile_update(
         }
     };
     state.write().await.mmwave.apply_cad_profile(&profile);
-    let mmwave_transform_sync = sync_saved_mmwave_transform(&state, &profile).await;
+    let mmwave_transform_sync = map_saved_mmwave_profile(&state).await;
     setup_profile_response(&profile, mmwave_transform_sync).into_response()
 }
 

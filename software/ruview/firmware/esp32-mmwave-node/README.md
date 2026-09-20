@@ -15,6 +15,18 @@ The ESP32 console is deliberately routed to USB Serial/JTAG. Do not change it
 back to UART0: GPIO20/21 are connected to the radar on this PCB and boot logs on
 GPIO21 could be interpreted as radar commands.
 
+## Onboard identity LED
+
+After boot, the firmware drives the ESP32-C3 Super Mini's active-low blue LED
+on GPIO8 from the configured stable node ID:
+
+- `MMWAVE1`: one short pulse every three seconds;
+- `MMWAVE2`: two short pulses every three seconds;
+- any other or missing node ID: continuous fast warning blink.
+
+The red power LED remains hardware-controlled. GPIO8 is configured only after
+startup so the firmware does not change the ESP32-C3 boot-strapping state.
+
 ## Measurement contract
 
 Every valid 30-byte radar frame becomes one UDP JSON packet using schema
@@ -24,7 +36,13 @@ Every valid 30-byte radar frame becomes one UDP JSON packet using schema
 - NTP Unix timestamp when available (`0` until synchronized);
 - explicit `calibration` or `reference` mode;
 - all three unfiltered sensor slots in local millimetres;
-- transformed room X/Z coordinates and the transform parameters.
+- legacy transformed room X/Z coordinates and the transform parameters.
+
+For the RuView sensing server, `node_id` plus the raw local coordinates are
+authoritative. The server applies the matching setup-profile transform for
+that node; the transformed fields remain in the packet for compatibility with
+older collectors and standalone diagnostics. Saving a new server profile does
+not require writing a transform back to the ESP.
 
 The LD2450 slots are not persistent person identities. Consumers must not treat
 slot 1, 2 or 3 as a stable track ID.
@@ -48,9 +66,11 @@ idf.py build
 idf.py -p /dev/cu.usbmodem... flash monitor
 ```
 
-Under **RuView mmWave node**, set the WiFi, UDP collector, stable node ID, a
-strong OTA token, and the radar-to-room transform. The initial USB flash is
-required once. Later app updates use WiFi OTA and preserve NVS/mode.
+Under **RuView mmWave node**, set the WiFi, UDP collector, stable node ID, and a
+strong OTA token. The radar-to-room transform remains available for standalone
+diagnostics and backward-compatible packets, but the RuView server uses the
+saved setup profile as its source of truth. The initial USB flash is required
+once. Later app updates use WiFi OTA and preserve NVS/mode.
 
 Transform definition:
 
@@ -102,9 +122,15 @@ The default stream interval is 50 ms. The LD2450 itself normally reports at
 radar measurements. WiFi modem sleep is disabled by default for the
 mains-powered node so DTIM wake-ups do not add receive latency. Each packet is
 acknowledged by the collector; an unacknowledged packet is retried with the
-same boot ID and sequence up to eight times with a 50 ms timeout. The server
-deduplicates a retransmission if only the ACK was lost. The attempt limit and
-timeout are configurable in **RuView mmWave node**.
+same boot ID and sequence up to eight times. The end-to-end retransmission
+timeout uses 150 ms as both its initial value and the minimum for this WLAN
+path, adapts upward from ACK round trips, and preserves bounded backoff after
+a successful retry as a learned floor for the current boot session. Fast
+median ACKs therefore cannot erase the measured WLAN tail. The server
+deduplicates a retransmission if only the ACK was lost. The
+attempt limit and initial/minimum timeout are configurable in **RuView mmWave
+node**. The learned timeout is capped at a configurable 2 s so a collector
+outage remains bounded.
 The server can use the authenticated `/transport` endpoint to repair a changed
 collector IP/port and persists that target in NVS.
 

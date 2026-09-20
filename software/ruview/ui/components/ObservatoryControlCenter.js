@@ -4,6 +4,7 @@ import {
   DEFAULT_MMWAVE_POSITION_M,
   DEFAULT_SENSOR_MOUNT_RADIUS_M,
   mmwaveMountingPosition,
+  mmwaveSensors,
   mmwaveYawMdeg,
   MMWAVE_SENSOR,
   RoomGeometryEditor,
@@ -36,6 +37,15 @@ export function defaultSetupProfileDocument() {
   const room = [4.02, 2.59, 3.44];
   const x = [1.01, 2.01, 3.01];
   const z = [0.86, 1.72, 2.58];
+  const primaryMmwave = {
+    node_id: 'MMWAVE1',
+    sensor: MMWAVE_SENSOR,
+    mounting_position_m: [...DEFAULT_MMWAVE_POSITION_M],
+    mounting_revision: 'draft',
+    allow_exterior: true,
+    yaw_mdeg: DEFAULT_MMWAVE_YAW_MDEG,
+    raw_x_inverted: false,
+  };
   return {
     schema_version: 1,
     profile_kind: 'ruview.setup-profile',
@@ -48,14 +58,19 @@ export function defaultSetupProfileDocument() {
       { id: 'RX3', role: 'receiver', position_m: [0.00, 0.74, 2.11] },
       { id: 'RX4', role: 'receiver', position_m: [4.02, 0.87, 2.46] },
     ],
-    mmwave: {
-      sensor: MMWAVE_SENSOR,
-      mounting_position_m: [...DEFAULT_MMWAVE_POSITION_M],
-      mounting_revision: 'draft',
-      allow_exterior: true,
-      yaw_mdeg: DEFAULT_MMWAVE_YAW_MDEG,
-      raw_x_inverted: false,
-    },
+    mmwave: { ...primaryMmwave },
+    mmwave_sensors: [
+      primaryMmwave,
+      {
+        node_id: 'MMWAVE2',
+        sensor: MMWAVE_SENSOR,
+        mounting_position_m: [room[0], DEFAULT_MMWAVE_POSITION_M[1], DEFAULT_MMWAVE_POSITION_M[2]],
+        mounting_revision: 'draft',
+        allow_exterior: true,
+        yaw_mdeg: 180000,
+        raw_x_inverted: false,
+      },
+    ],
     points: EXPECTED_POINTS.map((id, index) => ({
       id,
       coordinates_m: [x[index % 3], 0, z[Math.floor(index / 3)]],
@@ -274,6 +289,7 @@ export class ObservatoryControlCenter {
     this.selectedProfile = null;
     this.selectedRun = null;
     this.profileDraft = defaultSetupProfileDocument();
+    this.profileDraftDirty = false;
     this.profileSource = 'fallback';
     this.profileLabel = 'Fallback-Setup';
     this.workflowLabel = 'WiFi-only position experiment';
@@ -393,13 +409,18 @@ export class ObservatoryControlCenter {
     return Boolean(active && this.container?.contains(active) && active.matches('input, select, textarea'));
   }
 
-  _selectProfile(profile) {
+  _selectProfile(profile, { forceDraft = false } = {}) {
+    const keepDraft = !forceDraft
+      && this.selectedProfile?.id === profile?.id
+      && this.profileDraftDirty;
     this.selectedProfile = profile;
     this.profileSource = 'sqlite';
+    if (keepDraft) return;
     this.profileLabel = profile.label;
     this.profileDraft = typeof structuredClone === 'function'
       ? structuredClone(profile.document)
       : JSON.parse(JSON.stringify(profile.document));
+    this.profileDraftDirty = false;
   }
 
   async refreshAfterServerStart() {
@@ -437,6 +458,10 @@ export class ObservatoryControlCenter {
         ? profile.room_dimensions_m.slice(0, 3)
         : null,
       mountingPositionM: mmwaveMountingPosition(profile),
+      mmwaveSensors: mmwaveSensors(profile).map((sensor) => ({
+        nodeId: sensor.node_id,
+        mountingPositionM: mmwaveMountingPosition(profile, sensor.node_id),
+      })),
       txPosition: Array.isArray(profile.transmitter?.position_m)
         ? profile.transmitter.position_m.slice(0, 3)
         : null,
@@ -541,8 +566,9 @@ export class ObservatoryControlCenter {
                 `).join('')}</div>
               </div>
               <div class="occ-form-section">
-                <div class="occ-subheading">mmWave [x / y / z] (m) ${infoTip('mmWave', 'Fester Montagepunkt des HLK-LD2450. Radar-Truth bleibt getrennt vom WiFi-Modell.')}</div>
-                <div class="occ-triple">${this._tripleInputs('mmwave.mounting_position_m', mmwaveMountingPosition(this.profileDraft))}</div>
+                <div class="occ-subheading">mmWave [x / y / z] (m) ${infoTip('mmWave', 'Unabhängige Montagepunkte der HLK-LD2450. Radar-Truth bleibt getrennt vom WiFi-Modell.')}</div>
+                <label class="occ-checkbox"><input type="checkbox" data-occ-mmwave2-enabled ${mmwaveSensors(this.profileDraft).some((sensor) => sensor.node_id === 'MMWAVE2') ? 'checked' : ''}> MMWAVE2 im aktiven Setup verwenden</label>
+                ${['MMWAVE1', 'MMWAVE2'].map((nodeId) => `<div class="occ-node-row"><strong>${nodeId}</strong><div class="occ-triple">${this._tripleInputs(`mmwave.${nodeId}.mounting_position_m`, mmwaveMountingPosition(this.profileDraft, nodeId))}</div></div>`).join('')}
                 <p class="occ-helper">Montagepunkt, nicht die aktuelle Zielposition.</p>
                 <p class="occ-helper">Blickrichtung und Links/Rechts-Spiegelung werden direkt am mmWave-Marker im CAD-Inspector eingestellt.</p>
               </div>
@@ -608,13 +634,14 @@ export class ObservatoryControlCenter {
       ? this.container.querySelector('#occRoomCadEditor')
       : null;
     if (editorHost) {
-      this.geometryEditor = new RoomGeometryEditor(editorHost, {
-        document: this.profileDraft,
-        selectedIds: previousGeometrySelection,
-        onChange: (document) => {
-          this.profileDraft = document;
-          this._syncProfileFormFromDraft();
-        },
+        this.geometryEditor = new RoomGeometryEditor(editorHost, {
+          document: this.profileDraft,
+          selectedIds: previousGeometrySelection,
+          onChange: (document) => {
+            this.profileDraft = document;
+            this.profileDraftDirty = true;
+            this._syncProfileFormFromDraft();
+          },
         onSave: (document) => this._saveGeometryDocument(document),
         saveDisabled: experimentActionsDisabled,
         setupSource: this.profileSource,
@@ -716,7 +743,7 @@ export class ObservatoryControlCenter {
     set('room_dimensions_m', this.profileDraft.room_dimensions_m);
     set('transmitter.position_m', this.profileDraft.transmitter?.position_m);
     (this.profileDraft.receivers || []).forEach((receiver) => set(`receiver.${receiver.id}`, receiver.position_m));
-    set('mmwave.mounting_position_m', mmwaveMountingPosition(this.profileDraft));
+    ['MMWAVE1', 'MMWAVE2'].forEach((nodeId) => set(`mmwave.${nodeId}.mounting_position_m`, mmwaveMountingPosition(this.profileDraft, nodeId)));
     const yawInput = form.querySelector('[data-occ-field="mmwave.yaw_deg"]');
     if (yawInput) yawInput.value = mmwaveYawMdeg(this.profileDraft) / 1000;
     (this.profileDraft.points || []).forEach((point) => set(`point.${point.id}`, point.coordinates_m));
@@ -1383,6 +1410,7 @@ export class ObservatoryControlCenter {
     if (profileForm) {
       this.profileLabel = String(profileForm.querySelector('[name="profile_label"]')?.value || '');
       this.profileDraft = this._readProfileFromForm(profileForm);
+      this.profileDraftDirty = true;
       this.geometryEditor?.setDocument(this.profileDraft);
     }
     if (target.matches('[name="workflow_label"]')) this.workflowLabel = String(target.value || '');
@@ -1420,7 +1448,7 @@ export class ObservatoryControlCenter {
     if (profileButton) {
       const profile = this.profiles.find((candidate) => candidate.id === profileButton.dataset.occProfileId);
       if (profile) {
-        this._selectProfile(profile);
+        this._selectProfile(profile, { forceDraft: true });
         this.calibrationAvailability = null;
         this._render();
         const workflow = this.selectedRun?.workflow;
@@ -1558,7 +1586,8 @@ export class ObservatoryControlCenter {
 
   _readProfileFromForm(form = this.container.querySelector('#occProfileForm')) {
     const read = (prefix) => [0, 1, 2].map((index) => numberValue(form.querySelector(`[data-occ-field="${prefix}.${index}"]`)?.value));
-    const existingMmwave = this.profileDraft?.mmwave || {};
+    const existingMmwaveSensors = mmwaveSensors(this.profileDraft);
+    const existingMmwave = existingMmwaveSensors.find((sensor) => sensor.node_id === 'MMWAVE1') || {};
     const existingTransmitter = this.profileDraft?.transmitter || {};
     const existingReceivers = this.profileDraft?.receivers || [];
     const yawDegrees = numberValue(
@@ -1576,6 +1605,24 @@ export class ObservatoryControlCenter {
       furniture_revision: 'control-center',
       door_state_revision: 'closed',
     };
+    const mmwave2Toggle = form?.querySelector?.('[data-occ-mmwave2-enabled]');
+    const mmwave2Active = typeof mmwave2Toggle?.checked === 'boolean'
+      ? mmwave2Toggle.checked === true
+      : existingMmwaveSensors.some((sensor) => sensor.node_id === 'MMWAVE2');
+    const activeNodeIds = ['MMWAVE1', ...(mmwave2Active ? ['MMWAVE2'] : [])];
+    const sensors = activeNodeIds.map((nodeId) => {
+      const existing = existingMmwaveSensors.find((sensor) => sensor.node_id === nodeId) || {};
+      return {
+        ...existing,
+        node_id: nodeId,
+        sensor: existing.sensor || MMWAVE_SENSOR,
+        mounting_position_m: read(`mmwave.${nodeId}.mounting_position_m`),
+        mounting_revision: existing.mounting_revision || 'draft',
+        allow_exterior: nodeId === 'MMWAVE1' ? allowMmwaveExterior : existing.allow_exterior !== false,
+        yaw_mdeg: nodeId === 'MMWAVE1' ? Math.round(yawDegrees * 1000) : Number(existing.yaw_mdeg || 0),
+        raw_x_inverted: existing.raw_x_inverted === true,
+      };
+    });
     return {
       schema_version: 1,
       profile_kind: 'ruview.setup-profile',
@@ -1592,15 +1639,8 @@ export class ObservatoryControlCenter {
         role: 'receiver',
         position_m: read(`receiver.${id}`),
       })),
-      mmwave: {
-        ...existingMmwave,
-        sensor: existingMmwave.sensor || MMWAVE_SENSOR,
-        mounting_position_m: read('mmwave.mounting_position_m'),
-        mounting_revision: existingMmwave.mounting_revision || 'draft',
-        allow_exterior: allowMmwaveExterior,
-        yaw_mdeg: Math.round(yawDegrees * 1000),
-        raw_x_inverted: existingMmwave.raw_x_inverted === true,
-      },
+      mmwave: { ...sensors[0] },
+      mmwave_sensors: sensors,
       points: EXPECTED_POINTS.map((id) => ({ id, coordinates_m: read(`point.${id}`) })),
       radio: existingRadio,
       environment: existingEnvironment,
@@ -1631,6 +1671,7 @@ export class ObservatoryControlCenter {
       return;
     }
     this.profileDraft = document;
+    this.profileDraftDirty = true;
     this.busy = true;
     this.error = '';
     this._render();
@@ -1638,14 +1679,19 @@ export class ObservatoryControlCenter {
       const profile = this.selectedProfile
         ? await experimentService.updateProfile(this.selectedProfile.id, { label, document })
         : await experimentService.createProfile({ label, document });
-      this._selectProfile(profile);
+      this._selectProfile(profile, { forceDraft: true });
       const transformSync = profile.mmwave_transform_sync;
-      this.message = transformSync?.status === 'synced'
-        ? `Profile gespeichert und mmWave-Sensor synchronisiert: ${profile.profile_sha256.slice(0, 16)}…`
+      const mappedNodeIds = Array.isArray(transformSync?.node_ids)
+        ? transformSync.node_ids.filter(Boolean).join(' / ')
+        : '';
+      this.message = transformSync?.status === 'server_mapped'
+        ? `Profile gespeichert; mmWave wird serverseitig über ${mappedNodeIds || 'die Sensor-ID'} zugeordnet: ${profile.profile_sha256.slice(0, 16)}…`
+        : transformSync?.status === 'synced'
+          ? `Profile gespeichert; mmWave-Zuordnung aktiv: ${profile.profile_sha256.slice(0, 16)}…`
         : transformSync?.status === 'failed'
-          ? `Profile gespeichert, mmWave-Sensor nicht synchronisiert: ${transformSync.error || 'Fehler beim Schreiben'}`
+          ? `Profile gespeichert, serverseitige mmWave-Zuordnung fehlgeschlagen: ${transformSync.error || 'Fehler beim Anwenden des Profils'}`
           : transformSync?.status === 'skipped' && transformSync.reason
-            ? `Profile gespeichert; mmWave-Sensor nicht synchronisiert: ${transformSync.reason}`
+            ? `Profile gespeichert; mmWave-Profil nicht angewendet: ${transformSync.reason}`
           : `Profile gespeichert: ${profile.profile_sha256.slice(0, 16)}…`;
       await this.refresh({ quiet: true, allowWhileBusy: true });
     } catch (error) {
@@ -1671,6 +1717,7 @@ export class ObservatoryControlCenter {
     });
     this.profileLabel = String(form.querySelector('[name="profile_label"]')?.value || this.profileLabel);
     this.profileDraft = this._readProfileFromForm(form);
+    this.profileDraftDirty = true;
     this.message = 'Optionales P01–P09-Kontrollraster aktualisiert. Die reguläre Kalibrierung verwendet mmWave-Koordinaten.';
     this._render();
   }

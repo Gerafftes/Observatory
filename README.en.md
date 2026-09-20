@@ -43,7 +43,7 @@
 
 There is currently no public live demo: real measurements require the fixed
 local room setup with TX, RX1 through RX4, and the reference sensor. The
-[current technical handoff](08-aktueller-arbeitsstand-d6-und-position.md)
+[current technical handoff](docs/project/08-aktueller-arbeitsstand-d6-und-position.md)
 documents what has been verified and which hardware gate comes next.
 
 > **You are being sensed.**
@@ -73,7 +73,7 @@ documents what has been verified and which hardware gate comes next.
 - [Research question](#research-question)
 - [Current validation status](#current-validation-status)
 - [User interface](software/experiment-cockpit.en.md)
-- [How it works](architecture.en.md)
+- [How it works](experiment-reports/architecture/architecture.en.md)
 - [Verified results](experiment-reports/README.en.md)
 - [Hardware](hardware/README.en.md)
 - [Documentation](#documentation)
@@ -109,7 +109,7 @@ Then open `http://127.0.0.1:3002/ui/index.html#sensing`.
 The main entry points are:
 
 1. [UI, backend, and firmware](software/README.md)
-2. [Current D6/mmWave status](08-aktueller-arbeitsstand-d6-und-position.md)
+2. [Current D6/mmWave status](docs/project/08-aktueller-arbeitsstand-d6-und-position.md)
 3. [Result reports](experiment-reports/)
 4. [PCB-01 manufacturing files](hardware/pcb-01/)
 5. [PCB-03 manufacturing files and KiCad sources](hardware/pcb-03/)
@@ -118,7 +118,7 @@ The software is based on [ruvnet/RuView](https://github.com/ruvnet/RuView), but
 the Observatory changes and required subprojects are included directly in this
 repository. Provenance and pinned source revisions are listed in
 [`software/README.md`](software/README.md); project-specific changes are
-documented in [`06-ruview-anpassungen.md`](06-ruview-anpassungen.md).
+documented in [`06-ruview-anpassungen.md`](docs/project/06-ruview-anpassungen.md).
 
 ## What Observatory can do
 
@@ -193,7 +193,7 @@ cockpit page](software/experiment-cockpit.en.md).
 
 WiFi CSI is evaluated against an empty-room reference and discrete position
 fingerprints; mmWave remains an independent reference. The [architecture and
-data-flow page](architecture.en.md) explains the flow and evidence separation
+data-flow page](experiment-reports/architecture/architecture.en.md) explains the flow and evidence separation
 in detail.
 
 ## Verified results
@@ -226,16 +226,16 @@ German.
 
 | File | Contents |
 |---|---|
-| [`00-status-und-annahmen.md`](00-status-und-annahmen.md) | Setup, assumptions, coordinates, and open work |
-| [`01-projektjournal.md`](01-projektjournal.md) | Chronological development journal |
-| [`02-versuchslog.md`](02-versuchslog.md) | Experiments performed |
-| [`03-messprotokoll.md`](03-messprotokoll.md) | Measurement procedures and quality rules |
-| [`04-auswertung-bis-problemfrage.md`](04-auswertung-bis-problemfrage.md) | Analysis organized around the research question |
-| [`05-erfolge-niederlagen-und-aenderungen.md`](05-erfolge-niederlagen-und-aenderungen.md) | Successes, failures, and changes in direction |
-| [`06-ruview-anpassungen.md`](06-ruview-anpassungen.md) | Local changes to RuView |
-| [`07-screenshot-nachweise.md`](07-screenshot-nachweise.md) | Visual evidence and failure screenshots |
-| [`08-aktueller-arbeitsstand-d6-und-position.md`](08-aktueller-arbeitsstand-d6-und-position.md) | Authoritative D6/mmWave handoff |
-| [`architecture.en.md`](architecture.en.md) | Architecture, data flow, and evidence separation |
+| [`00-status-und-annahmen.md`](docs/project/00-status-und-annahmen.md) | Setup, assumptions, coordinates, and open work |
+| [`01-projektjournal.md`](docs/project/01-projektjournal.md) | Chronological development journal |
+| [`02-versuchslog.md`](docs/project/02-versuchslog.md) | Experiments performed |
+| [`03-messprotokoll.md`](docs/project/03-messprotokoll.md) | Measurement procedures and quality rules |
+| [`04-auswertung-bis-problemfrage.md`](docs/project/04-auswertung-bis-problemfrage.md) | Analysis organized around the research question |
+| [`05-erfolge-niederlagen-und-aenderungen.md`](docs/project/05-erfolge-niederlagen-und-aenderungen.md) | Successes, failures, and changes in direction |
+| [`06-ruview-anpassungen.md`](docs/project/06-ruview-anpassungen.md) | Local changes to RuView |
+| [`07-screenshot-nachweise.md`](docs/project/07-screenshot-nachweise.md) | Visual evidence and failure screenshots |
+| [`08-aktueller-arbeitsstand-d6-und-position.md`](docs/project/08-aktueller-arbeitsstand-d6-und-position.md) | Authoritative D6/mmWave handoff |
+| [`architecture.en.md`](experiment-reports/architecture/architecture.en.md) | Architecture, data flow, and evidence separation |
 | [`hardware/README.en.md`](hardware/README.en.md) | Hardware overview, PCBs, breadboard CAD, and fastening parts |
 | [`software/experiment-cockpit.en.md`](software/experiment-cockpit.en.md) | UI screenshots and experiment workflow |
 | [`software/`](software/README.md) | Complete UI, backend, and firmware source with provenance |

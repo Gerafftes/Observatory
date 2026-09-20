@@ -29,6 +29,7 @@ CLAUDE.local.md
 **/node_modules/
 **/.vite/
 firmware/**/build/
+software/ruview/firmware/esp32-mmwave-node/build-mmwave2/
 firmware/**/managed_components/
 firmware/**/dependencies.lock
 firmware/**/sdkconfig

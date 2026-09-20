@@ -342,6 +342,32 @@ test('yaw handle supports direct pointer adjustment and keyboard steps', () => {
   assert.equal(changedDocument.mmwave.yaw_mdeg, (afterPointer + 1000) % 360000);
 });
 
+test('position drags publish the current MMWAVE2 draft before pointerup', () => {
+  const profile = defaultSetupProfileDocument();
+  const container = { innerHTML: '', querySelector() { return null; } };
+  let changedDocument = null;
+  const editor = new RoomGeometryEditor(container, {
+    document: profile,
+    onChange: (document) => { changedDocument = document; },
+  });
+  editor._svgPoint = () => ({ x: 360, y: 220 });
+  editor.drag = { kind: 'position', id: 'MMWAVE2', pointerId: 8 };
+
+  const previousCSS = globalThis.CSS;
+  globalThis.CSS = { escape: (value) => value };
+  try {
+    editor._handlePointerMove({ pointerId: 8 });
+  } finally {
+    globalThis.CSS = previousCSS;
+  }
+
+  assert.ok(changedDocument);
+  assert.notDeepEqual(
+    changedDocument.mmwave_sensors.find((sensor) => sensor.node_id === 'MMWAVE2').mounting_position_m,
+    profile.mmwave_sensors.find((sensor) => sensor.node_id === 'MMWAVE2').mounting_position_m,
+  );
+});
+
 test('CAD view exposes and applies the mmWave placement calculation', () => {
   const container = { innerHTML: '' };
   let changedDocument = null;

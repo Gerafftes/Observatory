@@ -182,10 +182,39 @@ function formatClockTime(value) {
     });
 }
 
+/**
+ * Resolve one sensor from the multi-node status envelope without silently
+ * falling back to the primary sensor. A legacy, single-sensor response is
+ * still accepted for MMWAVE1, but it must never be displayed as MMWAVE2.
+ */
+export function selectMmwaveStatus(payload, nodeId = 'MMWAVE1') {
+  const envelope = payload && typeof payload === 'object' ? payload : null;
+  if (!envelope) return null;
+  if (Array.isArray(envelope.sensors)) {
+    return envelope.sensors.find((sensor) => (
+      sensor && (sensor.configured_node_id || sensor.node_id) === nodeId
+    )) || null;
+  }
+  const envelopeNodeId = envelope.configured_node_id || envelope.node_id;
+  if (nodeId !== 'MMWAVE1' && envelopeNodeId !== nodeId) return null;
+  return envelope;
+}
+
+function statusNodeIds(payload) {
+  if (Array.isArray(payload?.sensors)) {
+    return payload.sensors
+      .map((sensor) => sensor?.configured_node_id || sensor?.node_id)
+      .filter((nodeId) => typeof nodeId === 'string' && nodeId.length > 0);
+  }
+  const nodeId = payload?.configured_node_id || payload?.node_id;
+  return nodeId ? [nodeId] : ['MMWAVE1'];
+}
+
 export class MmwaveCalibrationAssistant {
-  constructor(container, calibrationContextProvider = () => null) {
+  constructor(container, calibrationContextProvider = () => null, nodeId = 'MMWAVE1') {
     this.container = container;
     this.calibrationContextProvider = calibrationContextProvider;
+    this.nodeId = nodeId;
     this.timer = null;
     this.busy = false;
     this.refreshInFlight = false;
@@ -197,6 +226,13 @@ export class MmwaveCalibrationAssistant {
     this.fixedPointResultDismissed = repeatResetActive || repeatResetStored();
     this.calibrationTimer = null;
     this.pointCheck = null;
+    this.availableNodeIds = [nodeId === 'MMWAVE2' ? 'MMWAVE2' : 'MMWAVE1'];
+  }
+
+  _endpoint(path) {
+    return this.nodeId === 'MMWAVE1'
+      ? path
+      : `${path}?node_id=${encodeURIComponent(this.nodeId)}`;
   }
 
   mount() {
@@ -241,6 +277,10 @@ export class MmwaveCalibrationAssistant {
             <div class="mmwave-eyebrow">RADAR-REFERENZ</div>
             <h3 id="mmwaveAssistantTitle">mmWave-Kalibrierung</h3>
             <p>Radar labelt Kalibrierung und Blindtest. Live nutzt nur CSI.</p>
+            <div role="group" aria-label="mmWave-Sensor auswählen">
+              <button type="button" class="mmwave-secondary-button" data-mmwave-node="MMWAVE1">MMWAVE1</button>
+              <button type="button" class="mmwave-secondary-button" data-mmwave-node="MMWAVE2">MMWAVE2</button>
+            </div>
           </div>
           <div class="mmwave-state is-loading" id="mmwaveState" role="status" aria-live="polite">
             PRÜFE LINK
@@ -297,14 +337,19 @@ export class MmwaveCalibrationAssistant {
       if (!response.ok) {
         throw new Error(payload.error || `Statusabfrage: HTTP ${response.status}`);
       }
-      if (payload?.fixed_point_calibration?.state === 'active') {
+      this.availableNodeIds = statusNodeIds(payload);
+      const sensorStatus = selectMmwaveStatus(payload, this.nodeId);
+      if (!sensorStatus) {
+        throw new Error(`${this.nodeId} ist im aktiven Setup nicht konfiguriert.`);
+      }
+      if (sensorStatus?.fixed_point_calibration?.state === 'active') {
         repeatResetActive = false;
         this.fixedPointResultDismissed = false;
         storeRepeatReset(false);
       }
       this.status = this.fixedPointResultDismissed
-        ? { ...payload, fixed_point_calibration: null, yaw_calibration: null }
-        : payload;
+        ? { ...sensorStatus, fixed_point_calibration: null, yaw_calibration: null }
+        : sensorStatus;
       const session = this.status?.session;
       if (session?.lifecycle && session.lifecycle !== 'active') {
         this.calibrationPlan = null;
@@ -335,6 +380,15 @@ export class MmwaveCalibrationAssistant {
   }
 
   async _onClick(event) {
+    const nodeButton = event.target.closest('[data-mmwave-node]');
+    if (nodeButton && !this.busy) {
+      this.nodeId = nodeButton.dataset.mmwaveNode;
+      this.status = null;
+      this.pointCheck = null;
+      this.calibrationPlan = null;
+      await this.refresh();
+      return;
+    }
     const action = event.target.closest('[data-mmwave-action]')?.dataset.mmwaveAction;
     if (!action || this.busy) return;
     if (action === 'refresh') {
@@ -375,7 +429,7 @@ export class MmwaveCalibrationAssistant {
     this._render();
     try {
       const [url, body] = requests[action];
-      const response = await fetch(url, {
+      const response = await fetch(this._endpoint(url), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
@@ -428,7 +482,7 @@ export class MmwaveCalibrationAssistant {
     this.busy = true;
     this._render();
     try {
-      const response = await fetch(MM_WAVE_FIXED_POINTS_CANCEL_ENDPOINT, {
+      const response = await fetch(this._endpoint(MM_WAVE_FIXED_POINTS_CANCEL_ENDPOINT), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: '{}',
@@ -467,7 +521,7 @@ export class MmwaveCalibrationAssistant {
       this.busy = true;
       this._render();
       try {
-        const response = await fetch(MM_WAVE_FIXED_POINTS_CANCEL_ENDPOINT, {
+        const response = await fetch(this._endpoint(MM_WAVE_FIXED_POINTS_CANCEL_ENDPOINT), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: '{}',
@@ -648,7 +702,7 @@ export class MmwaveCalibrationAssistant {
     this._clearActionError();
     this._render();
     try {
-      const response = await fetch(MM_WAVE_FIXED_POINTS_START_ENDPOINT, {
+      const response = await fetch(this._endpoint(MM_WAVE_FIXED_POINTS_START_ENDPOINT), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: '{}',
@@ -690,7 +744,7 @@ export class MmwaveCalibrationAssistant {
     this._clearActionError();
     this._render();
     try {
-      const response = await fetch(MM_WAVE_FIXED_POINTS_CHECK_ENDPOINT, {
+      const response = await fetch(this._endpoint(MM_WAVE_FIXED_POINTS_CHECK_ENDPOINT), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -753,7 +807,7 @@ export class MmwaveCalibrationAssistant {
       if (!calibrationContext?.profile_id) {
         throw new Error('Im Control Center muss ein unveränderliches Setup-Profil ausgewählt sein.');
       }
-      const response = await fetch(MM_WAVE_SESSION_START_ENDPOINT, {
+      const response = await fetch(this._endpoint(MM_WAVE_SESSION_START_ENDPOINT), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -795,7 +849,7 @@ export class MmwaveCalibrationAssistant {
     this._clearActionError();
     this._render();
     try {
-      const response = await fetch(MM_WAVE_KNOWN_POINT_ENDPOINT, {
+      const response = await fetch(this._endpoint(MM_WAVE_KNOWN_POINT_ENDPOINT), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -825,6 +879,15 @@ export class MmwaveCalibrationAssistant {
     const coverage = this.container.querySelector('#mmwaveCoverage');
     const error = this.container.querySelector('#mmwaveError');
     if (!state || !steps || !guidance || !zones || !coverage || !error) return;
+
+    this.container.querySelectorAll('[data-mmwave-node]').forEach((button) => {
+      const nodeId = button.dataset.mmwaveNode;
+      const available = this.availableNodeIds.includes(nodeId);
+      button.disabled = !available || this.busy;
+      button.setAttribute('aria-pressed', String(this.nodeId === nodeId));
+      button.classList.toggle('is-active', this.nodeId === nodeId);
+      button.title = available ? `Sensor ${nodeId} auswählen` : `${nodeId} ist im aktiven Setup nicht konfiguriert`;
+    });
 
     state.textContent = this.busy ? 'AKTION LÄUFT' : stateLabel(this.status?.state);
     state.className = `mmwave-state is-${this.busy ? 'loading' : (this.status?.state || 'disconnected')}`;

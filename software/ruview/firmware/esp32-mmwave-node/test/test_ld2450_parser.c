@@ -4,6 +4,7 @@
 #include "../main/coordinate_transform.h"
 #include "../main/ld2450_parser.h"
 #include "../main/measurement_ack.h"
+#include "../main/status_led.h"
 
 static void test_official_example(void)
 {
@@ -107,6 +108,62 @@ static void test_measurement_ack_contract(void)
     assert(!mmwave_ack_matches(ack, sizeof(ack) - 1, 0x12345678, 0x9ABCDEF0));
 }
 
+static void test_measurement_ack_timing(void)
+{
+    mmwave_ack_timing_t timing;
+    mmwave_ack_timing_init(&timing, 150);
+    assert(!timing.initialized);
+    assert(timing.timeout_ms == 150);
+
+    mmwave_ack_timing_observe(&timing, 80000, 50, 500);
+    assert(timing.initialized);
+    assert(timing.timeout_ms == 240);
+
+    mmwave_ack_timing_observe(&timing, 80000, 50, 500);
+    assert(timing.timeout_ms == 200);
+    assert(mmwave_ack_attempt_timeout_ms(200, 0, 500) == 200);
+    assert(mmwave_ack_attempt_timeout_ms(200, 1, 500) == 400);
+    assert(mmwave_ack_attempt_timeout_ms(200, 2, 500) == 500);
+
+    mmwave_ack_timing_backoff(&timing, 500);
+    assert(timing.timeout_ms == 400);
+    mmwave_ack_timing_backoff(&timing, 500);
+    assert(timing.timeout_ms == 500);
+
+    mmwave_ack_timing_init(&timing, 150);
+    mmwave_ack_timing_observe(&timing, 5000, 150, 500);
+    assert(timing.timeout_ms == 150);
+    mmwave_ack_timing_preserve_retry(&timing, 300);
+    assert(timing.timeout_ms == 300);
+    assert(timing.floor_timeout_ms == 300);
+    mmwave_ack_timing_preserve_retry(&timing, 150);
+    assert(timing.timeout_ms == 300);
+    mmwave_ack_timing_observe(&timing, 5000, 150, 500);
+    assert(timing.timeout_ms == 300);
+
+    mmwave_ack_timing_backoff(&timing, 500);
+    assert(timing.timeout_ms == 500);
+    assert(timing.floor_timeout_ms == 500);
+    mmwave_ack_timing_observe(&timing, 5000, 150, 500);
+    assert(timing.timeout_ms == 500);
+
+    mmwave_ack_timing_init(&timing, 150);
+    mmwave_ack_timing_preserve_retry(&timing, 300);
+    mmwave_ack_timing_preserve_retry(&timing, 600);
+    mmwave_ack_timing_preserve_retry(&timing, 1200);
+    assert(timing.floor_timeout_ms == 1200);
+    assert(mmwave_ack_attempt_timeout_ms(timing.timeout_ms, 1, 2000) == 2000);
+}
+
+static void test_status_led_identity_patterns(void)
+{
+    assert(status_led_identity_pulse_count("MMWAVE1") == 1);
+    assert(status_led_identity_pulse_count("MMWAVE2") == 2);
+    assert(status_led_identity_pulse_count("MMWAVE3") == 0);
+    assert(status_led_identity_pulse_count("") == 0);
+    assert(status_led_identity_pulse_count(NULL) == 0);
+}
+
 int main(void)
 {
     test_official_example();
@@ -114,6 +171,8 @@ int main(void)
     test_corrupt_frame_keeps_nested_header();
     test_room_coordinate_transform();
     test_measurement_ack_contract();
-    puts("ld2450 parser tests passed");
+    test_measurement_ack_timing();
+    test_status_led_identity_patterns();
+    puts("mmwave node tests passed");
     return 0;
 }

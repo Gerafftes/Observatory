@@ -22,6 +22,11 @@ test('default setup profile keeps the legacy point grid only for schema compatib
   assert.equal(profile.mmwave.allow_exterior, true);
   assert.equal(profile.mmwave.yaw_mdeg, 0);
   assert.equal(profile.mmwave.raw_x_inverted, false);
+  assert.deepEqual(profile.mmwave_sensors.map((sensor) => sensor.node_id), ['MMWAVE1', 'MMWAVE2']);
+  assert.notDeepEqual(
+    profile.mmwave_sensors[0].mounting_position_m,
+    profile.mmwave_sensors[1].mounting_position_m,
+  );
   assert.deepEqual(profile.points.map((point) => point.id), [
     'P01', 'P02', 'P03', 'P04', 'P05', 'P06', 'P07', 'P08', 'P09',
   ]);
@@ -45,6 +50,27 @@ test('fallback setup is labelled until a stored SQLite profile is selected', () 
   controlCenter._render();
 
   assert.equal(controlCenter.profileSource, 'sqlite');
+});
+
+test('refreshing the stored profile does not overwrite an unsaved CAD draft', () => {
+  const controlCenter = new ObservatoryControlCenter(null);
+  const storedProfile = {
+    id: 'profile-draft-test',
+    label: 'Gespeicherter Raum',
+    document: defaultSetupProfileDocument(),
+  };
+  controlCenter._selectProfile(storedProfile);
+  controlCenter.profileDraft = structuredClone(storedProfile.document);
+  controlCenter.profileDraft.mmwave_sensors.find((sensor) => sensor.node_id === 'MMWAVE2').mounting_position_m = [1, 1.2, 1.72];
+  controlCenter.profileDraftDirty = true;
+
+  controlCenter._selectProfile({ ...storedProfile, document: structuredClone(storedProfile.document) });
+
+  assert.deepEqual(
+    controlCenter.profileDraft.mmwave_sensors.find((sensor) => sensor.node_id === 'MMWAVE2').mounting_position_m,
+    [1, 1.2, 1.72],
+  );
+  assert.equal(controlCenter.profileDraftDirty, true);
 });
 
 test('geometry snapshot exposes the same CAD mmWave, TX, and RX positions', () => {
@@ -74,6 +100,22 @@ test('profile reads the CAD mmWave exterior policy together with form coordinate
   const profile = controlCenter._readProfileFromForm(form);
 
   assert.equal(profile.mmwave.allow_exterior, false);
+});
+
+test('profile can explicitly keep MMWAVE2 out of the active setup', () => {
+  const controlCenter = new ObservatoryControlCenter(null);
+  const form = {
+    querySelector(selector) {
+      if (selector === '[data-occ-mmwave2-enabled]') return { checked: false };
+      if (selector === '[data-cad-mmwave-exterior]') return { checked: true };
+      return { value: '0' };
+    },
+  };
+
+  const profile = controlCenter._readProfileFromForm(form);
+
+  assert.deepEqual(profile.mmwave_sensors.map((sensor) => sensor.node_id), ['MMWAVE1']);
+  assert.equal(profile.mmwave.node_id, 'MMWAVE1');
 });
 
 test('profile form edits preserve optional calibration standpoints', () => {
@@ -118,7 +160,8 @@ test('room editor presents mmWave as the primary calibration route', () => {
 
   assert.match(container.innerHTML, /Radar-Referenz/);
   assert.match(container.innerHTML, /mmWave \[x \/ y \/ z\]/);
-  assert.match(container.innerHTML, /mmwave\.mounting_position_m/);
+  assert.match(container.innerHTML, /mmwave\.MMWAVE1\.mounting_position_m/);
+  assert.match(container.innerHTML, /mmwave\.MMWAVE2\.mounting_position_m/);
   assert.match(container.innerHTML, /toggle-room-details/);
   assert.match(container.innerHTML, /aria-expanded="false"/);
   assert.match(container.innerHTML, /class="occ-room-details-panel" hidden/);
@@ -220,7 +263,7 @@ test('direct CAD profile save uses the editor document without a profile form', 
       label: payload.label,
       document: payload.document,
       profile_sha256: 'a'.repeat(64),
-      mmwave_transform_sync: { status: 'synced' },
+      mmwave_transform_sync: { status: 'server_mapped', node_ids: ['MMWAVE1'] },
     };
   };
 
@@ -233,7 +276,7 @@ test('direct CAD profile save uses the editor document without a profile form', 
   assert.equal(submitted.label, 'CAD test');
   assert.deepEqual(submitted.document.mmwave.mounting_position_m, [3.95, 1.41, 3.35]);
   assert.notEqual(submitted.document, document);
-  assert.match(controlCenter.message, /mmWave-Sensor synchronisiert/);
+  assert.match(controlCenter.message, /serverseitig.*MMWAVE1/);
 });
 
 test('profile save translates a fetch failure into an actionable server hint', async () => {

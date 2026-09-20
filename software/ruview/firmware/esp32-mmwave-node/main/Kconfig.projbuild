@@ -43,10 +43,23 @@ config MMWAVE_UDP_ACK_ATTEMPTS
         are bounded so a disconnected collector cannot block the UART task
         indefinitely.
 
-config MMWAVE_UDP_ACK_TIMEOUT_MS
-    int "Collector ACK timeout (ms)"
-    range 5 100
-    default 50
+config MMWAVE_UDP_ACK_INITIAL_TIMEOUT_MS
+    int "Initial/minimum collector ACK timeout (ms)"
+    range 50 500
+    default 150
+    help
+        Initial and minimum end-to-end retransmission timeout for this WLAN
+        path. The node adapts upward from ACK round trips and preserves bounded
+        exponential backoff after a retry.
+
+config MMWAVE_UDP_ACK_MAX_TIMEOUT_MS
+    int "Maximum collector ACK timeout (ms)"
+    range 500 5000
+    default 2000
+    help
+        Upper bound for the learned retransmission timeout. It must cover long
+        WLAN/AP queueing tails while still bounding recovery from a collector
+        outage.
 
 config MMWAVE_NODE_ID
     string "Stable node ID"

@@ -19,6 +19,34 @@ import { displayCoordinatesForRoom } from '../components/gaussian-splats.js';
 
 const room = [4.02, 2.59, 3.44];
 
+test('debug normalization selects one sensor by node_id without combining equal slots', () => {
+  const envelope = {
+    sensors: [
+      { configured_node_id: 'MMWAVE1', state: 'valid', target_count: 1, target_position_mm: [100, 200], packet_age_ms: 1, room_dimensions_m: room, targets: [{ target_slot: 1, inside_room: true, position_mm: [100, 200] }] },
+      { configured_node_id: 'MMWAVE2', state: 'valid', target_count: 1, target_position_mm: [3000, 2000], packet_age_ms: 1, room_dimensions_m: room, targets: [{ target_slot: 1, inside_room: true, position_mm: [3000, 2000] }] },
+    ],
+  };
+
+  assert.deepEqual(normalizeMmwaveDebugStatus(envelope, Date.now(), 'MMWAVE1').targetPositionMm, [100, 200]);
+  assert.deepEqual(normalizeMmwaveDebugStatus(envelope, Date.now(), 'MMWAVE2').targetPositionMm, [3000, 2000]);
+});
+
+test('debug view does not render primary packets as an absent secondary sensor', () => {
+  const primary = {
+    node_id: 'MMWAVE1',
+    state: 'valid',
+    target_count: 1,
+    target_position_mm: [100, 200],
+    packet_age_ms: 1,
+  };
+
+  const missing = normalizeMmwaveDebugStatus({ sensors: [primary] }, Date.now(), 'MMWAVE2');
+  assert.equal(missing.state, 'disconnected');
+  assert.equal(missing.accepted, false);
+  assert.equal(missing.targetPositionMm, null);
+  assert.match(missing.reason, /MMWAVE2/);
+});
+
 test('room coordinates use the current UI orientation and stay centered', () => {
   assert.deepEqual(roomPositionToScene([0, 0, 0], room), [2.01, 0, -1.72]);
   assert.deepEqual(roomPositionToScene(room, room), [-2.01, 2.59, 1.72]);
@@ -202,7 +230,8 @@ test('debug component keeps the source legend explicit', () => {
   assert.match(source, /Radar verworfen · außerhalb Raum/);
   assert.match(source, /Draufsicht/);
   assert.match(source, /keine Fusion/);
-  assert.match(source, /createMarkerLabel\('MMWAVE1'/);
+  assert.match(source, /createMarkerLabel\(this\.nodeId, HARDWARE_GREY/);
+  assert.doesNotMatch(source, /createMarkerLabel\('MMWAVE1', HARDWARE_GREY/);
   assert.match(source, /createMarkerLabel\('RADAR TARGET'/);
   assert.match(source, /createMarkerLabel\(receiverDisplayLabel\(node\.id, index\)/);
   assert.doesNotMatch(source, /PlaneGeometry|CylinderGeometry|ConeGeometry|TorusGeometry/);

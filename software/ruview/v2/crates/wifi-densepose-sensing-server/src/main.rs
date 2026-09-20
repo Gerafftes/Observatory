@@ -7325,75 +7325,126 @@ async fn main() {
         }
     });
 
-    let mut mmwave_manager = mmwave_calibration::MmwaveManager::new(
-        args.mmwave_udp_port,
-        runtime_position_geometry.room_dimensions,
-        mmwave_control,
-        position_setup
-            .as_deref()
-            .and_then(position_setup::SealedPositionSetup::mmwave)
-            .map(|definition| {
-                let (origin_x_mm, origin_z_mm, yaw_mdeg, raw_x_inverted) = definition.transform();
-                mmwave_calibration::ExpectedNode {
-                    node_id: definition.node_id().to_string(),
-                    mounting_position_m: Some(definition.mounting_position_m()),
-                    transform: mmwave_calibration::CoordinateFrame {
-                        local: "x_right_y_forward_mm".to_string(),
-                        room: "x_length_z_width_mm".to_string(),
-                        origin_x_mm,
-                        origin_z_mm,
-                        yaw_mdeg,
-                        raw_x_inverted,
-                    },
-                }
-            }),
-        position_setup.as_deref().and_then(|setup| {
-            setup.mmwave()?;
-            let receiver_positions_m = setup.receiver_positions_m();
-            let calibration_receiver_positions_m = setup.receiver_calibration_positions_m();
-            let calibration_rx_positions_m = calibration_receiver_positions_m
-                .iter()
-                .any(|position| position.is_some())
-                .then(|| {
-                    calibration_receiver_positions_m
-                        .into_iter()
-                        .zip(receiver_positions_m)
-                        .map(|(calibration, device)| calibration.unwrap_or(device))
-                        .collect()
-                });
-            Some(mmwave_calibration::ExperimentContext {
-                setup_id: setup.setup_id().to_string(),
-                setup_sha256: setup.setup_sha256().to_string(),
-                server_version: env!("CARGO_PKG_VERSION").to_string(),
-                geometry: position_capture::PositionCaptureGeometry {
-                    room_dimensions_m: setup.room_dimensions_m(),
-                    tx_position_m: setup.transmitter_position_m(),
-                    rx_positions_m: receiver_positions_m.to_vec(),
-                },
-                calibration_tx_position_m: setup.transmitter_calibration_position_m(),
-                calibration_rx_positions_m,
-            })
-        }),
-    );
-    mmwave_manager.set_node_control_configuration(mmwave_url_configured, mmwave_token_configured);
-    if position_setup.is_none() {
+    let mmwave_experiment = position_setup.as_deref().and_then(|setup| {
+        setup.mmwave()?;
+        let receiver_positions_m = setup.receiver_positions_m();
+        let calibration_receiver_positions_m = setup.receiver_calibration_positions_m();
+        let calibration_rx_positions_m = calibration_receiver_positions_m
+            .iter()
+            .any(|position| position.is_some())
+            .then(|| {
+                calibration_receiver_positions_m
+                    .into_iter()
+                    .zip(receiver_positions_m)
+                    .map(|(calibration, device)| calibration.unwrap_or(device))
+                    .collect()
+            });
+        Some(mmwave_calibration::ExperimentContext {
+            setup_id: setup.setup_id().to_string(),
+            setup_sha256: setup.setup_sha256().to_string(),
+            server_version: env!("CARGO_PKG_VERSION").to_string(),
+            geometry: position_capture::PositionCaptureGeometry {
+                room_dimensions_m: setup.room_dimensions_m(),
+                tx_position_m: setup.transmitter_position_m(),
+                rx_positions_m: receiver_positions_m.to_vec(),
+            },
+            calibration_tx_position_m: setup.transmitter_calibration_position_m(),
+            calibration_rx_positions_m,
+        })
+    });
+    let restored_mmwave_profile = if position_setup.is_none() {
         if let Some(store) = &experiment_store {
             match store.list_profiles().await {
-                Ok(profiles) => {
-                    if let Some(profile) = profiles.first() {
-                        mmwave_manager.apply_cad_profile(profile);
-                    }
+                Ok(profiles) => profiles.into_iter().next(),
+                Err(error) => {
+                    warn!("Could not restore CAD radar geometry: {error}");
+                    None
                 }
-                Err(error) => warn!("Could not restore CAD radar geometry: {error}"),
             }
+        } else {
+            None
+        }
+    } else {
+        None
+    };
+    let sealed_mmwave_sensors = position_setup
+        .as_deref()
+        .map(position_setup::SealedPositionSetup::mmwave_sensors)
+        .unwrap_or_default();
+    let sensor_ids: Vec<String> = if sealed_mmwave_sensors.is_empty() {
+        restored_mmwave_profile
+            .as_ref()
+            .and_then(|profile| profile.document.get("mmwave_sensors"))
+            .and_then(serde_json::Value::as_array)
+            .map(|sensors| {
+                sensors
+                    .iter()
+                    .filter_map(|sensor| sensor.get("node_id").and_then(serde_json::Value::as_str))
+                    .map(str::to_string)
+                    .collect::<Vec<_>>()
+            })
+            .filter(|ids| !ids.is_empty())
+            .unwrap_or_else(|| vec!["MMWAVE1".to_string()])
+    } else {
+        sealed_mmwave_sensors
+            .iter()
+            .map(|definition| definition.node_id().to_string())
+            .collect()
+    };
+    let mut managers = Vec::with_capacity(sensor_ids.len());
+    for node_id in sensor_ids {
+        let definition = sealed_mmwave_sensors
+            .iter()
+            .find(|definition| definition.node_id() == node_id);
+        let expected_node = definition.map(|definition| {
+            let (origin_x_mm, origin_z_mm, yaw_mdeg, raw_x_inverted) = definition.transform();
+            mmwave_calibration::ExpectedNode {
+                node_id: node_id.clone(),
+                mounting_position_m: Some(definition.mounting_position_m()),
+                transform: mmwave_calibration::CoordinateFrame {
+                    local: "x_right_y_forward_mm".to_string(),
+                    room: "x_length_z_width_mm".to_string(),
+                    origin_x_mm,
+                    origin_z_mm,
+                    yaw_mdeg,
+                    raw_x_inverted,
+                },
+            }
+        });
+        let control = (node_id == "MMWAVE1")
+            .then(|| mmwave_control.clone())
+            .flatten();
+        let mut manager = mmwave_calibration::MmwaveManager::new_for_node(
+            node_id.clone(),
+            args.mmwave_udp_port,
+            runtime_position_geometry.room_dimensions,
+            control,
+            expected_node,
+            mmwave_experiment.clone(),
+        );
+        manager.set_node_control_configuration(
+            node_id == "MMWAVE1" && mmwave_url_configured,
+            mmwave_token_configured,
+        );
+        managers.push((node_id, manager));
+    }
+    let mut mmwave_manager =
+        mmwave_calibration::MmwaveFleet::new(managers).expect("at least MMWAVE1 is configured");
+    if let Some(profile) = restored_mmwave_profile.as_ref() {
+        mmwave_manager.apply_cad_profile(profile);
+    }
+    for node_id in mmwave_manager.node_ids() {
+        mmwave_manager
+            .select_node(&node_id)
+            .expect("known mmWave node");
+        if let Err(error) = mmwave_manager.restore_yaw_calibration(&data_dir) {
+            warn!("Could not restore {node_id} yaw calibration: {error}");
+        }
+        if let Err(error) = mmwave_manager.restore_session_manifests(&data_dir) {
+            warn!("Could not restore {node_id} session manifests: {error}");
         }
     }
-    if let Err(error) = mmwave_manager.restore_yaw_calibration(&data_dir) {
-        warn!("Could not restore mmWave yaw calibration: {error}");
-    }
-    if let Err(error) = mmwave_manager.restore_session_manifests(&data_dir) {
-        warn!("Could not restore mmWave session manifests: {error}");
-    }
+    mmwave_manager.select_primary();
 
     let shutdown = Arc::new(Notify::new());
     let state: SharedState = Arc::new(RwLock::new(AppStateInner {
@@ -7406,9 +7457,17 @@ async fn main() {
         room_dimensions: runtime_position_geometry.room_dimensions,
         position_setup: position_setup.clone(),
         csi_grid_pin: args.csi_grid_pin,
+        mmwave_node_diagnostics: mmwave_manager
+            .node_ids()
+            .into_iter()
+            .map(|node_id| (node_id, MmwaveNodeDiagnosticsCache::default()))
+            .collect(),
+        mmwave_connections: mmwave_manager
+            .node_ids()
+            .into_iter()
+            .map(|node_id| (node_id, mmwave_connection::ConnectionStatus::default()))
+            .collect(),
         mmwave: mmwave_manager,
-        mmwave_node_diagnostics: MmwaveNodeDiagnosticsCache::default(),
-        mmwave_connection: mmwave_connection::ConnectionStatus::default(),
         live_position_tracker: position_live::LivePositionTracker::new(live_position_runtime),
         last_esp32_frame: None,
         last_raw_csi_frame: None,

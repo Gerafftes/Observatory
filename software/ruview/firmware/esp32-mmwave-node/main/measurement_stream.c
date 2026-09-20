@@ -10,6 +10,7 @@
 
 #include "esp_log.h"
 #include "esp_system.h"
+#include "esp_timer.h"
 #include "sdkconfig.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -24,8 +25,11 @@ static const char *TAG = "measurement_stream";
 #ifndef CONFIG_MMWAVE_UDP_ACK_ATTEMPTS
 #define CONFIG_MMWAVE_UDP_ACK_ATTEMPTS 8
 #endif
-#ifndef CONFIG_MMWAVE_UDP_ACK_TIMEOUT_MS
-#define CONFIG_MMWAVE_UDP_ACK_TIMEOUT_MS 50
+#ifndef CONFIG_MMWAVE_UDP_ACK_INITIAL_TIMEOUT_MS
+#define CONFIG_MMWAVE_UDP_ACK_INITIAL_TIMEOUT_MS 150
+#endif
+#ifndef CONFIG_MMWAVE_UDP_ACK_MAX_TIMEOUT_MS
+#define CONFIG_MMWAVE_UDP_ACK_MAX_TIMEOUT_MS 2000
 #endif
 
 static bool append_json(char *buffer, size_t capacity, size_t *used,
@@ -51,6 +55,7 @@ struct measurement_stream {
     app_config_t *config;
     uint32_t sequence;
     uint32_t boot_id;
+    mmwave_ack_timing_t ack_timing;
 };
 
 static bool sockaddr_matches(const struct sockaddr_in *left,
@@ -63,16 +68,41 @@ static bool sockaddr_matches(const struct sockaddr_in *left,
 
 static bool wait_for_ack(measurement_stream_t *stream,
                          const struct sockaddr_in *destination,
-                         uint32_t sequence)
+                         uint32_t sequence, uint32_t timeout_ms,
+                         int64_t started_us, uint64_t *round_trip_us)
 {
     uint8_t ack[MMWAVE_ACK_SIZE];
+    int64_t deadline_us = started_us + (int64_t)timeout_ms * 1000;
     while (true) {
+        int64_t remaining_us = deadline_us - esp_timer_get_time();
+        if (remaining_us <= 0) {
+            return false;
+        }
+        struct timeval timeout = {
+            .tv_sec = remaining_us / 1000000,
+            .tv_usec = remaining_us % 1000000,
+        };
+        fd_set read_set;
+        FD_ZERO(&read_set);
+        FD_SET(stream->socket_fd, &read_set);
+        int ready = select(stream->socket_fd + 1, &read_set, NULL, NULL,
+                           &timeout);
+        if (ready == 0) {
+            return false;
+        }
+        if (ready < 0) {
+            if (errno == EINTR) {
+                continue;
+            }
+            return false;
+        }
         struct sockaddr_in source = {0};
         socklen_t source_length = sizeof(source);
-        ssize_t received = recvfrom(stream->socket_fd, ack, sizeof(ack), 0,
+        ssize_t received = recvfrom(stream->socket_fd, ack, sizeof(ack),
+                                    MSG_DONTWAIT,
                                     (struct sockaddr *)&source, &source_length);
         if (received < 0) {
-            if (errno == EINTR) {
+            if (errno == EINTR || errno == EAGAIN || errno == EWOULDBLOCK) {
                 continue;
             }
             return false;
@@ -80,6 +110,7 @@ static bool wait_for_ack(measurement_stream_t *stream,
         if (sockaddr_matches(&source, destination) &&
             mmwave_ack_matches(ack, (size_t)received, stream->boot_id,
                                sequence)) {
+            *round_trip_us = (uint64_t)(esp_timer_get_time() - started_us);
             return true;
         }
     }
@@ -93,6 +124,8 @@ measurement_stream_t *measurement_stream_create(app_config_t *config)
     }
     stream->config = config;
     stream->boot_id = esp_random();
+    mmwave_ack_timing_init(&stream->ack_timing,
+                           CONFIG_MMWAVE_UDP_ACK_INITIAL_TIMEOUT_MS);
     stream->discovery = mmwave_discovery_create();
     if (stream->discovery == NULL) {
         ESP_LOGW(TAG, "Collector discovery socket unavailable; using persisted target only");
@@ -102,16 +135,6 @@ measurement_stream_t *measurement_stream_create(app_config_t *config)
         !app_config_transport_valid(config->target_host, config->target_port)) {
         ESP_LOGE(TAG, "Cannot create UDP stream for %s:%u",
                  config->target_host, config->target_port);
-        measurement_stream_destroy(stream);
-        return NULL;
-    }
-    const struct timeval ack_timeout = {
-        .tv_sec = 0,
-        .tv_usec = CONFIG_MMWAVE_UDP_ACK_TIMEOUT_MS * 1000,
-    };
-    if (setsockopt(stream->socket_fd, SOL_SOCKET, SO_RCVTIMEO, &ack_timeout,
-                   sizeof(ack_timeout)) < 0) {
-        ESP_LOGE(TAG, "Cannot configure UDP ACK timeout");
         measurement_stream_destroy(stream);
         return NULL;
     }
@@ -196,16 +219,36 @@ measurement_stream_result_t measurement_stream_send(
 
     // sendto() only confirms local queueing. The collector ACK closes the
     // actual Node -> WLAN -> server path; retries reuse the same sequence so
-    // the server can safely deduplicate a late ACK or retransmission.
+    // the server can safely deduplicate a late ACK or retransmission. The
+    // retransmission timeout covers the complete path, including WiFi/AP
+    // buffering. Clean first-attempt ACKs update the RTT estimator, while a
+    // successful retry raises the learned floor for this boot session. The
+    // initial timeout is also a floor: a fast median ACK must not erase the
+    // measured WiFi/AP tail that made an earlier timeout fire spuriously.
     for (unsigned attempt = 0; attempt < CONFIG_MMWAVE_UDP_ACK_ATTEMPTS; ++attempt) {
         result.attempts += 1;
+        int64_t started_us = esp_timer_get_time();
         ssize_t sent = sendto(stream->socket_fd, json, used, 0,
                               (struct sockaddr *)&destination,
                               sizeof(destination));
         if (sent == (ssize_t)used) {
             result.sent = true;
-            if (wait_for_ack(stream, &destination, sequence)) {
+            uint64_t round_trip_us = 0;
+            uint32_t timeout_ms = mmwave_ack_attempt_timeout_ms(
+                stream->ack_timing.timeout_ms, attempt,
+                CONFIG_MMWAVE_UDP_ACK_MAX_TIMEOUT_MS);
+            if (wait_for_ack(stream, &destination, sequence, timeout_ms,
+                             started_us, &round_trip_us)) {
                 result.acknowledged = true;
+                if (attempt == 0) {
+                    mmwave_ack_timing_observe(
+                        &stream->ack_timing, round_trip_us,
+                        CONFIG_MMWAVE_UDP_ACK_INITIAL_TIMEOUT_MS,
+                        CONFIG_MMWAVE_UDP_ACK_MAX_TIMEOUT_MS);
+                } else {
+                    mmwave_ack_timing_preserve_retry(
+                        &stream->ack_timing, timeout_ms);
+                }
                 break;
             }
         } else {
@@ -213,6 +256,8 @@ measurement_stream_result_t measurement_stream_send(
         }
     }
     if (!result.acknowledged) {
+        mmwave_ack_timing_backoff(&stream->ack_timing,
+                                  CONFIG_MMWAVE_UDP_ACK_MAX_TIMEOUT_MS);
         ESP_LOGW(TAG, "No collector ACK for sequence %" PRIu32 " after %u attempts",
                  sequence, result.attempts);
     }

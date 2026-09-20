@@ -17,10 +17,10 @@ use std::{
 };
 use tokio::fs;
 
-use crate::position_artifact::sha256_bytes;
 use crate::calibration_persistence::{
     profile_context_sha256, CalibrationBundle, CalibrationSummary,
 };
+use crate::position_artifact::sha256_bytes;
 
 pub(crate) const SCHEMA_VERSION: i64 = 3;
 pub(crate) const SUPPORTED_FIXTURE_ID: &str = "mmwave-synthetic-pass-status-v1";
@@ -318,9 +318,10 @@ impl ExperimentStore {
         .bind(&current.label)
         .bind(&current.profile_sha256)
         .bind(&current.profile_context_sha256)
-        .bind(serde_json::to_string(&current.document).map_err(|error| {
-            format!("serialize previous setup profile document: {error}")
-        })?)
+        .bind(
+            serde_json::to_string(&current.document)
+                .map_err(|error| format!("serialize previous setup profile document: {error}"))?,
+        )
         .bind(&current.created_at)
         .execute(&mut *transaction)
         .await
@@ -440,7 +441,14 @@ impl ExperimentStore {
         .await
         .map_err(|error| format!("insert workflow metadata: {error}"))?;
 
-        insert_phase_event(&mut transaction, &id, WORKFLOW_PHASES[0], "READY", &json!({})).await?;
+        insert_phase_event(
+            &mut transaction,
+            &id,
+            WORKFLOW_PHASES[0],
+            "READY",
+            &json!({}),
+        )
+        .await?;
         transaction
             .commit()
             .await
@@ -554,12 +562,14 @@ impl ExperimentStore {
         .bind(timestamp())
         .bind(finished_at)
         .bind((status == "BLOCKED").then_some("PHASE_BLOCKED"))
-        .bind((status == "BLOCKED").then_some(
-            payload
-                .get("message")
-                .and_then(Value::as_str)
-                .unwrap_or("workflow phase is blocked"),
-        ))
+        .bind(
+            (status == "BLOCKED").then_some(
+                payload
+                    .get("message")
+                    .and_then(Value::as_str)
+                    .unwrap_or("workflow phase is blocked"),
+            ),
+        )
         .bind(run_id)
         .bind(WORKFLOW_KIND)
         .execute(&mut *transaction)
@@ -701,10 +711,7 @@ impl ExperimentStore {
             return Err("run is not a WiFi-only workflow".to_string());
         }
 
-        let data_root = self
-            .db_path
-            .parent()
-            .unwrap_or_else(|| Path::new("data"));
+        let data_root = self.db_path.parent().unwrap_or_else(|| Path::new("data"));
         let root = fs::canonicalize(data_root)
             .await
             .map_err(|error| format!("resolve experiment data directory: {error}"))?;
@@ -765,7 +772,10 @@ impl ExperimentStore {
         let Some(run) = self.get_run(run_id).await? else {
             return Ok(None);
         };
-        let Some(artifact) = run.artifacts.iter().find(|artifact| artifact.kind == "report")
+        let Some(artifact) = run
+            .artifacts
+            .iter()
+            .find(|artifact| artifact.kind == "report")
         else {
             return Ok(None);
         };
@@ -787,10 +797,7 @@ impl ExperimentStore {
         bundle: &CalibrationBundle,
     ) -> Result<CalibrationSummary, String> {
         bundle.validate()?;
-        let data_root = self
-            .db_path
-            .parent()
-            .unwrap_or_else(|| Path::new("data"));
+        let data_root = self.db_path.parent().unwrap_or_else(|| Path::new("data"));
         let calibration_dir = data_root.join("calibrations");
         fs::create_dir_all(&calibration_dir)
             .await
@@ -909,10 +916,7 @@ impl ExperimentStore {
     ) -> Result<CalibrationBundle, String> {
         let relative_path: String = row.get("relative_path");
         let relative_path = validate_relative_artifact_path(&relative_path)?;
-        let data_root = self
-            .db_path
-            .parent()
-            .unwrap_or_else(|| Path::new("data"));
+        let data_root = self.db_path.parent().unwrap_or_else(|| Path::new("data"));
         let root = fs::canonicalize(data_root)
             .await
             .map_err(|error| format!("resolve calibration data directory: {error}"))?;
@@ -950,7 +954,10 @@ impl ExperimentStore {
             ("profile_context_sha256", &bundle.profile_context_sha256),
             ("setup_id", &bundle.setup_id),
             ("setup_sha256", &bundle.setup_sha256),
-            ("calibration_context_sha256", &bundle.calibration_context_sha256),
+            (
+                "calibration_context_sha256",
+                &bundle.calibration_context_sha256,
+            ),
             ("algorithm_version", &bundle.algorithm_version),
             ("captured_at", &bundle.captured_at),
         ] {
@@ -1089,9 +1096,7 @@ impl ExperimentStore {
             firmware_version: row.get("firmware_version"),
             calibration_id: row.try_get("calibration_id").unwrap_or(None),
             calibration_source: row.try_get("calibration_source").unwrap_or(None),
-            calibration_context_sha256: row
-                .try_get("calibration_context_sha256")
-                .unwrap_or(None),
+            calibration_context_sha256: row.try_get("calibration_context_sha256").unwrap_or(None),
             blind_seed: u64::try_from(row.get::<i64, _>("blind_seed")).unwrap_or(0),
             current_phase: row.get("current_phase"),
             current_status: row.get("current_status"),
@@ -1451,8 +1456,12 @@ fn normalize_profile_document(document: &Value) -> Result<Value, String> {
         None => DEFAULT_SENSOR_MOUNT_RADIUS_M,
         Some(value) => value
             .as_f64()
-            .filter(|number| number.is_finite() && *number >= 0.0 && *number <= MAX_SENSOR_MOUNT_RADIUS_M)
-            .ok_or_else(|| format!("sensor_mount_radius_m must be between 0 and {MAX_SENSOR_MOUNT_RADIUS_M} m"))?,
+            .filter(|number| {
+                number.is_finite() && *number >= 0.0 && *number <= MAX_SENSOR_MOUNT_RADIUS_M
+            })
+            .ok_or_else(|| {
+                format!("sensor_mount_radius_m must be between 0 and {MAX_SENSOR_MOUNT_RADIUS_M} m")
+            })?,
     };
     let transmitter = object
         .get("transmitter")
@@ -1463,7 +1472,10 @@ fn normalize_profile_document(document: &Value) -> Result<Value, String> {
         return Err("transmitter must be named TX".to_string());
     }
     if !within_sensor_bounds(tx_position, dimensions, sensor_mount_radius) {
-        return Err("transmitter.position_m must be inside room_dimensions_m or sensor_mount_radius_m".to_string());
+        return Err(
+            "transmitter.position_m must be inside room_dimensions_m or sensor_mount_radius_m"
+                .to_string(),
+        );
     }
     validate_calibration_position(
         transmitter.get("calibration_position_m"),
@@ -1500,37 +1512,64 @@ fn normalize_profile_document(document: &Value) -> Result<Value, String> {
         )?;
     }
 
-    if let Some(value) = object.get("mmwave") {
+    let canonical_mmwave_sensors = object.contains_key("mmwave_sensors");
+    let mmwave_values: Vec<&Value> = match object.get("mmwave_sensors") {
+        Some(value) => value
+            .as_array()
+            .ok_or_else(|| "mmwave_sensors must be an array".to_string())?
+            .iter()
+            .collect(),
+        None => object.get("mmwave").into_iter().collect(),
+    };
+    if mmwave_values.len() > 2 {
+        return Err("mmwave_sensors supports at most MMWAVE1 and MMWAVE2".to_string());
+    }
+    let mut mmwave_node_ids = std::collections::HashSet::new();
+    for (index, value) in mmwave_values.iter().enumerate() {
+        let field = format!("mmwave_sensors[{index}]");
         let mmwave = value
             .as_object()
-            .ok_or_else(|| "mmwave must be an object".to_string())?;
+            .ok_or_else(|| format!("{field} must be an object"))?;
+        let node_id = if canonical_mmwave_sensors {
+            mmwave
+                .get("node_id")
+                .and_then(Value::as_str)
+                .unwrap_or("MMWAVE1")
+        } else {
+            "MMWAVE1"
+        };
+        validate_short_identity(node_id, &format!("{field}.node_id"))?;
+        if !matches!(node_id, "MMWAVE1" | "MMWAVE2") {
+            return Err(format!("{field}.node_id must be MMWAVE1 or MMWAVE2"));
+        }
+        if !mmwave_node_ids.insert(node_id) {
+            return Err(format!("mmwave_sensors repeats node_id {node_id:?}"));
+        }
         let sensor = mmwave
             .get("sensor")
             .and_then(Value::as_str)
             .unwrap_or(MMWAVE_SENSOR);
         if sensor != MMWAVE_SENSOR {
-            return Err(format!("mmwave.sensor must be {MMWAVE_SENSOR:?}"));
+            return Err(format!("{field}.sensor must be {MMWAVE_SENSOR:?}"));
         }
         let mounting_position = finite_triplet(
             mmwave.get("mounting_position_m"),
-            "mmwave.mounting_position_m",
+            &format!("{field}.mounting_position_m"),
         )?;
         if !within_sensor_bounds(mounting_position, dimensions, sensor_mount_radius) {
             return Err(
-                "mmwave.mounting_position_m must be inside room_dimensions_m or sensor_mount_radius_m"
-                    .to_string(),
+                format!("{field}.mounting_position_m must be inside room_dimensions_m or sensor_mount_radius_m"),
             );
         }
         let allow_exterior = match mmwave.get("allow_exterior") {
             None => true,
             Some(value) => value
                 .as_bool()
-                .ok_or_else(|| "mmwave.allow_exterior must be a boolean".to_string())?,
+                .ok_or_else(|| format!("{field}.allow_exterior must be a boolean"))?,
         };
         if !allow_exterior && !within_sensor_bounds(mounting_position, dimensions, 0.0) {
             return Err(
-                "mmwave.mounting_position_m must be inside room_dimensions_m when mmwave.allow_exterior is false"
-                    .to_string(),
+                format!("{field}.mounting_position_m must be inside room_dimensions_m when allow_exterior is false"),
             );
         }
         if let Some(value) = mmwave.get("yaw_mdeg") {
@@ -1539,16 +1578,16 @@ fn normalize_profile_document(document: &Value) -> Result<Value, String> {
                 .and_then(|value| i32::try_from(value).ok())
                 .filter(|value| (-360000..=360000).contains(value))
                 .ok_or_else(|| {
-                    "mmwave.yaw_mdeg must be an integer between -360000 and 360000".to_string()
+                    format!("{field}.yaw_mdeg must be an integer between -360000 and 360000")
                 })?;
         }
         if let Some(value) = mmwave.get("raw_x_inverted") {
             if !value.is_boolean() {
-                return Err("mmwave.raw_x_inverted must be a boolean".to_string());
+                return Err(format!("{field}.raw_x_inverted must be a boolean"));
             }
         }
         if let Some(revision) = mmwave.get("mounting_revision").and_then(Value::as_str) {
-            validate_short_identity(revision, "mmwave.mounting_revision")?;
+            validate_short_identity(revision, &format!("{field}.mounting_revision"))?;
         }
     }
 
@@ -1584,6 +1623,33 @@ fn normalize_profile_document(document: &Value) -> Result<Value, String> {
 
     let mut normalized = document.clone();
     if let Some(object) = normalized.as_object_mut() {
+        let mut canonical_sensors = match object.remove("mmwave_sensors") {
+            Some(Value::Array(sensors)) => sensors,
+            Some(_) => unreachable!("validated mmwave_sensors array"),
+            None => object
+                .remove("mmwave")
+                .map(|mut sensor| {
+                    if let Some(sensor) = sensor.as_object_mut() {
+                        sensor.insert("node_id".to_string(), json!("MMWAVE1"));
+                    }
+                    vec![sensor]
+                })
+                .unwrap_or_default(),
+        };
+        for (index, sensor) in canonical_sensors.iter_mut().enumerate() {
+            if let Some(sensor) = sensor.as_object_mut() {
+                sensor
+                    .entry("node_id".to_string())
+                    .or_insert_with(|| json!(if index == 0 { "MMWAVE1" } else { "MMWAVE2" }));
+            }
+        }
+        object.remove("mmwave");
+        if !canonical_sensors.is_empty() {
+            object.insert(
+                "mmwave_sensors".to_string(),
+                Value::Array(canonical_sensors),
+            );
+        }
         object.insert("schema_version".to_string(), json!(PROFILE_SCHEMA_VERSION));
         object.insert("profile_kind".to_string(), json!("ruview.setup-profile"));
         object.insert("mmwave_status".to_string(), json!("NOT_CONNECTED"));
@@ -1644,8 +1710,7 @@ fn validate_calibration_position(
 }
 
 fn deterministic_profile_bytes(document: &Value) -> Result<Vec<u8>, String> {
-    super::position_artifact::deterministic_pretty_json(document)
-        .map_err(|error| error.to_string())
+    super::position_artifact::deterministic_pretty_json(document).map_err(|error| error.to_string())
 }
 
 fn new_profile_id() -> String {
@@ -1663,7 +1728,9 @@ fn new_profile_revision_id(profile_id: &str, version: i64) -> String {
 }
 
 fn phase_index(phase: &str) -> Option<usize> {
-    WORKFLOW_PHASES.iter().position(|candidate| *candidate == phase)
+    WORKFLOW_PHASES
+        .iter()
+        .position(|candidate| *candidate == phase)
 }
 
 fn validate_workflow_phase(phase: &str) -> Result<(), String> {
@@ -1697,7 +1764,9 @@ fn validate_relative_artifact_path(value: &str) -> Result<PathBuf, String> {
         || value.contains('\\')
         || value.chars().any(char::is_control)
     {
-        return Err("artifact path must be a short relative path without control separators".to_string());
+        return Err(
+            "artifact path must be a short relative path without control separators".to_string(),
+        );
     }
     let path = PathBuf::from(value);
     if path.is_absolute()
@@ -1705,7 +1774,9 @@ fn validate_relative_artifact_path(value: &str) -> Result<PathBuf, String> {
             .components()
             .any(|component| matches!(component, std::path::Component::ParentDir))
     {
-        return Err("artifact path must stay relative to the experiment data directory".to_string());
+        return Err(
+            "artifact path must stay relative to the experiment data directory".to_string(),
+        );
     }
     Ok(path)
 }
@@ -1724,7 +1795,12 @@ fn workflow_metric(workflow: &ExperimentWorkflow, key: &str) -> Value {
         .events
         .iter()
         .rev()
-        .find_map(|event| event.payload.get("metrics").and_then(|metrics| metrics.get(key)))
+        .find_map(|event| {
+            event
+                .payload
+                .get("metrics")
+                .and_then(|metrics| metrics.get(key))
+        })
         .cloned()
         .unwrap_or(Value::Null)
 }
@@ -1765,12 +1841,11 @@ async fn migrate(pool: &SqlitePool) -> Result<(), String> {
     .await
     .map_err(|error| format!("create experiment migration table: {error}"))?;
 
-    let version = sqlx::query_scalar::<_, i64>(
-        "SELECT COALESCE(MAX(version), 0) FROM schema_migrations",
-    )
-    .fetch_one(pool)
-    .await
-    .map_err(|error| format!("read experiment schema version: {error}"))?;
+    let version =
+        sqlx::query_scalar::<_, i64>("SELECT COALESCE(MAX(version), 0) FROM schema_migrations")
+            .fetch_one(pool)
+            .await
+            .map_err(|error| format!("read experiment schema version: {error}"))?;
 
     if version < 1 {
         let mut transaction = pool
@@ -1818,13 +1893,11 @@ async fn migrate(pool: &SqlitePool) -> Result<(), String> {
         .execute(&mut *transaction)
         .await
         .map_err(|error| format!("create experiment artifacts index: {error}"))?;
-        sqlx::query(
-            "INSERT INTO schema_migrations(version, applied_at) VALUES (1, ?)",
-        )
-        .bind(timestamp())
-        .execute(&mut *transaction)
-        .await
-        .map_err(|error| format!("record experiment schema migration: {error}"))?;
+        sqlx::query("INSERT INTO schema_migrations(version, applied_at) VALUES (1, ?)")
+            .bind(timestamp())
+            .execute(&mut *transaction)
+            .await
+            .map_err(|error| format!("record experiment schema migration: {error}"))?;
         transaction
             .commit()
             .await
@@ -1886,13 +1959,11 @@ async fn migrate(pool: &SqlitePool) -> Result<(), String> {
         .execute(&mut *transaction)
         .await
         .map_err(|error| format!("create experiment phase events index: {error}"))?;
-        sqlx::query(
-            "INSERT INTO schema_migrations(version, applied_at) VALUES (2, ?)",
-        )
-        .bind(timestamp())
-        .execute(&mut *transaction)
-        .await
-        .map_err(|error| format!("record control center schema migration: {error}"))?;
+        sqlx::query("INSERT INTO schema_migrations(version, applied_at) VALUES (2, ?)")
+            .bind(timestamp())
+            .execute(&mut *transaction)
+            .await
+            .map_err(|error| format!("record control center schema migration: {error}"))?;
         transaction
             .commit()
             .await
@@ -2108,11 +2179,13 @@ mod tests {
                 * crate::d5_presence::MIN_CALIBRATION_SAMPLES_PER_BLOCK,
         };
         let nodes = (1..=3)
-            .map(|node_id| crate::calibration_persistence::CalibrationNodeBundle {
-                node_id,
-                d5: Some(d5_reference),
-                d6: Some(d6_reference.clone()),
-            })
+            .map(
+                |node_id| crate::calibration_persistence::CalibrationNodeBundle {
+                    node_id,
+                    d5: Some(d5_reference),
+                    d6: Some(d6_reference.clone()),
+                },
+            )
             .collect();
         CalibrationBundle::new(
             "calibration-test-1".to_string(),
@@ -2238,12 +2311,28 @@ mod tests {
             )
             .await
             .expect("create WiFi workflow");
-        assert_eq!(run.workflow.as_ref().expect("workflow metadata").current_phase, "create_experiment");
-        assert_eq!(run.workflow.as_ref().expect("workflow metadata").events.len(), 1);
+        assert_eq!(
+            run.workflow
+                .as_ref()
+                .expect("workflow metadata")
+                .current_phase,
+            "create_experiment"
+        );
+        assert_eq!(
+            run.workflow
+                .as_ref()
+                .expect("workflow metadata")
+                .events
+                .len(),
+            1
+        );
 
-        fs::write(directory.path().join("prediction.json"), b"{\"predictions\":[]}")
-            .await
-            .expect("write prediction artifact");
+        fs::write(
+            directory.path().join("prediction.json"),
+            b"{\"predictions\":[]}",
+        )
+        .await
+        .expect("write prediction artifact");
         let registered = store
             .register_workflow_artifact(&run.id, "prediction", "prediction.json")
             .await
@@ -2363,11 +2452,24 @@ mod tests {
             .create_profile("mmWave mount", &document)
             .await
             .expect("mmWave mounting position must be accepted");
-        assert_eq!(profile.document["mmwave"]["sensor"], "HLK-LD2450");
-        assert_eq!(profile.document["mmwave"]["mounting_position_m"][0], -0.25);
-        assert_eq!(profile.document["mmwave"]["mounting_revision"], "breadboard-v1");
-        assert_eq!(profile.document["mmwave"]["yaw_mdeg"], 180000);
-        assert_eq!(profile.document["mmwave"]["raw_x_inverted"], true);
+        assert_eq!(profile.document["mmwave_sensors"][0]["node_id"], "MMWAVE1");
+        assert_eq!(
+            profile.document["mmwave_sensors"][0]["sensor"],
+            "HLK-LD2450"
+        );
+        assert_eq!(
+            profile.document["mmwave_sensors"][0]["mounting_position_m"][0],
+            -0.25
+        );
+        assert_eq!(
+            profile.document["mmwave_sensors"][0]["mounting_revision"],
+            "breadboard-v1"
+        );
+        assert_eq!(profile.document["mmwave_sensors"][0]["yaw_mdeg"], 180000);
+        assert_eq!(
+            profile.document["mmwave_sensors"][0]["raw_x_inverted"],
+            true
+        );
         assert_eq!(profile.profile_sha256.len(), 64);
 
         let mut changed = document;
@@ -2377,7 +2479,10 @@ mod tests {
             .await
             .expect("updated mmWave mounting position must be accepted");
         assert_ne!(updated.profile_sha256, profile.profile_sha256);
-        assert_eq!(updated.document["mmwave"]["mounting_position_m"][0], -0.20);
+        assert_eq!(
+            updated.document["mmwave_sensors"][0]["mounting_position_m"][0],
+            -0.20
+        );
     }
 
     #[tokio::test]
@@ -2397,7 +2502,7 @@ mod tests {
             .create_profile("invalid mmWave mount", &document)
             .await
             .expect_err("mmWave mount outside the configured radius must fail");
-        assert!(error.contains("mmwave.mounting_position_m"));
+        assert!(error.contains("mmwave_sensors[0].mounting_position_m"));
     }
 
     #[tokio::test]
@@ -2418,7 +2523,7 @@ mod tests {
             .create_profile("interior-only mmWave mount", &document)
             .await
             .expect_err("interior-only mmWave mount must reject exterior coordinates");
-        assert!(error.contains("mmwave.allow_exterior is false"));
+        assert!(error.contains("mmwave_sensors[0].mounting_position_m"));
     }
 
     #[tokio::test]
@@ -2439,7 +2544,10 @@ mod tests {
             .create_profile("interior-only mmWave mount", &document)
             .await
             .expect("interior mmWave mount must pass");
-        assert_eq!(profile.document["mmwave"]["allow_exterior"], false);
+        assert_eq!(
+            profile.document["mmwave_sensors"][0]["allow_exterior"],
+            false
+        );
     }
 
     #[tokio::test]
@@ -2467,7 +2575,10 @@ mod tests {
         assert_eq!(updated.version, 2);
         assert_ne!(updated.revision_id, profile.revision_id);
         assert_ne!(updated.profile_sha256, profile.profile_sha256);
-        assert_eq!(updated.profile_context_sha256, profile.profile_context_sha256);
+        assert_eq!(
+            updated.profile_context_sha256,
+            profile.profile_context_sha256
+        );
         assert_eq!(original_revision.version, 1);
         assert_eq!(original_revision.document, profile.document);
 
@@ -2661,18 +2772,19 @@ mod tests {
             .expect("load migrated run")
             .expect("migrated run exists");
         let workflow = run.workflow.expect("migrated workflow metadata");
-        assert_eq!(workflow.profile_revision_id.as_deref(), Some("profile-legacy-v4"));
+        assert_eq!(
+            workflow.profile_revision_id.as_deref(),
+            Some("profile-legacy-v4")
+        );
         assert_eq!(
             workflow.profile_context_sha256.as_deref(),
             Some(profile.profile_context_sha256.as_str())
         );
 
-        let version: i64 = sqlx::query_scalar(
-            "SELECT MAX(version) FROM schema_migrations",
-        )
-        .fetch_one(&store.pool)
-        .await
-        .expect("read migrated schema version");
+        let version: i64 = sqlx::query_scalar("SELECT MAX(version) FROM schema_migrations")
+            .fetch_one(&store.pool)
+            .await
+            .expect("read migrated schema version");
         assert_eq!(version, SCHEMA_VERSION);
     }
 
@@ -2735,10 +2847,17 @@ mod tests {
         let mut moved_receiver = cosmetic_update.document.clone();
         moved_receiver["receivers"][0]["position_m"][0] = json!(0.20);
         let moved = store
-            .update_profile(&cosmetic_update.id, "Fixed room with moved RX1", &moved_receiver)
+            .update_profile(
+                &cosmetic_update.id,
+                "Fixed room with moved RX1",
+                &moved_receiver,
+            )
             .await
             .expect("save moved receiver version");
-        assert_ne!(moved.profile_context_sha256, cosmetic_update.profile_context_sha256);
+        assert_ne!(
+            moved.profile_context_sha256,
+            cosmetic_update.profile_context_sha256
+        );
         assert!(store
             .find_compatible_calibration(
                 &moved.id,
@@ -2797,6 +2916,9 @@ mod tests {
         assert_eq!(workflow.current_phase, "empty_calibration");
         assert_eq!(workflow.current_status, "REUSED");
         assert_eq!(workflow.calibration_source.as_deref(), Some("reused"));
-        assert_eq!(workflow.calibration_id.as_deref(), Some("calibration-test-1"));
+        assert_eq!(
+            workflow.calibration_id.as_deref(),
+            Some("calibration-test-1")
+        );
     }
 }

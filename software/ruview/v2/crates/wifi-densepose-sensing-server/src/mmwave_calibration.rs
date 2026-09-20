@@ -8,6 +8,7 @@
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
 use std::fs::{File, OpenOptions};
 use std::io::{BufWriter, Write};
+use std::ops::{Deref, DerefMut};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
@@ -92,6 +93,19 @@ pub(crate) struct CoordinateFrame {
     pub(crate) raw_x_inverted: bool,
 }
 
+impl Default for CoordinateFrame {
+    fn default() -> Self {
+        Self {
+            local: "x_right_y_forward_mm".to_string(),
+            room: "x_length_z_width_mm".to_string(),
+            origin_x_mm: 0,
+            origin_z_mm: 0,
+            yaw_mdeg: 0,
+            raw_x_inverted: false,
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct RadarTarget {
@@ -99,7 +113,11 @@ pub(crate) struct RadarTarget {
     present: bool,
     x_mm: i16,
     y_mm: i16,
+    // Legacy derived coordinates. The server replaces them from the active
+    // node profile before consuming the packet.
+    #[serde(default)]
     pub(crate) room_x_mm: i32,
+    #[serde(default)]
     pub(crate) room_z_mm: i32,
     pub(crate) speed_cm_s: i16,
     resolution_mm: u16,
@@ -115,6 +133,8 @@ pub(crate) struct RadarPacket {
     sequence: u32,
     sensor_time_us: i64,
     unix_time_ms: i64,
+    // Legacy firmware metadata. Placement is server-authoritative by node_id.
+    #[serde(default)]
     pub(crate) coordinate_frame: CoordinateFrame,
     targets: Vec<RadarTarget>,
 }
@@ -255,6 +275,7 @@ struct StableCandidate {
 
 #[derive(Debug)]
 struct Session {
+    node_id: String,
     id: String,
     kind: SessionKind,
     phase: SessionPhase,
@@ -310,6 +331,8 @@ struct Session {
 #[serde(deny_unknown_fields)]
 struct SessionManifest {
     schema_version: u16,
+    #[serde(default = "default_mmwave_node_id")]
+    node_id: String,
     id: String,
     kind: SessionKind,
     lifecycle: SessionLifecycle,
@@ -329,6 +352,10 @@ struct SessionManifest {
 }
 
 const SESSION_MANIFEST_SCHEMA_VERSION: u16 = 1;
+
+fn default_mmwave_node_id() -> String {
+    "MMWAVE1".to_string()
+}
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "status", rename_all = "snake_case")]
@@ -512,8 +539,10 @@ pub(crate) struct PacketRejectionStatus {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct KnownPointSample {
+    pub(crate) node_id: String,
+    pub(crate) boot_id: u32,
     pub(crate) observed_at_ns: u64,
-    pub(crate) packet_sequence: u32,
+    pub(crate) sequence: u32,
     pub(crate) target_slot: u8,
     pub(crate) present: bool,
     pub(crate) raw_position_mm: [i32; 2],
@@ -552,6 +581,11 @@ pub(crate) struct KnownPointCheck {
 
 #[derive(Debug, Clone, Serialize)]
 pub(crate) struct RadarTargetStatus {
+    pub(crate) node_id: String,
+    pub(crate) boot_id: u32,
+    pub(crate) sequence: u32,
+    pub(crate) target_slot: u8,
+    // Legacy UI compatibility; target_slot is the canonical field.
     pub(crate) slot: u8,
     pub(crate) raw_position_mm: [i16; 2],
     pub(crate) position_mm: [i32; 2],
@@ -607,6 +641,8 @@ pub(crate) struct YawCalibrationAnchorStatus {
 #[serde(deny_unknown_fields)]
 pub(crate) struct YawCalibrationStatus {
     pub(crate) schema_version: u16,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) node_id: Option<String>,
     pub(crate) source_kind: String,
     pub(crate) source_id: String,
     pub(crate) source_sha256: String,
@@ -631,8 +667,10 @@ pub(crate) struct YawCalibrationStatus {
 
 #[derive(Debug, Clone)]
 struct RecentRadarObservation {
+    node_id: String,
+    boot_id: u32,
     observed_at_ns: u64,
-    packet_sequence: u32,
+    sequence: u32,
     target_slot: u8,
     present: bool,
     raw_position_mm: [i32; 2],
@@ -1177,9 +1215,10 @@ pub(crate) struct ExpectedNode {
 
 #[derive(Debug)]
 pub(crate) struct MmwaveManager {
+    configured_node_id: String,
+    enforce_configured_node_id: bool,
     cad_profile: Option<CadProfileGeometry>,
     cad_profile_error: Option<String>,
-    synced_cad_transform: Option<TransformRequest>,
     udp_port: u16,
     room_dimensions_mm: Option<[i32; 2]>,
     control: Option<NodeControl>,
@@ -1234,8 +1273,186 @@ pub(crate) struct MmwaveManager {
     restored_session: Option<SessionStatus>,
 }
 
+/// Independent runtime state for the configured mmWave nodes. The selected
+/// node only controls which sensor the legacy single-sensor API operates on;
+/// packet ingestion is always dispatched by the packet's immutable node_id.
+#[derive(Debug)]
+pub(crate) struct MmwaveFleet {
+    sensors: BTreeMap<String, MmwaveManager>,
+    primary_node_id: String,
+    selected_node_id: String,
+}
+
+impl MmwaveFleet {
+    pub(crate) fn new(sensors: Vec<(String, MmwaveManager)>) -> Result<Self, String> {
+        let sensors: BTreeMap<_, _> = sensors.into_iter().collect();
+        if sensors.is_empty() {
+            return Err("at least one configured mmWave sensor is required".to_string());
+        }
+        let selected_node_id = sensors.keys().next().expect("non-empty sensor map").clone();
+        Ok(Self {
+            sensors,
+            primary_node_id: selected_node_id.clone(),
+            selected_node_id,
+        })
+    }
+
+    pub(crate) fn node_ids(&self) -> Vec<String> {
+        self.sensors.keys().cloned().collect()
+    }
+
+    pub(crate) fn selected_node_id(&self) -> &str {
+        &self.selected_node_id
+    }
+
+    pub(crate) fn primary_node_id(&self) -> &str {
+        &self.primary_node_id
+    }
+
+    pub(crate) fn manager_for(&self, node_id: &str) -> Option<&MmwaveManager> {
+        self.sensors.get(node_id)
+    }
+
+    pub(crate) fn manager_for_mut(&mut self, node_id: &str) -> Option<&mut MmwaveManager> {
+        self.sensors.get_mut(node_id)
+    }
+
+    pub(crate) fn status_for(&self, node_id: &str, now_ns: u64) -> Option<MmwaveStatus> {
+        self.sensors
+            .get(node_id)
+            .map(|manager| manager.status(now_ns))
+    }
+
+    pub(crate) fn select_node(&mut self, node_id: &str) -> Result<(), String> {
+        if !self.sensors.contains_key(node_id) {
+            return Err(format!("unknown mmWave node_id {node_id:?}"));
+        }
+        self.selected_node_id = node_id.to_string();
+        Ok(())
+    }
+
+    pub(crate) fn select_primary(&mut self) {
+        self.selected_node_id = self.primary_node_id.clone();
+    }
+
+    pub(crate) fn ingest_json(
+        &mut self,
+        bytes: &[u8],
+        host_time: impl Into<HostTimestamp>,
+    ) -> Result<(), String> {
+        #[derive(Deserialize)]
+        struct PacketIdentity {
+            node_id: String,
+        }
+        let identity: PacketIdentity = serde_json::from_slice(bytes)
+            .map_err(|error| format!("invalid JSON packet: {error}"))?;
+        if !self.sensors.contains_key(&identity.node_id) {
+            return Err(format!(
+                "unknown mmWave node_id {:?}; configured nodes are {:?}",
+                identity.node_id,
+                self.node_ids()
+            ));
+        }
+        let manager = self
+            .sensors
+            .get_mut(&identity.node_id)
+            .expect("configured mmWave node must exist");
+        manager.ingest_json(bytes, host_time)
+    }
+
+    pub(crate) fn tick(&mut self, now: HostTimestamp) -> Result<(), String> {
+        for manager in self.sensors.values_mut() {
+            manager.tick(now.clone())?;
+        }
+        Ok(())
+    }
+
+    pub(crate) fn observe_csi(&mut self, frame: &RawCsiFrame) {
+        for manager in self.sensors.values_mut() {
+            manager.observe_csi(frame);
+        }
+    }
+
+    pub(crate) fn observe_wifi_prediction(&mut self, state: &LivePositionState) {
+        for manager in self.sensors.values_mut() {
+            manager.observe_wifi_prediction(state);
+        }
+    }
+
+    pub(crate) fn apply_cad_profile(&mut self, profile: &super::experiment::SetupProfile) {
+        for manager in self.sensors.values_mut() {
+            manager.apply_cad_profile(profile);
+        }
+    }
+
+    pub(crate) fn transport_metrics_for(
+        &self,
+        node_id: &str,
+    ) -> Option<Arc<MmwaveTransportMetrics>> {
+        self.sensors
+            .get(node_id)
+            .map(MmwaveManager::transport_metrics)
+    }
+
+    pub(crate) fn take_pending_index(&mut self) -> Option<(PathBuf, String)> {
+        self.sensors
+            .values_mut()
+            .find_map(MmwaveManager::take_pending_index)
+    }
+
+    pub(crate) fn position_publication_allowed(&self) -> bool {
+        self.sensors
+            .values()
+            .all(MmwaveManager::position_publication_allowed)
+    }
+}
+
+impl Deref for MmwaveFleet {
+    type Target = MmwaveManager;
+
+    fn deref(&self) -> &Self::Target {
+        self.sensors
+            .get(&self.selected_node_id)
+            .expect("selected mmWave node must exist")
+    }
+}
+
+impl DerefMut for MmwaveFleet {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        self.sensors
+            .get_mut(&self.selected_node_id)
+            .expect("selected mmWave node must exist")
+    }
+}
+
 impl MmwaveManager {
     pub(crate) fn new(
+        udp_port: u16,
+        room_dimensions_m: Option<[f64; 3]>,
+        control: Option<NodeControl>,
+        expected_node: Option<ExpectedNode>,
+        experiment: Option<ExperimentContext>,
+    ) -> Self {
+        let configured_node_id = expected_node
+            .as_ref()
+            .map(|node| node.node_id.clone())
+            .unwrap_or_else(default_mmwave_node_id);
+        let mut manager = Self::new_for_node(
+            configured_node_id,
+            udp_port,
+            room_dimensions_m,
+            control,
+            expected_node,
+            experiment,
+        );
+        // Legacy direct construction predates the fleet and learns the first
+        // packet identity. Production startup always uses new_for_node.
+        manager.enforce_configured_node_id = manager.expected_node.is_some();
+        manager
+    }
+
+    pub(crate) fn new_for_node(
+        configured_node_id: String,
         udp_port: u16,
         room_dimensions_m: Option<[f64; 3]>,
         control: Option<NodeControl>,
@@ -1249,9 +1466,10 @@ impl MmwaveManager {
         });
         let node_control_configured = control.is_some();
         Self {
+            configured_node_id,
+            enforce_configured_node_id: true,
             cad_profile: None,
             cad_profile_error: None,
-            synced_cad_transform: None,
             udp_port,
             room_dimensions_mm,
             control,
@@ -1311,48 +1529,7 @@ impl MmwaveManager {
         self.control.clone()
     }
 
-    pub(crate) fn pending_cad_transform_sync(&self) -> Option<TransformRequest> {
-        if !self.transform_reconfiguration_allowed() {
-            return None;
-        }
-        let transform = self
-            .cad_profile
-            .as_ref()
-            .map(transform_request_from_cad_geometry)?;
-        (self.synced_cad_transform.as_ref() != Some(&transform)).then_some(transform)
-    }
-
-    pub(crate) fn mark_cad_profile_sync_succeeded(&mut self, transform: TransformRequest) {
-        let current = self
-            .cad_profile
-            .as_ref()
-            .map(transform_request_from_cad_geometry);
-        if current.as_ref() != Some(&transform) {
-            return;
-        }
-        self.synced_cad_transform = Some(transform);
-        self.cad_profile_error = None;
-        self.clear_observed_transform();
-    }
-
-    pub(crate) fn transform_sync_required(&self) -> bool {
-        self.node_url_configured
-    }
-
-    pub(crate) fn mark_cad_profile_sync_failed(&mut self, error: String) {
-        self.cad_profile_error = Some(format!(
-            "CAD-Profil ist gespeichert, aber der mmWave-Sensor verwendet möglicherweise noch die alte Geometrie: {error}"
-        ));
-    }
-
     pub(crate) fn discovered_control(&mut self, url: Option<String>, token: Option<String>) {
-        let previous_url = self
-            .control
-            .as_ref()
-            .map(|control| control.base_url.as_str());
-        if previous_url != url.as_deref() {
-            self.synced_cad_transform = None;
-        }
         self.node_url_configured = url.is_some();
         self.node_token_configured = token.is_some();
         self.control = url.zip(token).map(|(base_url, bearer_token)| NodeControl {
@@ -1370,9 +1547,12 @@ impl MmwaveManager {
         }
         let room =
             serde_json::from_value::<[f64; 3]>(profile.document["room_dimensions_m"].clone());
-        let mounting = serde_json::from_value::<[f64; 3]>(
-            profile.document["mmwave"]["mounting_position_m"].clone(),
-        );
+        let profile_mmwave = profile_mmwave_for_node(&profile.document, &self.configured_node_id);
+        let mounting = profile_mmwave
+            .and_then(|sensor| sensor.get("mounting_position_m"))
+            .cloned()
+            .ok_or(())
+            .and_then(|value| serde_json::from_value::<[f64; 3]>(value).map_err(|_| ()));
         let (Ok(room), Ok(mounting)) = (room, mounting) else {
             self.cad_profile_error = Some(
                 "CAD-Profil enthält keine vollständige Raum- und mmWave-Geometrie.".to_string(),
@@ -1436,11 +1616,12 @@ impl MmwaveManager {
             return;
         }
         let orientation = (|| {
-            let mmwave = profile
-                .document
-                .get("mmwave")
-                .and_then(serde_json::Value::as_object)
-                .ok_or_else(|| "CAD-Profil enthält keine mmWave-Ausrichtung.".to_string())?;
+            let mmwave = profile_mmwave.ok_or_else(|| {
+                format!(
+                    "CAD-Profil enthält keine {}-Ausrichtung.",
+                    self.configured_node_id
+                )
+            })?;
             let yaw_mdeg = match mmwave.get("yaw_mdeg") {
                 None => None,
                 Some(value) => {
@@ -1495,7 +1676,6 @@ impl MmwaveManager {
             yaw_mdeg,
             raw_x_inverted,
         });
-        self.synced_cad_transform = None;
         self.cad_profile_error = None;
         self.last_transform = None;
         self.target_position_mm = None;
@@ -1521,13 +1701,7 @@ impl MmwaveManager {
         window_ms: u64,
         now_ns: u64,
     ) -> Result<KnownPointCheck, String> {
-        self.check_known_point_after(
-            expected_position_mm,
-            tolerance_mm,
-            window_ms,
-            now_ns,
-            None,
-        )
+        self.check_known_point_after(expected_position_mm, tolerance_mm, window_ms, now_ns, None)
     }
 
     fn check_known_point_after(
@@ -1584,8 +1758,10 @@ impl MmwaveManager {
         let samples = observations
             .iter()
             .map(|observation| KnownPointSample {
+                node_id: observation.node_id.clone(),
+                boot_id: observation.boot_id,
                 observed_at_ns: observation.observed_at_ns,
-                packet_sequence: observation.packet_sequence,
+                sequence: observation.sequence,
                 target_slot: observation.target_slot,
                 present: observation.present,
                 raw_position_mm: observation.raw_position_mm,
@@ -1685,13 +1861,9 @@ impl MmwaveManager {
             return Err("an mmWave session is already active".to_string());
         }
         if let Some(error) = &self.cad_profile_error {
-            return Err(format!("the current mmWave geometry is not usable: {error}"));
-        }
-        if self.node_url_configured && self.pending_cad_transform_sync().is_some() {
-            return Err(
-                "the saved CAD geometry has not yet been acknowledged by the mmWave sensor"
-                    .to_string(),
-            );
+            return Err(format!(
+                "the current mmWave geometry is not usable: {error}"
+            ));
         }
         let (_, receivers) = self.fixed_point_geometry().ok_or_else(|| {
             "an active CAD profile or sealed setup with TX and RX1 through RX4 is required"
@@ -1940,6 +2112,7 @@ impl MmwaveManager {
 
         Ok(YawCalibrationStatus {
             schema_version: YAW_CALIBRATION_SCHEMA_VERSION,
+            node_id: Some(self.configured_node_id.clone()),
             source_kind: source_kind.to_string(),
             source_id,
             source_sha256,
@@ -2014,7 +2187,8 @@ impl MmwaveManager {
         std::fs::create_dir_all(&directory)
             .map_err(|error| format!("could not create {}: {error}", directory.display()))?;
         let path = directory.join(format!(
-            "yaw-{}-{}.json",
+            "yaw-{}-{}-{}.json",
+            self.configured_node_id.to_ascii_lowercase(),
             calibration.created_at_unix_ns,
             calibration
                 .source_sha256
@@ -2063,6 +2237,10 @@ impl MmwaveManager {
                     .expected_node
                     .as_ref()
                     .is_some_and(|node| node.transform != calibration.base_transform)
+                || calibration
+                    .node_id
+                    .as_ref()
+                    .is_some_and(|node_id| node_id != &self.configured_node_id)
             {
                 continue;
             }
@@ -2169,6 +2347,9 @@ impl MmwaveManager {
             if manifest.schema_version != SESSION_MANIFEST_SCHEMA_VERSION {
                 continue;
             }
+            if manifest.node_id != self.configured_node_id {
+                continue;
+            }
             if manifest.lifecycle == SessionLifecycle::Active {
                 manifest.lifecycle = SessionLifecycle::Interrupted;
                 manifest.updated_at_unix_ns = now_unix_ns();
@@ -2234,7 +2415,7 @@ impl MmwaveManager {
         self.target_position_mm = None;
         self.targets.clear();
         self.state = LinkState::Disconnected;
-        self.reason = "Waiting for a packet with the new transform.".to_string();
+        self.reason = "Waiting for a packet mapped by the active profile.".to_string();
     }
 
     pub(crate) fn observe_csi(&mut self, frame: &RawCsiFrame) {
@@ -2352,6 +2533,40 @@ impl MmwaveManager {
         self.ingest(packet, bytes, host_time)
     }
 
+    fn server_transform(&self, packet: &RadarPacket) -> Option<CoordinateFrame> {
+        if let Some(cad) = &self.cad_profile {
+            let mut transform = packet.coordinate_frame.clone();
+            transform.origin_x_mm = (cad.mounting_position_m[0] * 1000.0).round() as i32;
+            transform.origin_z_mm = (cad.mounting_position_m[2] * 1000.0).round() as i32;
+            if let Some(yaw_mdeg) = cad.yaw_mdeg {
+                transform.yaw_mdeg = yaw_mdeg;
+            }
+            if let Some(raw_x_inverted) = cad.raw_x_inverted {
+                transform.raw_x_inverted = raw_x_inverted;
+            }
+            return Some(transform);
+        }
+        self.expected_node
+            .as_ref()
+            .map(|node| node.transform.clone())
+    }
+
+    fn apply_server_transform(&self, packet: &mut RadarPacket) {
+        let Some(transform) = self.server_transform(packet) else {
+            return;
+        };
+        let yaw = (f64::from(transform.yaw_mdeg) / 1000.0).to_radians();
+        for target in &mut packet.targets {
+            let right = f64::from(target.x_mm) * if transform.raw_x_inverted { -1.0 } else { 1.0 };
+            let forward = f64::from(target.y_mm);
+            target.room_x_mm =
+                transform.origin_x_mm + (forward * yaw.cos() - right * yaw.sin()).round() as i32;
+            target.room_z_mm =
+                transform.origin_z_mm + (forward * yaw.sin() + right * yaw.cos()).round() as i32;
+        }
+        packet.coordinate_frame = transform;
+    }
+
     fn ingest(
         &mut self,
         mut packet: RadarPacket,
@@ -2365,29 +2580,10 @@ impl MmwaveManager {
                 host_time.host_monotonic_ns,
             )
         })?;
-        if let Some(cad) = &self.cad_profile {
-            // Preview uses the saved mounting point and any explicit profile
-            // orientation. Raw packet bytes are never rewritten.
-            let origin_x = (cad.mounting_position_m[0] * 1000.0).round() as i32;
-            let origin_z = (cad.mounting_position_m[2] * 1000.0).round() as i32;
-            let yaw_mdeg = cad.yaw_mdeg.unwrap_or(packet.coordinate_frame.yaw_mdeg);
-            let raw_x_inverted = cad
-                .raw_x_inverted
-                .unwrap_or(packet.coordinate_frame.raw_x_inverted);
-            let yaw = (yaw_mdeg as f64 / 1000.0).to_radians();
-            for target in &mut packet.targets {
-                let right = f64::from(target.x_mm) * if raw_x_inverted { -1.0 } else { 1.0 };
-                let forward = f64::from(target.y_mm);
-                target.room_x_mm =
-                    origin_x + (forward * yaw.cos() - right * yaw.sin()).round() as i32;
-                target.room_z_mm =
-                    origin_z + (forward * yaw.sin() + right * yaw.cos()).round() as i32;
-            }
-            packet.coordinate_frame.origin_x_mm = origin_x;
-            packet.coordinate_frame.origin_z_mm = origin_z;
-            packet.coordinate_frame.yaw_mdeg = yaw_mdeg;
-            packet.coordinate_frame.raw_x_inverted = raw_x_inverted;
-        }
+        // The server profile is authoritative for placement. The ESP only
+        // needs to identify itself and report local radar coordinates; stale
+        // transform metadata from the packet must not move the target.
+        self.apply_server_transform(&mut packet);
         let sequence_disposition = self
             .validate_identity_and_sequence(&packet, host_time.host_monotonic_ns)
             .map_err(|error| {
@@ -2448,6 +2644,10 @@ impl MmwaveManager {
         self.targets = present
             .iter()
             .map(|target| RadarTargetStatus {
+                node_id: packet.node_id.clone(),
+                boot_id: packet.boot_id,
+                sequence: packet.sequence,
+                target_slot: target.slot,
                 slot: target.slot,
                 raw_position_mm: [target.x_mm, target.y_mm],
                 position_mm: [target.room_x_mm, target.room_z_mm],
@@ -2455,7 +2655,13 @@ impl MmwaveManager {
             })
             .collect();
         if let [target] = present.as_slice() {
-            self.remember_recent_observation(target, packet.sequence, &host_time);
+            self.remember_recent_observation(
+                target,
+                &packet.node_id,
+                packet.boot_id,
+                packet.sequence,
+                &host_time,
+            );
         }
         let mut outside_room_reason = None;
         if let Some((target, error)) = present.iter().find_map(|target| {
@@ -2635,6 +2841,15 @@ impl MmwaveManager {
         packet: &RadarPacket,
         host_monotonic_ns: u64,
     ) -> Result<RadarSequenceDisposition, PacketValidationError> {
+        if self.enforce_configured_node_id && packet.node_id != self.configured_node_id {
+            return Err(PacketValidationError::new(
+                PacketRejectCategory::UnexpectedNode,
+                format!(
+                    "manager is configured for mmWave node {:?}, received {:?}",
+                    self.configured_node_id, packet.node_id
+                ),
+            ));
+        }
         if let Some(expected) = &self.expected_node {
             if packet.node_id != expected.node_id {
                 return Err(PacketValidationError::new(
@@ -2643,12 +2858,6 @@ impl MmwaveManager {
                         "sealed setup requires mmWave node {:?}, received {:?}",
                         expected.node_id, packet.node_id
                     ),
-                ));
-            }
-            if packet.coordinate_frame != expected.transform {
-                return Err(PacketValidationError::new(
-                    PacketRejectCategory::TransformMismatch,
-                    "packet transform does not match the sealed setup",
                 ));
             }
         }
@@ -2848,10 +3057,24 @@ impl MmwaveManager {
                 }
             }
             Some(SessionPhase::Training) => {
-                self.observe_stable_zone(position, target.speed_cm_s, host_time, aligned, false)?;
+                self.observe_stable_zone(
+                    position,
+                    target.slot,
+                    target.speed_cm_s,
+                    host_time,
+                    aligned,
+                    false,
+                )?;
             }
             Some(SessionPhase::Blind) => {
-                self.observe_stable_zone(position, target.speed_cm_s, host_time, aligned, true)?;
+                self.observe_stable_zone(
+                    position,
+                    target.slot,
+                    target.speed_cm_s,
+                    host_time,
+                    aligned,
+                    true,
+                )?;
             }
             _ => {}
         }
@@ -2861,12 +3084,16 @@ impl MmwaveManager {
     fn remember_recent_observation(
         &mut self,
         target: &RadarTarget,
-        packet_sequence: u32,
+        node_id: &str,
+        boot_id: u32,
+        sequence: u32,
         host_time: &HostTimestamp,
     ) {
         self.recent_observations.push_back(RecentRadarObservation {
+            node_id: node_id.to_string(),
+            boot_id,
             observed_at_ns: host_time.host_monotonic_ns,
-            packet_sequence,
+            sequence,
             target_slot: target.slot,
             present: target.present,
             raw_position_mm: [i32::from(target.x_mm), i32::from(target.y_mm)],
@@ -3170,6 +3397,7 @@ impl MmwaveManager {
     fn observe_stable_zone(
         &mut self,
         position: [i32; 2],
+        target_slot: u8,
         speed_cm_s: i16,
         host_time: &HostTimestamp,
         aligned: bool,
@@ -3232,6 +3460,10 @@ impl MmwaveManager {
             .map(|bytes| sha256_bytes(&bytes))
             .ok_or_else(|| "stable radar observation has no transform".to_string())?;
         let radar_observation = RadarObservation {
+            node_id: self
+                .node_id
+                .clone()
+                .ok_or_else(|| "radar node identity is missing".to_string())?,
             host_unix_ns: host_time.host_unix_ns,
             host_monotonic_ns: host_time.host_monotonic_ns,
             clock_epoch_id: host_time.clock_epoch_id.clone(),
@@ -3241,6 +3473,7 @@ impl MmwaveManager {
             sequence: self
                 .sequence
                 .ok_or_else(|| "radar sequence is missing".to_string())?,
+            target_slot,
             transform_sha256,
             position_mm: position,
         };
@@ -3755,7 +3988,8 @@ impl MmwaveManager {
             return Err(error);
         }
         let id = format!(
-            "mmwave-{}-{}",
+            "mmwave-{}-{}-{}",
+            self.configured_node_id.to_ascii_lowercase(),
             match kind {
                 SessionKind::Calibration => "calibration",
                 SessionKind::Blind => "blind",
@@ -3790,6 +4024,7 @@ impl MmwaveManager {
         };
         let session_manifest = SessionManifest {
             schema_version: SESSION_MANIFEST_SCHEMA_VERSION,
+            node_id: self.configured_node_id.clone(),
             id: id.clone(),
             kind,
             lifecycle: SessionLifecycle::Active,
@@ -3833,6 +4068,7 @@ impl MmwaveManager {
             }
         }
         self.session = Some(Session {
+            node_id: self.configured_node_id.clone(),
             id,
             kind,
             phase: match kind {
@@ -3899,13 +4135,9 @@ impl MmwaveManager {
             return Err("a sealed room geometry is required".to_string());
         }
         if let Some(error) = &self.cad_profile_error {
-            return Err(format!("the current mmWave geometry is not usable: {error}"));
-        }
-        if self.node_url_configured && self.pending_cad_transform_sync().is_some() {
-            return Err(
-                "the saved CAD geometry has not yet been acknowledged by the mmWave sensor"
-                    .to_string(),
-            );
+            return Err(format!(
+                "the current mmWave geometry is not usable: {error}"
+            ));
         }
         if kind != SessionKind::MmwaveOnly && self.experiment.is_none() {
             return Err("a sealed schema-v2 setup with mmWave identity is required".to_string());
@@ -4048,7 +4280,7 @@ impl MmwaveManager {
                 .or_else(|| {
                     self.cad_profile.as_ref().and_then(|cad| {
                         (!cad.receiver_positions_m.is_empty())
-                        .then(|| cad.receiver_positions_m.clone())
+                            .then(|| cad.receiver_positions_m.clone())
                     })
                 }),
             calibration_tx_position_m: self
@@ -4060,9 +4292,9 @@ impl MmwaveManager {
                         .unwrap_or(experiment.geometry.tx_position_m)
                 })
                 .or_else(|| {
-                    self.cad_profile.as_ref().and_then(|cad| {
-                        cad.calibration_tx_position_m.or(cad.tx_position_m)
-                    })
+                    self.cad_profile
+                        .as_ref()
+                        .and_then(|cad| cad.calibration_tx_position_m.or(cad.tx_position_m))
                 }),
             calibration_receiver_positions_m: self
                 .experiment
@@ -4178,23 +4410,15 @@ impl MmwaveManager {
             .expected_mode
             .is_none_or(|expected| self.mode == Some(expected));
         let transform_ready = self.cad_profile.is_some() || self.expected_node.is_some();
-        let cad_transform_ready = self.cad_profile_error.is_none()
-            && (!self.node_url_configured || self.pending_cad_transform_sync().is_none());
+        let cad_transform_ready = self.cad_profile_error.is_none();
         let gates = vec![
-            PreflightGate {
-                id: "node_control_configured",
-                pass: self.control.is_some(),
-                detail: "mmWave node control URL and bearer token are configured".to_string(),
-            },
             PreflightGate {
                 id: "cad_profile_active",
                 pass: transform_ready && cad_transform_ready,
                 detail: if cad_transform_ready {
-                    "a saved CAD profile or sealed transform is active and acknowledged"
-                        .to_string()
+                    "a saved CAD profile or sealed transform is active; the server maps raw radar data by node_id".to_string()
                 } else {
-                    "the saved CAD transform must be acknowledged by the sensor before a run"
-                        .to_string()
+                    "the saved CAD profile must contain complete mmWave geometry".to_string()
                 },
             },
             PreflightGate {
@@ -4237,8 +4461,7 @@ impl MmwaveManager {
         let reboot_in_window = self
             .last_radar_reboot_ns
             .is_some_and(|seen| now_ns.saturating_sub(seen) <= PREFLIGHT_WINDOW_NS);
-        let cad_transform_ready = self.cad_profile_error.is_none()
-            && (!self.node_url_configured || self.pending_cad_transform_sync().is_none());
+        let cad_transform_ready = self.cad_profile_error.is_none();
         let mut gates = vec![
             PreflightGate {
                 id: "node_control_configured",
@@ -4454,6 +4677,7 @@ fn session_manifest_from_session(
 ) -> SessionManifest {
     SessionManifest {
         schema_version: SESSION_MANIFEST_SCHEMA_VERSION,
+        node_id: session.node_id.clone(),
         id: session.id.clone(),
         kind: session.kind,
         lifecycle,
@@ -5011,60 +5235,23 @@ pub(crate) struct TransformRequest {
     pub(crate) raw_x_inverted: bool,
 }
 
-/// Convert the saved CAD mmWave geometry into the firmware transform write.
-/// The firmware stores the floor-plane origin and orientation; mounting height
-/// remains CAD metadata used by the calibration ground-truth flow.
-pub(crate) fn transform_request_from_profile(
-    profile: &super::experiment::SetupProfile,
-) -> Option<TransformRequest> {
-    let mmwave = profile
-        .document
-        .get("mmwave")
-        .and_then(serde_json::Value::as_object)?;
-    let mounting = serde_json::from_value::<[f64; 3]>(
-        mmwave.get("mounting_position_m")?.clone(),
-    )
-    .ok()?;
-    let origin_x_mm = (mounting[0] * 1_000.0).round() as i32;
-    let origin_z_mm = (mounting[2] * 1_000.0).round() as i32;
-    let yaw_mdeg = mmwave
-        .get("yaw_mdeg")
-        .and_then(serde_json::Value::as_i64)
-        .and_then(|value| i32::try_from(value).ok())
-        .unwrap_or(0);
-    let raw_x_inverted = mmwave
-        .get("raw_x_inverted")
-        .and_then(serde_json::Value::as_bool)
-        .unwrap_or(false);
-    Some(transform_request_from_cad_values(
-        origin_x_mm,
-        origin_z_mm,
-        yaw_mdeg,
-        raw_x_inverted,
-    ))
-}
-
-fn transform_request_from_cad_geometry(cad: &CadProfileGeometry) -> TransformRequest {
-    transform_request_from_cad_values(
-        (cad.mounting_position_m[0] * 1_000.0).round() as i32,
-        (cad.mounting_position_m[2] * 1_000.0).round() as i32,
-        cad.yaw_mdeg.unwrap_or(0),
-        cad.raw_x_inverted.unwrap_or(false),
-    )
-}
-
-fn transform_request_from_cad_values(
-    origin_x_mm: i32,
-    origin_z_mm: i32,
-    yaw_mdeg: i32,
-    raw_x_inverted: bool,
-) -> TransformRequest {
-    TransformRequest {
-        origin_x_mm,
-        origin_z_mm,
-        yaw_mdeg,
-        raw_x_inverted,
+fn profile_mmwave_for_node<'a>(
+    document: &'a serde_json::Value,
+    node_id: &str,
+) -> Option<&'a serde_json::Map<String, serde_json::Value>> {
+    if let Some(sensors) = document
+        .get("mmwave_sensors")
+        .and_then(serde_json::Value::as_array)
+    {
+        return sensors.iter().find_map(|sensor| {
+            let sensor = sensor.as_object()?;
+            (sensor.get("node_id").and_then(serde_json::Value::as_str) == Some(node_id))
+                .then_some(sensor)
+        });
     }
+    (node_id == "MMWAVE1")
+        .then(|| document.get("mmwave")?.as_object())
+        .flatten()
 }
 
 pub(crate) fn set_node_transform(
@@ -5105,12 +5292,9 @@ pub(crate) fn set_node_transform(
 fn persisted_transform_from_response(
     response: serde_json::Value,
 ) -> Result<TransformRequest, String> {
-    let persisted = response
-        .get("transform")
-        .cloned()
-        .ok_or_else(|| {
-            "mmWave transform response did not include the persisted transform".to_string()
-        })?;
+    let persisted = response.get("transform").cloned().ok_or_else(|| {
+        "mmWave transform response did not include the persisted transform".to_string()
+    })?;
     serde_json::from_value::<TransformRequest>(persisted)
         .map_err(|error| format!("invalid persisted mmWave transform: {error}"))
 }
@@ -5186,6 +5370,115 @@ mod tests {
         MmwaveManager::new(DEFAULT_UDP_PORT, Some([4.02, 2.59, 3.44]), None, None, None)
     }
 
+    fn manager_for(node_id: &str) -> MmwaveManager {
+        MmwaveManager::new_for_node(
+            node_id.to_string(),
+            DEFAULT_UDP_PORT,
+            Some([4.02, 2.59, 3.44]),
+            None,
+            None,
+            None,
+        )
+    }
+
+    fn fleet_packet(node_id: &str, boot_id: u32, sequence: u32, slot: u8) -> Vec<u8> {
+        let mut value: serde_json::Value =
+            serde_json::from_slice(&packet(sequence, 1, MeasurementMode::Calibration)).unwrap();
+        value["node_id"] = serde_json::json!(node_id);
+        value["boot_id"] = serde_json::json!(boot_id);
+        value["targets"][0]["slot"] = serde_json::json!(slot);
+        serde_json::to_vec(&value).unwrap()
+    }
+
+    #[test]
+    fn fleet_keeps_equal_sequences_slots_reboots_and_ip_changes_independent() {
+        let mut fleet = MmwaveFleet::new(vec![
+            ("MMWAVE1".to_string(), manager_for("MMWAVE1")),
+            ("MMWAVE2".to_string(), manager_for("MMWAVE2")),
+        ])
+        .unwrap();
+
+        fleet
+            .ingest_json(&fleet_packet("MMWAVE1", 7, 42, 1), 1_000_000_000)
+            .unwrap();
+        fleet
+            .ingest_json(&fleet_packet("MMWAVE2", 7, 42, 1), 1_000_000_001)
+            .unwrap();
+        assert_eq!(
+            fleet
+                .status_for("MMWAVE1", 1_000_000_010)
+                .unwrap()
+                .packets_received,
+            1
+        );
+        assert_eq!(
+            fleet
+                .status_for("MMWAVE2", 1_000_000_010)
+                .unwrap()
+                .packets_received,
+            1
+        );
+
+        fleet
+            .ingest_json(&fleet_packet("MMWAVE1", 8, 0, 1), 1_100_000_000)
+            .unwrap();
+        assert_eq!(
+            fleet
+                .status_for("MMWAVE1", 1_100_000_010)
+                .unwrap()
+                .reboot_count,
+            1
+        );
+        assert_eq!(
+            fleet
+                .status_for("MMWAVE2", 1_100_000_010)
+                .unwrap()
+                .reboot_count,
+            0
+        );
+
+        fleet.select_node("MMWAVE2").unwrap();
+        fleet.discovered_control(
+            Some("http://192.168.4.2:8032".to_string()),
+            Some("token".to_string()),
+        );
+        fleet.discovered_control(
+            Some("http://192.168.4.77:8032".to_string()),
+            Some("token".to_string()),
+        );
+        let second = fleet.status_for("MMWAVE2", 1_100_000_010).unwrap();
+        assert_eq!(second.sequence, Some(42));
+        assert_eq!(second.reboot_count, 0);
+        assert!(fleet
+            .ingest_json(&fleet_packet("UNKNOWN", 7, 43, 1), 1_200_000_000)
+            .unwrap_err()
+            .contains("unknown mmWave node_id"));
+    }
+
+    #[test]
+    fn fleet_with_only_primary_sensor_has_no_optional_secondary_requirement() {
+        let mut fleet = MmwaveFleet::new(vec![
+            ("MMWAVE1".to_string(), manager_for("MMWAVE1")),
+        ])
+        .expect("a single configured mmWave sensor is valid");
+
+        assert_eq!(fleet.node_ids(), vec!["MMWAVE1"]);
+        assert!(fleet.manager_for("MMWAVE2").is_none());
+        fleet
+            .ingest_json(
+                &fleet_packet("MMWAVE1", 7, 42, 1),
+                1_000_000_000,
+            )
+            .expect("the primary sensor remains ingestible without MMWAVE2");
+        assert_eq!(
+            fleet
+                .status_for("MMWAVE1", 1_000_000_000)
+                .expect("primary status")
+                .packets_received,
+            1
+        );
+    }
+
     fn cad_profile(mount: [f64; 3], revision: &str) -> super::super::experiment::SetupProfile {
         super::super::experiment::SetupProfile {
             id: "cad-test".to_string(),
@@ -5211,21 +5504,7 @@ mod tests {
     }
 
     #[test]
-    fn saved_cad_mmwave_geometry_maps_to_the_firmware_transform() {
-        let mut profile = cad_profile([0.05, 1.45, 0.2], "transform-v1");
-        profile.document["mmwave"]["yaw_mdeg"] = serde_json::json!(38630);
-        profile.document["mmwave"]["raw_x_inverted"] = serde_json::json!(true);
-
-        let transform = transform_request_from_profile(&profile).expect("complete mmWave profile");
-
-        assert_eq!(transform.origin_x_mm, 50);
-        assert_eq!(transform.origin_z_mm, 200);
-        assert_eq!(transform.yaw_mdeg, 38_630);
-        assert!(transform.raw_x_inverted);
-    }
-
-    #[test]
-    fn transform_sync_requires_an_exact_sensor_acknowledgement() {
+    fn transform_endpoint_requires_an_exact_sensor_acknowledgement() {
         let expected = TransformRequest {
             origin_x_mm: 50,
             origin_z_mm: 200,
@@ -5300,10 +5579,16 @@ mod tests {
             .start_fixed_point_calibration(1_200_000_000)
             .expect("start a fresh repeated run");
         assert_eq!(second_run.current_anchor_id.as_deref(), Some("RX1"));
-        assert!(second_run.anchors.iter().all(|anchor| anchor.check.is_none()));
-        assert!(manager
-            .check_current_fixed_point(2_000, 10_000, 1_200_000_000)
-            .is_err(), "samples from before the repeated run must not be reused");
+        assert!(second_run
+            .anchors
+            .iter()
+            .all(|anchor| anchor.check.is_none()));
+        assert!(
+            manager
+                .check_current_fixed_point(2_000, 10_000, 1_200_000_000)
+                .is_err(),
+            "samples from before the repeated run must not be reused"
+        );
 
         manager
             .ingest_json(&packet(2, 1, MeasurementMode::Calibration), 1_300_000_000)
@@ -5314,66 +5599,57 @@ mod tests {
     }
 
     #[test]
-    fn cad_transform_sync_stays_pending_until_the_sensor_acknowledges_it() {
-        let mut manager = MmwaveManager::new(DEFAULT_UDP_PORT, None, None, None, None);
-        manager.apply_cad_profile(&cad_profile([0.05, 1.45, 0.2], "sync-v1"));
-        let transform = manager
-            .pending_cad_transform_sync()
-            .expect("saved CAD transform needs an initial sensor sync");
-        manager.discovered_control(
-            Some("http://radar-01.local".to_string()),
-            Some("test-token".to_string()),
-        );
-        assert_eq!(manager.pending_cad_transform_sync(), Some(transform.clone()));
-
-        manager.mark_cad_profile_sync_succeeded(transform.clone());
-        assert_eq!(manager.pending_cad_transform_sync(), None);
-
-        manager.discovered_control(
-            Some("http://radar-02.local".to_string()),
-            Some("test-token".to_string()),
-        );
-        assert_eq!(manager.pending_cad_transform_sync(), Some(transform));
-    }
-
-    #[test]
-    fn fixed_point_start_is_blocked_when_cad_transform_sync_failed() {
-        let mut manager = MmwaveManager::new(DEFAULT_UDP_PORT, None, None, None, None);
-        manager.apply_cad_profile(&cad_profile([1.0, 1.2, 0.5], "sync-failed-v1"));
-        manager.mark_cad_profile_sync_failed("sensor rejected the transform".to_string());
-
-        let error = manager
-            .validate_fixed_point_start(1_000_000_000)
-            .expect_err("a stale sensor geometry must fail closed");
-        assert!(error.contains("alte Geometrie"));
-    }
-
-    #[test]
-    fn fixed_point_start_waits_for_sensor_ack_and_a_fresh_packet() {
-        let mut manager = MmwaveManager::new(DEFAULT_UDP_PORT, None, None, None, None);
-        manager.set_node_control_configuration(true, true);
-        manager.apply_cad_profile(&cad_profile([1.0, 1.2, 0.5], "sync-pending-v1"));
+    fn radar_only_preflight_maps_by_profile_without_node_control() {
+        let mut manager = manager();
+        manager.apply_cad_profile(&cad_profile([1.0, 1.2, 0.5], "udp-only-v1"));
+        manager.set_node_control_configuration(true, false);
         manager
             .ingest_json(&packet(0, 1, MeasurementMode::Calibration), 1_000_000_000)
-            .expect("packet with the old sensor state");
+            .expect("UDP radar packet remains usable without node control");
 
-        let error = manager
-            .validate_fixed_point_start(1_000_000_000)
-            .expect_err("a pending sensor sync must fail closed");
-        assert!(error.contains("acknowledged"));
-
-        let transform = manager
-            .pending_cad_transform_sync()
-            .expect("the CAD transform still needs acknowledgement");
-        manager.mark_cad_profile_sync_succeeded(transform);
         let status = manager.status(1_000_000_000);
-        assert!(!status
-            .fixed_point_preflight
+        assert!(status.radar_preflight.ready);
+        assert!(status
+            .radar_preflight
             .gates
             .iter()
-            .find(|gate| gate.id == "radar_stream_fresh")
-            .expect("fresh-stream gate")
-            .pass);
+            .all(|gate| gate.id != "node_control_configured"));
+        assert!(status.node_control.url_configured);
+        assert!(!status.node_control.token_configured);
+        assert!(status
+            .radar_preflight
+            .gates
+            .iter()
+            .find(|gate| gate.id == "cad_profile_active")
+            .expect("CAD gate")
+            .detail
+            .contains("maps raw radar data by node_id"));
+        assert!(manager
+            .validate_session_start(SessionKind::MmwaveOnly)
+            .is_ok());
+        assert!(manager
+            .validate_live_session_start(SessionKind::MmwaveOnly, 1_000_000_000)
+            .is_ok());
+    }
+
+    #[test]
+    fn authenticated_control_does_not_gate_server_side_profile_mapping() {
+        let mut manager = manager();
+        manager.apply_cad_profile(&cad_profile([1.0, 1.2, 0.5], "udp-control-v1"));
+        manager.set_node_control_configuration(true, true);
+        manager
+            .ingest_json(&packet(0, 1, MeasurementMode::Calibration), 1_000_000_000)
+            .expect("fresh radar packet");
+
+        assert!(manager.radar_preflight(1_000_000_000).ready);
+        assert!(manager
+            .radar_preflight(1_000_000_000)
+            .gates
+            .iter()
+            .find(|gate| gate.id == "cad_profile_active")
+            .expect("CAD gate")
+            .detail
+            .contains("maps raw radar data by node_id"));
     }
 
     #[test]
@@ -5404,6 +5680,57 @@ mod tests {
                 ["origin_x_mm"],
             0
         );
+    }
+
+    #[test]
+    fn sealed_setup_maps_stale_sensor_transform_by_node_id() {
+        let mut manager = sealed_manager();
+        let mut stale_packet: serde_json::Value =
+            serde_json::from_slice(&packet(0, 1, MeasurementMode::Calibration)).unwrap();
+        stale_packet["coordinate_frame"]["origin_x_mm"] = serde_json::json!(3950);
+        stale_packet["coordinate_frame"]["origin_z_mm"] = serde_json::json!(3300);
+        stale_packet["coordinate_frame"]["yaw_mdeg"] = serde_json::json!(217400);
+        stale_packet["coordinate_frame"]["raw_x_inverted"] = serde_json::json!(true);
+
+        manager
+            .ingest_json(&serde_json::to_vec(&stale_packet).unwrap(), 1_000_000_000)
+            .expect("the sealed node identity remains valid with stale sensor metadata");
+
+        let status = manager.status(1_000_000_000);
+        assert_eq!(status.target_raw_position_mm, Some([100, 1000]));
+        assert_eq!(status.target_position_mm, Some([1000, 100]));
+        assert_eq!(status.transform.unwrap().origin_x_mm, 0);
+    }
+
+    #[test]
+    fn raw_only_packet_maps_by_node_id_without_legacy_transform_fields() {
+        let mut manager = MmwaveManager::new(DEFAULT_UDP_PORT, None, None, None, None);
+        manager.apply_cad_profile(&cad_profile([1.0, 1.2, 0.5], "raw-only-v1"));
+
+        let mut raw_only: serde_json::Value =
+            serde_json::from_slice(&packet(0, 1, MeasurementMode::Calibration)).unwrap();
+        raw_only
+            .as_object_mut()
+            .expect("packet object")
+            .remove("coordinate_frame");
+        for target in raw_only["targets"].as_array_mut().expect("target array") {
+            target
+                .as_object_mut()
+                .expect("target object")
+                .remove("room_x_mm");
+            target
+                .as_object_mut()
+                .expect("target object")
+                .remove("room_z_mm");
+        }
+
+        manager
+            .ingest_json(&serde_json::to_vec(&raw_only).unwrap(), 1_000_000_000)
+            .expect("server profile maps a raw-only packet");
+
+        let status = manager.status(1_000_000_000);
+        assert_eq!(status.target_raw_position_mm, Some([100, 1000]));
+        assert_eq!(status.target_position_mm, Some([2000, 600]));
     }
 
     #[test]
@@ -5461,7 +5788,7 @@ mod tests {
         assert_eq!(check.target_slot_switches, 0);
         assert_eq!(check.effective_yaw_mdeg, Some(0));
         assert_eq!(check.samples.len(), 3);
-        assert_eq!(check.samples[0].packet_sequence, 0);
+        assert_eq!(check.samples[0].sequence, 0);
         assert_eq!(check.samples[0].resolution_mm, 10);
         assert_eq!(check.observed_position_mm, [1_001, 1_500]);
         assert_eq!(check.median_error_mm, 0);
@@ -5624,6 +5951,7 @@ mod tests {
         let mut manager = sealed_manager();
         let calibration = YawCalibrationStatus {
             schema_version: YAW_CALIBRATION_SCHEMA_VERSION,
+            node_id: None,
             source_kind: "setup".to_string(),
             source_id: "setup-01".to_string(),
             source_sha256: "a".repeat(64),
@@ -5881,6 +6209,7 @@ mod tests {
         let manifest_path = directory.join("session.manifest.json");
         let manifest = SessionManifest {
             schema_version: SESSION_MANIFEST_SCHEMA_VERSION,
+            node_id: "MMWAVE1".to_string(),
             id: "session".to_string(),
             kind: SessionKind::Calibration,
             lifecycle: SessionLifecycle::Active,
@@ -5998,14 +6327,14 @@ mod tests {
                 setup_id: "setup-01".to_string(),
                 setup_sha256: "a".repeat(64),
                 server_version: "test".to_string(),
-            geometry: PositionCaptureGeometry {
-                room_dimensions_m: [4.02, 2.59, 3.44],
-                tx_position_m: [0.0, 1.0, 0.0],
-                rx_positions_m: vec![[0.0, 1.0, 0.0]; 4],
-            },
-            calibration_tx_position_m: None,
-            calibration_rx_positions_m: None,
-        }),
+                geometry: PositionCaptureGeometry {
+                    room_dimensions_m: [4.02, 2.59, 3.44],
+                    tx_position_m: [0.0, 1.0, 0.0],
+                    rx_positions_m: vec![[0.0, 1.0, 0.0]; 4],
+                },
+                calibration_tx_position_m: None,
+                calibration_rx_positions_m: None,
+            }),
         )
     }
 
@@ -6014,6 +6343,7 @@ mod tests {
         let recording_path = root.join("empty.mmwave.jsonl");
         let csi_recording_path = root.join("empty.raw-csi.v2.jsonl");
         Session {
+            node_id: "MMWAVE1".to_string(),
             id: "mmwave-calibration-test".to_string(),
             kind: SessionKind::Calibration,
             phase: SessionPhase::EmptyCalibration,
@@ -6678,6 +7008,7 @@ mod tests {
         let csi_recording_path = directory.path().join("blind.raw-csi.v2.jsonl");
         manager.expected_mode = Some(MeasurementMode::Reference);
         manager.session = Some(Session {
+            node_id: "MMWAVE1".to_string(),
             id: "mmwave-blind-test".to_string(),
             kind: SessionKind::Blind,
             phase: SessionPhase::Blind,

@@ -16,10 +16,11 @@ use super::raw_csi_recording::{
 };
 
 const MIN_SETUP_SCHEMA_VERSION: u16 = 1;
-const SETUP_SCHEMA_VERSION: u16 = 2;
+const SETUP_SCHEMA_VERSION: u16 = 3;
 const SETUP_ARTIFACT_KIND: &str = "ruview.position-setup";
 const SETUP_HASH_DOMAIN_V1: &[u8] = b"ruview.position-setup.v1\0";
 const SETUP_HASH_DOMAIN_V2: &[u8] = b"ruview.position-setup.v2\0";
+const SETUP_HASH_DOMAIN_V3: &[u8] = b"ruview.position-setup.v3\0";
 const COORDINATE_SYSTEM: &str = "x_length_y_height_z_width_lower_left_floor";
 const RECORDING_HOST_KIND: &str = "mac";
 /// SHA-256 over exactly the six binary MAC bytes written to the RX NVS
@@ -30,15 +31,14 @@ const EXPECTED_RX_IDS: [u8; 4] = [1, 2, 3, 4];
 const POSITION_LAYOUT_FLAGS_MASK: u8 = !0x10;
 const SHA256_HEX_LEN: usize = 64;
 const OBSERVATORY_SETUP_DRAFT_KIND: &str = "ruview.position-setup-draft";
-const OBSERVATORY_SETUP_DRAFT_MISSING_SECTIONS: [&str; 8] = [
+const OBSERVATORY_SETUP_DRAFT_MISSING_SECTIONS: [&str; 7] = [
     "transmitter.firmware",
     "receivers[*].firmware",
     "receivers[*].expected_grid",
     "recording_host",
     "radio.tx_filter_identity",
-    "mmwave.node_id",
-    "mmwave.firmware",
-    "mmwave.transform",
+    "mmwave_sensors[*].firmware",
+    "mmwave_sensors[*].transform",
 ];
 
 /// Strict input document consumed by `--position-create-setup`.
@@ -55,6 +55,8 @@ pub(crate) struct PositionSetupSpec {
     environment: EnvironmentDefinition,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     mmwave: Option<MmwaveDefinition>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    mmwave_sensors: Vec<MmwaveDefinition>,
 }
 
 /// Complete setup definition covered by `setup_sha256`.
@@ -71,6 +73,8 @@ pub(crate) struct PositionSetupDefinition {
     environment: EnvironmentDefinition,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     mmwave: Option<MmwaveDefinition>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    mmwave_sensors: Vec<MmwaveDefinition>,
     server: ServerBuildIdentity,
 }
 
@@ -243,7 +247,15 @@ impl SealedPositionSetup {
     }
 
     pub(crate) fn mmwave(&self) -> Option<&MmwaveDefinition> {
-        self.definition.mmwave.as_ref()
+        self.mmwave_sensors().first().copied()
+    }
+
+    pub(crate) fn mmwave_sensors(&self) -> Vec<&MmwaveDefinition> {
+        if self.definition.mmwave_sensors.is_empty() {
+            self.definition.mmwave.iter().collect()
+        } else {
+            self.definition.mmwave_sensors.iter().collect()
+        }
     }
 
     /// Require the overlapping measurement geometry and public deployment
@@ -265,10 +277,8 @@ impl SealedPositionSetup {
             .get("transmitter")
             .and_then(serde_json::Value::as_object)
             .ok_or_else(|| "setup profile transmitter must be an object".to_string())?;
-        let transmitter_position = profile_triplet_mm(
-            transmitter.get("position_m"),
-            "transmitter.position_m",
-        )?;
+        let transmitter_position =
+            profile_triplet_mm(transmitter.get("position_m"), "transmitter.position_m")?;
         if transmitter_position != self.definition.transmitter.position_mm {
             return Err(
                 "setup profile transmitter position does not match the active sealed setup"
@@ -295,13 +305,13 @@ impl SealedPositionSetup {
                 "setup profile receiver count does not match the active sealed setup".to_string(),
             );
         }
-        for (index, (profile_receiver, sealed_receiver)) in receivers
-            .iter()
-            .zip(&self.definition.receivers)
-            .enumerate()
+        for (index, (profile_receiver, sealed_receiver)) in
+            receivers.iter().zip(&self.definition.receivers).enumerate()
         {
             let expected_id = format!("RX{}", sealed_receiver.rx_id);
-            if profile_receiver.get("id").and_then(serde_json::Value::as_str)
+            if profile_receiver
+                .get("id")
+                .and_then(serde_json::Value::as_str)
                 != Some(expected_id.as_str())
             {
                 return Err(format!(
@@ -355,7 +365,9 @@ impl SealedPositionSetup {
             ),
         ] {
             let pointer = format!("/environment/{field}");
-            if document.pointer(&pointer).and_then(serde_json::Value::as_str)
+            if document
+                .pointer(&pointer)
+                .and_then(serde_json::Value::as_str)
                 != Some(sealed_value)
             {
                 return Err(format!(
@@ -364,45 +376,51 @@ impl SealedPositionSetup {
             }
         }
 
-        let profile_mmwave = document
-            .get("mmwave")
-            .and_then(serde_json::Value::as_object)
-            .ok_or_else(|| "setup profile mmwave must be an object".to_string())?;
-        let sealed_mmwave = self
-            .definition
-            .mmwave
-            .as_ref()
-            .ok_or_else(|| {
-                "active sealed setup is not schema v2 with mmWave identity".to_string()
-            })?;
-        if profile_mmwave
-            .get("sensor")
-            .and_then(serde_json::Value::as_str)
-            != Some(sealed_mmwave.sensor.as_str())
-        {
+        let profile_sensors = profile_mmwave_sensors(document)?;
+        let sealed_sensors = self.mmwave_sensors();
+        if profile_sensors.len() != sealed_sensors.len() {
             return Err(
-                "setup profile mmWave sensor does not match the active sealed setup".to_string(),
-            );
-        }
-        if profile_triplet_mm(
-            profile_mmwave.get("mounting_position_m"),
-            "mmwave.mounting_position_m",
-        )? != sealed_mmwave.mounting_position_mm
-        {
-            return Err(
-                "setup profile mmWave mounting position does not match the active sealed setup"
+                "setup profile mmWave sensor count does not match the active sealed setup"
                     .to_string(),
             );
         }
-        if profile_mmwave
-            .get("mounting_revision")
-            .and_then(serde_json::Value::as_str)
-            != Some(sealed_mmwave.mounting_revision.as_str())
+        for (index, (profile_mmwave, sealed_mmwave)) in
+            profile_sensors.iter().zip(sealed_sensors).enumerate()
         {
-            return Err(
-                "setup profile mmWave mounting revision does not match the active sealed setup"
-                    .to_string(),
-            );
+            let field = format!("mmwave_sensors[{index}]");
+            if self.schema_version >= 3
+                && profile_mmwave
+                    .get("node_id")
+                    .and_then(serde_json::Value::as_str)
+                    != Some(sealed_mmwave.node_id.as_str())
+            {
+                return Err(format!(
+                    "setup profile {field}.node_id does not match the active sealed setup"
+                ));
+            }
+            if profile_mmwave
+                .get("sensor")
+                .and_then(serde_json::Value::as_str)
+                != Some(sealed_mmwave.sensor.as_str())
+            {
+                return Err(format!(
+                    "setup profile {field}.sensor does not match the active sealed setup"
+                ));
+            }
+            if profile_triplet_mm(
+                profile_mmwave.get("mounting_position_m"),
+                &format!("{field}.mounting_position_m"),
+            )? != sealed_mmwave.mounting_position_mm
+            {
+                return Err(format!("setup profile {field} mounting position does not match the active sealed setup"));
+            }
+            if profile_mmwave
+                .get("mounting_revision")
+                .and_then(serde_json::Value::as_str)
+                != Some(sealed_mmwave.mounting_revision.as_str())
+            {
+                return Err(format!("setup profile {field} mounting revision does not match the active sealed setup"));
+            }
         }
         Ok(())
     }
@@ -596,10 +614,8 @@ pub(crate) fn observatory_profile_setup_draft(
     if transmitter.get("id").and_then(serde_json::Value::as_str) != Some("TX") {
         return Err("setup profile transmitter must be named TX".to_string());
     }
-    let transmitter_position = profile_triplet_mm(
-        transmitter.get("position_m"),
-        "transmitter.position_m",
-    )?;
+    let transmitter_position =
+        profile_triplet_mm(transmitter.get("position_m"), "transmitter.position_m")?;
     validate_position("transmitter.position_mm", transmitter_position, room)?;
     let transmitter_calibration_position = optional_profile_triplet_mm(
         transmitter.get("calibration_position_m"),
@@ -622,8 +638,7 @@ pub(crate) fn observatory_profile_setup_draft(
         .map(|(index, receiver)| {
             let rx_id = EXPECTED_RX_IDS[index];
             let expected_id = format!("RX{rx_id}");
-            if receiver.get("id").and_then(serde_json::Value::as_str)
-                != Some(expected_id.as_str())
+            if receiver.get("id").and_then(serde_json::Value::as_str) != Some(expected_id.as_str())
             {
                 return Err(format!(
                     "setup profile receiver {} must be named {expected_id}",
@@ -677,22 +692,53 @@ pub(crate) fn observatory_profile_setup_draft(
         "environment.door_state_revision",
     )?;
 
-    let mmwave = document
-        .get("mmwave")
-        .and_then(serde_json::Value::as_object)
-        .ok_or_else(|| "setup profile mmwave must be an object".to_string())?;
-    if mmwave.get("sensor").and_then(serde_json::Value::as_str) != Some("HLK-LD2450") {
-        return Err("setup profile mmwave.sensor must be HLK-LD2450".to_string());
+    let canonical_profile_sensors = document.get("mmwave_sensors").is_some();
+    let profile_sensors = profile_mmwave_sensors(document)?;
+    if profile_sensors.len() > 2 {
+        return Err("setup profile supports at most two mmWave sensors".to_string());
     }
-    let mmwave_position = profile_triplet_mm(
-        mmwave.get("mounting_position_m"),
-        "mmwave.mounting_position_m",
-    )?;
-    validate_position("mmwave.mounting_position_mm", mmwave_position, room)?;
-    let mmwave_mounting_revision = profile_public_identifier(
-        mmwave.get("mounting_revision"),
-        "mmwave.mounting_revision",
-    )?;
+    let mut mmwave_sensors = Vec::with_capacity(profile_sensors.len());
+    let mut node_ids = HashSet::new();
+    for (index, mmwave) in profile_sensors.iter().enumerate() {
+        let field = format!("mmwave_sensors[{index}]");
+        if mmwave.get("sensor").and_then(serde_json::Value::as_str) != Some("HLK-LD2450") {
+            return Err(format!("setup profile {field}.sensor must be HLK-LD2450"));
+        }
+        let node_id = if canonical_profile_sensors {
+            mmwave
+                .get("node_id")
+                .and_then(serde_json::Value::as_str)
+                .unwrap_or(if index == 0 { "MMWAVE1" } else { "MMWAVE2" })
+        } else {
+            "MMWAVE1"
+        };
+        validate_public_identifier(&format!("{field}.node_id"), node_id)?;
+        if !matches!(node_id, "MMWAVE1" | "MMWAVE2") {
+            return Err(format!(
+                "setup profile {field}.node_id must be MMWAVE1 or MMWAVE2"
+            ));
+        }
+        if !node_ids.insert(node_id) {
+            return Err(format!("setup profile repeats mmWave node_id {node_id:?}"));
+        }
+        let position = profile_triplet_mm(
+            mmwave.get("mounting_position_m"),
+            &format!("{field}.mounting_position_m"),
+        )?;
+        validate_position(&format!("{field}.mounting_position_mm"), position, room)?;
+        let mounting_revision = profile_public_identifier(
+            mmwave.get("mounting_revision"),
+            &format!("{field}.mounting_revision"),
+        )?;
+        mmwave_sensors.push(serde_json::json!({
+            "node_id": node_id,
+            "sensor": "HLK-LD2450",
+            "firmware": null,
+            "mounting_position_mm": position,
+            "mounting_revision": mounting_revision,
+            "transform": null,
+        }));
+    }
 
     Ok(serde_json::json!({
         "draft_schema_version": 1,
@@ -700,7 +746,7 @@ pub(crate) fn observatory_profile_setup_draft(
         "ready_to_seal": false,
         "missing_sections": OBSERVATORY_SETUP_DRAFT_MISSING_SECTIONS,
         "spec": {
-            "schema_version": 2,
+            "schema_version": 3,
             "coordinate_system": COORDINATE_SYSTEM,
             "room_dimensions_mm": room,
             "transmitter": {
@@ -719,22 +765,39 @@ pub(crate) fn observatory_profile_setup_draft(
                 "furniture_revision": furniture_revision,
                 "door_state_revision": door_state_revision,
             },
-            "mmwave": {
-                "node_id": null,
-                "sensor": "HLK-LD2450",
-                "firmware": null,
-                "mounting_position_mm": mmwave_position,
-                "mounting_revision": mmwave_mounting_revision,
-                "transform": null,
-            },
+            "mmwave_sensors": mmwave_sensors,
         },
     }))
 }
 
-fn profile_triplet_mm(
-    value: Option<&serde_json::Value>,
-    field: &str,
-) -> Result<[u32; 3], String> {
+fn profile_mmwave_sensors(
+    document: &serde_json::Value,
+) -> Result<Vec<&serde_json::Map<String, serde_json::Value>>, String> {
+    if let Some(sensors) = document.get("mmwave_sensors") {
+        let sensors = sensors
+            .as_array()
+            .ok_or_else(|| "setup profile mmwave_sensors must be an array".to_string())?;
+        if sensors.is_empty() {
+            return Err("setup profile mmwave_sensors must not be empty".to_string());
+        }
+        return sensors
+            .iter()
+            .enumerate()
+            .map(|(index, sensor)| {
+                sensor.as_object().ok_or_else(|| {
+                    format!("setup profile mmwave_sensors[{index}] must be an object")
+                })
+            })
+            .collect();
+    }
+    document
+        .get("mmwave")
+        .and_then(serde_json::Value::as_object)
+        .map(|sensor| vec![sensor])
+        .ok_or_else(|| "setup profile requires mmwave_sensors or legacy mmwave".to_string())
+}
+
+fn profile_triplet_mm(value: Option<&serde_json::Value>, field: &str) -> Result<[u32; 3], String> {
     let coordinates = value
         .and_then(serde_json::Value::as_array)
         .ok_or_else(|| format!("setup profile {field} must be an array"))?;
@@ -856,6 +919,7 @@ fn create_position_setup_with_executable(
         radio: spec.radio,
         environment: spec.environment,
         mmwave: spec.mmwave,
+        mmwave_sensors: spec.mmwave_sensors,
         server: ServerBuildIdentity {
             package_version: env!("CARGO_PKG_VERSION").to_string(),
             executable_sha256,
@@ -904,6 +968,7 @@ fn validate_spec(spec: &PositionSetupSpec) -> Result<(), String> {
         radio: spec.radio.clone(),
         environment: spec.environment.clone(),
         mmwave: spec.mmwave.clone(),
+        mmwave_sensors: spec.mmwave_sensors.clone(),
         server: ServerBuildIdentity {
             package_version: env!("CARGO_PKG_VERSION").to_string(),
             executable_sha256: "0".repeat(SHA256_HEX_LEN),
@@ -919,11 +984,39 @@ fn validate_definition(definition: &PositionSetupDefinition) -> Result<(), Strin
             definition.schema_version
         ));
     }
-    match (definition.schema_version, definition.mmwave.as_ref()) {
-        (1, None) => {}
-        (1, Some(_)) => return Err("schema v1 must not contain mmwave".to_string()),
-        (2, Some(mmwave)) => validate_mmwave(mmwave, definition.room_dimensions_mm)?,
-        (2, None) => return Err("schema v2 requires mmwave".to_string()),
+    match definition.schema_version {
+        1 if definition.mmwave.is_none() && definition.mmwave_sensors.is_empty() => {}
+        1 => return Err("schema v1 must not contain mmWave sensors".to_string()),
+        2 if definition.mmwave_sensors.is_empty() => validate_mmwave(
+            definition
+                .mmwave
+                .as_ref()
+                .ok_or_else(|| "schema v2 requires mmwave".to_string())?,
+            definition.room_dimensions_mm,
+        )?,
+        2 => return Err("schema v2 must use the legacy mmwave object".to_string()),
+        3 if definition.mmwave.is_none() => {
+            if definition.mmwave_sensors.is_empty() || definition.mmwave_sensors.len() > 2 {
+                return Err("schema v3 mmwave_sensors must contain one or two sensors".to_string());
+            }
+            let mut node_ids = HashSet::new();
+            for sensor in &definition.mmwave_sensors {
+                validate_mmwave(sensor, definition.room_dimensions_mm)?;
+                if !matches!(sensor.node_id.as_str(), "MMWAVE1" | "MMWAVE2") {
+                    return Err(format!(
+                        "schema v3 mmwave node_id must be MMWAVE1 or MMWAVE2, got {:?}",
+                        sensor.node_id
+                    ));
+                }
+                if !node_ids.insert(sensor.node_id.as_str()) {
+                    return Err(format!(
+                        "mmwave_sensors repeats node_id {:?}",
+                        sensor.node_id
+                    ));
+                }
+            }
+        }
+        3 => return Err("schema v3 must use mmwave_sensors, not mmwave".to_string()),
         _ => unreachable!("schema range checked above"),
     }
     if definition.coordinate_system != COORDINATE_SYSTEM {
@@ -1165,6 +1258,7 @@ fn definition_sha256(definition: &PositionSetupDefinition) -> Result<String, Str
     let domain = match definition.schema_version {
         1 => SETUP_HASH_DOMAIN_V1,
         2 => SETUP_HASH_DOMAIN_V2,
+        3 => SETUP_HASH_DOMAIN_V3,
         _ => return Err("unsupported setup schema for hashing".to_string()),
     };
     let mut sealed = Vec::with_capacity(domain.len() + canonical.len());
@@ -1355,18 +1449,30 @@ mod tests {
             ("__LAYOUT_REVISION__", "\"test-layout-v1\""),
             ("__FURNITURE_REVISION__", "\"test-furniture-v1\""),
             ("__DOOR_STATE_REVISION__", "\"test-door-closed-v1\""),
-            ("__MMWAVE_NODE_ID__", "\"radar-01\""),
-            ("__MMWAVE_FIRMWARE_VERSION__", "\"mmwave-v1\""),
+            ("__MMWAVE1_NODE_ID__", "\"MMWAVE1\""),
+            ("__MMWAVE1_FIRMWARE_VERSION__", "\"mmwave-v1\""),
             (
-                "__MMWAVE_FIRMWARE_ARTIFACT_SHA256__",
+                "__MMWAVE1_FIRMWARE_ARTIFACT_SHA256__",
                 "\"1111111111111111111111111111111111111111111111111111111111111111\"",
             ),
-            ("__MMWAVE_MOUNTING_POSITION_MM__", "[0,1200,1720]"),
-            ("__MMWAVE_MOUNTING_REVISION__", "\"wall-center-v1\""),
-            ("__MMWAVE_ORIGIN_X_MM__", "0"),
-            ("__MMWAVE_ORIGIN_Z_MM__", "1720"),
-            ("__MMWAVE_YAW_MDEG__", "0"),
-            ("__MMWAVE_RAW_X_INVERTED__", "false"),
+            ("__MMWAVE1_MOUNTING_POSITION_MM__", "[0,1200,1720]"),
+            ("__MMWAVE1_MOUNTING_REVISION__", "\"wall-center-v1\""),
+            ("__MMWAVE1_ORIGIN_X_MM__", "0"),
+            ("__MMWAVE1_ORIGIN_Z_MM__", "1720"),
+            ("__MMWAVE1_YAW_MDEG__", "0"),
+            ("__MMWAVE1_RAW_X_INVERTED__", "false"),
+            ("__MMWAVE2_NODE_ID__", "\"MMWAVE2\""),
+            ("__MMWAVE2_FIRMWARE_VERSION__", "\"mmwave-v1\""),
+            (
+                "__MMWAVE2_FIRMWARE_ARTIFACT_SHA256__",
+                "\"2222222222222222222222222222222222222222222222222222222222222222\"",
+            ),
+            ("__MMWAVE2_MOUNTING_POSITION_MM__", "[4020,1200,1720]"),
+            ("__MMWAVE2_MOUNTING_REVISION__", "\"opposite-wall-v1\""),
+            ("__MMWAVE2_ORIGIN_X_MM__", "4020"),
+            ("__MMWAVE2_ORIGIN_Z_MM__", "1720"),
+            ("__MMWAVE2_YAW_MDEG__", "180000"),
+            ("__MMWAVE2_RAW_X_INVERTED__", "false"),
         ] {
             replace_template_value(&mut rendered, token, value);
         }
@@ -1416,6 +1522,57 @@ mod tests {
         assert_eq!(v2.schema_version, 2);
         assert_eq!(v2.mmwave().unwrap().node_id(), "radar-01");
         assert_ne!(v1.setup_sha256, v2.setup_sha256);
+    }
+
+    #[test]
+    fn schema_v3_seals_two_named_sensors_and_rejects_unknown_or_duplicate_ids() {
+        let directory = TempDir::new().unwrap();
+        let executable = executable_fixture(&directory, b"schema v3 sensors");
+        let sensor = |node_id: &str, x: u32, yaw_mdeg: i32, hash_byte: char| {
+            json!({
+                "node_id": node_id,
+                "sensor": "HLK-LD2450",
+                "firmware": {
+                    "target": "esp32c3",
+                    "version": "mmwave-v1",
+                    "artifact_sha256": hash(hash_byte)
+                },
+                "mounting_position_mm": [x, 1200, 1720],
+                "mounting_revision": format!("{node_id}-mount-v1"),
+                "transform": {
+                    "origin_x_mm": x,
+                    "origin_z_mm": 1720,
+                    "yaw_mdeg": yaw_mdeg,
+                    "raw_x_inverted": false
+                }
+            })
+        };
+        let mut value = valid_spec_value();
+        value["schema_version"] = json!(3);
+        value["mmwave_sensors"] = json!([
+            sensor("MMWAVE1", 0, 0, '1'),
+            sensor("MMWAVE2", 4020, 180000, '2')
+        ]);
+        let sealed =
+            create_position_setup_with_executable(parse_spec(value.clone()).unwrap(), &executable)
+                .expect("two independent named sensors must seal");
+        assert_eq!(
+            sealed
+                .mmwave_sensors()
+                .into_iter()
+                .map(MmwaveDefinition::node_id)
+                .collect::<Vec<_>>(),
+            ["MMWAVE1", "MMWAVE2"]
+        );
+
+        value["mmwave_sensors"][1]["node_id"] = json!("UNKNOWN");
+        assert!(validate_spec(&parse_spec(value.clone()).unwrap())
+            .unwrap_err()
+            .contains("must be MMWAVE1 or MMWAVE2"));
+        value["mmwave_sensors"][1]["node_id"] = json!("MMWAVE1");
+        assert!(validate_spec(&parse_spec(value).unwrap())
+            .unwrap_err()
+            .contains("repeats node_id"));
     }
 
     fn executable_fixture(directory: &TempDir, bytes: &[u8]) -> PathBuf {
@@ -1577,7 +1734,10 @@ mod tests {
 
         assert_eq!(draft["kind"], OBSERVATORY_SETUP_DRAFT_KIND);
         assert_eq!(draft["ready_to_seal"], false);
-        assert_eq!(draft["spec"]["room_dimensions_mm"], json!([4020, 2590, 3440]));
+        assert_eq!(
+            draft["spec"]["room_dimensions_mm"],
+            json!([4020, 2590, 3440])
+        );
         assert_eq!(
             draft["spec"]["transmitter"]["position_mm"],
             json!([1510, 1190, 390])
@@ -1587,7 +1747,7 @@ mod tests {
             json!([200, 500, 400])
         );
         assert_eq!(
-            draft["spec"]["mmwave"]["mounting_position_mm"],
+            draft["spec"]["mmwave_sensors"][0]["mounting_position_mm"],
             json!([0, 1200, 1720])
         );
         assert_eq!(draft["spec"]["radio"]["channel"], 6);

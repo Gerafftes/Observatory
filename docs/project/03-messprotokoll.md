@@ -155,9 +155,9 @@ diesen realen Aufbau einschließlich Mac, Möbeln, Kabeln und normalen
 Gegenständen mit — ausgeschlossen ist nur eine Person. Frühere Aufnahmen mit
 „Mac mittig“ sind nicht als Kalibrierung für diesen Aufbau verwendbar.
 Nachweise:
-[TX-Firmwareidentität](experiment-reports/2026-08-09_D6_setupaufnahme-und-tx-firmwareidentitaet/README.md)
+[TX-Firmwareidentität](../../experiment-reports/2026-08-09_D6_setupaufnahme-und-tx-firmwareidentitaet/README.md)
 und
-[Neusiegelung/Preflight](experiment-reports/2026-08-09_D6_sidecar-fix-neusiegelung-und-preflight/README.md).
+[Neusiegelung/Preflight](../../experiment-reports/2026-08-09_D6_sidecar-fix-neusiegelung-und-preflight/README.md).
 
 Die neue Leerraumkalibrierung `empty-neutral-20260809-02` ist inzwischen unter
 dem neuen Siegel bestanden: 65 Sekunden, 6.102 Frames, 0 Drops, vollständige
