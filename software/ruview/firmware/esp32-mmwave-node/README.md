@@ -144,6 +144,12 @@ DHCP: its address may change without manually editing the node target. The
 discovery listener is enabled when the server has `MMWAVE_NODE_TOKEN`
 configured; it is deliberately disabled without the shared secret.
 
+The ESP32-C3 Super Mini user LED identifies the configured node without using
+its IP address: `MMWAVE1` emits one short pulse every three seconds and
+`MMWAVE2` emits two. An unknown node ID uses a fast warning blink and is not
+silently assigned. GPIO 8 and active-low drive are configurable for boards
+whose onboard LED is wired differently.
+
 Disabling modem sleep increases power consumption. If it is re-enabled for a
 battery deployment, expect the access point's DTIM/listen interval to become a
 possible lower bound on receive latency; compare the server's transport delay

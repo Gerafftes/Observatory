@@ -1468,8 +1468,18 @@ fn normalize_profile_document(document: &Value) -> Result<Value, String> {
         .and_then(Value::as_object)
         .ok_or_else(|| "transmitter must be an object".to_string())?;
     let tx_position = finite_triplet(transmitter.get("position_m"), "transmitter.position_m")?;
-    if transmitter.get("id").and_then(Value::as_str) != Some("TX") {
-        return Err("transmitter must be named TX".to_string());
+    if !matches!(
+        transmitter.get("id").and_then(Value::as_str),
+        Some("TX" | "TX1")
+    ) {
+        return Err("transmitter must be named TX1 (legacy TX is accepted)".to_string());
+    }
+    if transmitter
+        .get("node_id")
+        .and_then(Value::as_str)
+        .is_some_and(|node_id| node_id != "TX1")
+    {
+        return Err("transmitter.node_id must be TX1".to_string());
     }
     if !within_sensor_bounds(tx_position, dimensions, sensor_mount_radius) {
         return Err(
@@ -1496,6 +1506,13 @@ fn normalize_profile_document(document: &Value) -> Result<Value, String> {
         let expected_id = format!("RX{}", index + 1);
         if receiver.get("id").and_then(Value::as_str) != Some(expected_id.as_str()) {
             return Err(format!("receivers must be ordered and named {expected_id}"));
+        }
+        if receiver
+            .get("node_id")
+            .and_then(Value::as_str)
+            .is_some_and(|node_id| node_id != expected_id)
+        {
+            return Err(format!("{expected_id}.node_id must be {expected_id}"));
         }
         let position = finite_triplet(
             receiver.get("position_m"),
@@ -1653,6 +1670,16 @@ fn normalize_profile_document(document: &Value) -> Result<Value, String> {
         object.insert("schema_version".to_string(), json!(PROFILE_SCHEMA_VERSION));
         object.insert("profile_kind".to_string(), json!("ruview.setup-profile"));
         object.insert("mmwave_status".to_string(), json!("NOT_CONNECTED"));
+        if let Some(transmitter) = object.get_mut("transmitter").and_then(Value::as_object_mut) {
+            transmitter.insert("node_id".to_string(), json!("TX1"));
+        }
+        if let Some(receivers) = object.get_mut("receivers").and_then(Value::as_array_mut) {
+            for (index, receiver) in receivers.iter_mut().enumerate() {
+                if let Some(receiver) = receiver.as_object_mut() {
+                    receiver.insert("node_id".to_string(), json!(format!("RX{}", index + 1)));
+                }
+            }
+        }
     }
     Ok(normalized)
 }

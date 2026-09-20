@@ -9,6 +9,8 @@
  *   - Opacity: classification confidence
  */
 
+import { deviceThreeColor, receiverIdentity } from '../device-identity.js';
+
 // Use global THREE from CDN (loaded in SensingTab)
 const getThree = () => window.THREE;
 
@@ -66,9 +68,6 @@ function valueToColor(v) {
   return [r, g, b];
 }
 
-// ---- Node marker color palette -------------------------------------------
-
-const NODE_MARKER_COLORS = [0x00ccff, 0xff7a00, 0xff00cc, 0xffcc00, 0x8b5cf6, 0x00ffcc, 0xff0044];
 const DEFAULT_ROOM_DIMENSIONS = [20, 6, 20];
 const PROBABILITY_DISPLAY_SCALE_PER_CELL = 0.2;
 const POSITION_ESTIMATE_STATES = new Set([
@@ -873,8 +872,8 @@ export class GaussianSplatRenderer {
         for (const node of nodes) {
           activeIds.add(node.node_id);
           if (!this.nodeMarkers.has(node.node_id)) {
-            const colorIndex = Math.max(0, Number(node.node_id) - 1) % NODE_MARKER_COLORS.length;
-            const markerColor = NODE_MARKER_COLORS[colorIndex];
+            const identity = receiverIdentity(node.node_id);
+            const markerColor = deviceThreeColor(identity?.id);
             const geo = new THREE.SphereGeometry(0.12, 16, 16);
             const mat = new THREE.MeshBasicMaterial({
               color: markerColor,
@@ -882,7 +881,7 @@ export class GaussianSplatRenderer {
               opacity: 0.8,
             });
             const marker = new THREE.Mesh(geo, mat);
-            marker.add(this._createMarkerLabel(`RX${node.node_id}`, markerColor, THREE));
+            marker.add(this._createMarkerLabel(identity?.id || 'RX?', markerColor, THREE));
             this.scene.add(marker);
             this.nodeMarkers.set(node.node_id, marker);
           }

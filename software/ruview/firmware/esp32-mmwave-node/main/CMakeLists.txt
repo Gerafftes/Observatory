@@ -3,6 +3,7 @@ idf_component_register(
         "app_main.c"
         "app_config.c"
         "coordinate_transform.c"
+        "identity_indicator.c"
         "ld2450_parser.c"
         "measurement_stream.c"
         "mmwave_discovery.c"

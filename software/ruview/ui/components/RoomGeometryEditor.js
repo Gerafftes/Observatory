@@ -1,3 +1,5 @@
+import { deviceColor, deviceIdentity } from '../device-identity.js';
+
 const VIEWBOX = Object.freeze({
   width: 980,
   height: 600,
@@ -115,7 +117,15 @@ function calibrationEntities(document) {
 
 function selectableLabel(id) {
   const deviceId = calibrationDeviceId(id);
-  return deviceId ? `${deviceId} Kalibrierstandpunkt` : wallLabel(id);
+  const label = deviceIdentity(deviceId || id)?.id || deviceId || wallLabel(id);
+  return deviceId ? `${label} Kalibrierstandpunkt` : label;
+}
+
+function deviceLegendItem(id) {
+  const identity = deviceIdentity(id);
+  const label = identity?.id || id;
+  const colorStyle = identity ? ` style="--device-color:${identity.color}"` : '';
+  return `<span class="occ-cad-legend-item"><i class="occ-cad-swatch occ-cad-swatch-${id.toLowerCase()}"${colorStyle} aria-hidden="true"></i>${escapeHTML(label)}</span>`;
 }
 
 export function sensorMountRadius(document) {
@@ -167,16 +177,18 @@ function updateEntityPosition(document, id, position) {
   const deviceId = calibrationDeviceId(id);
   if (deviceId === 'TX') {
     next.transmitter = {
-      ...(next.transmitter || { id: 'TX' }),
+      ...(next.transmitter || { id: 'TX', node_id: 'TX1' }),
+      node_id: 'TX1',
       calibration_position_m: [...position],
     };
   } else if (deviceId) {
     next.receivers = (next.receivers || []).map((receiver) => receiver.id === deviceId
-      ? { ...receiver, calibration_position_m: [...position] }
+      ? { ...receiver, node_id: deviceId, calibration_position_m: [...position] }
       : receiver);
   } else if (id === 'TX') {
     next.transmitter = {
-      ...(next.transmitter || { id: 'TX' }),
+      ...(next.transmitter || { id: 'TX', node_id: 'TX1' }),
+      node_id: 'TX1',
       position_m: [...position],
     };
   } else if (MMWAVE_IDS.includes(id)) {
@@ -192,7 +204,7 @@ function updateEntityPosition(document, id, position) {
     if (id === 'MMWAVE1') next.mmwave = { ...updated };
   } else {
     next.receivers = (next.receivers || []).map((receiver) => receiver.id === id
-      ? { ...receiver, position_m: [...position] }
+      ? { ...receiver, node_id: id, position_m: [...position] }
       : receiver);
   }
   return next;
@@ -681,11 +693,16 @@ function markerMarkup(entity, room, selectedIds, radius) {
   const handleAttributes = calibration
     ? `data-calibration-handle data-calibration-id="${escapeHTML(entity.id)}"`
     : `data-geometry-handle data-geometry-id="${escapeHTML(entity.id)}"`;
-  const markerLabel = calibration ? `${entity.deviceId} Kalibrierstandpunkt` : entity.id;
-  const markerText = calibration ? `${entity.deviceId}·K` : entity.id;
+  const deviceLabel = deviceIdentity(entity.deviceId || entity.id)?.id || entity.deviceId || entity.id;
+  const markerLabel = calibration ? `${deviceLabel} Kalibrierstandpunkt` : deviceLabel;
+  const markerText = calibration ? `${deviceLabel}·K` : deviceLabel;
+  const identityStyle = deviceIdentity(entity.deviceId || entity.id)
+    ? `style="--device-color:${deviceColor(entity.deviceId || entity.id)}"`
+    : '';
   return `
     <g class="occ-cad-marker occ-cad-marker-${kind} occ-cad-marker-${colorClass} ${entity.explicit === false ? 'is-fallback' : ''} ${selected ? 'is-selected' : ''}"
        ${handleAttributes}
+       ${identityStyle}
        tabindex="0" role="button" aria-label="${escapeHTML(`${markerLabel} bei ${formatNumber(entity.position_m[0])} x ${formatNumber(entity.position_m[2])} m`)}"
       transform="translate(${point.x.toFixed(2)} ${point.y.toFixed(2)})">
      <circle class="occ-cad-marker-hit" r="18"></circle>
@@ -1595,7 +1612,7 @@ export class RoomGeometryEditor {
         : '';
     this.container.innerHTML = `
       <div class="occ-cad-toolbar">
-          <div><span class="occ-cad-kicker">CAD / TOPPLAN</span><strong>Raum</strong><small>Klick: Auswahl · Leer: löschen · Shift: zweites Element · Drag: x/z · y: Höhe</small><div class="occ-cad-legend">${['TX', 'RX1', 'RX2', 'RX3', 'RX4', ...MMWAVE_IDS].map((id) => `<span class="occ-cad-legend-item"><i class="occ-cad-swatch occ-cad-swatch-${id.toLowerCase()}" aria-hidden="true"></i>${id}</span>`).join('')}<span class="occ-cad-legend-item">·K = Kalibrierstandpunkt</span></div></div>
+          <div><span class="occ-cad-kicker">CAD / TOPPLAN</span><strong>Raum</strong><small>Klick: Auswahl · Leer: löschen · Shift: zweites Element · Drag: x/z · y: Höhe</small><div class="occ-cad-legend">${['TX', 'RX1', 'RX2', 'RX3', 'RX4', ...MMWAVE_IDS].map(deviceLegendItem).join('')}<span class="occ-cad-legend-item">·K = Kalibrierstandpunkt</span></div></div>
         <div class="occ-cad-toolbar-actions"><span data-cad-validation class="occ-cad-validation ${validation.valid ? 'is-valid' : 'is-invalid'}">${validation.valid ? 'GEOMETRIE GÜLTIG' : `${validation.errors.length} BLOCKER`}</span><button type="button" class="occ-button occ-button-primary" data-cad-action="calculate-mmwave-placement">mmWave-Position berechnen</button><button type="button" class="occ-button occ-button-primary" data-cad-action="save-positions" ${this.saveDisabled ? 'disabled' : ''}>Geometrie speichern</button><button type="button" class="occ-button occ-button-quiet" data-cad-action="toggle-snap">Rasterfang ${this.snap ? 'AN' : 'AUS'}</button></div>
       </div>
       <div class="occ-cad-layout">

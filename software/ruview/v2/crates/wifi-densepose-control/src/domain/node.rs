@@ -1,21 +1,5 @@
 use serde::{Deserialize, Serialize};
 
-/// MAC address value object (e.g., "AA:BB:CC:DD:EE:FF").
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub struct MacAddress(pub String);
-
-impl MacAddress {
-    pub fn new(addr: impl Into<String>) -> Self {
-        Self(addr.into())
-    }
-}
-
-impl std::fmt::Display for MacAddress {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.0)
-    }
-}
-
 /// Node health status.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
@@ -95,10 +79,12 @@ pub struct DiscoveredNode {
     pub notes: Option<String>,
 }
 
-/// Aggregate root: maintains the set of all known nodes, keyed by MAC.
+/// Aggregate root keyed by the firmware-provisioned node ID.
+///
+/// IP and MAC addresses are mutable connection metadata, never identity keys.
 #[derive(Debug, Default)]
 pub struct NodeRegistry {
-    nodes: std::collections::HashMap<MacAddress, DiscoveredNode>,
+    nodes: std::collections::HashMap<u8, DiscoveredNode>,
 }
 
 impl NodeRegistry {
@@ -106,14 +92,14 @@ impl NodeRegistry {
         Self::default()
     }
 
-    /// Insert or update a node. Deduplicates by MAC address.
-    pub fn upsert(&mut self, mac: MacAddress, node: DiscoveredNode) {
-        self.nodes.insert(mac, node);
+    /// Insert or update a node using its stable node ID.
+    pub fn upsert(&mut self, node: DiscoveredNode) {
+        self.nodes.insert(node.node_id, node);
     }
 
-    /// Get a node by MAC address.
-    pub fn get(&self, mac: &MacAddress) -> Option<&DiscoveredNode> {
-        self.nodes.get(mac)
+    /// Get a node by its stable firmware ID.
+    pub fn get(&self, node_id: u8) -> Option<&DiscoveredNode> {
+        self.nodes.get(&node_id)
     }
 
     /// List all known nodes.

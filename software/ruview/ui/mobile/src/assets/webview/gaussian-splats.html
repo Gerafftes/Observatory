@@ -116,6 +116,25 @@
           return [r, g, b];
         }
 
+        const DEVICE_COLORS = Object.freeze({
+          TX1: 0xff9f0a,
+          RX1: 0x0a84ff,
+          RX2: 0x30d158,
+          RX3: 0xff375f,
+          RX4: 0xbf5af2,
+        });
+        const UNKNOWN_DEVICE_COLOR = 0x68737a;
+
+        function canonicalNodeId(node) {
+          const rawId = node && node.node_id;
+          if (Number.isInteger(rawId) && rawId >= 1 && rawId <= 4) {
+            return `RX${rawId}`;
+          }
+          const textId = String(rawId ?? node?.id ?? '').trim().toUpperCase();
+          if (textId === 'TX') return 'TX1';
+          return Object.prototype.hasOwnProperty.call(DEVICE_COLORS, textId) ? textId : null;
+        }
+
         // ---- GaussianSplatRenderer -------------------------------------------
 
         class GaussianSplatRenderer {
@@ -248,19 +267,47 @@
           }
 
           _createNodeMarkers(THREE) {
-            // Router at center — green sphere
+            // TX1 at center — canonical amber identity colour
             const routerGeo = new THREE.SphereGeometry(0.3, 16, 16);
-            const routerMat = new THREE.MeshBasicMaterial({ color: 0x00ff88, transparent: true, opacity: 0.8 });
+            const routerMat = new THREE.MeshBasicMaterial({ color: DEVICE_COLORS.TX1, transparent: true, opacity: 0.8 });
             this.routerMarker = new THREE.Mesh(routerGeo, routerMat);
             this.routerMarker.position.set(0, 0.5, 0);
             this.scene.add(this.routerMarker);
 
-            // ESP32 node — cyan sphere (default position, updated from data)
-            const nodeGeo = new THREE.SphereGeometry(0.25, 16, 16);
-            const nodeMat = new THREE.MeshBasicMaterial({ color: 0x00ccff, transparent: true, opacity: 0.8 });
-            this.nodeMarker = new THREE.Mesh(nodeGeo, nodeMat);
-            this.nodeMarker.position.set(2, 0.5, 1.5);
-            this.scene.add(this.nodeMarker);
+            this.nodeMarkers = new Map();
+          }
+
+          _syncNodeMarkers(THREE, nodes) {
+            const visibleKeys = new Set();
+            nodes.forEach((node, index) => {
+              if (!Array.isArray(node.position) || node.position.length < 3) return;
+
+              const identity = canonicalNodeId(node);
+              const key = identity || `unassigned:${String(node.node_id ?? index)}`;
+              visibleKeys.add(key);
+
+              let marker = this.nodeMarkers.get(key);
+              if (!marker) {
+                const geometry = new THREE.SphereGeometry(0.25, 16, 16);
+                const material = new THREE.MeshBasicMaterial({
+                  color: identity ? DEVICE_COLORS[identity] : UNKNOWN_DEVICE_COLOR,
+                  transparent: true,
+                  opacity: 0.8,
+                });
+                marker = new THREE.Mesh(geometry, material);
+                this.nodeMarkers.set(key, marker);
+                this.scene.add(marker);
+              }
+              marker.position.set(node.position[0], 0.5, node.position[2]);
+            });
+
+            for (const [key, marker] of this.nodeMarkers) {
+              if (visibleKeys.has(key)) continue;
+              this.scene.remove(marker);
+              marker.geometry.dispose();
+              marker.material.dispose();
+              this.nodeMarkers.delete(key);
+            }
           }
 
           _createBodyBlob(THREE) {
@@ -385,11 +432,8 @@
               bGeo.attributes.splatSize.needsUpdate = true;
             }
 
-            // -- Update node positions -----------------------------------------
-            if (nodes.length > 0 && nodes[0].position && this.nodeMarker) {
-              const pos = nodes[0].position;
-              this.nodeMarker.position.set(pos[0], 0.5, pos[2]);
-            }
+            // -- Update identity-coloured RX positions -------------------------
+            this._syncNodeMarkers(getThree(), nodes);
           }
 
           // ---- Render loop -------------------------------------------------

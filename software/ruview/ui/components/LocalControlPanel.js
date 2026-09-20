@@ -1,4 +1,5 @@
 import { controlHelperRequest, getControlHelperOrigin } from '../services/control-helper.service.js';
+import { deviceColor, receiverIdentity } from '../device-identity.js';
 
 function escapeHTML(value) {
   return String(value ?? '')
@@ -88,7 +89,13 @@ export class LocalControlPanel {
     const stateClass = this.available ? 'is-running' : 'is-offline';
     const disabled = this.busy || !this.available;
     const nodeSummary = this.nodes.length
-      ? this.nodes.map((node) => `${escapeHTML(node.ip || '—')} · ${escapeHTML(node.mac || 'ohne MAC')}`).join('<br>')
+      ? this.nodes.map((node) => {
+        const identity = receiverIdentity(node.node_id);
+        const label = identity?.id || 'NICHT ZUGEORDNET';
+        const route = node.ip ? ` · Verbindung ${escapeHTML(node.ip)}` : '';
+        const warning = node.notes ? ` · ${escapeHTML(node.notes)}` : '';
+        return `<span class="device-identity-label" style="--device-color:${deviceColor(identity?.id)}"><i aria-hidden="true"></i><strong>${label}</strong></span>${route}${warning}`;
+      }).join('<br>')
       : 'Noch keine Discovery ausgeführt.';
     const portSummary = this.ports.length
       ? this.ports.map((port) => `${escapeHTML(port.name)}${port.is_esp32_compatible ? ' · ESP32-kompatibel' : ''}`).join('<br>')

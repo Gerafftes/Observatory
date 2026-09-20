@@ -31,6 +31,7 @@
 #include "wasm_upload.h"
 #include "display_task.h"
 #include "mmwave_sensor.h"
+#include "node_identity.h"
 #include "swarm_bridge.h"
 #include "rv_radio_ops.h"          /* ADR-081 Layer 1 — Radio Abstraction Layer. */
 #include "adaptive_controller.h"   /* ADR-081 Layer 2 — Adaptive controller. */
@@ -46,6 +47,7 @@
 #include "esp_timer.h"
 
 static const char *TAG = "main";
+static led_strip_handle_t s_identity_led;
 
 /* ADR-040: WASM timer handle (calls on_timer at configurable interval). */
 static esp_timer_handle_t s_wasm_timer;
@@ -145,53 +147,10 @@ static void wifi_init_sta(void)
     }
 }
 
-#if CONFIG_LED_GAMMA_VIZ
-/* Viridis colormap (60 steps), generated from ruv-neural-viz::ColorMap::viridis()
- * — the rUv-Neural brain-topology colormap, now no_std (ruvnet/ruv-neural#3 /
- * RuView#1126). Used as the ON-phase colour of the 40 Hz gamma flicker below:
- * dark-purple (still) -> teal -> green -> yellow (strong motion). */
-static const uint8_t VIRIDIS_LUT[60][3] = {
-    { 68,  1, 84},{ 67,  6, 88},{ 67, 12, 91},{ 66, 17, 95},{ 66, 23, 99},
-    { 65, 28,103},{ 64, 34,106},{ 64, 39,110},{ 63, 45,114},{ 63, 50,118},
-    { 62, 56,121},{ 61, 61,125},{ 61, 67,129},{ 60, 72,132},{ 59, 78,136},
-    { 59, 83,139},{ 57, 87,139},{ 55, 92,139},{ 53, 96,139},{ 52,100,139},
-    { 50,104,139},{ 48,109,139},{ 46,113,139},{ 44,117,140},{ 43,122,140},
-    { 41,126,140},{ 39,130,140},{ 37,134,140},{ 36,139,140},{ 34,143,140},
-    { 35,147,139},{ 39,151,136},{ 43,154,133},{ 47,158,130},{ 52,162,127},
-    { 56,166,124},{ 60,170,121},{ 64,173,119},{ 68,177,116},{ 72,181,113},
-    { 76,185,110},{ 81,189,107},{ 85,192,104},{ 89,196,102},{ 93,200, 99},
-    {102,203, 95},{113,205, 91},{124,207, 87},{134,209, 82},{145,211, 78},
-    {156,213, 74},{167,215, 70},{178,217, 66},{188,219, 62},{199,221, 58},
-    {210,223, 54},{221,225, 49},{231,227, 45},{242,229, 41},{253,231, 37},
-};
-static led_strip_handle_t s_viz_led;
-
-/* motion_energy that saturates the colormap to yellow (CONFIG, milli-units). */
-#define LED_MOTION_FULLSCALE ((float)CONFIG_LED_MOTION_FULLSCALE_MILLI / 1000.0f)
-
-/* GENUS-style 40 Hz gamma flicker: full on/off square wave, 50% duty (toggled
- * every 12.5 ms → 40 Hz). The ON colour is live CSI motion (edge motion_energy)
- * mapped through the ruv-neural-viz viridis LUT — still=purple, moving=yellow.
- * So the LED is a real 40 Hz gamma stimulus whose hue tracks sensed motion. */
-static void led_gamma_40hz_cb(void *arg)
+static uint8_t scale_identity_led_channel(uint8_t channel)
 {
-    static bool on = false;
-    on = !on;
-    if (on) {
-        edge_vitals_pkt_t v;
-        float m = edge_get_vitals(&v) ? v.motion_energy : 0.0f;
-        float norm = m / LED_MOTION_FULLSCALE;
-        if (norm < 0.0f) norm = 0.0f;
-        if (norm > 1.0f) norm = 1.0f;
-        int idx = (int)(norm * 59.0f + 0.5f);
-        const uint8_t *c = VIRIDIS_LUT[idx];
-        led_strip_set_pixel(s_viz_led, 0, c[0], c[1], c[2]); /* R,G,B (driver maps to GRB) */
-    } else {
-        led_strip_set_pixel(s_viz_led, 0, 0, 0, 0);          /* off phase */
-    }
-    led_strip_refresh(s_viz_led);
+    return (uint8_t)(((uint16_t)channel * CONFIG_LED_IDENTITY_BRIGHTNESS + 127U) / 255U);
 }
-#endif /* CONFIG_LED_GAMMA_VIZ */
 
 void app_main(void)
 {
@@ -225,8 +184,7 @@ void app_main(void)
     /* Onboard WS2812. C6 wires the LED to GPIO 8; S3 to GPIO 38 (DevKitC-1 v1.0)
      * or GPIO 48 (DevKitC-1 v1.1 / N16R8 — see #962). On S3 we drive 48 (the
      * common module). On C6, GPIO 38/48 don't exist (only 0-30) — gate by target.
-     * Behaviour is set by CONFIG_LED_GAMMA_VIZ (ADR-183): on = 40 Hz gamma flicker
-     * coloured by CSI motion; off = clear the LED at boot. */
+     * The LED is a stable identity indicator. Position remains server-owned. */
 #if defined(CONFIG_IDF_TARGET_ESP32C6)
     const int led_gpio = 8;
 #else
@@ -243,26 +201,27 @@ void app_main(void)
         .resolution_hz = 10 * 1000 * 1000, // 10MHz
         .flags.with_dma = false,
     };
-#if CONFIG_LED_GAMMA_VIZ
-    if (led_strip_new_rmt_device(&strip_config, &rmt_config, &s_viz_led) == ESP_OK) {
-        const esp_timer_create_args_t viz_args = {
-            .callback = &led_gamma_40hz_cb,
-            .name = "led_gamma_40hz",
-        };
-        esp_timer_handle_t viz_timer;
-        if (esp_timer_create(&viz_args, &viz_timer) == ESP_OK) {
-            esp_timer_start_periodic(viz_timer, 12500); // 12.5 ms toggle → 40 Hz square wave
-            ESP_LOGI(TAG, "Onboard WS2812: 40 Hz gamma flicker (GENUS), colour=CSI motion via ruv-neural-viz, GPIO %d", led_gpio);
-        }
+    node_identity_t identity;
+    esp_err_t led_ret = led_strip_new_rmt_device(&strip_config, &rmt_config, &s_identity_led);
+    if (led_ret != ESP_OK) {
+        ESP_LOGW(TAG, "Cannot initialize onboard identity LED on GPIO %d: %s",
+                 led_gpio, esp_err_to_name(led_ret));
+    } else if (!node_identity_resolve(g_nvs_config.node_id, &identity)) {
+        led_strip_clear(s_identity_led);
+        ESP_LOGW(TAG, "Node ID %u has no RX identity colour; onboard LED stays off",
+                 (unsigned)g_nvs_config.node_id);
+    } else {
+        ESP_ERROR_CHECK(led_strip_set_pixel(
+            s_identity_led,
+            0,
+            scale_identity_led_channel(identity.red),
+            scale_identity_led_channel(identity.green),
+            scale_identity_led_channel(identity.blue)));
+        ESP_ERROR_CHECK(led_strip_refresh(s_identity_led));
+        ESP_LOGI(TAG, "Identity %s: onboard LED #%02x%02x%02x at %u/255 brightness, GPIO %d",
+                 identity.label, identity.red, identity.green, identity.blue,
+                 (unsigned)CONFIG_LED_IDENTITY_BRIGHTNESS, led_gpio);
     }
-#else
-    /* Viz disabled — clear the onboard LED at boot and release the RMT channel. */
-    led_strip_handle_t led_strip;
-    if (led_strip_new_rmt_device(&strip_config, &rmt_config, &led_strip) == ESP_OK) {
-        led_strip_clear(led_strip);
-        led_strip_del(led_strip);
-    }
-#endif /* CONFIG_LED_GAMMA_VIZ */
 
     /* ADR-110 P4: 802.15.4 mesh time-sync (C6 only).
      * Initialized BEFORE WiFi so it's available even when WiFi STA can't

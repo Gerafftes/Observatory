@@ -3,7 +3,7 @@ set -eu
 
 repo_dir=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 source_dir="$repo_dir/software/ruview"
-expected_source_entries=15872
+expected_source_entries=15888
 
 required_paths='README.md
 LICENSE

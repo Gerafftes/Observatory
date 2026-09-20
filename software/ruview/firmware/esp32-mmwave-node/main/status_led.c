@@ -7,12 +7,11 @@
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include "identity_indicator.h"
 
-#define STATUS_LED_GPIO GPIO_NUM_8
-#define STATUS_LED_ON_LEVEL 0
-#define STATUS_LED_OFF_LEVEL 1
-#define STATUS_LED_PULSE_MS 150
-#define STATUS_LED_PULSE_GAP_MS 150
+#define STATUS_LED_PULSE_MS 120
+#define STATUS_LED_PULSE_GAP_MS 180
+#define STATUS_LED_WARNING_MS 150
 #define STATUS_LED_CYCLE_MS 3000
 
 static const char *TAG = "status_led";
@@ -20,8 +19,11 @@ static uint8_t s_identity_pulse_count;
 
 static void status_led_set(bool enabled)
 {
-    gpio_set_level(STATUS_LED_GPIO,
-                   enabled ? STATUS_LED_ON_LEVEL : STATUS_LED_OFF_LEVEL);
+#ifdef CONFIG_MMWAVE_STATUS_LED_ACTIVE_LOW
+    gpio_set_level(CONFIG_MMWAVE_STATUS_LED_GPIO, enabled ? 0 : 1);
+#else
+    gpio_set_level(CONFIG_MMWAVE_STATUS_LED_GPIO, enabled ? 1 : 0);
+#endif
 }
 
 static void status_led_task(void *argument)
@@ -30,9 +32,9 @@ static void status_led_task(void *argument)
     while (true) {
         if (s_identity_pulse_count == 0) {
             status_led_set(true);
-            vTaskDelay(pdMS_TO_TICKS(STATUS_LED_PULSE_MS));
+            vTaskDelay(pdMS_TO_TICKS(STATUS_LED_WARNING_MS));
             status_led_set(false);
-            vTaskDelay(pdMS_TO_TICKS(STATUS_LED_PULSE_GAP_MS));
+            vTaskDelay(pdMS_TO_TICKS(STATUS_LED_WARNING_MS));
             continue;
         }
 
@@ -54,9 +56,9 @@ static void status_led_task(void *argument)
 
 void status_led_start(const char *node_id)
 {
-    s_identity_pulse_count = status_led_identity_pulse_count(node_id);
+    s_identity_pulse_count = (uint8_t)identity_indicator_pulse_count(node_id);
     const gpio_config_t output = {
-        .pin_bit_mask = 1ULL << STATUS_LED_GPIO,
+        .pin_bit_mask = 1ULL << CONFIG_MMWAVE_STATUS_LED_GPIO,
         .mode = GPIO_MODE_OUTPUT,
         .pull_up_en = GPIO_PULLUP_DISABLE,
         .pull_down_en = GPIO_PULLDOWN_DISABLE,
@@ -64,8 +66,8 @@ void status_led_start(const char *node_id)
     };
     esp_err_t error = gpio_config(&output);
     if (error != ESP_OK) {
-        ESP_LOGE(TAG, "Cannot configure GPIO 8 identity LED: %s",
-                 esp_err_to_name(error));
+        ESP_LOGE(TAG, "Cannot configure GPIO %d identity LED: %s",
+                 CONFIG_MMWAVE_STATUS_LED_GPIO, esp_err_to_name(error));
         return;
     }
     status_led_set(false);

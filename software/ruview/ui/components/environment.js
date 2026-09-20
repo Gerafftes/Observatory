@@ -1,6 +1,8 @@
 // Room Environment - WiFi DensePose 3D Visualization
 // Grid floor, AP/receiver markers, detection zones, confidence heatmap
 
+import { deviceThreeColor } from '../device-identity.js';
+
 export class Environment {
   constructor(scene) {
     this.scene = scene;
@@ -185,18 +187,18 @@ export class Environment {
     this._apMeshes = [];
     this._rxMeshes = [];
 
-    // Transmitter markers: small pyramid/cone shape, blue
+    // Transmitter markers: identity-colored pyramid/cone shapes.
     const txGeom = new THREE.ConeGeometry(0.12, 0.25, 4);
-    const txMat = new THREE.MeshPhongMaterial({
-      color: 0x0088ff,
-      emissive: 0x003366,
-      emissiveIntensity: 0.5,
-      transparent: true,
-      opacity: 0.9
-    });
 
     for (const ap of this.accessPoints) {
-      const mesh = new THREE.Mesh(txGeom, txMat.clone());
+      const color = deviceThreeColor(ap.id);
+      const mesh = new THREE.Mesh(txGeom, new THREE.MeshPhongMaterial({
+        color,
+        emissive: color,
+        emissiveIntensity: 0.18,
+        transparent: true,
+        opacity: 0.9
+      }));
       mesh.position.set(...ap.pos);
       mesh.rotation.z = Math.PI; // Point downward
       mesh.castShadow = true;
@@ -205,28 +207,28 @@ export class Environment {
       this._apMeshes.push(mesh);
 
       // Small point light at each AP
-      const light = new THREE.PointLight(0x0066ff, 0.3, 4);
+      const light = new THREE.PointLight(color, 0.3, 4);
       light.position.set(...ap.pos);
       this.group.add(light);
 
       // Label
-      const label = this._createLabel(ap.id, 0x0088ff);
+      const label = this._createLabel(ap.id, color);
       label.position.set(ap.pos[0], ap.pos[1] + 0.3, ap.pos[2]);
       this.group.add(label);
     }
 
-    // Receiver markers: inverted cone, green
+    // Receiver markers: one canonical color per stable RX identity.
     const rxGeom = new THREE.ConeGeometry(0.12, 0.25, 4);
-    const rxMat = new THREE.MeshPhongMaterial({
-      color: 0x00cc44,
-      emissive: 0x004422,
-      emissiveIntensity: 0.5,
-      transparent: true,
-      opacity: 0.9
-    });
 
     for (const rx of this.receivers) {
-      const mesh = new THREE.Mesh(rxGeom, rxMat.clone());
+      const color = deviceThreeColor(rx.id);
+      const mesh = new THREE.Mesh(rxGeom, new THREE.MeshPhongMaterial({
+        color,
+        emissive: color,
+        emissiveIntensity: 0.18,
+        transparent: true,
+        opacity: 0.9
+      }));
       mesh.position.set(...rx.pos);
       mesh.castShadow = true;
       mesh.name = `rx-${rx.id}`;
@@ -234,12 +236,12 @@ export class Environment {
       this._rxMeshes.push(mesh);
 
       // Small point light
-      const light = new THREE.PointLight(0x00cc44, 0.2, 3);
+      const light = new THREE.PointLight(color, 0.2, 3);
       light.position.set(...rx.pos);
       this.group.add(light);
 
       // Label
-      const label = this._createLabel(rx.id, 0x00cc44);
+      const label = this._createLabel(rx.id, color);
       label.position.set(rx.pos[0], rx.pos[1] + 0.3, rx.pos[2]);
       this.group.add(label);
     }

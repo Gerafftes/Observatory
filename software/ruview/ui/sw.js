@@ -1,13 +1,14 @@
 // RuView Service Worker - Offline caching for the dashboard shell
 // Strategy: Network-first with cache fallback so local UI updates are visible.
 
-const CACHE_NAME = 'ruview-v10-browser-shell';
+const CACHE_NAME = 'ruview-v11-device-identities';
 const scopeUrl = self.registration.scope;
 const SHELL_ASSETS = [
   '',
   'index.html',
   'style.css',
   'app.js',
+  'device-identity.js',
   'config/api.config.js',
   'components/TabManager.js',
   'components/DashboardTab.js',

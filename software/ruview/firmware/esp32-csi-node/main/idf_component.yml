@@ -9,7 +9,7 @@ dependencies:
   ## LCD touch abstraction
   espressif/esp_lcd_touch: "^1.0"
 
-  ## Onboard WS2812 LED Disabling
+  ## Onboard WS2812 identity LED
   espressif/led_strip: "^3.0.0"
 
   ## Real Ed25519 verification for signed RVF WASM containers
