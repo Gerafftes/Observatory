@@ -30,16 +30,6 @@ server applies the sealed Setup-v2 transform matching the `node_id` to the raw
 coordinates. Already transformed packet fields remain only for older
 collectors and standalone diagnostics.
 
-The following Bklit-style diagrams document those implemented contracts. They
-deliberately contain no new measurements and prove neither loss-free transport
-nor positioning accuracy.
-
-![ACK connection flow from the LD2450 to the sensing server](project-media/diagrams/mmwave-connection/01-ack-verbindungsfluss.png)
-
-![Adaptive timeout and retry model](project-media/diagrams/mmwave-connection/02-timeout-und-retry.png)
-
-![Server ownership of the room-coordinate transform](project-media/diagrams/mmwave-connection/03-transform-verantwortung.png)
-
 ```text
 physical setup
 → setup seal
