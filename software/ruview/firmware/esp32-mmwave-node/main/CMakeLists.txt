@@ -7,6 +7,7 @@ idf_component_register(
         "measurement_stream.c"
         "mmwave_discovery.c"
         "node_diagnostics.c"
+        "status_led.c"
         "web_server.c"
     INCLUDE_DIRS "."
     REQUIRES
@@ -14,6 +15,7 @@ idf_component_register(
         json
         driver
         esp_app_format
+        esp_driver_gpio
         esp_driver_uart
         esp_event
         esp_http_server

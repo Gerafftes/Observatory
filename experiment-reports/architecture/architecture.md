@@ -35,11 +35,11 @@ Die folgenden Bklit-artigen Schaubilder dokumentieren diese implementierten
 Verträge. Sie enthalten bewusst keine neuen Messwerte und belegen weder
 Paketverlustfreiheit noch Positionsgenauigkeit.
 
-![ACK-Verbindungsfluss vom LD2450 bis zum Sensing Server](project-media/diagrams/mmwave-connection/01-ack-verbindungsfluss.png)
+![ACK-Verbindungsfluss vom LD2450 bis zum Sensing Server](figures/mmwave-connection/01-ack-verbindungsfluss.png)
 
-![Adaptives Timeout- und Retry-Modell](project-media/diagrams/mmwave-connection/02-timeout-und-retry.png)
+![Adaptives Timeout- und Retry-Modell](figures/mmwave-connection/02-timeout-und-retry.png)
 
-![Serverseitige Verantwortung für die Raumtransformation](project-media/diagrams/mmwave-connection/03-transform-verantwortung.png)
+![Serverseitige Verantwortung für die Raumtransformation](figures/mmwave-connection/03-transform-verantwortung.png)
 
 ```text
 physischer Aufbau
@@ -53,6 +53,6 @@ physischer Aufbau
 → Live-Anzeige
 ```
 
-Die Implementierungsdetails stehen im [Software-Überblick](software/README.md);
+Die Implementierungsdetails stehen im [Software-Überblick](../../software/README.md);
 die reproduzierbaren UI-Schritte sind im
-[Experiment-Cockpit-Guide](software/experiment-cockpit.md) beschrieben.
+[Experiment-Cockpit-Guide](../../software/experiment-cockpit.md) beschrieben.

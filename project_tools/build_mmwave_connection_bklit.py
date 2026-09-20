@@ -30,7 +30,13 @@ from build_mmwave_transport_bklit import (
 
 
 PROJECT_DIR = Path(__file__).resolve().parent.parent
-OUTPUT_DIR = PROJECT_DIR / "project-media" / "diagrams" / "mmwave-connection"
+OUTPUT_DIR = (
+    PROJECT_DIR
+    / "experiment-reports"
+    / "architecture"
+    / "figures"
+    / "mmwave-connection"
+)
 
 
 def canvas(kicker: str, title: str, subtitle: str) -> tuple[Image.Image, ImageDraw.ImageDraw]:

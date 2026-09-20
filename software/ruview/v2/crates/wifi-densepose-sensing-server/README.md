@@ -410,8 +410,12 @@ IPv4 configuration set to DHCP once, the node can learn a changed Mac address
 automatically and persist it without a manual `/transport` update.
 
 The setup must use schema version 2 and seal the node ID, firmware artifact,
-mounting revision, and room-coordinate transform. Transform changes are
-rejected after sealing or while a session is active. The generated position
+mounting revision, and room-coordinate transform. The server applies that
+transform to raw radar coordinates by `node_id`; it does not require writing
+the transform back to the ESP. Legacy `coordinate_frame`, `room_x_mm`, and
+`room_z_mm` fields remain accepted for wire compatibility but are optional;
+the required placement inputs are the node ID and local radar coordinates.
+Transform changes are rejected after sealing or while a session is active. The generated position
 index stores the setup hash, full radar-recording hash, CSI-grid identities,
 54 training-block hashes, empty reference, and the WiFi-only fingerprint
 model. Artifacts are created without overwriting existing files.

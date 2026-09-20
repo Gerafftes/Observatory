@@ -699,6 +699,8 @@
 .occ-cad-input { display: grid; gap: 4px; min-width: 0; color: var(--occ-muted); font: 650 9px/1 var(--font-family-mono); }
 .occ-cad-input input { min-width: 0; width: 100%; min-height: 29px; padding: 6px 5px; border: 1px solid var(--occ-ink); border-radius: 0; background: var(--occ-paper); color: var(--occ-ink); font: 10px/1 var(--font-family-mono); }
 .occ-cad-input input:focus { outline: 2px solid var(--occ-signal); outline-offset: 1px; }
+.occ-checkbox { display: flex; align-items: flex-start; gap: 7px; margin: 8px 0 10px; color: var(--occ-ink); font: 650 9px/1.35 var(--font-family-mono); cursor: pointer; }
+.occ-checkbox input { flex: 0 0 auto; width: 13px; height: 13px; margin: .05em 0 0; accent-color: var(--occ-signal); }
 .occ-cad-checkbox { display: flex; align-items: flex-start; gap: 7px; color: var(--occ-ink); font: 650 9px/1.35 var(--font-family-mono); cursor: pointer; }
 .occ-cad-checkbox input { flex: 0 0 auto; margin: 0; accent-color: var(--occ-signal); }
 .occ-cad-helper { margin: 0; color: var(--occ-muted); font: 9px/1.4 var(--font-family-mono); }
@@ -754,7 +756,7 @@
 .occ-node-editor,
 .occ-point-editor { display: grid; gap: 5px; margin-top: 7px; }
 .occ-node-row { gap: 8px; }
-.occ-node-row strong { width: 34px; flex: 0 0 34px; font: 650 10px/1 var(--font-family-mono); }
+.occ-node-row strong { width: 48px; flex: 0 0 48px; white-space: nowrap; font: 650 10px/1 var(--font-family-mono); }
 .occ-node-row .occ-triple,
 .occ-point-row .occ-triple { flex: 1; margin-top: 0; }
 .occ-point-row { display: grid; grid-template-columns: 34px minmax(0, 1fr); gap: 8px; align-items: center; }

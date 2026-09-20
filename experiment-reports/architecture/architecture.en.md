@@ -34,11 +34,11 @@ The following Bklit-style diagrams document those implemented contracts. They
 deliberately contain no new measurements and prove neither loss-free transport
 nor positioning accuracy.
 
-![ACK connection flow from the LD2450 to the sensing server](project-media/diagrams/mmwave-connection/01-ack-verbindungsfluss.png)
+![ACK connection flow from the LD2450 to the sensing server](figures/mmwave-connection/01-ack-verbindungsfluss.png)
 
-![Adaptive timeout and retry model](project-media/diagrams/mmwave-connection/02-timeout-und-retry.png)
+![Adaptive timeout and retry model](figures/mmwave-connection/02-timeout-und-retry.png)
 
-![Server ownership of the room-coordinate transform](project-media/diagrams/mmwave-connection/03-transform-verantwortung.png)
+![Server ownership of the room-coordinate transform](figures/mmwave-connection/03-transform-verantwortung.png)
 
 ```text
 physical setup
@@ -52,6 +52,6 @@ physical setup
 → live display
 ```
 
-Implementation details are in the [software overview](software/README.md); the
+Implementation details are in the [software overview](../../software/README.md); the
 reproducible UI steps are documented in the
-[experiment cockpit guide](software/experiment-cockpit.en.md).
+[experiment cockpit guide](../../software/experiment-cockpit.en.md).

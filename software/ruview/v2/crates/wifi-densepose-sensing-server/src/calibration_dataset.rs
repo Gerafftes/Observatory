@@ -30,11 +30,15 @@ pub(crate) fn deterministic_sample_id(
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct RadarObservation {
+    #[serde(default)]
+    pub(crate) node_id: String,
     pub(crate) host_unix_ns: u64,
     pub(crate) host_monotonic_ns: u64,
     pub(crate) clock_epoch_id: String,
     pub(crate) boot_id: u32,
     pub(crate) sequence: u32,
+    #[serde(default)]
+    pub(crate) target_slot: u8,
     pub(crate) transform_sha256: String,
     pub(crate) position_mm: [i32; 2],
 }
@@ -50,6 +54,26 @@ pub(crate) struct ReceiverSample {
     pub(crate) features: Vec<f64>,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct RadarSampleKey {
+    pub(crate) node_id: String,
+    pub(crate) boot_id: u32,
+    pub(crate) sequence: u32,
+    pub(crate) target_slot: u8,
+}
+
+impl From<&RadarObservation> for RadarSampleKey {
+    fn from(observation: &RadarObservation) -> Self {
+        Self {
+            node_id: observation.node_id.clone(),
+            boot_id: observation.boot_id,
+            sequence: observation.sequence,
+            target_slot: observation.target_slot,
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "status", rename_all = "snake_case")]
 pub(crate) enum CalibrationDatasetRecord {
@@ -60,6 +84,8 @@ pub(crate) enum CalibrationDatasetRecord {
         window_end_unix_ns: u64,
         window_midpoint_monotonic_ns: u64,
         radar_position_m: [f64; 3],
+        radar_before_key: RadarSampleKey,
+        radar_after_key: RadarSampleKey,
         radar_before_delta_ms: u64,
         radar_after_delta_ms: u64,
         max_abs_delta_ms: u64,
@@ -188,7 +214,9 @@ pub(crate) fn align_record(
     else {
         return reject("missing_radar_after_midpoint".to_string());
     };
-    if before.clock_epoch_id != after.clock_epoch_id
+    if before.node_id != after.node_id
+        || before.target_slot != after.target_slot
+        || before.clock_epoch_id != after.clock_epoch_id
         || before.boot_id != after.boot_id
         || before.transform_sha256 != after.transform_sha256
     {
@@ -199,9 +227,15 @@ pub(crate) fn align_record(
     if before_delta > ALIGNMENT_LIMIT_NS || after_delta > ALIGNMENT_LIMIT_NS {
         return reject("radar_alignment_limit_exceeded".to_string());
     }
-    let span = after.host_monotonic_ns.saturating_sub(before.host_monotonic_ns);
+    let span = after
+        .host_monotonic_ns
+        .saturating_sub(before.host_monotonic_ns);
     let numerator = midpoint_monotonic_ns.saturating_sub(before.host_monotonic_ns) as f64;
-    let ratio = if span == 0 { 0.0 } else { numerator / span as f64 };
+    let ratio = if span == 0 {
+        0.0
+    } else {
+        numerator / span as f64
+    };
     let interpolate = |axis: usize| {
         f64::from(before.position_mm[axis])
             + ratio * f64::from(after.position_mm[axis] - before.position_mm[axis])
@@ -236,6 +270,8 @@ pub(crate) fn align_record(
         window_end_unix_ns: block.window_end_unix_ns,
         window_midpoint_monotonic_ns: midpoint_monotonic_ns,
         radar_position_m: [interpolate(0) / 1000.0, 0.0, interpolate(1) / 1000.0],
+        radar_before_key: before.into(),
+        radar_after_key: after.into(),
         radar_before_delta_ms: before_delta / 1_000_000,
         radar_after_delta_ms: after_delta / 1_000_000,
         max_abs_delta_ms: max_delta / 1_000_000,
@@ -247,7 +283,9 @@ pub(crate) fn align_record(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::position_capture::{PositionGridIdentity, RxPositionFeatures, POSITION_FEATURE_COUNT};
+    use crate::position_capture::{
+        PositionGridIdentity, RxPositionFeatures, POSITION_FEATURE_COUNT,
+    };
 
     fn block() -> PositionFeatureBlock {
         PositionFeatureBlock {
@@ -276,11 +314,13 @@ mod tests {
 
     fn radar(at: u64, x: i32) -> RadarObservation {
         RadarObservation {
+            node_id: "MMWAVE1".to_string(),
             host_unix_ns: at,
             host_monotonic_ns: at,
             clock_epoch_id: "epoch".to_string(),
             boot_id: 1,
             sequence: at as u32,
+            target_slot: 1,
             transform_sha256: "a".repeat(64),
             position_mm: [x, 500],
         }
@@ -293,7 +333,12 @@ mod tests {
             "Z001".into(),
             &block(),
             1_000_000_000,
-            &[(1, 1_000_000_000), (2, 1_000_000_000), (3, 1_000_000_000), (4, 1_000_000_000)],
+            &[
+                (1, 1_000_000_000),
+                (2, 1_000_000_000),
+                (3, 1_000_000_000),
+                (4, 1_000_000_000),
+            ],
             &[radar(850_000_000, 1000), radar(1_150_000_000, 2000)],
         );
         match record {
@@ -318,7 +363,12 @@ mod tests {
             "Z001".into(),
             &block(),
             1_000_000_000,
-            &[(1, 1_000_000_000), (2, 1_000_000_000), (3, 1_000_000_000), (4, 1_000_000_000)],
+            &[
+                (1, 1_000_000_000),
+                (2, 1_000_000_000),
+                (3, 1_000_000_000),
+                (4, 1_000_000_000),
+            ],
             &[radar(849_999_999, 1000), radar(1_150_000_000, 2000)],
         );
         assert!(matches!(record, CalibrationDatasetRecord::Rejected { .. }));
@@ -335,7 +385,12 @@ mod tests {
             "Z001".into(),
             &block(),
             1_000_000_000,
-            &[(1, 1_000_000_000), (2, 1_000_000_000), (3, 1_000_000_000), (4, 1_000_000_000)],
+            &[
+                (1, 1_000_000_000),
+                (2, 1_000_000_000),
+                (3, 1_000_000_000),
+                (4, 1_000_000_000),
+            ],
             &[before, after],
         );
         assert!(matches!(record, CalibrationDatasetRecord::Accepted { .. }));
@@ -350,10 +405,17 @@ mod tests {
             "Z001".into(),
             &block(),
             1_000_000_000,
-            &[(1, 1_000_000_000), (2, 1_000_000_000), (3, 1_000_000_000), (4, 1_000_000_000)],
+            &[
+                (1, 1_000_000_000),
+                (2, 1_000_000_000),
+                (3, 1_000_000_000),
+                (4, 1_000_000_000),
+            ],
             &[radar(850_000_000, 1000), rebooted],
         );
-        assert!(matches!(reboot_record, CalibrationDatasetRecord::Rejected { reasons, .. } if reasons == vec!["radar_epoch_boot_or_transform_changed"]));
+        assert!(
+            matches!(reboot_record, CalibrationDatasetRecord::Rejected { reasons, .. } if reasons == vec!["radar_epoch_boot_or_transform_changed"])
+        );
 
         let mut transformed = radar(1_150_000_000, 2000);
         transformed.transform_sha256 = "b".repeat(64);
@@ -362,10 +424,59 @@ mod tests {
             "Z001".into(),
             &block(),
             1_000_000_000,
-            &[(1, 1_000_000_000), (2, 1_000_000_000), (3, 1_000_000_000), (4, 1_000_000_000)],
+            &[
+                (1, 1_000_000_000),
+                (2, 1_000_000_000),
+                (3, 1_000_000_000),
+                (4, 1_000_000_000),
+            ],
             &[radar(850_000_000, 1000), transformed],
         );
-        assert!(matches!(transform_record, CalibrationDatasetRecord::Rejected { reasons, .. } if reasons == vec!["radar_epoch_boot_or_transform_changed"]));
+        assert!(
+            matches!(transform_record, CalibrationDatasetRecord::Rejected { reasons, .. } if reasons == vec!["radar_epoch_boot_or_transform_changed"])
+        );
+    }
+
+    #[test]
+    fn rejects_interpolation_across_sensor_or_target_slot_identity() {
+        let before = radar(850_000_000, 1000);
+        let mut other_sensor = radar(1_150_000_000, 2000);
+        other_sensor.node_id = "MMWAVE2".to_string();
+        let sensor_record = align_record(
+            "sample".into(),
+            "Z001".into(),
+            &block(),
+            1_000_000_000,
+            &[
+                (1, 1_000_000_000),
+                (2, 1_000_000_000),
+                (3, 1_000_000_000),
+                (4, 1_000_000_000),
+            ],
+            &[before.clone(), other_sensor],
+        );
+        assert!(
+            matches!(sensor_record, CalibrationDatasetRecord::Rejected { reasons, .. } if reasons == vec!["radar_epoch_boot_or_transform_changed"])
+        );
+
+        let mut other_slot = radar(1_150_000_000, 2000);
+        other_slot.target_slot = 2;
+        let slot_record = align_record(
+            "sample".into(),
+            "Z001".into(),
+            &block(),
+            1_000_000_000,
+            &[
+                (1, 1_000_000_000),
+                (2, 1_000_000_000),
+                (3, 1_000_000_000),
+                (4, 1_000_000_000),
+            ],
+            &[before, other_slot],
+        );
+        assert!(
+            matches!(slot_record, CalibrationDatasetRecord::Rejected { reasons, .. } if reasons == vec!["radar_epoch_boot_or_transform_changed"])
+        );
     }
 
     #[test]
@@ -378,17 +489,26 @@ mod tests {
             &[(1, 1_000_000_000), (2, 1_000_000_000), (3, 1_000_000_000)],
             &[radar(850_000_000, 1000), radar(1_150_000_000, 2000)],
         );
-        assert!(matches!(missing, CalibrationDatasetRecord::Rejected { reasons, .. } if reasons == vec!["missing_rx4_midpoint"]));
+        assert!(
+            matches!(missing, CalibrationDatasetRecord::Rejected { reasons, .. } if reasons == vec!["missing_rx4_midpoint"])
+        );
 
         let late = align_record(
             "sample".into(),
             "Z001".into(),
             &block(),
             1_000_000_000,
-            &[(1, 1_000_000_000), (2, 1_150_000_001), (3, 1_000_000_000), (4, 1_000_000_000)],
+            &[
+                (1, 1_000_000_000),
+                (2, 1_150_000_001),
+                (3, 1_000_000_000),
+                (4, 1_000_000_000),
+            ],
             &[radar(850_000_000, 1000), radar(1_150_000_000, 2000)],
         );
-        assert!(matches!(late, CalibrationDatasetRecord::Rejected { reasons, .. } if reasons == vec!["rx2_alignment_limit_exceeded"]));
+        assert!(
+            matches!(late, CalibrationDatasetRecord::Rejected { reasons, .. } if reasons == vec!["rx2_alignment_limit_exceeded"])
+        );
     }
 
     #[test]
@@ -404,7 +524,12 @@ mod tests {
             "Z001".into(),
             &block(),
             1_000_000_000,
-            &[(1, 1_000_000_000), (2, 1_000_000_000), (3, 1_000_000_000), (4, 1_000_000_000)],
+            &[
+                (1, 1_000_000_000),
+                (2, 1_000_000_000),
+                (3, 1_000_000_000),
+                (4, 1_000_000_000),
+            ],
             &[radar(850_000_000, 1000), radar(1_150_000_000, 2000)],
         );
         let first_dir = tempfile::tempdir().expect("first dataset directory");
@@ -441,11 +566,15 @@ mod tests {
         );
         assert_eq!(
             std::fs::read(
-                first_dir.path().join("session-01.calibration-samples.v1.jsonl")
+                first_dir
+                    .path()
+                    .join("session-01.calibration-samples.v1.jsonl")
             )
             .expect("first samples"),
             std::fs::read(
-                second_dir.path().join("session-01.calibration-samples.v1.jsonl")
+                second_dir
+                    .path()
+                    .join("session-01.calibration-samples.v1.jsonl")
             )
             .expect("second samples")
         );

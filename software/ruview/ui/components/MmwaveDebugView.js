@@ -116,8 +116,22 @@ function rejectionRawPosition(status) {
 }
 
 /** Normalize the server response without making a missing target look valid. */
-export function normalizeMmwaveDebugStatus(status, nowMs = Date.now()) {
-  const raw = status && typeof status === 'object' ? status : {};
+export function normalizeMmwaveDebugStatus(status, nowMs = Date.now(), nodeId = 'MMWAVE1') {
+  const envelope = status && typeof status === 'object' ? status : {};
+  const raw = Array.isArray(envelope.sensors)
+    ? envelope.sensors.find((sensor) => (sensor.configured_node_id || sensor.node_id) === nodeId)
+      || {
+        node_id: nodeId,
+        state: 'disconnected',
+        reason: `${nodeId} ist im aktiven Setup nicht konfiguriert.`,
+      }
+    : ((nodeId === 'MMWAVE1' || (envelope.configured_node_id || envelope.node_id) === nodeId)
+      ? envelope
+      : {
+        node_id: nodeId,
+        state: 'disconnected',
+        reason: `${nodeId} ist im aktiven Setup nicht konfiguriert.`,
+      });
   const state = typeof raw.state === 'string' ? raw.state.toLowerCase() : 'disconnected';
   const roomDimensions = isValidRoomDimensions(raw.room_dimensions_m)
     ? raw.room_dimensions_m.slice(0, 3)
@@ -146,7 +160,9 @@ export function normalizeMmwaveDebugStatus(status, nowMs = Date.now()) {
     ? raw.targets
       .filter((target) => target?.inside_room === false && finitePair(target.position_mm))
       .map((target) => ({
-        slot: Number.isFinite(Number(target.slot)) ? Number(target.slot) : null,
+        slot: Number.isFinite(Number(target.target_slot ?? target.slot))
+          ? Number(target.target_slot ?? target.slot)
+          : null,
         positionMm: target.position_mm.slice(0, 2),
         rawPositionMm: finitePair(target.raw_position_mm)
           ? target.raw_position_mm.slice(0, 2)
@@ -404,7 +420,10 @@ export class MmwaveDebugView {
       ? options.getSetupGeometry
       : null;
     this._configuredGeometry = null;
-    this.status = normalizeMmwaveDebugStatus(null);
+    this.nodeId = options.nodeId || 'MMWAVE1';
+    this._statusEnvelope = null;
+    this.availableNodeIds = [this.nodeId];
+    this.status = normalizeMmwaveDebugStatus(null, Date.now(), this.nodeId);
     this.rx = normalizeRxDebugState(null, 0, 1);
     this.connectionState = 'connecting';
     this.roomDimensions = DEFAULT_ROOM_DIMENSIONS.slice();
@@ -452,6 +471,10 @@ export class MmwaveDebugView {
             <div class="mmwave-eyebrow sensing-mmwave-debug-kicker">SOURCE COMPARISON</div>
             <h3 id="sensingMmwaveDebugTitle">Radar / RX-Debug</h3>
             <p>Getrennte Messspuren: mmWave liefert die Referenz, RX/CSI die spätere WiFi-only-Schätzung.</p>
+            <div role="group" aria-label="mmWave-Sensor auswählen">
+              <button type="button" class="mmwave-secondary-button" data-mmwave-debug-node="MMWAVE1">MMWAVE1</button>
+              <button type="button" class="mmwave-secondary-button" data-mmwave-debug-node="MMWAVE2">MMWAVE2</button>
+            </div>
           </div>
           <div class="mmwave-state sensing-mmwave-debug-state" data-mmwave-debug="state" role="status" aria-live="polite">VERBINDE …</div>
         </div>
@@ -496,6 +519,7 @@ export class MmwaveDebugView {
     this._canvas = this.container.querySelector('[data-mmwave-debug="canvas"]');
     this._refreshConfiguredGeometry();
     this._bindControls();
+    this._syncNodeSelector();
     this._initScene();
     this._syncHardwareVisibility();
     this.setView('reset');
@@ -521,6 +545,18 @@ export class MmwaveDebugView {
       hardwareButton.addEventListener('click', listener);
       this._listeners.push(() => hardwareButton.removeEventListener('click', listener));
     }
+    this.container.querySelectorAll('[data-mmwave-debug-node]').forEach((button) => {
+      const listener = () => {
+        if (button.dataset.mmwaveDebugNode === this.nodeId) return;
+        this.nodeId = button.dataset.mmwaveDebugNode;
+        this.updateStatus(this._statusEnvelope);
+        // Rebuild even when both sensors share the same mounting point so the
+        // hardware marker label follows the selected node identity.
+        if (this._scene) this._buildMarkers();
+      };
+      button.addEventListener('click', listener);
+      this._listeners.push(() => button.removeEventListener('click', listener));
+    });
     const pointerDown = (event) => {
       if (event.button !== undefined && event.button !== 0) return;
       this._drag = { x: event.clientX, y: event.clientY, yaw: this._yaw, pitch: this._pitch };
@@ -552,6 +588,26 @@ export class MmwaveDebugView {
     this._listeners.push(() => this._viewport.removeEventListener('pointerup', pointerUp));
     this._listeners.push(() => this._viewport.removeEventListener('pointercancel', pointerUp));
     this._listeners.push(() => this._viewport.removeEventListener('wheel', wheel));
+  }
+
+  _syncNodeSelector() {
+    const envelope = this._statusEnvelope;
+    const available = Array.isArray(envelope?.sensors)
+      ? envelope.sensors
+        .map((sensor) => sensor?.configured_node_id || sensor?.node_id)
+        .filter((nodeId) => typeof nodeId === 'string' && nodeId.length > 0)
+      : [envelope?.configured_node_id || envelope?.node_id || 'MMWAVE1'];
+    this.availableNodeIds = available;
+    this.container?.querySelectorAll?.('[data-mmwave-debug-node]').forEach((button) => {
+      const nodeId = button.dataset.mmwaveDebugNode;
+      const isAvailable = available.includes(nodeId);
+      button.disabled = !isAvailable;
+      button.setAttribute('aria-pressed', String(this.nodeId === nodeId));
+      button.classList.toggle('is-active', this.nodeId === nodeId);
+      button.title = isAvailable
+        ? `Sensor ${nodeId} auswählen`
+        : `${nodeId} ist im aktiven Setup nicht konfiguriert`;
+    });
   }
 
   _initScene() {
@@ -651,7 +707,7 @@ export class MmwaveDebugView {
       new THREE.MeshBasicMaterial({ color: HARDWARE_GREY, transparent: true, opacity: 0.9 }),
     );
     this._sensorMarker.position.set(...sensorPosition);
-    const sensorLabel = createMarkerLabel('MMWAVE1', HARDWARE_GREY, THREE);
+    const sensorLabel = createMarkerLabel(this.nodeId, HARDWARE_GREY, THREE);
     if (sensorLabel) this._sensorMarker.add(sensorLabel);
     this._hardwareGroup.add(this._sensorMarker);
 
@@ -767,6 +823,9 @@ export class MmwaveDebugView {
       const mountingPositionM = finiteTriplet(geometry.mountingPositionM)
         ? geometry.mountingPositionM.slice(0, 3)
         : null;
+      const selectedSensor = Array.isArray(geometry.mmwaveSensors)
+        ? geometry.mmwaveSensors.find((sensor) => sensor?.nodeId === this.nodeId)
+        : null;
       const txPosition = finiteTriplet(geometry.txPosition)
         ? geometry.txPosition.slice(0, 3)
         : null;
@@ -781,7 +840,14 @@ export class MmwaveDebugView {
       if (!roomDimensions && !mountingPositionM && !txPosition && receiverPositionsM.length === 0) {
         return null;
       }
-      return { roomDimensions, mountingPositionM, txPosition, receiverPositionsM };
+      return {
+        roomDimensions,
+        mountingPositionM: finiteTriplet(selectedSensor?.mountingPositionM)
+          ? selectedSensor.mountingPositionM.slice(0, 3)
+          : mountingPositionM,
+        txPosition,
+        receiverPositionsM,
+      };
     } catch {
       return null;
     }
@@ -893,10 +959,12 @@ export class MmwaveDebugView {
   }
 
   updateStatus(status, nowMs = Date.now()) {
+    this._statusEnvelope = status;
+    this._syncNodeSelector();
     this._refreshConfiguredGeometry();
     const previousMount = this.status.mountingPositionM;
     this._statusError = null;
-    this.status = normalizeMmwaveDebugStatus(status, nowMs);
+    this.status = normalizeMmwaveDebugStatus(status, nowMs, this.nodeId);
     const dimensions = this._configuredGeometry?.roomDimensions || this.status.roomDimensions;
     const mountChanged = !sameTuple(previousMount, this.status.mountingPositionM);
     if (dimensions && !sameTuple(dimensions, this.roomDimensions)) {

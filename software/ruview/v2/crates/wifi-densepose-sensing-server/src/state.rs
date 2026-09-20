@@ -1016,11 +1016,11 @@ pub(super) struct AppStateInner {
     pub(super) csi_grid_pin: Option<CsiGridPin>,
     /// Independent mmWave teacher/reference state. It is never read by the
     /// WiFi position predictor.
-    pub(super) mmwave: mmwave_calibration::MmwaveManager,
+    pub(super) mmwave: mmwave_calibration::MmwaveFleet,
     /// Cached read-only ESP counters. Polling the ESP independently avoids
     /// coupling the one-second UI refresh cadence to the shared experiment WLAN.
-    pub(super) mmwave_node_diagnostics: MmwaveNodeDiagnosticsCache,
-    pub(super) mmwave_connection: mmwave_connection::ConnectionStatus,
+    pub(super) mmwave_node_diagnostics: BTreeMap<String, MmwaveNodeDiagnosticsCache>,
+    pub(super) mmwave_connections: BTreeMap<String, mmwave_connection::ConnectionStatus>,
     /// Fail-closed discrete live-position inference and temporal consensus.
     pub(super) live_position_tracker: position_live::LivePositionTracker,
     /// Instant of the last ESP32 UDP frame received (for offline detection).

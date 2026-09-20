@@ -110,7 +110,11 @@ fn transport_hint(target: Option<&str>, receiver: Option<&str>, token: bool) -> 
     let mut hints = Vec::new();
     if let (Some(target), Some(receiver)) = (target, receiver) {
         if target != receiver {
-            hints.push(format!("Radar sendet an {target}; dieser Server empfängt unter {receiver}. Der Server versucht, das Ziel über den authentifizierten Transport-Fix automatisch anzugleichen."));
+            if token {
+                hints.push(format!("Radar sendet an {target}; dieser Server empfängt unter {receiver}. Der Server versucht, das Ziel über den authentifizierten Transport-Fix automatisch anzugleichen."));
+            } else {
+                hints.push(format!("Radar sendet an {target}; dieser Server empfängt unter {receiver}. Ohne MMWAVE_NODE_TOKEN kann der Server das Ziel nur erkennen, nicht ändern; das Radar-Ziel bleibt unverändert."));
+            }
         }
     }
     if !token {
@@ -267,6 +271,7 @@ mod tests {
         assert!(hint.contains("192.168.4.50:5010"));
         assert!(hint.contains("192.168.4.3:5010"));
         assert!(hint.contains("MMWAVE_NODE_TOKEN"));
+        assert!(hint.contains("nur erkennen, nicht ändern"));
         assert!(
             !transport_hint(Some("192.168.4.3:5011"), Some("192.168.4.3:5010"), true).is_empty()
         );

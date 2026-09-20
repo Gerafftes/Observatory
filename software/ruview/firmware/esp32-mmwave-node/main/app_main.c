@@ -17,6 +17,7 @@
 #include "ld2450_parser.h"
 #include "measurement_stream.h"
 #include "node_diagnostics.h"
+#include "status_led.h"
 #include "web_server.h"
 
 #define RADAR_UART UART_NUM_1
@@ -149,8 +150,11 @@ void app_main(void)
         error = nvs_flash_init();
     }
     ESP_ERROR_CHECK(error);
-    if (!app_config_load(&s_config)) {
-        ESP_LOGE(TAG, "WiFi SSID and collector host must be configured");
+    bool config_valid = app_config_load(&s_config);
+    status_led_start(s_config.node_id);
+    if (!config_valid) {
+        ESP_LOGE(TAG,
+                 "WiFi SSID, collector host, and node ID must be configured");
         return;
     }
     ESP_LOGI(TAG, "Starting %s in %s mode", s_config.node_id,

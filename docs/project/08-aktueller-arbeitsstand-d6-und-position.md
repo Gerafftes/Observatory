@@ -1021,7 +1021,7 @@ kaschiert. Dann werden die Fehler nach Punkt, RX und Merkmal ausgewertet.
   binding-aware 25-Sekunden-Preflight ausführen
 
 Detailnachweis:
-[experiment-reports/2026-08-09_D6_setupaufnahme-und-tx-firmwareidentitaet/README.md](experiment-reports/2026-08-09_D6_setupaufnahme-und-tx-firmwareidentitaet/README.md)
+[experiment-reports/2026-08-09_D6_setupaufnahme-und-tx-firmwareidentitaet/README.md](../../experiment-reports/2026-08-09_D6_setupaufnahme-und-tx-firmwareidentitaet/README.md)
 
 ### 2026-08-09 — Setup-Siegel und versiegelter Preflight bestanden
 
@@ -1058,7 +1058,7 @@ Detailnachweis:
   Bestätigung `Raum leer`
 
 Detailnachweis:
-[experiment-reports/2026-08-09_D6_setup-siegel-und-preflight/README.md](experiment-reports/2026-08-09_D6_setup-siegel-und-preflight/README.md)
+[experiment-reports/2026-08-09_D6_setup-siegel-und-preflight/README.md](../../experiment-reports/2026-08-09_D6_setup-siegel-und-preflight/README.md)
 
 ### 2026-08-09 — Sidecar-Fix, Neusiegelung und neuer Preflight
 
@@ -1082,7 +1082,7 @@ Detailnachweis:
   Bestätigung, dass der Raum vollständig ohne Person bleibt
 
 Detailnachweis:
-[experiment-reports/2026-08-09_D6_sidecar-fix-neusiegelung-und-preflight/README.md](experiment-reports/2026-08-09_D6_sidecar-fix-neusiegelung-und-preflight/README.md)
+[experiment-reports/2026-08-09_D6_sidecar-fix-neusiegelung-und-preflight/README.md](../../experiment-reports/2026-08-09_D6_sidecar-fix-neusiegelung-und-preflight/README.md)
 
 ### 2026-08-09 — Neue 65-Sekunden-Leerraumkalibrierung bestanden
 

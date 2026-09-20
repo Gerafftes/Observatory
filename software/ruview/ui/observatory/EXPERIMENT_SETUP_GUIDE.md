@@ -67,14 +67,16 @@ Das darf erst nach dem Hardware- und Transportcheck geschehen.
 Gespeicherte Profile werden direkt in die unversiegelte Radar-Vorschau übernommen:
 Raummaße und mmWave-Montagepunkt gelten sofort; nach einem Server-Neustart wird
 das zuletzt gespeicherte Profil wiederhergestellt. Der Server berechnet die
-Vorschauposition aus Radar-Rohkoordinaten, gespeicherter Montageposition und der
-vom Sensor gemeldeten Ausrichtung. Das ist noch keine geprüfte Kalibrierung.
+Vorschauposition aus Radar-Rohkoordinaten, der Sensor-ID und der gespeicherten
+Montageposition beziehungsweise Ausrichtung. Die Position ist damit nicht von
+einem im ESP gespeicherten Transform abhängig. Das ist noch keine geprüfte
+Kalibrierung.
 Ein versiegelter oder laufender Versuch behält seine gebundene Geometrie und
 meldet Profiländerungen ausdrücklich, statt sie während der Messung zu übernehmen.
 
 Die Verbindungssuche prüft bekannte private LAN-Nachbarn auf Port 8032 und
 wiederholt sich nach Verbindungsabbrüchen. Bei mehreren Knoten muss
-`MMWAVE_NODE_URL` gesetzt werden. Der Zugriffstoken kommt aus `MMWAVE_NODE_TOKEN`
+`MMWAVE_NODE_URL` kann für Diagnose und Steuerbefehle gesetzt werden. Der Zugriffstoken kommt aus `MMWAVE_NODE_TOKEN`
 oder lokal aus `data/mmwave-node-token.txt`; bestehende BLL-Installationen können
 weiter die Datei `private/mmwave-ota-token.txt` ein oder zwei Verzeichnisse oberhalb
 des Arbeitsverzeichnisses verwenden. Token werden nicht in der API ausgegeben.
@@ -335,7 +337,7 @@ WiFi-Transport noch Radar-Streaming oder Positionsgenauigkeit.
 | uart_idle | Keine UART-Bytes vom LD2450 | Versorgung, TX/RX-Leitung, GPIO und Baudrate prüfen |
 | invalid_frames | UART-Bytes vorhanden, aber Frames ungültig | Baudrate und Leitung prüfen |
 | udp_blocked | Radarframes gültig, aber kein UDP vom ESP | Zielserver, WLAN und UDP-Konfiguration prüfen |
-| streaming | UART, Parser und UDP liefern Daten | Transform- und Sync-Prüfung beginnen |
+| streaming | UART, Parser und UDP liefern Daten | serverseitige Transform- und Node-ID-Prüfung beginnen |
 | SOFTWARE-ONLY / UNVALIDATED | Demo-/Simulationslauf | Keine Hardwarequalität daraus ableiten |
 
 ## 8. Abnahmekriterien für einen echten Lauf

@@ -429,98 +429,78 @@ pub(crate) fn spawn_mmwave_node_diagnostics_poller(
         interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
         loop {
             interval.tick().await;
-            let (preferred, expected, port) = {
+            let (node_ids, port) = {
                 let state = state.read().await;
-                let expected = state
-                    .position_setup
-                    .as_deref()
-                    .and_then(|setup| setup.mmwave())
-                    .map(|node| node.node_id().to_string())
-                    .or_else(|| state.mmwave_connection.node_id.clone());
                 (
-                    configured_url
-                        .clone()
-                        .or_else(|| state.mmwave_connection.node_url.clone()),
-                    expected,
+                    state.mmwave.node_ids(),
                     state
                         .mmwave
                         .status(server_clock::now().host_monotonic_ns)
                         .udp_port,
                 )
             };
-            let token_for_probe = token.clone();
-            let probe = tokio::task::spawn_blocking(move || {
-                mmwave_connection::probe(
-                    preferred.as_deref(),
-                    expected.as_deref(),
-                    port,
-                    token_for_probe.as_deref(),
-                    true,
-                )
-            })
-            .await;
-            if let Ok(mut probe) = probe {
-                let (pending_transform, control, sync_required) = {
+            for node_id in node_ids {
+                let preferred = {
+                    let state = state.read().await;
+                    configured_url.clone().or_else(|| {
+                        state
+                            .mmwave_connections
+                            .get(&node_id)
+                            .and_then(|connection| connection.node_url.clone())
+                    })
+                };
+                let expected = node_id.clone();
+                let token_for_probe = token.clone();
+                let probe = tokio::task::spawn_blocking(move || {
+                    mmwave_connection::probe(
+                        preferred.as_deref(),
+                        Some(&expected),
+                        port,
+                        token_for_probe.as_deref(),
+                        true,
+                    )
+                })
+                .await;
+                let Ok(mut probe) = probe else { continue };
+                {
                     let mut state = state.write().await;
+                    let previous = state
+                        .mmwave_connections
+                        .get(&node_id)
+                        .cloned()
+                        .unwrap_or_default();
                     if !probe.status.reachable {
                         // Keep the established identity across outages so discovery
                         // cannot silently substitute a different physical radar.
-                        probe.status.node_id = state.mmwave_connection.node_id.clone();
-                        probe.status.node_url = configured_url
-                            .clone()
-                            .or_else(|| state.mmwave_connection.node_url.clone());
+                        probe.status.node_id = Some(node_id.clone());
+                        probe.status.node_url =
+                            configured_url.clone().or_else(|| previous.node_url.clone());
 
                         let diagnostics_still_fresh = state
                             .mmwave_node_diagnostics
+                            .get(&node_id)
+                            .expect("configured node diagnostics")
                             .status(probe.status.node_url.is_some(), token.is_some())
                             .reachable
                             == Some(true);
-                        if diagnostics_still_fresh && state.mmwave_connection.reachable {
-                            probe.status = state.mmwave_connection.clone();
+                        if diagnostics_still_fresh && previous.reachable {
+                            probe.status = previous;
                         }
                     }
+                    let discovered_url = probe.status.node_url.clone();
                     state
+                        .mmwave_node_diagnostics
+                        .get_mut(&node_id)
+                        .expect("configured node diagnostics")
+                        .record(probe.diagnostics);
+                    state
+                        .mmwave_connections
+                        .insert(node_id.clone(), probe.status);
+                    let manager = state
                         .mmwave
-                        .discovered_control(probe.status.node_url.clone(), token.clone());
-                    state.mmwave_node_diagnostics.record(probe.diagnostics);
-                    state.mmwave_connection = probe.status;
-                    (
-                        state.mmwave.pending_cad_transform_sync(),
-                        state.mmwave.control(),
-                        state.mmwave.transform_sync_required(),
-                    )
-                };
-                let Some(transform) = pending_transform else {
-                    continue;
-                };
-                let Some(control) = control else {
-                    if sync_required {
-                        state.write().await.mmwave.mark_cad_profile_sync_failed(
-                            "mmWave node control is not available; check MMWAVE_NODE_URL and its bearer token"
-                                .to_string(),
-                        );
-                    }
-                    continue;
-                };
-                let transform_for_sync = transform.clone();
-                let result = tokio::task::spawn_blocking(move || {
-                    mmwave_calibration::set_node_transform(&control, &transform_for_sync)
-                })
-                .await;
-                match result {
-                    Ok(Ok(())) => state
-                        .write()
-                        .await
-                        .mmwave
-                        .mark_cad_profile_sync_succeeded(transform),
-                    Ok(Err(error)) => state
-                        .write()
-                        .await
-                        .mmwave
-                        .mark_cad_profile_sync_failed(error),
-                    Err(error) => state.write().await.mmwave.mark_cad_profile_sync_failed(
-                        format!("mmWave transform sync task failed: {error}"),
-                    ),
+                        .manager_for_mut(&node_id)
+                        .expect("configured node");
+                    manager.discovered_control(discovered_url, token.clone());
                 }
             }
         }
@@ -547,13 +527,14 @@ pub(crate) const DEFAULT_MMWAVE_REORDER_HOLD_MS: u64 = 20;
 pub(crate) const DEFAULT_MMWAVE_RECEIVE_BUFFER_BYTES: usize = 256 * 1024;
 const MMWAVE_ACK_MAGIC: u32 = 0x5256_414b;
 
-#[derive(Debug, Clone, Copy, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 struct MmwavePacketOrder {
+    node_id: String,
     boot_id: u32,
     sequence: u32,
 }
 
-fn mmwave_ack(order: MmwavePacketOrder) -> [u8; 12] {
+fn mmwave_ack(order: &MmwavePacketOrder) -> [u8; 12] {
     let mut ack = [0_u8; 12];
     ack[..4].copy_from_slice(&MMWAVE_ACK_MAGIC.to_be_bytes());
     ack[4..8].copy_from_slice(&order.boot_id.to_be_bytes());
@@ -566,16 +547,23 @@ struct QueuedMmwaveDatagram {
     source: SocketAddr,
     host_time: server_clock::HostTimestamp,
     order: Option<MmwavePacketOrder>,
+    transport_metrics: Arc<mmwave_calibration::MmwaveTransportMetrics>,
 }
 
 impl QueuedMmwaveDatagram {
-    fn new(bytes: Vec<u8>, source: SocketAddr, host_time: server_clock::HostTimestamp) -> Self {
+    fn new(
+        bytes: Vec<u8>,
+        source: SocketAddr,
+        host_time: server_clock::HostTimestamp,
+        transport_metrics: Arc<mmwave_calibration::MmwaveTransportMetrics>,
+    ) -> Self {
         let order = serde_json::from_slice(&bytes).ok();
         Self {
             bytes,
             source,
             host_time,
             order,
+            transport_metrics,
         }
     }
 }
@@ -594,59 +582,86 @@ fn mmwave_sequence_is_newer(candidate: u32, previous: u32) -> bool {
     candidate != previous && candidate.wrapping_sub(previous) < u32::MAX / 2
 }
 
-fn sort_mmwave_datagram_batch(batch: &mut [QueuedMmwaveDatagram]) {
-    let Some(boot_id) = batch
-        .first()
-        .and_then(|packet| packet.order)
-        .map(|order| order.boot_id)
-    else {
-        return;
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum MmwaveOrderDisposition {
+    Forward,
+    Duplicate,
+    Late,
+}
+
+fn mmwave_order_disposition(
+    last_forwarded: &std::collections::HashMap<String, MmwavePacketOrder>,
+    order: &MmwavePacketOrder,
+) -> MmwaveOrderDisposition {
+    let Some(previous) = last_forwarded.get(&order.node_id) else {
+        return MmwaveOrderDisposition::Forward;
     };
-    if !batch
-        .iter()
-        .all(|packet| packet.order.is_some_and(|order| order.boot_id == boot_id))
+    if previous.boot_id != order.boot_id
+        || mmwave_sequence_is_newer(order.sequence, previous.sequence)
     {
-        // Preserve arrival order across malformed packets or a real node reboot
-        // so the fail-closed validation path can report them accurately.
-        return;
+        return MmwaveOrderDisposition::Forward;
     }
-    batch.sort_by(|left, right| {
-        compare_mmwave_sequence(
-            left.order.expect("single valid boot was checked").sequence,
-            right.order.expect("single valid boot was checked").sequence,
-        )
+    if previous.sequence == order.sequence {
+        MmwaveOrderDisposition::Duplicate
+    } else {
+        MmwaveOrderDisposition::Late
+    }
+}
+
+fn sort_mmwave_datagram_batch(batch: &mut [QueuedMmwaveDatagram]) {
+    let mut group_order = std::collections::HashMap::new();
+    let mut next_group = 0_usize;
+    for packet in batch.iter() {
+        if let Some(order) = &packet.order {
+            group_order
+                .entry((order.node_id.clone(), order.boot_id))
+                .or_insert_with(|| {
+                    let group = next_group;
+                    next_group += 1;
+                    group
+                });
+        }
+    }
+    batch.sort_by(|left, right| match (&left.order, &right.order) {
+        (Some(left), Some(right)) => {
+            let left_group = group_order[&(left.node_id.clone(), left.boot_id)];
+            let right_group = group_order[&(right.node_id.clone(), right.boot_id)];
+            left_group
+                .cmp(&right_group)
+                .then_with(|| compare_mmwave_sequence(left.sequence, right.sequence))
+        }
+        _ => std::cmp::Ordering::Equal,
     });
 }
 
 async fn process_mmwave_batch(
     state: &SharedState,
-    transport_metrics: &mmwave_calibration::MmwaveTransportMetrics,
     batch: &mut Vec<QueuedMmwaveDatagram>,
-    last_forwarded: &mut Option<MmwavePacketOrder>,
+    last_forwarded: &mut std::collections::HashMap<String, MmwavePacketOrder>,
 ) {
     sort_mmwave_datagram_batch(batch);
     for packet in batch.drain(..) {
-        transport_metrics.note_dequeued();
-        if let Some(order) = packet.order {
-            if last_forwarded.is_some_and(|previous| {
-                previous.boot_id == order.boot_id
-                    && !mmwave_sequence_is_newer(order.sequence, previous.sequence)
-            }) {
-                if last_forwarded.is_some_and(|previous| previous.sequence == order.sequence) {
-                    transport_metrics.note_duplicate();
-                } else {
-                    transport_metrics.note_sequence_discard();
+        packet.transport_metrics.note_dequeued();
+        if let Some(order) = packet.order.as_ref() {
+            match mmwave_order_disposition(last_forwarded, order) {
+                MmwaveOrderDisposition::Duplicate => {
+                    packet.transport_metrics.note_duplicate();
+                    continue;
                 }
-                continue;
+                MmwaveOrderDisposition::Late => {
+                    packet.transport_metrics.note_sequence_discard();
+                    continue;
+                }
+                MmwaveOrderDisposition::Forward => {}
             }
-            *last_forwarded = Some(order);
+            last_forwarded.insert(order.node_id.clone(), order.clone());
         }
         process_mmwave_datagram(
             state,
             packet.bytes,
             packet.source,
             packet.host_time,
-            transport_metrics,
+            &packet.transport_metrics,
         )
         .await;
     }
@@ -696,10 +711,9 @@ pub(crate) async fn mmwave_receiver_task(
     let (packet_tx, mut packet_rx) = mpsc::unbounded_channel::<QueuedMmwaveDatagram>();
     let transport_metrics = state.read().await.mmwave.transport_metrics();
     let processor_state = state.clone();
-    let processor_metrics = transport_metrics.clone();
     tokio::spawn(async move {
         let mut batch = Vec::new();
-        let mut last_forwarded = None;
+        let mut last_forwarded = std::collections::HashMap::new();
         let mut flush_interval =
             tokio::time::interval(Duration::from_millis(reorder_hold_ms.max(1)));
         flush_interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
@@ -713,7 +727,6 @@ pub(crate) async fn mmwave_receiver_task(
                     None => {
                         process_mmwave_batch(
                             &processor_state,
-                            &processor_metrics,
                             &mut batch,
                             &mut last_forwarded,
                         ).await;
@@ -723,7 +736,6 @@ pub(crate) async fn mmwave_receiver_task(
                 _ = flush_interval.tick() => {
                     process_mmwave_batch(
                         &processor_state,
-                        &processor_metrics,
                         &mut batch,
                         &mut last_forwarded,
                     ).await;
@@ -736,20 +748,35 @@ pub(crate) async fn mmwave_receiver_task(
     loop {
         match socket.recv_from(&mut buffer).await {
             Ok((length, source)) => {
+                let order: Option<MmwavePacketOrder> =
+                    serde_json::from_slice(&buffer[..length]).ok();
+                let (packet_metrics, known_node) = if let Some(order) = order.as_ref() {
+                    let state = state.read().await;
+                    (
+                        state
+                            .mmwave
+                            .transport_metrics_for(&order.node_id)
+                            .unwrap_or_else(|| transport_metrics.clone()),
+                        state.mmwave.manager_for(&order.node_id).is_some(),
+                    )
+                } else {
+                    (transport_metrics.clone(), false)
+                };
                 let packet = QueuedMmwaveDatagram::new(
                     buffer[..length].to_vec(),
                     source,
                     server_clock::now(),
+                    packet_metrics.clone(),
                 );
-                let order = packet.order;
-                transport_metrics.note_received();
+                let order = packet.order.clone();
+                packet_metrics.note_received();
                 if packet_tx.send(packet).is_err() {
-                    transport_metrics.note_dequeued();
+                    packet_metrics.note_dequeued();
                     error!("mmWave processor stopped; UDP receiver is shutting down");
                     return;
                 }
-                if let Some(order) = order {
-                    if let Err(error) = socket.send_to(&mmwave_ack(order), source).await {
+                if let Some(order) = order.filter(|_| known_node) {
+                    if let Err(error) = socket.send_to(&mmwave_ack(&order), source).await {
                         warn!("Could not acknowledge mmWave packet from {source}: {error}");
                     }
                 }
@@ -761,18 +788,21 @@ pub(crate) async fn mmwave_receiver_task(
 
 #[cfg(test)]
 mod mmwave_udp_order_tests {
-    use super::{compare_mmwave_sequence, mmwave_ack, mmwave_sequence_is_newer, MmwavePacketOrder};
+    use super::{
+        compare_mmwave_sequence, mmwave_ack, mmwave_order_disposition, mmwave_sequence_is_newer,
+        MmwaveOrderDisposition, MmwavePacketOrder,
+    };
+    use std::collections::HashMap;
 
     #[test]
     fn acknowledgement_matches_firmware_wire_contract() {
         assert_eq!(
-            mmwave_ack(MmwavePacketOrder {
+            mmwave_ack(&MmwavePacketOrder {
+                node_id: "MMWAVE1".to_string(),
                 boot_id: 0x1234_5678,
                 sequence: 0x9abc_def0,
             }),
-            [
-                0x52, 0x56, 0x41, 0x4b, 0x12, 0x34, 0x56, 0x78, 0x9a, 0xbc, 0xde, 0xf0,
-            ]
+            [0x52, 0x56, 0x41, 0x4b, 0x12, 0x34, 0x56, 0x78, 0x9a, 0xbc, 0xde, 0xf0,]
         );
     }
 
@@ -796,6 +826,70 @@ mod mmwave_udp_order_tests {
         assert!(!mmwave_sequence_is_newer(41, 42));
         assert!(mmwave_sequence_is_newer(43, 42));
         assert!(mmwave_sequence_is_newer(0, u32::MAX));
+    }
+
+    #[test]
+    fn equal_sequences_are_filtered_per_node_and_reboots_reset_only_that_node() {
+        let mut last = HashMap::from([
+            (
+                "MMWAVE1".to_string(),
+                MmwavePacketOrder {
+                    node_id: "MMWAVE1".to_string(),
+                    boot_id: 7,
+                    sequence: 42,
+                },
+            ),
+            (
+                "MMWAVE2".to_string(),
+                MmwavePacketOrder {
+                    node_id: "MMWAVE2".to_string(),
+                    boot_id: 7,
+                    sequence: 41,
+                },
+            ),
+        ]);
+        assert_eq!(
+            mmwave_order_disposition(
+                &last,
+                &MmwavePacketOrder {
+                    node_id: "MMWAVE2".to_string(),
+                    boot_id: 7,
+                    sequence: 42,
+                }
+            ),
+            MmwaveOrderDisposition::Forward
+        );
+        assert_eq!(
+            mmwave_order_disposition(
+                &last,
+                &MmwavePacketOrder {
+                    node_id: "MMWAVE1".to_string(),
+                    boot_id: 7,
+                    sequence: 42,
+                }
+            ),
+            MmwaveOrderDisposition::Duplicate
+        );
+        last.insert(
+            "MMWAVE1".to_string(),
+            MmwavePacketOrder {
+                node_id: "MMWAVE1".to_string(),
+                boot_id: 7,
+                sequence: 42,
+            },
+        );
+        assert_eq!(
+            mmwave_order_disposition(
+                &last,
+                &MmwavePacketOrder {
+                    node_id: "MMWAVE1".to_string(),
+                    boot_id: 8,
+                    sequence: 0,
+                }
+            ),
+            MmwaveOrderDisposition::Forward
+        );
+        assert_eq!(last["MMWAVE2"].sequence, 41);
     }
 }
 

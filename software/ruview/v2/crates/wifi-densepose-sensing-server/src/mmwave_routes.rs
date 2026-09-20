@@ -41,6 +41,30 @@ struct MmwaveModeRequest {
     mode: mmwave_calibration::MeasurementMode,
 }
 
+#[derive(Debug, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct MmwaveNodeQuery {
+    node_id: Option<String>,
+}
+
+async fn resolve_mmwave_node(
+    state: &SharedState,
+    query: &MmwaveNodeQuery,
+) -> Result<String, (StatusCode, Json<serde_json::Value>)> {
+    let state = state.read().await;
+    let node_id = query
+        .node_id
+        .as_deref()
+        .unwrap_or_else(|| state.mmwave.primary_node_id());
+    if state.mmwave.manager_for(node_id).is_none() {
+        return Err(mmwave_api_error(
+            StatusCode::BAD_REQUEST,
+            format!("unknown mmWave node_id {node_id:?}"),
+        ));
+    }
+    Ok(node_id.to_string())
+}
+
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct MmwaveSessionStartRequest {
@@ -305,6 +329,7 @@ mod mmwave_node_stream_advance_tests {
 
 async fn wait_for_mmwave_mode_and_preflight(
     state: &SharedState,
+    node_id: &str,
     kind: mmwave_calibration::SessionKind,
     expected_mode: mmwave_calibration::MeasurementMode,
 ) -> Result<(), String> {
@@ -312,7 +337,10 @@ async fn wait_for_mmwave_mode_and_preflight(
     loop {
         let status = {
             let state = state.read().await;
-            state.mmwave.status(server_clock::now().host_monotonic_ns)
+            state
+                .mmwave
+                .status_for(node_id, server_clock::now().host_monotonic_ns)
+                .ok_or_else(|| format!("unknown mmWave node_id {node_id:?}"))?
         };
         let preflight_ready = match kind {
             mmwave_calibration::SessionKind::MmwaveOnly => status.radar_preflight_ready(),
@@ -337,13 +365,17 @@ async fn wait_for_mmwave_mode_and_preflight(
 
 async fn wait_for_mmwave_mode_and_radar_preflight(
     state: &SharedState,
+    node_id: &str,
     expected_mode: mmwave_calibration::MeasurementMode,
 ) -> Result<(), String> {
     let deadline = std::time::Instant::now() + MMWAVE_SESSION_START_SETTLE_TIMEOUT;
     loop {
         let status = {
             let state = state.read().await;
-            state.mmwave.status(server_clock::now().host_monotonic_ns)
+            state
+                .mmwave
+                .status_for(node_id, server_clock::now().host_monotonic_ns)
+                .ok_or_else(|| format!("unknown mmWave node_id {node_id:?}"))?
         };
         if status.mode == Some(expected_mode) && status.radar_preflight_ready() {
             return Ok(());
@@ -369,21 +401,32 @@ fn mmwave_api_error(
 }
 
 async fn mmwave_status_endpoint(State(state): State<SharedState>) -> Json<serde_json::Value> {
+    let now_ns = server_clock::now().host_monotonic_ns;
     let (mut status, diagnostics, node_control, connection) = {
         let state = state.read().await;
-        let status = state.mmwave.status(server_clock::now().host_monotonic_ns);
-        let node_control = state.mmwave_node_diagnostics.status(
+        let node_id = state.mmwave.primary_node_id();
+        let status = state
+            .mmwave
+            .status_for(node_id, now_ns)
+            .expect("primary mmWave node must exist");
+        let diagnostics_cache = state
+            .mmwave_node_diagnostics
+            .get(node_id)
+            .expect("selected node diagnostics must exist");
+        let connection = state
+            .mmwave_connections
+            .get(node_id)
+            .cloned()
+            .unwrap_or_default();
+        let node_control = diagnostics_cache.status(
             status.node_control.url_configured,
             status.node_control.token_configured,
         );
         (
             status,
-            state
-                .mmwave_connection
-                .reachable
-                .then(|| state.mmwave_node_diagnostics.snapshot()),
+            connection.reachable.then(|| diagnostics_cache.snapshot()),
             node_control,
-            state.mmwave_connection.clone(),
+            connection,
         )
     };
     if let Some(diagnostics) = diagnostics {
@@ -400,19 +443,60 @@ async fn mmwave_status_endpoint(State(state): State<SharedState>) -> Json<serde_
     let mut response = serde_json::to_value(status).expect("mmWave status is serializable");
     response["connection"] =
         serde_json::to_value(connection).expect("connection status is serializable");
+    let state = state.read().await;
+    response["selected_node_id"] =
+        serde_json::Value::String(state.mmwave.primary_node_id().to_string());
+    response["sensors"] = serde_json::Value::Array(
+        state
+            .mmwave
+            .node_ids()
+            .into_iter()
+            .filter_map(|node_id| {
+                let mut sensor = state.mmwave.status_for(&node_id, now_ns)?;
+                let connection = state
+                    .mmwave_connections
+                    .get(&node_id)
+                    .cloned()
+                    .unwrap_or_default();
+                if let Some(cache) = state.mmwave_node_diagnostics.get(&node_id) {
+                    if connection.reachable {
+                        sensor.attach_node_diagnostics_window(cache.snapshot());
+                    }
+                    sensor.node_control = cache.status(
+                        sensor.node_control.url_configured,
+                        sensor.node_control.token_configured,
+                    );
+                }
+                sensor.node_control.reachable = Some(connection.reachable);
+                let mut value = serde_json::to_value(sensor).ok()?;
+                value["configured_node_id"] = serde_json::Value::String(node_id);
+                value["connection"] = serde_json::to_value(connection).ok()?;
+                Some(value)
+            })
+            .collect(),
+    );
     Json(response)
 }
 
 async fn mmwave_mode_endpoint(
     State(state): State<SharedState>,
+    Query(query): Query<MmwaveNodeQuery>,
     Json(request): Json<MmwaveModeRequest>,
 ) -> MmwaveApiResult {
-    let control = state.read().await.mmwave.control().ok_or_else(|| {
-        mmwave_api_error(
-            StatusCode::SERVICE_UNAVAILABLE,
-            "mmWave node control is not configured",
-        )
-    })?;
+    let node_id = resolve_mmwave_node(&state, &query).await?;
+    let control = state
+        .read()
+        .await
+        .mmwave
+        .manager_for(&node_id)
+        .expect("resolved node")
+        .control()
+        .ok_or_else(|| {
+            mmwave_api_error(
+                StatusCode::SERVICE_UNAVAILABLE,
+                "mmWave node control is not configured",
+            )
+        })?;
     tokio::task::spawn_blocking(move || mmwave_calibration::set_node_mode(&control, request.mode))
         .await
         .map_err(|error| mmwave_api_error(StatusCode::INTERNAL_SERVER_ERROR, error.to_string()))?
@@ -422,17 +506,20 @@ async fn mmwave_mode_endpoint(
 
 async fn mmwave_transform_endpoint(
     State(state): State<SharedState>,
+    Query(query): Query<MmwaveNodeQuery>,
     Json(request): Json<mmwave_calibration::TransformRequest>,
 ) -> MmwaveApiResult {
+    let node_id = resolve_mmwave_node(&state, &query).await?;
     let control = {
         let state = state.read().await;
-        if !state.mmwave.transform_reconfiguration_allowed() {
+        let manager = state.mmwave.manager_for(&node_id).expect("resolved node");
+        if !manager.transform_reconfiguration_allowed() {
             return Err(mmwave_api_error(
                 StatusCode::CONFLICT,
                 "the transform cannot change during a session or after setup sealing",
             ));
         }
-        state.mmwave.control().ok_or_else(|| {
+        manager.control().ok_or_else(|| {
             mmwave_api_error(
                 StatusCode::SERVICE_UNAVAILABLE,
                 "mmWave node control is not configured",
@@ -444,14 +531,22 @@ async fn mmwave_transform_endpoint(
         .await
         .map_err(|error| mmwave_api_error(StatusCode::INTERNAL_SERVER_ERROR, error.to_string()))?
         .map_err(|error| mmwave_api_error(StatusCode::BAD_GATEWAY, error))?;
-    state.write().await.mmwave.clear_observed_transform();
+    state
+        .write()
+        .await
+        .mmwave
+        .manager_for_mut(&node_id)
+        .expect("resolved node")
+        .clear_observed_transform();
     Ok(Json(serde_json::json!({ "transform": response })))
 }
 
 async fn mmwave_session_start_endpoint(
     State(state): State<SharedState>,
+    Query(query): Query<MmwaveNodeQuery>,
     Json(request): Json<MmwaveSessionStartRequest>,
 ) -> MmwaveApiResult {
+    let node_id = resolve_mmwave_node(&state, &query).await?;
     let MmwaveSessionStartRequest {
         kind,
         policy,
@@ -497,15 +592,15 @@ async fn mmwave_session_start_endpoint(
     } else {
         None
     };
+    let expected_mode = expected_mmwave_mode(kind);
     let (control, data_dir) = {
         let state = state.read().await;
-        state
-            .mmwave
+        let manager = state.mmwave.manager_for(&node_id).expect("resolved node");
+        manager
             .validate_session_start(kind)
             .map_err(|error| mmwave_api_error(StatusCode::CONFLICT, error))?;
         if kind == mmwave_calibration::SessionKind::Calibration {
-            state
-                .mmwave
+            manager
                 .validate_calibration_phase_two_start()
                 .map_err(|error| mmwave_api_error(StatusCode::CONFLICT, error))?;
         }
@@ -517,67 +612,124 @@ async fn mmwave_session_start_endpoint(
                 "classification calibration is already collecting",
             ));
         }
-        let control = state.mmwave.control().ok_or_else(|| {
-            mmwave_api_error(
+        let current_mode = manager.status(server_clock::now().host_monotonic_ns).mode;
+        let control = manager.control();
+        if control.is_none()
+            && (kind != mmwave_calibration::SessionKind::MmwaveOnly
+                || mode_change_required(current_mode, expected_mode))
+        {
+            return Err(mmwave_api_error(
                 StatusCode::SERVICE_UNAVAILABLE,
-                "automatic sessions require configured mmWave node control",
-            )
-        })?;
+                "automatic sessions require configured mmWave node control; mmWave-only UDP mode can continue without it only when the sensor is already in calibration mode",
+            ));
+        }
         (control, state.data_dir.clone())
     };
-    let expected_mode = expected_mmwave_mode(kind);
-    let diagnostics_control = control.clone();
-    let diagnostics_before = tokio::task::spawn_blocking(move || {
-        mmwave_calibration::get_node_diagnostics(&diagnostics_control)
-    })
-    .await
-    .map_err(|error| mmwave_api_error(StatusCode::INTERNAL_SERVER_ERROR, error.to_string()))?
-    .map_err(|error| mmwave_api_error(StatusCode::BAD_GATEWAY, error))?;
-    if diagnostics_before.uart_bytes_received == 0
-        || diagnostics_before.radar_frames_valid == 0
-        || diagnostics_before.udp_packets_sent == 0
-    {
-        return Err(mmwave_api_error(
-            StatusCode::CONFLICT,
-            "mmWave node diagnostics show no radar streaming yet",
-        ));
-    }
+    let diagnostics_before = if let Some(control) = control.clone() {
+        let diagnostics_control = control;
+        let diagnostics = tokio::task::spawn_blocking(move || {
+            mmwave_calibration::get_node_diagnostics(&diagnostics_control)
+        })
+        .await
+        .map_err(|error| mmwave_api_error(StatusCode::INTERNAL_SERVER_ERROR, error.to_string()))?
+        .map_err(|error| mmwave_api_error(StatusCode::BAD_GATEWAY, error))?;
+        if diagnostics.uart_bytes_received == 0
+            || diagnostics.radar_frames_valid == 0
+            || diagnostics.udp_packets_sent == 0
+        {
+            return Err(mmwave_api_error(
+                StatusCode::CONFLICT,
+                "mmWave node diagnostics show no radar streaming yet",
+            ));
+        }
+        Some(diagnostics)
+    } else {
+        None
+    };
 
     {
         let mut state = state.write().await;
         state
             .mmwave
+            .manager_for_mut(&node_id)
+            .expect("resolved node")
             .prepare_session_start(kind)
             .map_err(|error| mmwave_api_error(StatusCode::CONFLICT, error))?;
     }
 
-    let mode_control = control.clone();
-    let mode_join = tokio::task::spawn_blocking(move || {
-        mmwave_calibration::set_node_mode(&mode_control, expected_mode)
-    })
-    .await;
-    let mode_result = match mode_join {
-        Ok(result) => result.map_err(|error| mmwave_api_error(StatusCode::BAD_GATEWAY, error)),
-        Err(error) => {
-            state.write().await.mmwave.cancel_prepared_session_start();
-            return Err(mmwave_api_error(
-                StatusCode::INTERNAL_SERVER_ERROR,
-                error.to_string(),
-            ));
+    if let Some(control) = control {
+        let mode_control = control.clone();
+        let mode_join = tokio::task::spawn_blocking(move || {
+            mmwave_calibration::set_node_mode(&mode_control, expected_mode)
+        })
+        .await;
+        let mode_result = match mode_join {
+            Ok(result) => result.map_err(|error| mmwave_api_error(StatusCode::BAD_GATEWAY, error)),
+            Err(error) => {
+                state
+                    .write()
+                    .await
+                    .mmwave
+                    .manager_for_mut(&node_id)
+                    .expect("resolved node")
+                    .cancel_prepared_session_start();
+                return Err(mmwave_api_error(
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    error.to_string(),
+                ));
+            }
+        };
+        if let Err(error) = mode_result {
+            state
+                .write()
+                .await
+                .mmwave
+                .manager_for_mut(&node_id)
+                .expect("resolved node")
+                .cancel_prepared_session_start();
+            return Err(error);
         }
-    };
-    if let Err(error) = mode_result {
-        state.write().await.mmwave.cancel_prepared_session_start();
-        return Err(error);
-    }
 
-    if let Err(error) = wait_for_mmwave_mode_and_preflight(&state, kind, expected_mode).await {
-        state.write().await.mmwave.cancel_prepared_session_start();
-        return Err(mmwave_api_error(StatusCode::CONFLICT, error));
-    }
+        if let Err(error) =
+            wait_for_mmwave_mode_and_preflight(&state, &node_id, kind, expected_mode).await
+        {
+            state
+                .write()
+                .await
+                .mmwave
+                .manager_for_mut(&node_id)
+                .expect("resolved node")
+                .cancel_prepared_session_start();
+            return Err(mmwave_api_error(StatusCode::CONFLICT, error));
+        }
 
-    if let Err(error) = wait_for_mmwave_node_stream_advance(&control, &diagnostics_before).await {
-        state.write().await.mmwave.cancel_prepared_session_start();
+        if let Some(diagnostics_before) = diagnostics_before.as_ref() {
+            if let Err(error) =
+                wait_for_mmwave_node_stream_advance(&control, diagnostics_before).await
+            {
+                state
+                    .write()
+                    .await
+                    .mmwave
+                    .manager_for_mut(&node_id)
+                    .expect("resolved node")
+                    .cancel_prepared_session_start();
+                return Err(mmwave_api_error(StatusCode::CONFLICT, error));
+            }
+        }
+    } else if let Err(error) =
+        wait_for_mmwave_mode_and_preflight(&state, &node_id, kind, expected_mode).await
+    {
+        // No authenticated control is required for this branch: the sensor
+        // was already in calibration mode and the server only waits for the
+        // fresh UDP/radar preflight before opening the recording.
+        state
+            .write()
+            .await
+            .mmwave
+            .manager_for_mut(&node_id)
+            .expect("resolved node")
+            .cancel_prepared_session_start();
         return Err(mmwave_api_error(StatusCode::CONFLICT, error));
     }
 
@@ -589,7 +741,11 @@ async fn mmwave_session_start_endpoint(
             .as_ref()
             .is_none_or(|setup| setup.setup_sha256() != context.setup_sha256)
         {
-            state.mmwave.cancel_prepared_session_start();
+            state
+                .mmwave
+                .manager_for_mut(&node_id)
+                .expect("resolved node")
+                .cancel_prepared_session_start();
             return Err(mmwave_api_error(
                 StatusCode::CONFLICT,
                 "the sealed setup changed while calibration was being prepared",
@@ -599,14 +755,22 @@ async fn mmwave_session_start_endpoint(
     if kind == mmwave_calibration::SessionKind::Calibration {
         state
             .mmwave
+            .manager_for(&node_id)
+            .expect("resolved node")
             .validate_calibration_phase_two_start()
             .map_err(|error| mmwave_api_error(StatusCode::CONFLICT, error))?;
     }
     if let Err(error) = state
         .mmwave
+        .manager_for_mut(&node_id)
+        .expect("resolved node")
         .start_session(kind, &data_dir, now.clone(), policy)
     {
-        state.mmwave.cancel_prepared_session_start();
+        state
+            .mmwave
+            .manager_for_mut(&node_id)
+            .expect("resolved node")
+            .cancel_prepared_session_start();
         return Err(mmwave_api_error(StatusCode::CONFLICT, error));
     }
     if kind == mmwave_calibration::SessionKind::Calibration {
@@ -614,7 +778,11 @@ async fn mmwave_session_start_endpoint(
             .d5_presence
             .start_calibration(std::time::Instant::now())
         {
-            let _ = state.mmwave.stop_session();
+            let _ = state
+                .mmwave
+                .manager_for_mut(&node_id)
+                .expect("resolved node")
+                .stop_session();
             return Err(mmwave_api_error(StatusCode::CONFLICT, error));
         }
         for node in state.node_states.values_mut() {
@@ -626,21 +794,28 @@ async fn mmwave_session_start_endpoint(
         state.active_calibration_source = None;
         state.calibration_context = calibration_context;
     }
-    let status = state.mmwave.status(now.host_monotonic_ns);
+    let status = state
+        .mmwave
+        .status_for(&node_id, now.host_monotonic_ns)
+        .expect("resolved node");
     Ok(Json(
         serde_json::to_value(status).expect("mmWave status is serializable"),
     ))
 }
 
-async fn mmwave_fixed_points_start_endpoint(State(state): State<SharedState>) -> MmwaveApiResult {
+async fn mmwave_fixed_points_start_endpoint(
+    State(state): State<SharedState>,
+    Query(query): Query<MmwaveNodeQuery>,
+) -> MmwaveApiResult {
+    let node_id = resolve_mmwave_node(&state, &query).await?;
     let (control, current_mode) = {
         let state = state.read().await;
-        state
-            .mmwave
+        let manager = state.mmwave.manager_for(&node_id).expect("resolved node");
+        manager
             .validate_fixed_point_start(server_clock::now().host_monotonic_ns)
             .map_err(|error| mmwave_api_error(StatusCode::CONFLICT, error))?;
-        let status = state.mmwave.status(server_clock::now().host_monotonic_ns);
-        (state.mmwave.control(), status.mode)
+        let status = manager.status(server_clock::now().host_monotonic_ns);
+        (manager.control(), status.mode)
     };
     let expected_mode = mmwave_calibration::MeasurementMode::Calibration;
     if mode_change_required(current_mode, expected_mode) {
@@ -656,13 +831,15 @@ async fn mmwave_fixed_points_start_endpoint(State(state): State<SharedState>) ->
         .await
         .map_err(|error| mmwave_api_error(StatusCode::INTERNAL_SERVER_ERROR, error.to_string()))?
         .map_err(|error| mmwave_api_error(StatusCode::BAD_GATEWAY, error))?;
-        wait_for_mmwave_mode_and_radar_preflight(&state, expected_mode)
+        wait_for_mmwave_mode_and_radar_preflight(&state, &node_id, expected_mode)
             .await
             .map_err(|error| mmwave_api_error(StatusCode::CONFLICT, error))?;
     }
     let mut state = state.write().await;
     let fixed_points = state
         .mmwave
+        .manager_for_mut(&node_id)
+        .expect("resolved node")
         .start_fixed_point_calibration(server_clock::now().host_monotonic_ns)
         .map_err(|error| mmwave_api_error(StatusCode::CONFLICT, error))?;
     Ok(Json(
@@ -672,8 +849,10 @@ async fn mmwave_fixed_points_start_endpoint(State(state): State<SharedState>) ->
 
 async fn mmwave_fixed_points_check_endpoint(
     State(state): State<SharedState>,
+    Query(query): Query<MmwaveNodeQuery>,
     Json(request): Json<FixedPointCheckRequest>,
 ) -> MmwaveApiResult {
+    let node_id = resolve_mmwave_node(&state, &query).await?;
     if !(50..=2_000).contains(&request.tolerance_mm) {
         return Err(mmwave_api_error(
             StatusCode::BAD_REQUEST,
@@ -690,6 +869,8 @@ async fn mmwave_fixed_points_check_endpoint(
         let mut state = state.write().await;
         let fixed_points = state
             .mmwave
+            .manager_for_mut(&node_id)
+            .expect("resolved node")
             .check_current_fixed_point(
                 request.tolerance_mm,
                 request.window_ms,
@@ -700,12 +881,15 @@ async fn mmwave_fixed_points_check_endpoint(
             let data_dir = state.data_dir.clone();
             state
                 .mmwave
+                .manager_for_mut(&node_id)
+                .expect("resolved node")
                 .persist_yaw_calibration(&data_dir)
                 .map_err(|error| mmwave_api_error(StatusCode::INTERNAL_SERVER_ERROR, error))?;
         }
         state
             .mmwave
-            .status(server_clock::now().host_monotonic_ns)
+            .status_for(&node_id, server_clock::now().host_monotonic_ns)
+            .expect("resolved node")
             .fixed_point_calibration
             .ok_or_else(|| {
                 mmwave_api_error(
@@ -719,10 +903,21 @@ async fn mmwave_fixed_points_check_endpoint(
     ))
 }
 
-async fn mmwave_fixed_points_cancel_endpoint(State(state): State<SharedState>) -> MmwaveApiResult {
+async fn mmwave_fixed_points_cancel_endpoint(
+    State(state): State<SharedState>,
+    Query(query): Query<MmwaveNodeQuery>,
+) -> MmwaveApiResult {
+    let node_id = resolve_mmwave_node(&state, &query).await?;
     let mut state = state.write().await;
-    state.mmwave.cancel_fixed_point_calibration();
-    let status = state.mmwave.status(server_clock::now().host_monotonic_ns);
+    state
+        .mmwave
+        .manager_for_mut(&node_id)
+        .expect("resolved node")
+        .cancel_fixed_point_calibration();
+    let status = state
+        .mmwave
+        .status_for(&node_id, server_clock::now().host_monotonic_ns)
+        .expect("resolved node");
     Ok(Json(
         serde_json::to_value(status).expect("mmWave status is serializable"),
     ))
@@ -730,8 +925,10 @@ async fn mmwave_fixed_points_cancel_endpoint(State(state): State<SharedState>) -
 
 async fn mmwave_known_point_check_endpoint(
     State(state): State<SharedState>,
+    Query(query): Query<MmwaveNodeQuery>,
     Json(request): Json<KnownPointCheckRequest>,
 ) -> MmwaveApiResult {
+    let node_id = resolve_mmwave_node(&state, &query).await?;
     if !request
         .expected_position_m
         .iter()
@@ -763,12 +960,16 @@ async fn mmwave_known_point_check_endpoint(
         let now_ns = server_clock::now().host_monotonic_ns;
         let result = {
             let state = state.read().await;
-            state.mmwave.check_known_point(
-                expected_position_mm,
-                request.tolerance_mm,
-                request.window_ms,
-                now_ns,
-            )
+            state
+                .mmwave
+                .manager_for(&node_id)
+                .expect("resolved node")
+                .check_known_point(
+                    expected_position_mm,
+                    request.tolerance_mm,
+                    request.window_ms,
+                    now_ns,
+                )
         };
         match result {
             Ok(check) => {
@@ -785,13 +986,22 @@ async fn mmwave_known_point_check_endpoint(
     }
 }
 
-async fn mmwave_session_stop_endpoint(State(state): State<SharedState>) -> MmwaveApiResult {
+async fn mmwave_session_stop_endpoint(
+    State(state): State<SharedState>,
+    Query(query): Query<MmwaveNodeQuery>,
+) -> MmwaveApiResult {
+    let node_id = resolve_mmwave_node(&state, &query).await?;
     let mut state = state.write().await;
     state
         .mmwave
+        .manager_for_mut(&node_id)
+        .expect("resolved node")
         .stop_session()
         .map_err(|error| mmwave_api_error(StatusCode::CONFLICT, error))?;
-    let status = state.mmwave.status(server_clock::now().host_monotonic_ns);
+    let status = state
+        .mmwave
+        .status_for(&node_id, server_clock::now().host_monotonic_ns)
+        .expect("resolved node");
     Ok(Json(
         serde_json::to_value(status).expect("mmWave status is serializable"),
     ))

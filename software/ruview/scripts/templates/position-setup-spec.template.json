@@ -1,5 +1,5 @@
 {
-  "schema_version": 2,
+  "schema_version": 3,
   "coordinate_system": "x_length_y_height_z_width_lower_left_floor",
   "room_dimensions_mm": "__ROOM_DIMENSIONS_MM__",
   "transmitter": {
@@ -94,21 +94,40 @@
     "furniture_revision": "__FURNITURE_REVISION__",
     "door_state_revision": "__DOOR_STATE_REVISION__"
   },
-  "mmwave": {
-    "node_id": "__MMWAVE_NODE_ID__",
-    "sensor": "HLK-LD2450",
-    "firmware": {
-      "target": "esp32c3",
-      "version": "__MMWAVE_FIRMWARE_VERSION__",
-      "artifact_sha256": "__MMWAVE_FIRMWARE_ARTIFACT_SHA256__"
+  "mmwave_sensors": [
+    {
+      "node_id": "__MMWAVE1_NODE_ID__",
+      "sensor": "HLK-LD2450",
+      "firmware": {
+        "target": "esp32c3",
+        "version": "__MMWAVE1_FIRMWARE_VERSION__",
+        "artifact_sha256": "__MMWAVE1_FIRMWARE_ARTIFACT_SHA256__"
+      },
+      "mounting_position_mm": "__MMWAVE1_MOUNTING_POSITION_MM__",
+      "mounting_revision": "__MMWAVE1_MOUNTING_REVISION__",
+      "transform": {
+        "origin_x_mm": "__MMWAVE1_ORIGIN_X_MM__",
+        "origin_z_mm": "__MMWAVE1_ORIGIN_Z_MM__",
+        "yaw_mdeg": "__MMWAVE1_YAW_MDEG__",
+        "raw_x_inverted": "__MMWAVE1_RAW_X_INVERTED__"
+      }
     },
-    "mounting_position_mm": "__MMWAVE_MOUNTING_POSITION_MM__",
-    "mounting_revision": "__MMWAVE_MOUNTING_REVISION__",
-    "transform": {
-      "origin_x_mm": "__MMWAVE_ORIGIN_X_MM__",
-      "origin_z_mm": "__MMWAVE_ORIGIN_Z_MM__",
-      "yaw_mdeg": "__MMWAVE_YAW_MDEG__",
-      "raw_x_inverted": "__MMWAVE_RAW_X_INVERTED__"
+    {
+      "node_id": "__MMWAVE2_NODE_ID__",
+      "sensor": "HLK-LD2450",
+      "firmware": {
+        "target": "esp32c3",
+        "version": "__MMWAVE2_FIRMWARE_VERSION__",
+        "artifact_sha256": "__MMWAVE2_FIRMWARE_ARTIFACT_SHA256__"
+      },
+      "mounting_position_mm": "__MMWAVE2_MOUNTING_POSITION_MM__",
+      "mounting_revision": "__MMWAVE2_MOUNTING_REVISION__",
+      "transform": {
+        "origin_x_mm": "__MMWAVE2_ORIGIN_X_MM__",
+        "origin_z_mm": "__MMWAVE2_ORIGIN_Z_MM__",
+        "yaw_mdeg": "__MMWAVE2_YAW_MDEG__",
+        "raw_x_inverted": "__MMWAVE2_RAW_X_INVERTED__"
+      }
     }
-  }
+  ]
 }

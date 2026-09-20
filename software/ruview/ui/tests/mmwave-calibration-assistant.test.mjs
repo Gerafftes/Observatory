@@ -6,6 +6,7 @@ import {
   MmwaveCalibrationAssistant,
   mmwaveAssistantViewModel,
   mmwaveTransportDiagnostic,
+  selectMmwaveStatus,
 } from '../components/MmwaveCalibrationAssistant.js';
 
 const stylesheet = readFileSync(new URL('../style.css', import.meta.url), 'utf8');
@@ -13,6 +14,26 @@ const syntheticPassStatus = JSON.parse(readFileSync(
   new URL('./fixtures/mmwave-synthetic-pass-status.json', import.meta.url),
   'utf8',
 ));
+
+test('assistant scopes mutating requests to the selected sensor identity', () => {
+  const primary = new MmwaveCalibrationAssistant({}, () => null, 'MMWAVE1');
+  const secondary = new MmwaveCalibrationAssistant({}, () => null, 'MMWAVE2');
+
+  assert.equal(primary._endpoint('/api/v1/mmwave/session/start'), '/api/v1/mmwave/session/start');
+  assert.equal(
+    secondary._endpoint('/api/v1/mmwave/session/start'),
+    '/api/v1/mmwave/session/start?node_id=MMWAVE2',
+  );
+});
+
+test('calibration status never falls back from an absent secondary sensor to the primary', () => {
+  const primary = { node_id: 'MMWAVE1', state: 'valid', target_count: 1 };
+
+  assert.equal(selectMmwaveStatus(primary, 'MMWAVE2'), null);
+  assert.equal(selectMmwaveStatus({ sensors: [primary] }, 'MMWAVE2'), null);
+  assert.equal(selectMmwaveStatus({ sensors: [primary, { node_id: 'MMWAVE2' }] }, 'MMWAVE2').node_id, 'MMWAVE2');
+  assert.equal(selectMmwaveStatus(primary, 'MMWAVE1'), primary);
+});
 
 function zones(trainingBlocks = 0, blindVisits = 0) {
   return Array.from({ length: 9 }, (_, index) => ({

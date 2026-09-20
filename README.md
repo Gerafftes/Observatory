@@ -40,7 +40,7 @@
 
 Eine öffentliche Live-Demo gibt es derzeit nicht: Die echte Messung benötigt
 den festen lokalen Raumaufbau mit TX, RX1 bis RX4 und dem Referenzsensor. Der
-[aktuelle technische Wiedereinstieg](08-aktueller-arbeitsstand-d6-und-position.md)
+[aktuelle technische Wiedereinstieg](docs/project/08-aktueller-arbeitsstand-d6-und-position.md)
 zeigt, was bereits real geprüft wurde und welches Hardware-Gate als Nächstes
 folgt.
 
@@ -71,7 +71,7 @@ folgt.
 - [Forschungsfrage](#forschungsfrage)
 - [Aktueller Validierungsstand](#aktueller-validierungsstand)
 - [Benutzeroberfläche](software/experiment-cockpit.md)
-- [Wie es funktioniert](architecture.md)
+- [Wie es funktioniert](experiment-reports/architecture/architecture.md)
 - [Belastbare Ergebnisse](experiment-reports/README.md)
 - [Hardware](hardware/README.md)
 - [Dokumentation](#dokumentation)
@@ -107,7 +107,7 @@ Danach ist die Sensing-UI unter
 Die wichtigsten Einstiegspunkte sind:
 
 1. [UI, Backend und Firmware](software/README.md)
-2. [Aktueller D6-/mmWave-Arbeitsstand](08-aktueller-arbeitsstand-d6-und-position.md)
+2. [Aktueller D6-/mmWave-Arbeitsstand](docs/project/08-aktueller-arbeitsstand-d6-und-position.md)
 3. [Ergebnisberichte](experiment-reports/)
 4. [PCB-01-Fertigungsdaten](hardware/pcb-01/)
 5. [PCB-03-Fertigungsdaten und KiCad-Quellen](hardware/pcb-03/)
@@ -116,7 +116,7 @@ Die Software basiert auf [ruvnet/RuView](https://github.com/ruvnet/RuView), ist
 aber mit den Observatory-Anpassungen und den benötigten Unterprojekten direkt
 im Repository enthalten. Herkunft und festgeschriebene Quellstände stehen in
 [`software/README.md`](software/README.md); die Projektanpassungen sind unter
-[`06-ruview-anpassungen.md`](06-ruview-anpassungen.md) dokumentiert.
+[`06-ruview-anpassungen.md`](docs/project/06-ruview-anpassungen.md) dokumentiert.
 
 ## Was Observatory kann
 
@@ -192,7 +192,7 @@ Evaluation. Die Screenshots und die vollständige Kurzanleitung stehen auf der
 
 WLAN-CSI wird mit einer aufbaugebundenen Leerraumreferenz und diskreten
 Positions-Fingerprints ausgewertet; mmWave bleibt eine unabhängige Referenz.
-Die [Architektur- und Datenflussseite](architecture.md) erklärt den Ablauf und
+Die [Architektur- und Datenflussseite](experiment-reports/architecture/architecture.md) erklärt den Ablauf und
 die Trennung der Evidenzstufen ausführlicher.
 
 ## Belastbare Ergebnisse
@@ -222,16 +222,16 @@ Befestigungs- und mmWave-Bauteile, Bilder und Gehäusehinweise.
 
 | Datei | Inhalt |
 |---|---|
-| [`00-status-und-annahmen.md`](00-status-und-annahmen.md) | Aufbau, Annahmen, Koordinaten und offene Punkte |
-| [`01-projektjournal.md`](01-projektjournal.md) | Chronologischer Entwicklungsverlauf |
-| [`02-versuchslog.md`](02-versuchslog.md) | Durchgeführte Versuche |
-| [`03-messprotokoll.md`](03-messprotokoll.md) | Messabläufe und Qualitätsregeln |
-| [`04-auswertung-bis-problemfrage.md`](04-auswertung-bis-problemfrage.md) | Auswertung entlang der Forschungsfrage |
-| [`05-erfolge-niederlagen-und-aenderungen.md`](05-erfolge-niederlagen-und-aenderungen.md) | Erfolge, Fehlschläge und Kursänderungen |
-| [`06-ruview-anpassungen.md`](06-ruview-anpassungen.md) | Lokale Änderungen an RuView |
-| [`07-screenshot-nachweise.md`](07-screenshot-nachweise.md) | Visuelle Nachweise und Fehlerbilder |
-| [`08-aktueller-arbeitsstand-d6-und-position.md`](08-aktueller-arbeitsstand-d6-und-position.md) | Verbindlicher D6-/mmWave-Wiedereinstieg |
-| [`architecture.md`](architecture.md) | Architektur, Datenfluss und Evidenztrennung |
+| [`00-status-und-annahmen.md`](docs/project/00-status-und-annahmen.md) | Aufbau, Annahmen, Koordinaten und offene Punkte |
+| [`01-projektjournal.md`](docs/project/01-projektjournal.md) | Chronologischer Entwicklungsverlauf |
+| [`02-versuchslog.md`](docs/project/02-versuchslog.md) | Durchgeführte Versuche |
+| [`03-messprotokoll.md`](docs/project/03-messprotokoll.md) | Messabläufe und Qualitätsregeln |
+| [`04-auswertung-bis-problemfrage.md`](docs/project/04-auswertung-bis-problemfrage.md) | Auswertung entlang der Forschungsfrage |
+| [`05-erfolge-niederlagen-und-aenderungen.md`](docs/project/05-erfolge-niederlagen-und-aenderungen.md) | Erfolge, Fehlschläge und Kursänderungen |
+| [`06-ruview-anpassungen.md`](docs/project/06-ruview-anpassungen.md) | Lokale Änderungen an RuView |
+| [`07-screenshot-nachweise.md`](docs/project/07-screenshot-nachweise.md) | Visuelle Nachweise und Fehlerbilder |
+| [`08-aktueller-arbeitsstand-d6-und-position.md`](docs/project/08-aktueller-arbeitsstand-d6-und-position.md) | Verbindlicher D6-/mmWave-Wiedereinstieg |
+| [`architecture.md`](experiment-reports/architecture/architecture.md) | Architektur, Datenfluss und Evidenztrennung |
 | [`hardware/README.md`](hardware/README.md) | Hardwareübersicht, Platinen, Breadboard-CAD und Befestigungsteile |
 | [`software/experiment-cockpit.md`](software/experiment-cockpit.md) | UI-Screenshots und Experiment-Workflow |
 | [`software/`](software/README.md) | Vollständiger UI-, Backend- und Firmware-Quellstand mit Herkunftsnachweis |
