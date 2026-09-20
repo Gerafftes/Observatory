@@ -195,6 +195,10 @@ Positions-Fingerprints ausgewertet; mmWave bleibt eine unabhängige Referenz.
 Die [Architektur- und Datenflussseite](experiment-reports/architecture/architecture.md) erklärt den Ablauf und
 die Trennung der Evidenzstufen ausführlicher.
 
+<a href="experiment-reports/architecture/architecture.md"><img src="experiment-reports/architecture/figures/mmwave-connection/01-ack-verbindungsfluss.png" alt="BKLIT-Diagramm des ACK-Verbindungsflusses vom HLK-LD2450 über den ESP32-C3 und WLAN bis zum Sensing Server" width="100%"></a>
+
+*Messung voran, Bestätigung zurück: Wiederholungen behalten dieselbe Messungsidentität und werden serverseitig dedupliziert.*
+
 ## Belastbare Ergebnisse
 
 Die [Ergebnisübersicht](experiment-reports/README.md) enthält den vollständigen, neuesten
