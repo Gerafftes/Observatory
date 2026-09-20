@@ -9,6 +9,7 @@
  * - Reflective floor, settings dialog, and practical data HUD
  */
 import * as THREE from 'three';
+import { deviceThreeColor, receiverIdentity } from '../../device-identity.js';
 import { sensingProtocols } from '../../services/ws-auth.js';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
@@ -519,16 +520,19 @@ class Observatory {
 
     const txMarker = new THREE.Mesh(
       new THREE.OctahedronGeometry(0.12),
-      new THREE.MeshBasicMaterial({ color: C.blueSignal })
+      new THREE.MeshBasicMaterial({ color: deviceThreeColor('TX1') })
     );
+    txMarker.name = 'TX1';
     txMarker.position.fromArray(geometry.txPosition);
     this._hardwareEnvironment.add(txMarker);
 
     for (const receiver of geometry.receivers) {
+      const identity = receiverIdentity(receiver.nodeId);
       const rxMarker = new THREE.Mesh(
         new THREE.CylinderGeometry(0.07, 0.1, 0.18, 12),
-        new THREE.MeshBasicMaterial({ color: C.amber })
+        new THREE.MeshBasicMaterial({ color: deviceThreeColor(identity?.id) })
       );
+      rxMarker.name = identity?.id || 'RX?';
       rxMarker.position.fromArray(receiver.position);
       this._hardwareEnvironment.add(rxMarker);
     }

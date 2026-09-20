@@ -33,7 +33,6 @@
 #endif
 #define RADAR_STREAM_INTERVAL_US ((int64_t)CONFIG_MMWAVE_STREAM_INTERVAL_MS * 1000)
 #define WIFI_CONNECTED_BIT BIT0
-
 static const char *TAG = "mmwave_node";
 static EventGroupHandle_t s_wifi_events;
 static app_config_t s_config;
@@ -150,7 +149,7 @@ void app_main(void)
         error = nvs_flash_init();
     }
     ESP_ERROR_CHECK(error);
-    bool config_valid = app_config_load(&s_config);
+    const bool config_valid = app_config_load(&s_config);
     status_led_start(s_config.node_id);
     if (!config_valid) {
         ESP_LOGE(TAG,

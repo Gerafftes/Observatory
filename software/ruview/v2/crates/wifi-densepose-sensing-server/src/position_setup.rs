@@ -81,6 +81,8 @@ pub(crate) struct PositionSetupDefinition {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct TransmitterDefinition {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    node_id: Option<String>,
     position_mm: [u32; 3],
     #[serde(default, skip_serializing_if = "Option::is_none")]
     calibration_position_mm: Option<[u32; 3]>,
@@ -91,6 +93,8 @@ struct TransmitterDefinition {
 #[serde(deny_unknown_fields)]
 struct ReceiverDefinition {
     rx_id: u8,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    node_id: Option<String>,
     position_mm: [u32; 3],
     #[serde(default, skip_serializing_if = "Option::is_none")]
     calibration_position_mm: Option<[u32; 3]>,
@@ -225,6 +229,14 @@ impl SealedPositionSetup {
         millimetres_to_metres(self.definition.transmitter.position_mm)
     }
 
+    pub(crate) fn transmitter_node_id(&self) -> &str {
+        self.definition
+            .transmitter
+            .node_id
+            .as_deref()
+            .unwrap_or("TX1")
+    }
+
     pub(crate) fn transmitter_calibration_position_m(&self) -> Option<[f64; 3]> {
         self.definition
             .transmitter
@@ -235,6 +247,21 @@ impl SealedPositionSetup {
     pub(crate) fn receiver_positions_m(&self) -> [[f64; 3]; 4] {
         std::array::from_fn(|index| {
             millimetres_to_metres(self.definition.receivers[index].position_mm)
+        })
+    }
+
+    pub(crate) fn receiver_node_id(&self, wire_id: u8) -> Option<&str> {
+        let receiver = self
+            .definition
+            .receivers
+            .iter()
+            .find(|receiver| receiver.rx_id == wire_id)?;
+        receiver.node_id.as_deref().or_else(|| match wire_id {
+            1 => Some("RX1"),
+            2 => Some("RX2"),
+            3 => Some("RX3"),
+            4 => Some("RX4"),
+            _ => None,
         })
     }
 
@@ -277,6 +304,20 @@ impl SealedPositionSetup {
             .get("transmitter")
             .and_then(serde_json::Value::as_object)
             .ok_or_else(|| "setup profile transmitter must be an object".to_string())?;
+        let profile_tx_id = transmitter
+            .get("id")
+            .and_then(serde_json::Value::as_str)
+            .ok_or_else(|| "setup profile transmitter must have an id".to_string())?;
+        if !matches!(profile_tx_id, "TX" | "TX1") || self.transmitter_node_id() != "TX1" {
+            return Err("setup profile transmitter identity does not match TX1".to_string());
+        }
+        if transmitter
+            .get("node_id")
+            .and_then(serde_json::Value::as_str)
+            .is_some_and(|node_id| node_id != "TX1")
+        {
+            return Err("setup profile transmitter.node_id must be TX1".to_string());
+        }
         let transmitter_position =
             profile_triplet_mm(transmitter.get("position_m"), "transmitter.position_m")?;
         if transmitter_position != self.definition.transmitter.position_mm {
@@ -317,6 +358,15 @@ impl SealedPositionSetup {
                 return Err(format!(
                     "setup profile receiver {} does not match {expected_id}",
                     index + 1
+                ));
+            }
+            if profile_receiver
+                .get("node_id")
+                .and_then(serde_json::Value::as_str)
+                .is_some_and(|node_id| node_id != expected_id)
+            {
+                return Err(format!(
+                    "setup profile {expected_id}.node_id does not match the active sealed setup"
                 ));
             }
             let field = format!("receivers[{index}].position_m");
@@ -611,8 +661,20 @@ pub(crate) fn observatory_profile_setup_draft(
         .get("transmitter")
         .and_then(serde_json::Value::as_object)
         .ok_or_else(|| "setup profile transmitter must be an object".to_string())?;
-    if transmitter.get("id").and_then(serde_json::Value::as_str) != Some("TX") {
-        return Err("setup profile transmitter must be named TX".to_string());
+    if !matches!(
+        transmitter.get("id").and_then(serde_json::Value::as_str),
+        Some("TX" | "TX1")
+    ) {
+        return Err(
+            "setup profile transmitter must be named TX1 (legacy TX is accepted)".to_string(),
+        );
+    }
+    if transmitter
+        .get("node_id")
+        .and_then(serde_json::Value::as_str)
+        .is_some_and(|node_id| node_id != "TX1")
+    {
+        return Err("setup profile transmitter.node_id must be TX1".to_string());
     }
     let transmitter_position =
         profile_triplet_mm(transmitter.get("position_m"), "transmitter.position_m")?;
@@ -645,6 +707,15 @@ pub(crate) fn observatory_profile_setup_draft(
                     index + 1
                 ));
             }
+            if receiver
+                .get("node_id")
+                .and_then(serde_json::Value::as_str)
+                .is_some_and(|node_id| node_id != expected_id)
+            {
+                return Err(format!(
+                    "setup profile {expected_id}.node_id must be {expected_id}"
+                ));
+            }
             let field = format!("receivers[{index}].position_m");
             let position = profile_triplet_mm(receiver.get("position_m"), &field)?;
             validate_position(&format!("{expected_id}.position_mm"), position, room)?;
@@ -662,6 +733,7 @@ pub(crate) fn observatory_profile_setup_draft(
             }
             Ok(serde_json::json!({
                 "rx_id": rx_id,
+                "node_id": expected_id,
                 "position_mm": position,
                 "calibration_position_mm": calibration_position,
                 "firmware": null,
@@ -750,6 +822,7 @@ pub(crate) fn observatory_profile_setup_draft(
             "coordinate_system": COORDINATE_SYSTEM,
             "room_dimensions_mm": room,
             "transmitter": {
+                "node_id": "TX1",
                 "position_mm": transmitter_position,
                 "calibration_position_mm": transmitter_calibration_position,
                 "firmware": null,
@@ -1034,6 +1107,9 @@ fn validate_definition(definition: &PositionSetupDefinition) -> Result<(), Strin
         definition.transmitter.position_mm,
         definition.room_dimensions_mm,
     )?;
+    if definition.transmitter.node_id.as_deref().unwrap_or("TX1") != "TX1" {
+        return Err("transmitter.node_id must be TX1".to_string());
+    }
     if let Some(position) = definition.transmitter.calibration_position_mm {
         validate_position(
             "transmitter.calibration_position_mm",
@@ -1055,6 +1131,13 @@ fn validate_definition(definition: &PositionSetupDefinition) -> Result<(), Strin
     }
     let mut receiver_positions = HashSet::new();
     for receiver in &definition.receivers {
+        let expected_node_id = format!("RX{}", receiver.rx_id);
+        if receiver.node_id.as_deref().unwrap_or(&expected_node_id) != expected_node_id {
+            return Err(format!(
+                "RX{} node_id must be {expected_node_id}",
+                receiver.rx_id
+            ));
+        }
         validate_position(
             &format!("RX{}.position_mm", receiver.rx_id),
             receiver.position_mm,
@@ -1691,6 +1774,39 @@ mod tests {
     }
 
     #[test]
+    fn setup_maps_wire_ids_to_canonical_nodes_without_storing_positions_in_firmware() {
+        let directory = TempDir::new().unwrap();
+        let executable = executable_fixture(&directory, b"identity-aware executable");
+        let mut explicit = valid_spec_value();
+        explicit["transmitter"]["node_id"] = json!("TX1");
+        for index in 0..4 {
+            explicit["receivers"][index]["node_id"] = json!(format!("RX{}", index + 1));
+        }
+
+        let setup =
+            create_position_setup_with_executable(parse_spec(explicit).unwrap(), &executable)
+                .unwrap();
+        assert_eq!(setup.transmitter_node_id(), "TX1");
+        assert_eq!(setup.receiver_node_id(1), Some("RX1"));
+        assert_eq!(setup.receiver_node_id(4), Some("RX4"));
+        assert_eq!(setup.receiver_node_id(5), None);
+
+        let legacy = create_position_setup_with_executable(
+            parse_spec(valid_spec_value()).unwrap(),
+            &executable,
+        )
+        .unwrap();
+        assert_eq!(legacy.transmitter_node_id(), "TX1");
+        assert_eq!(legacy.receiver_node_id(2), Some("RX2"));
+
+        let mut wrong = valid_spec_value();
+        wrong["receivers"][0]["node_id"] = json!("RX2");
+        assert!(validate_spec(&parse_spec(wrong).unwrap())
+            .unwrap_err()
+            .contains("RX1 node_id"));
+    }
+
+    #[test]
     fn observatory_profile_must_match_the_active_v2_setup() {
         let directory = TempDir::new().unwrap();
         let setup = valid_v2_setup(&directory);
@@ -1742,6 +1858,8 @@ mod tests {
             draft["spec"]["transmitter"]["position_mm"],
             json!([1510, 1190, 390])
         );
+        assert_eq!(draft["spec"]["transmitter"]["node_id"], "TX1");
+        assert_eq!(draft["spec"]["receivers"][0]["node_id"], "RX1");
         assert_eq!(
             draft["spec"]["receivers"][1]["position_mm"],
             json!([200, 500, 400])

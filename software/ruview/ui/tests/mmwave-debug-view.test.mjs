@@ -233,7 +233,9 @@ test('debug component keeps the source legend explicit', () => {
   assert.match(source, /createMarkerLabel\(this\.nodeId, HARDWARE_GREY/);
   assert.doesNotMatch(source, /createMarkerLabel\('MMWAVE1', HARDWARE_GREY/);
   assert.match(source, /createMarkerLabel\('RADAR TARGET'/);
-  assert.match(source, /createMarkerLabel\(receiverDisplayLabel\(node\.id, index\)/);
+  assert.match(source, /receiverIdentity\(node\.id\)/);
+  assert.match(source, /createMarkerLabel\(identity\?\.id \|\| 'RX\?'/);
+  assert.match(source, /createMarkerLabel\('TX1'/);
   assert.doesNotMatch(source, /PlaneGeometry|CylinderGeometry|ConeGeometry|TorusGeometry/);
   assert.doesNotMatch(source, /0xffa62b|0x2dd4e8|0x7dd3fc/);
   assert.doesNotMatch(source, /children\[1\]\.scale/);

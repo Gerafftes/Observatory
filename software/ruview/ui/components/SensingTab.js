@@ -7,6 +7,7 @@
  */
 
 import { sensingService } from '../services/sensing.service.js';
+import { receiverIdentity, UNKNOWN_DEVICE_COLOR } from '../device-identity.js';
 import {
   GaussianSplatRenderer,
   positionEstimateViewModel,
@@ -594,12 +595,10 @@ export class SensingTab {
       container.appendChild(msg);
       return;
     }
-    const NODE_COLORS = ['#00ccff', '#ff6600', '#00ff88', '#ff00cc', '#ffcc00', '#8800ff', '#00ffcc', '#ff0044'];
     container.textContent = '';
     for (const nf of nodeFeatures) {
-      const nodeId = nf.node_id;
-      const nodeIndex = Number(nodeId);
-      const color = NODE_COLORS[Number.isFinite(nodeIndex) ? nodeIndex % NODE_COLORS.length : 0];
+      const identity = receiverIdentity(nf.node_id);
+      const color = identity?.color || UNKNOWN_DEVICE_COLOR;
       const statusColor = nf.stale ? '#888' : '#0f0';
 
       const row = document.createElement('div');
@@ -609,7 +608,7 @@ export class SensingTab {
       idCol.style.minWidth = '50px';
       const nameEl = document.createElement('div');
       nameEl.style.cssText = `font-size:11px;font-weight:600;color:${color};`;
-      nameEl.textContent = 'Node ' + nf.node_id;
+      nameEl.textContent = identity?.id || 'RX?';
       const statusEl = document.createElement('div');
       statusEl.style.cssText = `font-size:9px;color:${statusColor};`;
       statusEl.textContent = nf.stale ? 'STALE' : 'ACTIVE';

@@ -16,7 +16,9 @@ test('default setup profile keeps the legacy point grid only for schema compatib
   assert.deepEqual(profile.room_dimensions_m, [4.02, 2.59, 3.44]);
   assert.equal(profile.sensor_mount_radius_m, 0.5);
   assert.equal(profile.transmitter.id, 'TX');
+  assert.equal(profile.transmitter.node_id, 'TX1');
   assert.deepEqual(profile.receivers.map((receiver) => receiver.id), ['RX1', 'RX2', 'RX3', 'RX4']);
+  assert.deepEqual(profile.receivers.map((receiver) => receiver.node_id), ['RX1', 'RX2', 'RX3', 'RX4']);
   assert.equal(profile.mmwave.sensor, 'HLK-LD2450');
   assert.deepEqual(profile.mmwave.mounting_position_m, [0.0, 1.2, 1.72]);
   assert.equal(profile.mmwave.allow_exterior, true);

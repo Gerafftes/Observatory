@@ -9,3 +9,10 @@ cc -std=c11 -Wall -Wextra -Werror \
     -lm \
     -o /tmp/ruview-mmwave-parser-test
 /tmp/ruview-mmwave-parser-test
+
+cc -std=c11 -Wall -Wextra -Werror \
+    -I"$test_dir/../main" \
+    "$test_dir/test_identity_indicator.c" \
+    "$test_dir/../main/identity_indicator.c" \
+    -o /tmp/ruview-mmwave-identity-indicator-test
+/tmp/ruview-mmwave-identity-indicator-test

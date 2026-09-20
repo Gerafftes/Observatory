@@ -1,5 +1,6 @@
 import { apiService } from '../services/api.service.js';
 import { experimentService } from '../services/experiment.service.js';
+import { deviceColor, receiverIdentity } from '../device-identity.js';
 import {
   DEFAULT_MMWAVE_POSITION_M,
   DEFAULT_SENSOR_MOUNT_RADIUS_M,
@@ -51,12 +52,12 @@ export function defaultSetupProfileDocument() {
     profile_kind: 'ruview.setup-profile',
     room_dimensions_m: room,
     sensor_mount_radius_m: DEFAULT_SENSOR_MOUNT_RADIUS_M,
-    transmitter: { id: 'TX', position_m: [1.51, 1.19, 0.39] },
+    transmitter: { id: 'TX', node_id: 'TX1', position_m: [1.51, 1.19, 0.39] },
     receivers: [
-      { id: 'RX1', role: 'receiver', position_m: [0.00, 0.50, 0.28] },
-      { id: 'RX2', role: 'receiver', position_m: [4.02, 0.87, 0.97] },
-      { id: 'RX3', role: 'receiver', position_m: [0.00, 0.74, 2.11] },
-      { id: 'RX4', role: 'receiver', position_m: [4.02, 0.87, 2.46] },
+      { id: 'RX1', node_id: 'RX1', role: 'receiver', position_m: [0.00, 0.50, 0.28] },
+      { id: 'RX2', node_id: 'RX2', role: 'receiver', position_m: [4.02, 0.87, 0.97] },
+      { id: 'RX3', node_id: 'RX3', role: 'receiver', position_m: [0.00, 0.74, 2.11] },
+      { id: 'RX4', node_id: 'RX4', role: 'receiver', position_m: [4.02, 0.87, 2.46] },
     ],
     mmwave: { ...primaryMmwave },
     mmwave_sensors: [
@@ -1249,9 +1250,12 @@ export class ObservatoryControlCenter {
   _nodesMarkup() {
     const nodes = Array.isArray(this.status?.nodes) ? this.status.nodes : [];
     if (!nodes.length) return '<div class="occ-empty">Keine CSI-Nodes.</div>';
-    return `<div class="occ-table-wrap"><table class="occ-table"><thead><tr><th>Node</th><th>Status</th><th>RSSI ${infoTip('RSSI', 'Empfangsstärke des letzten Pakets.')}</th><th>CSI-Rate ${infoTip('CSI-Rate', 'Frames pro Sekunde.')}</th><th>Verlust ${infoTip('Verlust', 'Aus Sequenzlücken geschätzt.')}</th><th>Seq.</th><th>Zeit / Sync ${infoTip('Zeit / Sync', 'Zeitbezug zum Mesh.')}</th></tr></thead><tbody>${nodes.map((node) => `
-      <tr><td><strong>${escapeHTML(node.display_name || `RX${node.node_id}`)}</strong><small>${escapeHTML(node.role || 'unbekannt')}</small></td><td><span class="occ-node-state ${node.status === 'active' ? 'is-active' : 'is-stale'}">${escapeHTML(node.status)}</span><small>${escapeHTML(node.last_seen_ms ?? '--')} ms ago</small></td><td>${node.rssi_dbm == null ? '--' : `${Number(node.rssi_dbm).toFixed(1)} dBm`}</td><td>${node.frame_rate_hz == null ? `wird ermittelt (${escapeHTML(node.frame_rate_samples ?? 0)})` : `${Number(node.frame_rate_hz).toFixed(1)} Hz`}</td><td>${node.packet_loss_percent == null ? '--' : `${Number(node.packet_loss_percent).toFixed(1)}%`}<small>${escapeHTML(node.inferred_lost_frames ?? 0)} geschätzt</small></td><td>${escapeHTML(node.latest_sequence ?? '--')}</td><td>${node.sync ? `${escapeHTML(node.sync.is_valid ? 'gültig' : 'veraltet')} · ${escapeHTML(node.sync.offset_us)} µs` : 'kein Mesh-Sync'}</td></tr>
-    `).join('')}</tbody></table></div>`;
+    return `<div class="occ-table-wrap"><table class="occ-table"><thead><tr><th>Node</th><th>Status</th><th>RSSI ${infoTip('RSSI', 'Empfangsstärke des letzten Pakets.')}</th><th>CSI-Rate ${infoTip('CSI-Rate', 'Frames pro Sekunde.')}</th><th>Verlust ${infoTip('Verlust', 'Aus Sequenzlücken geschätzt.')}</th><th>Seq.</th><th>Zeit / Sync ${infoTip('Zeit / Sync', 'Zeitbezug zum Mesh.')}</th></tr></thead><tbody>${nodes.map((node) => {
+      const identity = receiverIdentity(node.node_id);
+      const label = identity?.id || node.display_name || `RX?`;
+      return `
+      <tr><td><strong class="device-identity-label" style="--device-color:${deviceColor(label)}"><i aria-hidden="true"></i>${escapeHTML(label)}</strong><small>${escapeHTML(node.role || 'unbekannt')}</small></td><td><span class="occ-node-state ${node.status === 'active' ? 'is-active' : 'is-stale'}">${escapeHTML(node.status)}</span><small>${escapeHTML(node.last_seen_ms ?? '--')} ms ago</small></td><td>${node.rssi_dbm == null ? '--' : `${Number(node.rssi_dbm).toFixed(1)} dBm`}</td><td>${node.frame_rate_hz == null ? `wird ermittelt (${escapeHTML(node.frame_rate_samples ?? 0)})` : `${Number(node.frame_rate_hz).toFixed(1)} Hz`}</td><td>${node.packet_loss_percent == null ? '--' : `${Number(node.packet_loss_percent).toFixed(1)}%`}<small>${escapeHTML(node.inferred_lost_frames ?? 0)} geschätzt</small></td><td>${escapeHTML(node.latest_sequence ?? '--')}</td><td>${node.sync ? `${escapeHTML(node.sync.is_valid ? 'gültig' : 'veraltet')} · ${escapeHTML(node.sync.offset_us)} µs` : 'kein Mesh-Sync'}</td></tr>`;
+    }).join('')}</tbody></table></div>`;
   }
 
   _recordingsMarkup() {
@@ -1631,11 +1635,13 @@ export class ObservatoryControlCenter {
       transmitter: {
         ...existingTransmitter,
         id: 'TX',
+        node_id: 'TX1',
         position_m: read('transmitter.position_m'),
       },
       receivers: ['RX1', 'RX2', 'RX3', 'RX4'].map((id) => ({
         ...(existingReceivers.find((receiver) => receiver.id === id) || {}),
         id,
+        node_id: id,
         role: 'receiver',
         position_m: read(`receiver.${id}`),
       })),

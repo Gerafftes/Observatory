@@ -2,11 +2,16 @@
 
 | Field | Value |
 |-------|-------|
-| **Status** | Accepted — implemented & hardware-confirmed on ESP32-S3 N16R8 (COM8) |
+| **Status** | Superseded 2026-09-20 by stable RX identity colours |
 | **Date** | 2026-06-17 |
 | **Deciders** | ruv |
 | **Codename** | **GAMMA-VIZ** |
 | **Builds on** | `ruv-neural-viz::ColorMap` (now `no_std` — ruvnet/ruv-neural#3 / RuView#1126), the ESP32 edge `motion_energy` metric (`edge_processing.c`), PR #962 (WS2812 on GPIO 48) |
+
+> Historical record: the production CSI firmware no longer runs the 40 Hz
+> stimulus. Its onboard LED now shows the fixed `RX1`-`RX4` identity colour
+> shared with the UI; unknown IDs stay dark. Device position remains exclusively
+> server-owned.
 
 ## Context
 

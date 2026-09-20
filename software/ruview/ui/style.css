@@ -623,12 +623,7 @@
 .occ-cad-toolbar small { color: var(--occ-muted); font: 9px/1.3 var(--font-family-mono); }
 .occ-cad-legend { display: flex; align-items: center; gap: 9px; flex-wrap: wrap; margin-top: 3px; color: var(--occ-muted); font: 650 9px/1 var(--font-family-mono); }
 .occ-cad-legend-item { display: inline-flex; align-items: center; gap: 4px; }
-.occ-cad-swatch { width: 8px; height: 8px; border: 1px solid var(--occ-paper); outline: 1px solid currentColor; background: currentColor; }
-.occ-cad-swatch-tx { color: var(--occ-signal); }
-.occ-cad-swatch-rx1 { color: #156b8a; }
-.occ-cad-swatch-rx2 { color: #287a57; }
-.occ-cad-swatch-rx3 { color: #aa681f; }
-.occ-cad-swatch-rx4 { color: #6b7787; }
+.occ-cad-swatch { width: 8px; height: 8px; border: 1px solid var(--occ-paper); outline: 1px solid var(--device-color, currentColor); background: var(--device-color, currentColor); }
 .occ-cad-swatch-mmwave { color: #6f4c1e; }
 .occ-cad-kicker,
 .occ-cad-inspector-kicker,
@@ -676,11 +671,8 @@
 .occ-cad-marker:active { cursor: grabbing; }
 .occ-cad-marker-hit { fill: transparent; stroke: transparent; }
 .occ-cad-marker-core { stroke: var(--occ-paper); stroke-width: 2; vector-effect: non-scaling-stroke; }
-.occ-cad-marker-tx .occ-cad-marker-core { fill: var(--occ-signal); }
-.occ-cad-marker-rx1 .occ-cad-marker-core { fill: #156b8a; }
-.occ-cad-marker-rx2 .occ-cad-marker-core { fill: #287a57; }
-.occ-cad-marker-rx3 .occ-cad-marker-core { fill: #aa681f; }
-.occ-cad-marker-rx4 .occ-cad-marker-core { fill: #6b7787; }
+.occ-cad-marker-tx .occ-cad-marker-core,
+.occ-cad-marker-rx .occ-cad-marker-core { fill: var(--device-color, #68737a); }
 .occ-cad-marker-mmwave .occ-cad-marker-core { fill: #6f4c1e; }
 .occ-cad-marker-calibration .occ-cad-marker-core { fill: var(--occ-paper); stroke: var(--occ-ink); stroke-width: 1.5; }
 .occ-cad-marker-calibration.is-fallback { opacity: .52; }
@@ -849,6 +841,8 @@
 .occ-node-state { display: inline-block; padding: 4px 6px; border-color: var(--occ-rule); color: var(--occ-muted); }
 .occ-node-state.is-active { border-color: #1d5d4f; color: #1d5d4f; }
 .occ-node-state.is-stale { border-color: var(--occ-signal); color: var(--occ-signal); }
+.device-identity-label { display: inline-flex; align-items: center; gap: 7px; }
+.device-identity-label > i { width: 9px; height: 9px; flex: 0 0 9px; border-radius: 50%; background: var(--device-color, #68737a); box-shadow: 0 0 0 1px rgba(17, 17, 17, .22); }
 .occ-recording-list { margin-top: 12px; border-top: 1px solid var(--occ-ink); }
 .occ-recording-row { justify-content: space-between; gap: 10px; padding: 9px 0; border-bottom: 1px solid var(--occ-rule); }
 .occ-recording-row span { display: grid; gap: 3px; min-width: 0; }

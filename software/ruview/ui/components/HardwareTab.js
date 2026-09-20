@@ -2,6 +2,7 @@
 
 import { API_CONFIG } from '../config/api.config.js';
 import { apiService } from '../services/api.service.js';
+import { deviceColor, receiverIdentity } from '../device-identity.js';
 import { LocalControlPanel } from './LocalControlPanel.js';
 
 const NODE_REFRESH_INTERVAL_MS = 5000;
@@ -82,7 +83,15 @@ export class HardwareTab {
 
     const title = document.createElement('div');
     title.className = 'hardware-node-title';
-    title.textContent = node.display_name || `RX${node.node_id ?? '—'}`;
+
+    const identity = receiverIdentity(node.node_id);
+    const label = document.createElement('span');
+    label.className = 'device-identity-label';
+    label.style.setProperty('--device-color', deviceColor(identity?.id));
+    const swatch = document.createElement('i');
+    swatch.setAttribute('aria-hidden', 'true');
+    label.append(swatch, identity?.id || node.display_name || 'RX?');
+    title.appendChild(label);
 
     const state = document.createElement('span');
     state.className = `hardware-node-state ${node.status === 'active' ? 'is-active' : 'is-stale'}`;

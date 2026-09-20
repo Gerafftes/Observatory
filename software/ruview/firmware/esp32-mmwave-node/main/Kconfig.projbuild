@@ -65,6 +65,20 @@ config MMWAVE_NODE_ID
     string "Stable node ID"
     default "MMWAVE1"
 
+config MMWAVE_STATUS_LED_GPIO
+    int "Onboard status LED GPIO"
+    range 0 21
+    default 8
+    help
+        ESP32-C3 Super Mini user LED. Change this only for a board revision
+        that routes its onboard LED to a different GPIO.
+
+config MMWAVE_STATUS_LED_ACTIVE_LOW
+    bool "Onboard status LED is active-low"
+    default y
+    help
+        The standard ESP32-C3 Super Mini user LED on GPIO 8 is active-low.
+
 config MMWAVE_OTA_PSK
     string "OTA and mode-control bearer token"
     default ""

@@ -3,6 +3,7 @@
   "coordinate_system": "x_length_y_height_z_width_lower_left_floor",
   "room_dimensions_mm": "__ROOM_DIMENSIONS_MM__",
   "transmitter": {
+    "node_id": "TX1",
     "position_mm": "__TX_POSITION_MM__",
     "firmware": {
       "target": "__TX_FIRMWARE_TARGET__",
@@ -13,6 +14,7 @@
   "receivers": [
     {
       "rx_id": 1,
+      "node_id": "RX1",
       "position_mm": "__RX1_POSITION_MM__",
       "firmware": {
         "target": "__RX1_FIRMWARE_TARGET__",
@@ -29,6 +31,7 @@
     },
     {
       "rx_id": 2,
+      "node_id": "RX2",
       "position_mm": "__RX2_POSITION_MM__",
       "firmware": {
         "target": "__RX2_FIRMWARE_TARGET__",
@@ -45,6 +48,7 @@
     },
     {
       "rx_id": 3,
+      "node_id": "RX3",
       "position_mm": "__RX3_POSITION_MM__",
       "firmware": {
         "target": "__RX3_FIRMWARE_TARGET__",
@@ -61,6 +65,7 @@
     },
     {
       "rx_id": 4,
+      "node_id": "RX4",
       "position_mm": "__RX4_POSITION_MM__",
       "firmware": {
         "target": "__RX4_FIRMWARE_TARGET__",

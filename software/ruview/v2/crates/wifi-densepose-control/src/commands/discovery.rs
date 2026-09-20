@@ -1,3 +1,4 @@
+use std::collections::BTreeMap;
 use std::net::{SocketAddr, UdpSocket};
 use std::time::Duration;
 
@@ -8,8 +9,7 @@ use tokio::time::timeout;
 use tokio_serial::available_ports;
 
 use crate::domain::node::{
-    Chip, DiscoveredNode, DiscoveryMethod, HealthStatus, MacAddress, MeshRole, NodeCapabilities,
-    NodeRegistry,
+    Chip, DiscoveredNode, DiscoveryMethod, HealthStatus, MeshRole, NodeCapabilities,
 };
 /// Service type for RuView ESP32 nodes using mDNS.
 const MDNS_SERVICE_TYPE: &str = "_ruview._udp.local.";
@@ -26,7 +26,7 @@ const BEACON_MAGIC: &[u8] = b"RUVIEW_BEACON";
 /// 1. Start mDNS browser for `_ruview._udp.local.`
 /// 2. Send UDP broadcast on port 5006
 /// 3. Collect responses for `timeout_ms` milliseconds
-/// 4. Deduplicate by MAC address and return merged results
+/// 4. Merge by stable node_id; IP and MAC are connection metadata only
 pub async fn discover_nodes(timeout_ms: Option<u64>) -> Result<Vec<DiscoveredNode>, String> {
     let timeout_duration = Duration::from_millis(timeout_ms.unwrap_or(3000));
 
@@ -36,24 +36,62 @@ pub async fn discover_nodes(timeout_ms: Option<u64>) -> Result<Vec<DiscoveredNod
         discover_via_udp(timeout_duration),
     );
 
-    // Merge results, deduplicating by MAC address
-    let mut registry = NodeRegistry::new();
+    Ok(merge_discovered_nodes(
+        mdns_nodes.unwrap_or_default(),
+        udp_nodes.unwrap_or_default(),
+    ))
+}
 
-    for node in mdns_nodes.unwrap_or_default() {
-        if let Some(ref mac) = node.mac {
-            registry.upsert(MacAddress::new(mac), node);
+fn merge_discovered_nodes(
+    mdns_nodes: Vec<DiscoveredNode>,
+    udp_nodes: Vec<DiscoveredNode>,
+) -> Vec<DiscoveredNode> {
+    let mut assigned = BTreeMap::<u8, DiscoveredNode>::new();
+    let mut unassigned = Vec::new();
+
+    for mut node in mdns_nodes.into_iter().chain(udp_nodes) {
+        if !(1..=4).contains(&node.node_id) {
+            node.notes = Some(format!(
+                "unassigned node_id {}; not mapped to RX1-RX4",
+                node.node_id
+            ));
+            unassigned.push(node);
+            continue;
+        }
+
+        match assigned.entry(node.node_id) {
+            std::collections::btree_map::Entry::Vacant(entry) => {
+                entry.insert(node);
+            }
+            std::collections::btree_map::Entry::Occupied(mut entry) => {
+                let previous = entry.get();
+                let same_device = match (&previous.mac, &node.mac) {
+                    (Some(first), Some(second)) => first.eq_ignore_ascii_case(second),
+                    _ => previous.hostname == node.hostname,
+                };
+                if same_device {
+                    if node.hostname.is_none() {
+                        node.hostname.clone_from(&previous.hostname);
+                    }
+                    if node.friendly_name.is_none() {
+                        node.friendly_name.clone_from(&previous.friendly_name);
+                    }
+                    entry.insert(node);
+                } else {
+                    let conflicted = entry.get_mut();
+                    conflicted.health = HealthStatus::Degraded;
+                    conflicted.notes = Some(format!(
+                        "identity conflict: more than one device claims RX{}",
+                        conflicted.node_id
+                    ));
+                }
+            }
         }
     }
 
-    for node in udp_nodes.unwrap_or_default() {
-        if let Some(ref mac) = node.mac {
-            registry.upsert(MacAddress::new(mac), node);
-        }
-    }
-
-    let nodes: Vec<DiscoveredNode> = registry.all().into_iter().cloned().collect();
-
-    Ok(nodes)
+    let mut nodes: Vec<_> = assigned.into_values().collect();
+    nodes.extend(unassigned);
+    nodes
 }
 
 /// Discover nodes via mDNS (Bonjour/Avahi).
@@ -604,6 +642,54 @@ mod tests {
         assert_eq!(node.mesh_role, MeshRole::Coordinator);
         assert_eq!(node.tdm_slot, Some(0));
         assert_eq!(node.tdm_total, Some(4));
+    }
+
+    #[test]
+    fn discovery_merges_ip_changes_by_node_id_and_flags_identity_conflicts() {
+        let first = parse_beacon_response(
+            b"RUVIEW_BEACON|AA:BB:CC:DD:EE:01|1|0.3.0|esp32s3|node|0|4",
+            "192.168.4.2:5006".parse().unwrap(),
+        )
+        .unwrap();
+        let moved = parse_beacon_response(
+            b"RUVIEW_BEACON|AA:BB:CC:DD:EE:01|1|0.3.0|esp32s3|node|0|4",
+            "192.168.4.9:5006".parse().unwrap(),
+        )
+        .unwrap();
+        let conflict = parse_beacon_response(
+            b"RUVIEW_BEACON|AA:BB:CC:DD:EE:02|1|0.3.0|esp32s3|node|0|4",
+            "192.168.4.3:5006".parse().unwrap(),
+        )
+        .unwrap();
+
+        let moved_result = merge_discovered_nodes(vec![first.clone()], vec![moved]);
+        assert_eq!(moved_result.len(), 1);
+        assert_eq!(moved_result[0].node_id, 1);
+        assert_eq!(moved_result[0].ip, "192.168.4.9");
+
+        let conflict_result = merge_discovered_nodes(vec![first], vec![conflict]);
+        assert_eq!(conflict_result.len(), 1);
+        assert_eq!(conflict_result[0].health, HealthStatus::Degraded);
+        assert!(conflict_result[0]
+            .notes
+            .as_deref()
+            .is_some_and(|notes| notes.contains("claims RX1")));
+    }
+
+    #[test]
+    fn discovery_keeps_unknown_ids_unassigned() {
+        let unknown = parse_beacon_response(
+            b"RUVIEW_BEACON|AA:BB:CC:DD:EE:05|5|0.3.0|esp32s3|node|0|4",
+            "192.168.4.5:5006".parse().unwrap(),
+        )
+        .unwrap();
+
+        let nodes = merge_discovered_nodes(vec![unknown], vec![]);
+        assert_eq!(nodes.len(), 1);
+        assert!(nodes[0]
+            .notes
+            .as_deref()
+            .is_some_and(|notes| notes.contains("not mapped")));
     }
 
     #[test]

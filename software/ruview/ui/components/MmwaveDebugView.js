@@ -11,6 +11,8 @@
  * while WiFi localization is still uncalibrated.
  */
 
+import { deviceThreeColor, receiverIdentity } from '../device-identity.js';
+
 export const MMWAVE_STATUS_ENDPOINT = '/api/v1/mmwave/status';
 export const MMWAVE_STATUS_FRESH_MS = 1500;
 export const MMWAVE_REJECTION_VISIBLE_MS = 3000;
@@ -713,13 +715,14 @@ export class MmwaveDebugView {
 
     const tx = this._configuredGeometry?.txPosition || this.rx.txPosition;
     if (tx) {
+      const txColor = deviceThreeColor('TX1');
       const txPosition = roomPositionToScene(tx, this.roomDimensions);
       this._txMarker = new THREE.Mesh(
         new THREE.OctahedronGeometry(0.16, 0),
-        new THREE.MeshBasicMaterial({ color: INK_BLACK, transparent: true, opacity: 0.82 }),
+        new THREE.MeshBasicMaterial({ color: txColor, transparent: true, opacity: 0.9 }),
       );
       this._txMarker.position.set(...txPosition);
-      const txLabel = createMarkerLabel('TX', INK_BLACK, THREE);
+      const txLabel = createMarkerLabel('TX1', txColor, THREE);
       if (txLabel) this._txMarker.add(txLabel);
       this._hardwareGroup.add(this._txMarker);
     } else {
@@ -785,15 +788,17 @@ export class MmwaveDebugView {
       : this.rx.nodes.length
         ? this.rx.nodes
         : this.status.receiverPositionsM.map((position, index) => ({ id: index + 1, position }));
-    for (const [index, node] of nodes.entries()) {
+    for (const node of nodes) {
       const scenePosition = roomPositionToScene(node.position, this.roomDimensions);
       if (!scenePosition) continue;
+      const identity = receiverIdentity(node.id);
+      const color = deviceThreeColor(identity?.id);
       const mesh = new THREE.Mesh(
         new THREE.SphereGeometry(0.12, 16, 16),
-        new THREE.MeshBasicMaterial({ color: HARDWARE_GREY, transparent: true, opacity: 0.82 }),
+        new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.9 }),
       );
       mesh.position.set(...scenePosition);
-      const label = createMarkerLabel(receiverDisplayLabel(node.id, index), HARDWARE_GREY, THREE);
+      const label = createMarkerLabel(identity?.id || 'RX?', color, THREE);
       if (label) mesh.add(label);
       this._hardwareGroup.add(mesh);
       this._rxNodeMeshes.push(mesh);
@@ -831,8 +836,8 @@ export class MmwaveDebugView {
         : null;
       const receiverPositionsM = Array.isArray(geometry.receiverPositionsM)
         ? geometry.receiverPositionsM
-          .map((node, index) => ({
-            id: node?.id || index + 1,
+          .map((node) => ({
+            id: node?.id || null,
             position: finiteTriplet(node?.position) ? node.position.slice(0, 3) : null,
           }))
           .filter((node) => node.position)
