@@ -31,6 +31,16 @@ Setup-v2-Transform auf die Rohkoordinaten an. Bereits transformierte
 Paketfelder bleiben nur für ältere Empfänger und Standalone-Diagnostik
 erhalten.
 
+Die folgenden Bklit-artigen Schaubilder dokumentieren diese implementierten
+Verträge. Sie enthalten bewusst keine neuen Messwerte und belegen weder
+Paketverlustfreiheit noch Positionsgenauigkeit.
+
+![ACK-Verbindungsfluss vom LD2450 bis zum Sensing Server](project-media/diagrams/mmwave-connection/01-ack-verbindungsfluss.png)
+
+![Adaptives Timeout- und Retry-Modell](project-media/diagrams/mmwave-connection/02-timeout-und-retry.png)
+
+![Serverseitige Verantwortung für die Raumtransformation](project-media/diagrams/mmwave-connection/03-transform-verantwortung.png)
+
 ```text
 physischer Aufbau
 → Setup-Siegel
