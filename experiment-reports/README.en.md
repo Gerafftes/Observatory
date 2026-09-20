@@ -29,6 +29,7 @@ index.
 
 | Date | Series | Result type | Evidence class | Assessment | Report | Primary figure |
 |---|---|---|---|---|---|---|
+| 2026-09-20 | mmWave | sequence-loss comparison | two supplied 60-second windows | `0.1.6` **passed**; 0 lost sequences | [Report](2026-09-20_mmwave-sequenzverlustvergleich/README.md) | [Sequence loss](2026-09-20_mmwave-sequenzverlustvergleich/figures/01-sequenzverlust.png) |
 | 2026-09-13 | mmWave | transport comparison | three controlled before/after runs plus redundancy test | **better, but not loss-free** | [Report](2026-09-13_mmwave_transport-vergleich/README.md) | [Arrival and loss](2026-09-13_mmwave_transport-vergleich/figures/01-ankunft-und-verlust.png) |
 | 2026-08-30 | mmWave | runtime audit | recorded accepted packets | **failed**; sequence gap | [Report](2026-08-30_mmwave_runtime-audit/README.md) | — |
 | 2026-08-23 | D4/D5/D6 | technical synthesis | 25 recordings, replay, and setup-bound technical evidence | D5-abs **failed**; D6 is technical only | [Report](2026-08-23_D4-D5-D6_technischer-bericht/README.md) | [Global comparison](2026-08-23_D4-D5-D6_technischer-bericht/figures/01-globaler-vergleich.png) |
@@ -51,11 +52,12 @@ index.
 
 ### mmWave transport
 
-[![Arrival and loss in the mmWave before/after comparison](2026-09-13_mmwave_transport-vergleich/figures/01-ankunft-und-verlust.png)](2026-09-13_mmwave_transport-vergleich/README.md)
+[![Sequence loss with firmware 0.1.5 and 0.1.6](2026-09-20_mmwave-sequenzverlustvergleich/figures/01-sequenzverlust.png)](2026-09-20_mmwave-sequenzverlustvergleich/README.md)
 
-Transport improved overall but remains loss-prone, with a measured `13.1%`
-sequence-loss ratio. The other three figures and render QA are colocated in the
-[result package](2026-09-13_mmwave_transport-vergleich/README.md).
+Firmware `0.1.6` reached `0.00%` sequence loss in the supplied 60-second
+window, and the `radar_sequence_loss_free` gate passed. Two additional charts,
+the exact table values, and the evidence boundary are colocated in the
+[result package](2026-09-20_mmwave-sequenzverlustvergleich/README.md).
 
 ### D4/D5/D6
 

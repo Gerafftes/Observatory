@@ -30,6 +30,7 @@ Index daher nicht.
 
 | Datum | Serie | Ergebnistyp | Evidenzklasse | Bewertung | Bericht | Primärdiagramm |
 |---|---|---|---|---|---|---|
+| 2026-09-20 | mmWave | Sequenzverlustvergleich | zwei bereitgestellte 60-Sekunden-Fenster | `0.1.6` **bestanden**; 0 verlorene Sequenzen | [Bericht](2026-09-20_mmwave-sequenzverlustvergleich/README.md) | [Sequenzverlust](2026-09-20_mmwave-sequenzverlustvergleich/figures/01-sequenzverlust.png) |
 | 2026-09-13 | mmWave | Transportvergleich | drei kontrollierte Vorher-/Nachher-Läufe plus Redundanztest | **besser, aber nicht verlustfrei** | [Bericht](2026-09-13_mmwave_transport-vergleich/README.md) | [Ankunft und Verlust](2026-09-13_mmwave_transport-vergleich/figures/01-ankunft-und-verlust.png) |
 | 2026-08-30 | mmWave | Runtime-Audit | aufgezeichnete akzeptierte Pakete | **nicht bestanden**; Sequenzlücke | [Bericht](2026-08-30_mmwave_runtime-audit/README.md) | — |
 | 2026-08-23 | D4/D5/D6 | technischer Gesamtbericht | 25 Aufnahmen, Replay und setupgebundene Techniknachweise | D5-abs **nicht bestanden**; D6 nur technisch | [Bericht](2026-08-23_D4-D5-D6_technischer-bericht/README.md) | [Globaler Vergleich](2026-08-23_D4-D5-D6_technischer-bericht/figures/01-globaler-vergleich.png) |
@@ -52,11 +53,12 @@ Index daher nicht.
 
 ### mmWave-Transport
 
-[![Ankunft und Verlust im mmWave-Vorher-/Nachher-Vergleich](2026-09-13_mmwave_transport-vergleich/figures/01-ankunft-und-verlust.png)](2026-09-13_mmwave_transport-vergleich/README.md)
+[![Sequenzverlust mit Firmware 0.1.5 und 0.1.6](2026-09-20_mmwave-sequenzverlustvergleich/figures/01-sequenzverlust.png)](2026-09-20_mmwave-sequenzverlustvergleich/README.md)
 
-Der Transport wurde insgesamt besser, ist mit `13,1 %` gemessener
-Sequenzverlustquote aber weiterhin nicht verlustfrei. Die drei weiteren
-Diagramme und die Render-QA stehen direkt im [Ergebnispaket](2026-09-13_mmwave_transport-vergleich/README.md).
+Firmware `0.1.6` erreichte im bereitgestellten 60-Sekunden-Fenster `0,00 %`
+Sequenzverlust; das Gate `radar_sequence_loss_free` bestand. Zwei weitere
+Diagramme, die exakten Tabellenwerte und die Evidenzgrenze stehen direkt im
+[Ergebnispaket](2026-09-20_mmwave-sequenzverlustvergleich/README.md).
 
 ### D4/D5/D6
 
