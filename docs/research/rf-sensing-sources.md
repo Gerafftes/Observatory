@@ -76,13 +76,3 @@ Diese acht Quellen liefern überwiegend Kontext oder Überblicke. Für Implement
 | V02 | [Bilawal Sidhu: WiFi Can See You](https://www.youtube.com/watch?v=0OdR8rRMz3I) | Überblick und Wegweiser zu Originalquellen. |
 | V06 | [Bilawal Sidhu: AI Can See Without Cameras](https://www.youtube.com/watch?v=olaQ3-m271M) | Überblick über Radar und Biometrie; Aussagen anhand der Primärbelege prüfen. |
 | V05 | [Hampton Law: Wi-Fi und Polizei](https://www.youtube.com/watch?v=LngDW3t36nc) | US-Rechtskommentar; kaum Details zur Signalverarbeitung oder technischen Validierung. |
-
-## Prüfstand
-
-- **Videos:** Alle sieben Transkripte gelesen; V02–V06 automatisch generiert.
-- **Lokale Volltexte:** P01 (10 Seiten), P06 (23), P07 (14), P09 (10), P10 (23). Titelseiten geprüft; bei P10 zusätzlich ausgewählte Methodik-, Ergebnis- und Einschränkungsabschnitte.
-- **Offene Volltexte:** P04, P08 und D02. Bisher nur Veröffentlichungsangaben, Metadaten oder Auszüge geprüft.
-- **Prüfbelege:** [UC Santa Cruz zu Pulse-Fi](https://news.ucsc.edu/2025/09/pulse-fi-wifi-heart-rate/), [Verlagsmetadaten zu P06](https://www.mdpi.com/2072-4292/16/14/2572/notes), [dblp zu RDGait](https://dblp.org/rec/journals/imwut/WangZWWFZ24.html).
-- **Bereinigung:** Fünf doppelte Links zu P02, V03, V04, V06 und V07 entfernt; RF-Pose-Zugänge gebündelt und YouTube-Teilenparameter bereinigt.
-
-Kurzbeschreibungen dienen zur Orientierung. Leistungsangaben sind Aussagen der Quellen und kein unabhängiger Nachweis für Observatory. Die Sammlung enthält öffentliche Links und eigene Beschreibungen; PDFs und Transkripte werden nicht mitveröffentlicht.
