@@ -6,12 +6,6 @@ This directory is the canonical, date-ordered index of measured BLL results.
 Each entry is a self-contained package: its `README.md` sits next to the
 associated figures, tables, and rendering notes.
 
-## Source of truth
-
-`experiment-reports/` is the only current source for result evidence.
-`software/ruview/results/` remains a historical software snapshot. It is not
-synchronized automatically and is not interpreted as a newer measurement.
-
 Packages use `YYYY-MM-DD_<series>_<result-type>`. Experiment identifiers such
 as `D4`, `E0`, and `RX` retain uppercase spelling, while descriptive parts use
 lowercase ASCII slugs. Inside a package:
