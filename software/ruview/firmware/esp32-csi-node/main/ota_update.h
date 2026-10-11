@@ -9,6 +9,7 @@
 #ifndef OTA_UPDATE_H
 #define OTA_UPDATE_H
 
+#include <stdbool.h>
 #include "esp_err.h"
 #include "esp_http_server.h"
 
@@ -37,5 +38,11 @@ esp_err_t ota_update_init(void);
  * @return ESP_OK on success.
  */
 esp_err_t ota_update_init_ex(void **out_server);
+
+/**
+ * Complete the boot self-test for a PENDING_VERIFY image.
+ * A failed pending image is marked invalid and rolled back automatically.
+ */
+esp_err_t ota_update_complete_boot_self_test(bool essential_runtime_ready);
 
 #endif /* OTA_UPDATE_H */

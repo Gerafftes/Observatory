@@ -728,6 +728,7 @@ mod raw_recording_lifecycle_tests {
             flags: 0,
             mesh_timestamp_us: None,
             source_binding: None,
+            protocol_identity: None,
             iq_pairs: vec![IqPair { i: 20, q: 0 }; 64],
         }
     }

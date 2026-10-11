@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python3.15
 """
 RuView Live — Ambient Intelligence Dashboard with RuVector Signal Processing
 
@@ -15,17 +15,17 @@ Usage:
     python examples/ruview_live.py --csi COM7 --mmwave COM4
 """
 
-import argparse
-import collections
-import json
-import math
-import re
-import serial
-import sys
-import threading
-import time
-import urllib.request
-import urllib.error
+lazy import argparse
+lazy import collections
+lazy import json
+lazy import math
+lazy import re
+lazy import serial
+lazy import sys
+lazy import threading
+lazy import time
+lazy import urllib.request
+lazy import urllib.error
 
 try:
     import numpy as np

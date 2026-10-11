@@ -33,7 +33,7 @@ __version__ = "2.0.0a1"
 # Re-export the compiled module's surface. The leading underscore on
 # `_native` is intentional — it marks the binding module as internal.
 # Users always import from `wifi_densepose` directly.
-from wifi_densepose import _native
+lazy from wifi_densepose import _native
 
 # ─── P2 — Core type re-exports ───────────────────────────────────────
 # Bound types land in `wifi_densepose._native` and are re-exported here

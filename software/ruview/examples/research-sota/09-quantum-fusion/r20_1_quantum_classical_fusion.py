@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python3.15
 """R20.1 — Working Bayesian fusion demo for ADR-114 cog-quantum-vitals.
 
 See docs/research/sota-2026-05-22/R20_1-quantum-classical-fusion-demo.md.
@@ -22,10 +22,10 @@ Pure NumPy.
 
 from __future__ import annotations
 
-import argparse
-import json
-from pathlib import Path
-import numpy as np
+lazy import argparse
+lazy import json
+lazy from pathlib import Path
+lazy import numpy as np
 
 
 def simulate_csi_breathing(duration_s=60, fs=50, true_rate_bpm=15, rng=None):

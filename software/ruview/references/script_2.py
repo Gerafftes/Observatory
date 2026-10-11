@@ -1,13 +1,13 @@
 # WiFi DensePose Implementation - Core Neural Network Architecture
 # Based on "DensePose From WiFi" by Carnegie Mellon University
 
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
-import numpy as np
-import math
-from typing import Dict, List, Tuple, Optional
-from collections import OrderedDict
+lazy import torch
+lazy import torch.nn as nn
+lazy import torch.nn.functional as F
+lazy import numpy as np
+lazy import math
+lazy from typing import Dict, List, Tuple, Optional
+lazy from collections import OrderedDict
 
 # CSI Phase Sanitization Module
 class CSIPhaseProcessor:

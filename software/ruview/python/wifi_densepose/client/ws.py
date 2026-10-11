@@ -33,12 +33,12 @@ asyncio.run(main())
 
 from __future__ import annotations
 
-import asyncio
-import json
-import logging
-import os
-from dataclasses import dataclass, field
-from typing import Any, AsyncIterator, Optional
+lazy import asyncio
+lazy import json
+lazy import logging
+lazy import os
+lazy from dataclasses import dataclass, field
+lazy from typing import Any, AsyncIterator, Optional
 
 # Defer import — only fail at construction time, not at module load.
 try:

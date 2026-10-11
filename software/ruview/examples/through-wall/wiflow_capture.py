@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python3.15
 """WiFlow-style camera-supervised capture (ADR-079 / ADR-180).
 
 Runs on a box with BOTH a camera (ground truth) and reachable live CSI:
@@ -17,16 +17,16 @@ Usage (on ruvultra, with the CSI tunneled to localhost:8765):
     python3 wiflow_capture.py --ws ws://localhost:8765/ws/sensing \
         --cam 0 --out ~/wiflow-room/dataset.jsonl --seconds 180
 """
-import argparse, asyncio, json, time, threading, sys, os
-from collections import deque
+lazy import argparse, asyncio, json, time, threading, sys, os
+lazy from collections import deque
 
-import urllib.request
-import cv2
-import numpy as np
-import mediapipe as mp
-from mediapipe.tasks.python import BaseOptions
-from mediapipe.tasks.python.vision import PoseLandmarker, PoseLandmarkerOptions, RunningMode
-import websockets
+lazy import urllib.request
+lazy import cv2
+lazy import numpy as np
+lazy import mediapipe as mp
+lazy from mediapipe.tasks.python import BaseOptions
+lazy from mediapipe.tasks.python.vision import PoseLandmarker, PoseLandmarkerOptions, RunningMode
+lazy import websockets
 
 _MODEL_URL = ("https://storage.googleapis.com/mediapipe-models/pose_landmarker/"
               "pose_landmarker_lite/float16/latest/pose_landmarker_lite.task")

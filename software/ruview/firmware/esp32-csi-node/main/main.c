@@ -12,6 +12,7 @@
 #include "freertos/task.h"
 #include "freertos/event_groups.h"
 #include "esp_system.h"
+#include "esp_random.h"
 #include "esp_wifi.h"
 #include "esp_event.h"
 #include "esp_log.h"
@@ -21,6 +22,7 @@
 #include "led_strip.h"
 
 #include "csi_collector.h"
+#include "csi_transport.h"
 #include "stream_sender.h"
 #include "nvs_config.h"
 #include "edge_processing.h"
@@ -46,11 +48,25 @@
 
 #include "esp_timer.h"
 
+#if defined(CONFIG_CSI_RAW_PROFILE) && CONFIG_CSI_RAW_PROFILE
+#define CSI_RAW_PROFILE_ENABLED 1
+#else
+#define CSI_RAW_PROFILE_ENABLED 0
+#endif
+
+#ifdef CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ
+#define CSI_CONFIGURED_CPU_FREQUENCY_MHZ CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ
+#else
+#define CSI_CONFIGURED_CPU_FREQUENCY_MHZ 0
+#endif
+
 static const char *TAG = "main";
 static led_strip_handle_t s_identity_led;
 
 /* ADR-040: WASM timer handle (calls on_timer at configurable interval). */
+#if !CSI_RAW_PROFILE_ENABLED
 static esp_timer_handle_t s_wasm_timer;
+#endif
 
 /* Runtime configuration (loaded from NVS or Kconfig defaults).
  * Global so other modules (wasm_upload.c) can access pubkey, etc. */
@@ -63,6 +79,17 @@ nvs_config_t g_nvs_config;
 static EventGroupHandle_t s_wifi_event_group;
 static int s_retry_num = 0;
 #define MAX_RETRY 10
+static esp_timer_handle_t s_wifi_reconnect_timer;
+
+static void wifi_reconnect_timer_cb(void *arg)
+{
+    (void)arg;
+    esp_err_t result = esp_wifi_connect();
+    if (result != ESP_OK) {
+        ESP_LOGW(TAG, "Deferred WiFi reconnect failed to start: %s",
+                 esp_err_to_name(result));
+    }
+}
 
 static void event_handler(void *arg, esp_event_base_t event_base,
                           int32_t event_id, void *event_data)
@@ -70,22 +97,37 @@ static void event_handler(void *arg, esp_event_base_t event_base,
     if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_START) {
         esp_wifi_connect();
     } else if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_DISCONNECTED) {
-        if (s_retry_num < MAX_RETRY) {
-            esp_wifi_connect();
-            s_retry_num++;
-            ESP_LOGI(TAG, "Retrying WiFi connection (%d/%d)", s_retry_num, MAX_RETRY);
-        } else {
+        xEventGroupClearBits(s_wifi_event_group, WIFI_CONNECTED_BIT);
+        csi_collector_notify_network_change(false);
+        stream_sender_notify_network_change();
+        if (s_retry_num == MAX_RETRY) {
             xEventGroupSetBits(s_wifi_event_group, WIFI_FAIL_BIT);
         }
+        uint32_t shift = s_retry_num < 6 ? (uint32_t)s_retry_num : 6u;
+        uint32_t delay_ms = 500u << shift;
+        if (delay_ms > 30000u) delay_ms = 30000u;
+        if (s_retry_num < MAX_RETRY) s_retry_num++;
+        if (s_wifi_reconnect_timer != NULL
+            && !esp_timer_is_active(s_wifi_reconnect_timer)) {
+            esp_timer_start_once(s_wifi_reconnect_timer, (uint64_t)delay_ms * 1000u);
+        }
+        ESP_LOGI(TAG, "WiFi reconnect scheduled in %lu ms (attempt %d)",
+                 (unsigned long)delay_ms, s_retry_num);
     } else if (event_base == IP_EVENT && event_id == IP_EVENT_STA_GOT_IP) {
         ip_event_got_ip_t *event = (ip_event_got_ip_t *)event_data;
         ESP_LOGI(TAG, "Got IP: " IPSTR, IP2STR(&event->ip_info.ip));
         s_retry_num = 0;
+        if (s_wifi_reconnect_timer != NULL
+            && esp_timer_is_active(s_wifi_reconnect_timer)) {
+            esp_timer_stop(s_wifi_reconnect_timer);
+        }
+        csi_collector_notify_network_change(true);
+        stream_sender_notify_network_change();
         xEventGroupSetBits(s_wifi_event_group, WIFI_CONNECTED_BIT);
     }
 }
 
-static void wifi_init_sta(void)
+static bool wifi_init_sta(void)
 {
     s_wifi_event_group = xEventGroupCreate();
 
@@ -95,6 +137,13 @@ static void wifi_init_sta(void)
 
     wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
     ESP_ERROR_CHECK(esp_wifi_init(&cfg));
+
+    esp_timer_create_args_t reconnect_timer_args = {
+        .callback = wifi_reconnect_timer_cb,
+        .arg = NULL,
+        .name = "wifi_reconnect",
+    };
+    ESP_ERROR_CHECK(esp_timer_create(&reconnect_timer_args, &s_wifi_reconnect_timer));
 
     esp_event_handler_instance_t instance_any_id;
     esp_event_handler_instance_t instance_got_ip;
@@ -142,9 +191,11 @@ static void wifi_init_sta(void)
 
     if (bits & WIFI_CONNECTED_BIT) {
         ESP_LOGI(TAG, "Connected to WiFi");
+        return true;
     } else if (bits & WIFI_FAIL_BIT) {
         ESP_LOGE(TAG, "Failed to connect to WiFi after %d retries", MAX_RETRY);
     }
+    return false;
 }
 
 static uint8_t scale_identity_led_channel(uint8_t channel)
@@ -165,10 +216,23 @@ void app_main(void)
     /* Load runtime config (NVS overrides Kconfig defaults) */
     nvs_config_load(&g_nvs_config);
 
+    node_identity_t identity;
+    if (!node_identity_resolve(g_nvs_config.node_id, &identity)) {
+        ESP_LOGE(TAG, "Unknown RX node_id=%u; refusing to start (expected RX1-RX4)",
+                 (unsigned)g_nvs_config.node_id);
+        return;
+    }
+
+    uint64_t boot_id = 0;
+    while (boot_id == 0) {
+        esp_fill_random(&boot_id, sizeof(boot_id));
+    }
+
     /* Capture node_id IMMEDIATELY — before wifi_init_sta() can corrupt
      * g_nvs_config. See #232/#375/#390: WiFi driver init clobbers the struct
      * on some devices, reverting node_id to the Kconfig default of 1. */
     csi_collector_set_node_id(g_nvs_config.node_id);
+    csi_collector_set_boot_id(boot_id);
 
     const esp_app_desc_t *app_desc = esp_app_get_description();
 #if defined(CONFIG_IDF_TARGET_ESP32C6)
@@ -178,8 +242,9 @@ void app_main(void)
 #else
     const char *target_name = "ESP32";
 #endif
-    ESP_LOGI(TAG, "%s CSI Node (ADR-018 / ADR-110) — v%s — Node ID: %d",
-             target_name, app_desc->version, g_nvs_config.node_id);
+    ESP_LOGI(TAG, "%s CSI Node (protocol v%u) — v%s — %s — boot=%016llx",
+             target_name, (unsigned)CSI_PROTOCOL_VERSION, app_desc->version,
+             identity.label, (unsigned long long)boot_id);
 
     /* Onboard WS2812. C6 wires the LED to GPIO 8; S3 to GPIO 38 (DevKitC-1 v1.0)
      * or GPIO 48 (DevKitC-1 v1.1 / N16R8 — see #962). On S3 we drive 48 (the
@@ -201,7 +266,6 @@ void app_main(void)
         .resolution_hz = 10 * 1000 * 1000, // 10MHz
         .flags.with_dma = false,
     };
-    node_identity_t identity;
     esp_err_t led_ret = led_strip_new_rmt_device(&strip_config, &rmt_config, &s_identity_led);
     if (led_ret != ESP_OK) {
         ESP_LOGW(TAG, "Cannot initialize onboard identity LED on GPIO %d: %s",
@@ -246,8 +310,9 @@ void app_main(void)
 
     /* Initialize WiFi STA (skip entirely under QEMU mock — no RF hardware) */
 #ifndef CONFIG_CSI_MOCK_SKIP_WIFI_CONNECT
-    wifi_init_sta();
+    bool wifi_ready = wifi_init_sta();
 #else
+    bool wifi_ready = true;
     ESP_LOGI(TAG, "Mock CSI mode: skipping WiFi init (CONFIG_CSI_MOCK_SKIP_WIFI_CONNECT)");
 #endif
 
@@ -256,7 +321,13 @@ void app_main(void)
     ESP_LOGI(TAG, "Mock CSI mode: skipping UDP sender init (no network)");
 #else
     if (stream_sender_init_with(g_nvs_config.target_ip, g_nvs_config.target_port) != 0) {
-        ESP_LOGE(TAG, "Failed to initialize UDP sender");
+        ESP_LOGW(TAG, "UDP socket unavailable at boot; sender task will rebuild it");
+    }
+    esp_err_t transport_ret = csi_transport_start();
+    if (transport_ret != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to start bounded CSI sender task: %s",
+                 esp_err_to_name(transport_ret));
+        (void)ota_update_complete_boot_self_test(false);
         return;
     }
 #endif
@@ -305,7 +376,10 @@ void app_main(void)
     }
 #endif
 
-    /* ADR-039: Initialize edge processing pipeline. */
+    /* ADR-039: Initialize edge processing pipeline unless this is raw RX. */
+#if CSI_RAW_PROFILE_ENABLED
+    ESP_LOGI(TAG, "Raw CSI profile: local edge DSP disabled");
+#else
     edge_config_t edge_cfg = {
         .tier              = g_nvs_config.edge_tier,
         .presence_thresh   = g_nvs_config.presence_thresh,
@@ -320,11 +394,14 @@ void app_main(void)
         ESP_LOGW(TAG, "Edge processing init failed: %s (continuing without edge DSP)",
                  esp_err_to_name(edge_ret));
     }
+#endif
 
     /* Initialize OTA update HTTP server (requires network). */
     httpd_handle_t ota_server = NULL;
+    bool ota_ready = true;
 #ifndef CONFIG_CSI_MOCK_SKIP_WIFI_CONNECT
     esp_err_t ota_ret = ota_update_init_ex(&ota_server);
+    ota_ready = ota_ret == ESP_OK;
     if (ota_ret != ESP_OK) {
         ESP_LOGW(TAG, "OTA server init failed: %s", esp_err_to_name(ota_ret));
     }
@@ -334,6 +411,10 @@ void app_main(void)
 #endif
 
     /* ADR-040: Initialize WASM programmable sensing runtime. */
+#if CSI_RAW_PROFILE_ENABLED
+    esp_err_t wasm_ret = ESP_ERR_NOT_SUPPORTED;
+    ESP_LOGI(TAG, "Raw CSI profile: WASM runtime disabled");
+#else
     esp_err_t wasm_ret = wasm_runtime_init();
     if (wasm_ret != ESP_OK) {
         ESP_LOGW(TAG, "WASM runtime init failed: %s", esp_err_to_name(wasm_ret));
@@ -364,6 +445,7 @@ void app_main(void)
             ESP_LOGW(TAG, "WASM timer create failed: %s", esp_err_to_name(timer_ret));
         }
     }
+#endif
 
     /* Development convenience: allow selected NVS settings to be updated
      * over WiFi on the shared OTA HTTP server. Network target changes still
@@ -376,7 +458,13 @@ void app_main(void)
         }
     }
 
-    /* ADR-063: Initialize mmWave sensor (auto-detect on UART). */
+    esp_err_t self_test_ret = ota_update_complete_boot_self_test(wifi_ready && ota_ready);
+    if (self_test_ret != ESP_OK) {
+        ESP_LOGW(TAG, "OTA boot self-test state update failed: %s",
+                 esp_err_to_name(self_test_ret));
+    }
+
+    /* ADR-063: Keep mmWave initialization unchanged in every RX profile. */
     esp_err_t mmwave_ret = mmwave_sensor_init(-1, -1);  /* -1 = use default GPIO pins */
     if (mmwave_ret == ESP_OK) {
         mmwave_state_t mw;
@@ -389,8 +477,11 @@ void app_main(void)
     }
 
     /* ADR-066: Initialize swarm bridge to Cognitum Seed (if configured). */
-    esp_err_t swarm_ret = ESP_ERR_INVALID_ARG;
-#ifndef CONFIG_CSI_MOCK_SKIP_WIFI_CONNECT
+    esp_err_t swarm_ret = ESP_ERR_NOT_SUPPORTED;
+#if CSI_RAW_PROFILE_ENABLED
+    ESP_LOGI(TAG, "Raw CSI profile: swarm bridge disabled");
+#elif !defined(CONFIG_CSI_MOCK_SKIP_WIFI_CONNECT)
+    swarm_ret = ESP_ERR_INVALID_ARG;
     if (g_nvs_config.seed_url[0] != '\0') {
         swarm_config_t swarm_cfg = {
             .heartbeat_sec = g_nvs_config.swarm_heartbeat_sec,
@@ -417,6 +508,7 @@ void app_main(void)
      * Either way, the layers above (adaptive controller, mesh plane,
      * feature extraction) address the radio through the same vtable —
      * this is the portability acceptance test in ADR-081. */
+#if !CSI_RAW_PROFILE_ENABLED
 #ifdef CONFIG_CSI_MOCK_ENABLED
     rv_radio_ops_mock_register();
 #else
@@ -435,12 +527,20 @@ void app_main(void)
         ESP_LOGW(TAG, "Adaptive controller init failed: %s",
                  esp_err_to_name(adapt_ret));
     }
+#else
+    esp_err_t adapt_ret = ESP_ERR_NOT_SUPPORTED;
+    ESP_LOGI(TAG, "Raw CSI profile: adaptive controller disabled");
+#endif
 
     /* Initialize power management. */
+#if !CSI_RAW_PROFILE_ENABLED
     power_mgmt_init(g_nvs_config.power_duty);
+#else
+    ESP_LOGI(TAG, "Raw CSI profile: power-management duty-cycle task disabled");
+#endif
 
     /* ADR-045: Start AMOLED display task (gracefully skips if no display). */
-#ifdef CONFIG_DISPLAY_ENABLE
+#if defined(CONFIG_DISPLAY_ENABLE) && !CSI_RAW_PROFILE_ENABLED
     esp_err_t disp_ret = display_task_start();
     if (disp_ret != ESP_OK) {
         ESP_LOGW(TAG, "Display init returned: %s", esp_err_to_name(disp_ret));
@@ -453,7 +553,7 @@ void app_main(void)
      * looks dead despite being on the network. Now that the display probe has
      * run, boards with no AMOLED panel (no QSPI/SPI-flash cache contention)
      * upgrade the filter to capture DATA frames too, restoring CSI yield. */
-#ifdef CONFIG_DISPLAY_ENABLE
+#if defined(CONFIG_DISPLAY_ENABLE) && !CSI_RAW_PROFILE_ENABLED
     bool has_display = display_is_active();   /* runtime panel probe result */
 #else
     bool has_display = false;                 /* display support not compiled in */
@@ -462,9 +562,11 @@ void app_main(void)
         csi_collector_enable_data_capture();
     }
 
-    ESP_LOGI(TAG, "CSI streaming active → %s:%d (edge_tier=%u, OTA=%s, WASM=%s, mmWave=%s, swarm=%s, adapt=%s)",
+    ESP_LOGI(TAG, "CSI streaming active → %s:%d (profile=%s, edge_tier=%u, CPU-config=%u MHz, OTA=%s, WASM=%s, mmWave=%s, swarm=%s, adapt=%s)",
              g_nvs_config.target_ip, g_nvs_config.target_port,
+             CSI_RAW_PROFILE_ENABLED ? "raw" : "full",
              g_nvs_config.edge_tier,
+             (unsigned)CSI_CONFIGURED_CPU_FREQUENCY_MHZ,
              (ota_ret == ESP_OK) ? "ready" : "off",
              (wasm_ret == ESP_OK) ? "ready" : "off",
              (mmwave_ret == ESP_OK) ? "active" : "off",

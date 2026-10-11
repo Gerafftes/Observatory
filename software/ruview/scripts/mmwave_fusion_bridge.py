@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python3.15
 """
 ADR-063 Phase 6: Real-time mmWave + WiFi CSI Fusion Bridge
 
@@ -13,13 +13,13 @@ Usage:
     python scripts/mmwave_fusion_bridge.py --csi-port COM7 --mmwave-port COM4
 """
 
-import argparse
-import re
-import serial
-import sys
-import threading
-import time
-from dataclasses import dataclass, field
+lazy import argparse
+lazy import re
+lazy import serial
+lazy import sys
+lazy import threading
+lazy import time
+lazy from dataclasses import dataclass, field
 
 
 @dataclass

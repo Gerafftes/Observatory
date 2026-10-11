@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-import json
-import tempfile
-import unittest
-from pathlib import Path
+lazy import json
+lazy import tempfile
+lazy import unittest
+lazy from pathlib import Path
 
-from scripts.evaluate_d5_replay import (
+lazy from scripts.evaluate_d5_replay import (
     LabeledRun,
     ReplayConfig,
     RunSample,

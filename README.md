@@ -111,6 +111,7 @@ Die wichtigsten Einstiegspunkte sind:
 3. [Ergebnisberichte](experiment-reports/)
 4. [PCB-01-Fertigungsdaten](hardware/pcb-01/)
 5. [PCB-03-Fertigungsdaten und KiCad-Quellen](hardware/pcb-03/)
+6. [MMWAVE1/2: USB-/OTA-Upload](software/ruview/firmware/esp32-mmwave-node/README.md#mmwave1-and-mmwave2-upload) · [Firmware-Quellcode](software/ruview/firmware/esp32-mmwave-node/main/)
 
 Die Software basiert auf [ruvnet/RuView](https://github.com/ruvnet/RuView), ist
 aber mit den Observatory-Anpassungen und den benötigten Unterprojekten direkt

@@ -7,12 +7,12 @@ in [0,1] — the labeled calibration samples from the deployment room (~100–20
 Outputs a tiny adapter (.npz, ~11 KB) that, loaded over the shared base at inference, recovers
 SOTA-level pose for that room/person (ADR-150 §3.5–3.6).
 """
-import argparse
-import numpy as np
-import torch
-import torch.nn as nn
+lazy import argparse
+lazy import numpy as np
+lazy import torch
+lazy import torch.nn as nn
 
-from model import PoseNet, standardize
+lazy from model import PoseNet, standardize
 
 
 def main():

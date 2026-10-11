@@ -24,10 +24,10 @@ for entity in helper.entities_for_node("aabbccddeeff"):
 
 from __future__ import annotations
 
-import json
-import re
-from dataclasses import dataclass, field
-from typing import Any, Iterable
+lazy import json
+lazy import re
+lazy from dataclasses import dataclass, field
+lazy from typing import Any, Iterable
 
 
 # ─── Topic schema ────────────────────────────────────────────────────

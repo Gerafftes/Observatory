@@ -16,13 +16,13 @@ Coverage:
 
 from __future__ import annotations
 
-import math
+lazy import math
 
-import numpy as np
-import pytest
+lazy import numpy as np
+lazy import pytest
 
-import wifi_densepose
-from wifi_densepose import BfldFrame, BfldKind, BfldReport
+lazy import wifi_densepose
+lazy from wifi_densepose import BfldFrame, BfldKind, BfldReport
 
 
 # ─── BfldKind enum ───────────────────────────────────────────────────

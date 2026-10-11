@@ -48,9 +48,9 @@ entire workflow uses Python and pre-built firmware binaries.
 Install these on your host laptop/desktop (Windows, macOS, or Linux):
 
 ```bash
-# Python 3.10 or later
+# Python 3.15 or later
 python --version
-# Expected: Python 3.10.x or later
+# Expected: Python 3.15.x or later
 
 # esptool for flashing firmware
 pip install esptool

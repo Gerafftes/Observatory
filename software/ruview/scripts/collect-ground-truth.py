@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python3.15
 """Camera ground-truth collection for WiFi pose estimation training (ADR-079).
 
 Captures webcam keypoints via MediaPipe PoseLandmarker (Tasks API) and
@@ -23,23 +23,23 @@ Usage:
 
 from __future__ import annotations
 
-import argparse
-import json
-import os
-import signal
-import sys
-import time
-import urllib.request
-import urllib.error
-from pathlib import Path
-from datetime import datetime
+lazy import argparse
+lazy import json
+lazy import os
+lazy import signal
+lazy import sys
+lazy import time
+lazy import urllib.request
+lazy import urllib.error
+lazy from pathlib import Path
+lazy from datetime import datetime
 
-import cv2
-import numpy as np
+lazy import cv2
+lazy import numpy as np
 
-import mediapipe as mp
-from mediapipe.tasks.python import BaseOptions
-from mediapipe.tasks.python.vision import (
+lazy import mediapipe as mp
+lazy from mediapipe.tasks.python import BaseOptions
+lazy from mediapipe.tasks.python.vision import (
     PoseLandmarker,
     PoseLandmarkerOptions,
     RunningMode,

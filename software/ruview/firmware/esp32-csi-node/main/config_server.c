@@ -22,6 +22,7 @@
 #include "nvs.h"
 #include "nvs_config.h"
 #include "ota_update.h"
+#include "stream_sender.h"
 
 static const char *TAG = "config_server";
 
@@ -159,6 +160,8 @@ static esp_err_t config_post_handler(httpd_req_t *req)
     }
 
     bool changed = false;
+    bool target_changed = false;
+    bool reboot_required = false;
     char value[64];
 
 #define RETURN_ON_NVS_WRITE_ERROR(call, key_name) do {                         \
@@ -180,6 +183,7 @@ static esp_err_t config_post_handler(httpd_req_t *req)
         }
         RETURN_ON_NVS_WRITE_ERROR(nvs_set_str(handle, "target_ip", value), "target_ip");
         changed = true;
+        target_changed = true;
     }
 
     if (httpd_query_key_value(query, "target_port", value, sizeof(value)) == ESP_OK) {
@@ -191,17 +195,19 @@ static esp_err_t config_post_handler(httpd_req_t *req)
         }
         RETURN_ON_NVS_WRITE_ERROR(nvs_set_u16(handle, "target_port", (uint16_t)port), "target_port");
         changed = true;
+        target_changed = true;
     }
 
     if (httpd_query_key_value(query, "node_id", value, sizeof(value)) == ESP_OK) {
         uint32_t node_id = 0;
-        if (!parse_u32_range(value, 0, 255, &node_id)) {
+        if (!parse_u32_range(value, 1, 4, &node_id)) {
             nvs_close(handle);
-            httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid node_id");
+            httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid node_id; expected RX1-RX4");
             return ESP_FAIL;
         }
         RETURN_ON_NVS_WRITE_ERROR(nvs_set_u8(handle, "node_id", (uint8_t)node_id), "node_id");
         changed = true;
+        reboot_required = true;
     }
 
     if (httpd_query_key_value(query, "csi_channel", value, sizeof(value)) == ESP_OK) {
@@ -213,6 +219,7 @@ static esp_err_t config_post_handler(httpd_req_t *req)
         }
         RETURN_ON_NVS_WRITE_ERROR(nvs_set_u8(handle, "csi_channel", (uint8_t)channel), "csi_channel");
         changed = true;
+        reboot_required = true;
     }
 
     if (httpd_query_key_value(query, "edge_tier", value, sizeof(value)) == ESP_OK) {
@@ -224,6 +231,7 @@ static esp_err_t config_post_handler(httpd_req_t *req)
         }
         RETURN_ON_NVS_WRITE_ERROR(nvs_set_u8(handle, "edge_tier", (uint8_t)edge_tier), "edge_tier");
         changed = true;
+        reboot_required = true;
     }
 
     if (httpd_query_key_value(query, "tdm_slot", value, sizeof(value)) == ESP_OK) {
@@ -235,6 +243,7 @@ static esp_err_t config_post_handler(httpd_req_t *req)
         }
         RETURN_ON_NVS_WRITE_ERROR(nvs_set_u8(handle, "tdm_slot", (uint8_t)tdm_slot), "tdm_slot");
         changed = true;
+        reboot_required = true;
     }
 
     if (httpd_query_key_value(query, "tdm_total", value, sizeof(value)) == ESP_OK) {
@@ -246,6 +255,7 @@ static esp_err_t config_post_handler(httpd_req_t *req)
         }
         RETURN_ON_NVS_WRITE_ERROR(nvs_set_u8(handle, "tdm_nodes", (uint8_t)tdm_total), "tdm_nodes");
         changed = true;
+        reboot_required = true;
     }
 
     if (httpd_query_key_value(query, "clear_filter_mac", value, sizeof(value)) == ESP_OK
@@ -255,6 +265,7 @@ static esp_err_t config_post_handler(httpd_req_t *req)
             ESP_LOGW(TAG, "Failed to erase filter_mac: %s", esp_err_to_name(erase_err));
         }
         changed = true;
+        reboot_required = true;
     }
 
     if (!changed) {
@@ -285,8 +296,21 @@ static esp_err_t config_post_handler(httpd_req_t *req)
         return ESP_OK;
     }
 
-    ESP_LOGI(TAG, "Config updated via HTTP; reboot required to apply network settings");
-    return send_json(req, "{\"status\":\"ok\",\"rebooting\":false,\"reboot_required\":true}");
+    int target_result = 0;
+    if (target_changed) {
+        nvs_config_t updated;
+        nvs_config_load(&updated);
+        target_result = stream_sender_reconfigure(updated.target_ip, updated.target_port);
+    }
+    ESP_LOGI(TAG, "Config updated via HTTP; UDP target refresh=%s; identity/radio changes require reboot",
+             !target_changed ? "unchanged" : (target_result == 0 ? "scheduled" : "failed"));
+    if (target_result != 0) {
+        return send_json(req,
+                         "{\"status\":\"error\",\"target_applied\":false,\"reboot_required\":true}");
+    }
+    return send_json(req, reboot_required
+        ? "{\"status\":\"ok\",\"target_applied\":true,\"reboot_required\":true}"
+        : "{\"status\":\"ok\",\"target_applied\":true,\"reboot_required\":false}");
 
 #undef RETURN_ON_NVS_WRITE_ERROR
 }

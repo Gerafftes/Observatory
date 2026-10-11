@@ -24,11 +24,11 @@ crate-type = ["cdylib", "rlib"]
 path = "src/lib.rs"
 
 [dependencies]
-# PyO3 with abi3-py310 — one compiled binary covers Python 3.10, 3.11,
-# 3.12, 3.13, and any future 3.x that keeps the stable ABI (ADR-117 §5.4).
+# PyO3 with abi3-py315 — one compiled binary covers Python 3.15 and future
+# 3.x releases that keep the stable ABI (ADR-117 §5.4).
 # Without abi3 we'd need a separate wheel per Python minor version × OS
 # × arch, blowing up the cibuildwheel matrix.
-pyo3 = { version = "0.22", features = ["extension-module", "abi3-py310"] }
+pyo3 = { version = "0.29", features = ["extension-module", "abi3-py315"] }
 
 # Re-export the Rust core types through PyO3 #[pyclass] wrappers in P2.
 # Default-features-off keeps the wheel size below the 5 MB ADR-117 §5.4
@@ -48,7 +48,7 @@ wifi-densepose-bfld = { version = "0.3.0", path = "../v2/crates/wifi-densepose-b
 
 # numpy bridge — needed for P3.5 BfldFrame (Complex64 ndarray) and for
 # the future P3 CsiFrame numpy round-trip.
-numpy = "0.22"
+numpy = "0.29"
 
 [dev-dependencies]
 # Doc-test infrastructure for the Python-facing examples in the bound

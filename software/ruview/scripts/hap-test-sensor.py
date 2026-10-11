@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python3.15
 """
 hap-test-sensor.py — ADR-125 §2.1.a smoke test.
 
@@ -19,16 +19,16 @@ Clear motion:    rm   /tmp/ruview-motion
 State persists across restarts in ~/.ruview-hap/accessory.state.
 """
 
-from pathlib import Path
-import json
-import os
-import sys
-import time
-import signal
+lazy from pathlib import Path
+lazy import json
+lazy import os
+lazy import sys
+lazy import time
+lazy import signal
 
-from pyhap.accessory import Accessory, Bridge
-from pyhap.accessory_driver import AccessoryDriver
-from pyhap.const import CATEGORY_SENSOR, CATEGORY_BRIDGE
+lazy from pyhap.accessory import Accessory, Bridge
+lazy from pyhap.accessory_driver import AccessoryDriver
+lazy from pyhap.const import CATEGORY_SENSOR, CATEGORY_BRIDGE
 
 STATE_DIR = Path(os.path.expanduser("~/.ruview-hap"))
 STATE_DIR.mkdir(exist_ok=True)

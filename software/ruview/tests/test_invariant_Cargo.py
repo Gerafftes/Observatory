@@ -1,6 +1,6 @@
-import pytest
-import re
-import os
+lazy import pytest
+lazy import re
+lazy import os
 
 
 ADVERSARIAL_PAYLOADS = [

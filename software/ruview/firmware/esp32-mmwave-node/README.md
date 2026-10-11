@@ -1,8 +1,10 @@
 # ESP32-C3 HLK-LD2450 calibration/reference node
 
-Firmware for the `PCB-01` carrier with an ESP32-C3 Super Mini and HLK-LD2450.
-It streams all three raw radar target slots over UDP and exposes authenticated
-WiFi OTA on the same port and paths used by the RuView RX nodes.
+Firmware for ESP32-C3 Super Mini / HLK-LD2450 reference nodes. The current
+carrier design is [PCB-03](../../../../hardware/pcb-03/README.md); the UART
+wiring was first verified on PCB-01. The firmware streams all three raw radar
+target slots over UDP and exposes authenticated WiFi OTA on the same port and
+paths used by the RuView RX nodes.
 
 ## Hardware verified from PCB-01
 
@@ -55,22 +57,62 @@ accuracy run, first freeze the WiFi model, switch the node to `reference`, and
 record with `--expected-mode reference`. The receiver fails immediately if the
 mode is wrong, helping prevent reference leakage into training.
 
-## Configure and build
+## MMWAVE1 and MMWAVE2 upload
 
-Install ESP-IDF 5.4, then:
+Both nodes use the same [firmware source](main/) (entry point:
+[app_main.c](main/app_main.c)), [configuration options](main/Kconfig.projbuild), and
+[OTA upload tool](tools/ota_update.py). The compiled node ID is different, so
+build a separate image for each node. No device-specific `.bin` files are
+committed to this repository.
+
+Install ESP-IDF 5.4, activate its environment, and run these commands from this
+directory. Each build keeps its own `sdkconfig` and binary under the ignored
+`build/` directory; an existing project-root `sdkconfig` is left untouched.
+In **RuView mmWave node** in each `menuconfig`, set the WiFi credentials, the
+current UDP collector address and port (`55010`), a strong OTA token, and the
+**Stable node ID** shown below. Use the token shared with the sensing server if
+collector discovery and automatic target correction are needed. Do not copy one
+node's image to the other node.
+
+| Node | Stable node ID in `menuconfig` | App image after `build` |
+| --- | --- | --- |
+| MMWAVE1 | `MMWAVE1` | `build/mmwave1/esp32-mmwave-node.bin` |
+| MMWAVE2 | `MMWAVE2` | `build/mmwave2/esp32-mmwave-node.bin` |
+
+### MMWAVE1: configure, build, and initial USB flash
 
 ```sh
-idf.py set-target esp32c3
-idf.py menuconfig
-idf.py build
-idf.py -p /dev/cu.usbmodem... flash monitor
+idf.py -B build/mmwave1 -DSDKCONFIG=build/mmwave1.sdkconfig -DIDF_TARGET=esp32c3 menuconfig
+idf.py -B build/mmwave1 -DSDKCONFIG=build/mmwave1.sdkconfig build
+idf.py -B build/mmwave1 -DSDKCONFIG=build/mmwave1.sdkconfig -p /dev/cu.usbmodem... flash monitor
 ```
 
-Under **RuView mmWave node**, set the WiFi, UDP collector, stable node ID, and a
-strong OTA token. The radar-to-room transform remains available for standalone
-diagnostics and backward-compatible packets, but the RuView server uses the
-saved setup profile as its source of truth. The initial USB flash is required
-once. Later app updates use WiFi OTA and preserve NVS/mode.
+### MMWAVE2: configure, build, and initial USB flash
+
+For the MMWAVE2 board diagnosed on 2026-09-26, enable **Limit WiFi TX power**
+and set **Maximum WiFi TX power** to `40` (quarter-dBm units, 10 dBm). The
+high/low/high SoftAP comparison reproduced failure at `78` and successful
+association at `40`; see the [diagnostic report](../../../../experiment-reports/mmwave2-wifi-20260926.md)
+and [standalone AP probe](tools/ap_probe/README.md). This option is off by
+default for other boards. Preserve it in MMWAVE2's private build configuration
+when rebuilding; it is applied before the first association attempt.
+
+```sh
+idf.py -B build/mmwave2 -DSDKCONFIG=build/mmwave2.sdkconfig -DIDF_TARGET=esp32c3 menuconfig
+idf.py -B build/mmwave2 -DSDKCONFIG=build/mmwave2.sdkconfig build
+idf.py -B build/mmwave2 -DSDKCONFIG=build/mmwave2.sdkconfig -p /dev/cu.usbmodem... flash monitor
+```
+
+Replace `/dev/cu.usbmodem...` with the port of the intended ESP32-C3 and
+connect only that node for the USB flash. `flash` writes the build's bootloader,
+partition table, OTA initialization data, and app; reserve it for initial
+provisioning or a deliberate full USB reflash. Check the node ID in the boot
+log and the corresponding LED pattern before connecting the other node.
+
+The radar-to-room transform remains available for standalone diagnostics and
+backward-compatible packets, but the RuView server uses the saved setup
+profile as its source of truth. Later app updates can use WiFi OTA with the
+matching node image and preserve the node's NVS/mode.
 
 Transform definition:
 
@@ -89,13 +131,53 @@ the radar as an accuracy reference.
 
 ## Operate and update over WiFi
 
+Find each node's current IP address on the experiment WLAN. Read its status
+first and confirm `node_id` before uploading the matching app image. Set
+`MMWAVE_OTA_PSK` to the shared server/node token in your shell. Replace each
+documentation IP below with the current address before running it.
+
+For MMWAVE1, run the status command and verify `node_id` is `MMWAVE1`:
+
 ```sh
-python3 tools/ota_update.py 192.0.2.60 --status
-python3 tools/ota_update.py 192.0.2.60 --token "$MMWAVE_OTA_PSK" --mode calibration
-python3 tools/ota_update.py 192.0.2.60 --token "$MMWAVE_OTA_PSK" --mode reference
-python3 tools/ota_update.py 192.0.2.60 --token "$MMWAVE_OTA_PSK" \
-  --firmware build/esp32-mmwave-node.bin
+MMWAVE1_IP=192.0.2.60
+python3 tools/ota_update.py "$MMWAVE1_IP" --status
 ```
+
+Only then upload the MMWAVE1 app:
+
+```sh
+python3 tools/ota_update.py "$MMWAVE1_IP" --token "$MMWAVE_OTA_PSK" \
+  --firmware build/mmwave1/esp32-mmwave-node.bin
+```
+
+For MMWAVE2, run the status command and verify `node_id` is `MMWAVE2`:
+
+```sh
+MMWAVE2_IP=192.0.2.61
+python3 tools/ota_update.py "$MMWAVE2_IP" --status
+```
+
+Only then upload the MMWAVE2 app:
+
+```sh
+python3 tools/ota_update.py "$MMWAVE2_IP" --token "$MMWAVE_OTA_PSK" \
+  --firmware build/mmwave2/esp32-mmwave-node.bin
+```
+
+The token must match the selected node. For server-managed discovery and
+automatic target correction, both nodes must use the token configured as
+`MMWAVE_NODE_TOKEN` on the server. After each update, read `/ota/status` again
+and verify the node ID, target, and increasing UART/radar/UDP counters. An HTTP
+response alone does not prove that the LD2450 is sending frames.
+
+To change a node's measurement mode without uploading firmware:
+
+```sh
+python3 tools/ota_update.py "$MMWAVE1_IP" --token "$MMWAVE_OTA_PSK" --mode calibration
+python3 tools/ota_update.py "$MMWAVE1_IP" --token "$MMWAVE_OTA_PSK" --mode reference
+```
+
+Use `"$MMWAVE2_IP"` for MMWAVE2 instead.
 
 Endpoints on port 8032:
 
@@ -133,6 +215,12 @@ node**. The learned timeout is capped at a configurable 2 s so a collector
 outage remains bounded.
 The server can use the authenticated `/transport` endpoint to repair a changed
 collector IP/port and persists that target in NVS.
+
+ACKs must come from the configured collector IP and port. On a host with
+multiple addresses, use the address selected for replies towards the node:
+a wildcard UDP listener may receive through an IP alias but reply through the
+interface's primary address. That mismatch causes ACK timeouts despite server
+reception; correct the target through `/transport` and retain ACK validation.
 
 The node also keeps its WiFi interface in the normal DHCP-client mode. While
 radar frames are streaming it broadcasts an authenticated collector-discovery

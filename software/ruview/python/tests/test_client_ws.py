@@ -10,14 +10,14 @@ binary, but the wire protocol is the contract under test here.
 
 from __future__ import annotations
 
-import asyncio
-import json
-from typing import Any
+lazy import asyncio
+lazy import json
+lazy from typing import Any
 
-import pytest
-import websockets
+lazy import pytest
+lazy import websockets
 
-from wifi_densepose.client import (
+lazy from wifi_densepose.client import (
     ConnectionEstablishedMessage,
     EdgeVitalsMessage,
     PoseDataMessage,

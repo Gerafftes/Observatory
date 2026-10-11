@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python3.15
 """
 ruview-sensing-server.py — ADR-125 Tier 1+2 iter 2.
 
@@ -31,14 +31,14 @@ API routes require ``Authorization: Bearer <token>`` using the token from
 all telemetry and state-changing routes fail closed when the token is absent.
 """
 from __future__ import annotations
-import hmac
-import json
-import os
-import re
-import sys
-import time
-from http.server import BaseHTTPRequestHandler, HTTPServer
-from urllib.parse import urlparse, parse_qs
+lazy import hmac
+lazy import json
+lazy import os
+lazy import re
+lazy import sys
+lazy import time
+lazy from http.server import BaseHTTPRequestHandler, HTTPServer
+lazy from urllib.parse import urlparse, parse_qs
 
 FEATURE_FILE = os.environ.get("RUVIEW_FEATURE_JSON",
                               "/tmp/ruview-last-feature.json")

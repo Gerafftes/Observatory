@@ -17,17 +17,17 @@ Usage:
 Writes/merges into results/edge_optimization.json under key "onnx".
 """
 
-import json
-import os
-import platform
-import statistics
-import time
-import traceback
+lazy import json
+lazy import os
+lazy import platform
+lazy import statistics
+lazy import time
+lazy import traceback
 
-import numpy as np
-import torch
+lazy import numpy as np
+lazy import torch
 
-from _bench_common import RESULTS, import_upstream, load_wiflow_model
+lazy from _bench_common import RESULTS, import_upstream, load_wiflow_model
 
 import_upstream()  # sys.path + models stub + >1GB np.load mmap patch
 

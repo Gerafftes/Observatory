@@ -1,0 +1,13 @@
+menu "MMWAVE2 AP diagnosis"
+config AP_PROBE_PASSWORD
+    string "Private WPA2 test password (8-63 characters)"
+    default ""
+config AP_PROBE_CHANNEL
+    int "AP channel"
+    range 1 11
+    default 1
+config AP_PROBE_TX_POWER
+    int "Maximum TX power in quarter dBm (78 = driver default maximum)"
+    range 8 78
+    default 78
+endmenu

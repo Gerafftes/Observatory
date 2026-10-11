@@ -13,16 +13,16 @@ Usage:
 Writes/merges into results/edge_optimization.json under key "onnx_accuracy".
 """
 
-import argparse
-import json
-import os
-import sys
+lazy import argparse
+lazy import json
+lazy import os
+lazy import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 
-from _bench_common import RESULTS, evaluate  # noqa: E402
-from quantize_bench import build_test_subset  # noqa: E402  (sets up upstream imports)
+lazy from _bench_common import RESULTS, evaluate  # noqa: E402
+lazy from quantize_bench import build_test_subset  # noqa: E402  (sets up upstream imports)
 
 
 def evaluate_ort(sess, loader, label):

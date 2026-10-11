@@ -202,7 +202,7 @@ from ruview.client import (
 
 The wheels ship for Linux (x86_64, aarch64 via sdist), macOS (sdist),
 and Windows (amd64 wheel). Stable ABI (`abi3-py310`) — one binary
-covers Python 3.10+. Multi-arch native wheels are produced by the
+covers Python 3.15+. Multi-arch native wheels are produced by the
 [pip-release.yml](../.github/workflows/pip-release.yml) cibuildwheel
 matrix on each `v*-pip` tag.
 
@@ -1813,7 +1813,7 @@ For significantly higher accuracy, use a webcam as a **temporary teacher** durin
 
 ### Requirements
 
-- Python 3.9+ with `mediapipe` and `opencv-python` (`pip install mediapipe opencv-python`)
+- Python 3.15+ with `mediapipe` and `opencv-python` (`pip install mediapipe opencv-python`)
 - ESP32-S3 node streaming CSI over UDP (port 5005)
 - A webcam (laptop, USB, or Mac camera via Tailscale)
 
@@ -2065,7 +2065,7 @@ This is useful when:
 ### What You Need
 
 **Required:**
-- Python 3.8+ (you probably already have this)
+- Python 3.15+
 - QEMU with ESP32-S3 support (Espressif's fork)
 
 **Install QEMU (one-time setup):**

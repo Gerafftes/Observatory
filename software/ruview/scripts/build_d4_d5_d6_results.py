@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python3.15
 """Build the D4/D5/D6 run inventory and the report figures.
 
 The script is deliberately read-only with respect to recordings. It derives the
@@ -8,15 +8,15 @@ artifacts below ``RuView/results``.
 
 from __future__ import annotations
 
-import csv
-import json
-import math
-import statistics
-from collections import Counter, defaultdict
-from pathlib import Path
-from typing import Any, Iterable
+lazy import csv
+lazy import json
+lazy import math
+lazy import statistics
+lazy from collections import Counter, defaultdict
+lazy from pathlib import Path
+lazy from typing import Any, Iterable
 
-from PIL import Image, ImageDraw, ImageFont
+lazy from PIL import Image, ImageDraw, ImageFont
 
 
 PROJECT_DIR = Path(__file__).resolve().parent.parent

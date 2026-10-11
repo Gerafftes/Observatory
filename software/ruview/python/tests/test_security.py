@@ -15,19 +15,19 @@ sensing-server can't:
 
 from __future__ import annotations
 
-import json
-from types import SimpleNamespace
+lazy import json
+lazy from types import SimpleNamespace
 
-import pytest
+lazy import pytest
 
-from wifi_densepose.client import RuViewMqttClient, SemanticPrimitiveListener
-from wifi_densepose.client.ha import (
+lazy from wifi_densepose.client import RuViewMqttClient, SemanticPrimitiveListener
+lazy from wifi_densepose.client.ha import (
     HABlueprintHelper,
     parse_discovery_payload,
     parse_discovery_topic,
 )
-from wifi_densepose.client.mqtt import _topic_matches
-from wifi_densepose.client.ws import _decode
+lazy from wifi_densepose.client.mqtt import _topic_matches
+lazy from wifi_densepose.client.ws import _decode
 
 
 # ─── WS decoder robustness ──────────────────────────────────────────

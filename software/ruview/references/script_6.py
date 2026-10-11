@@ -1,9 +1,9 @@
 # DensePose-RCNN Architecture for WiFi-based Human Pose Estimation
 # Based on the DensePose paper and WiFi-DensePose implementation
 
-import numpy as np
-from typing import Dict, List, Tuple, Optional
-from collections import OrderedDict
+lazy import numpy as np
+lazy from typing import Dict, List, Tuple, Optional
+lazy from collections import OrderedDict
 
 class ResNetFPN:
     """

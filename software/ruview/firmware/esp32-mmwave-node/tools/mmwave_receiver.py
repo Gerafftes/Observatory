@@ -1,16 +1,16 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python3.15
 """Record timestamped LD2450 UDP measurements as JSONL."""
 
-import argparse
-import json
-import socket
-import time
+lazy import argparse
+lazy import json
+lazy import socket
+lazy import time
 
 
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--bind", default="0.0.0.0")
-    parser.add_argument("--port", type=int, default=5010)
+    parser.add_argument("--port", type=int, default=55010)
     parser.add_argument("--expected-mode", required=True,
                         choices=("calibration", "reference"))
     parser.add_argument("--output", required=True)

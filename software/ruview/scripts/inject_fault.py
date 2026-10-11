@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python3.15
 """
 QEMU Fault Injector — ADR-061 Layer 9
 
@@ -17,12 +17,12 @@ Usage:
     python3 inject_fault.py --socket /path/to/qemu.sock --fault wifi_kill
 """
 
-import argparse
-import os
-import random
-import socket
-import sys
-import time
+lazy import argparse
+lazy import os
+lazy import random
+lazy import socket
+lazy import sys
+lazy import time
 
 
 # Timeout for each monitor command (seconds)

@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python3.15
 """
 QEMU ESP32-S3 UART Output Validator (ADR-061)
 
@@ -17,13 +17,13 @@ Exit codes:
     3  Fatal (crash or corruption detected)
 """
 
-import argparse
-import re
-import sys
-from dataclasses import dataclass, field
-from enum import IntEnum
-from pathlib import Path
-from typing import List, Optional
+lazy import argparse
+lazy import re
+lazy import sys
+lazy from dataclasses import dataclass, field
+lazy from enum import IntEnum
+lazy from pathlib import Path
+lazy from typing import List, Optional
 
 
 class Severity(IntEnum):

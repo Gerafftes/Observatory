@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python3.15
 """
 ESP32-S3 CSI Node Provisioning Script
 
@@ -13,14 +13,14 @@ Requirements:
     (or use the nvs_partition_gen.py bundled with ESP-IDF)
 """
 
-import argparse
-import csv
-import io
-import os
-import struct
-import subprocess
-import sys
-import tempfile
+lazy import argparse
+lazy import csv
+lazy import io
+lazy import os
+lazy import struct
+lazy import subprocess
+lazy import sys
+lazy import tempfile
 
 
 # NVS partition table offset — default for ESP-IDF 4MB flash with standard

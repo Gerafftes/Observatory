@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python3.15
 """Platform probe: reproduce verify.py's hash-relevant FFT steps in isolation.
 
 Runs the same scipy.fft.fft / scipy.signal calls that verify.py hashes
@@ -20,15 +20,15 @@ The output now contains TWO hashes:
 If `sha256_raw` differs across machines but `sha256_quantized` matches,
 the quantize-before-hash fix is doing its job.
 """
-import hashlib
-import json
-import platform
-import struct
-import sys
+lazy import hashlib
+lazy import json
+lazy import platform
+lazy import struct
+lazy import sys
 
-import numpy as np
-import scipy.fft
-import scipy.signal
+lazy import numpy as np
+lazy import scipy.fft
+lazy import scipy.signal
 
 # Deterministic synthetic input -- no IO, no .env, no Settings
 rng = np.random.RandomState(42)

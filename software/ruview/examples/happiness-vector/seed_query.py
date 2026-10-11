@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python3.15
 """
 Cognitum Seed — Happiness Vector Query Tool
 
@@ -13,12 +13,12 @@ Requirements:
     Python 3.7+ (stdlib only, no dependencies)
 """
 
-import argparse
-import json
-import sys
-import time
-import urllib.request
-import urllib.error
+lazy import argparse
+lazy import json
+lazy import sys
+lazy import time
+lazy import urllib.request
+lazy import urllib.error
 
 
 def api(base, path, token=None, method="GET", data=None):

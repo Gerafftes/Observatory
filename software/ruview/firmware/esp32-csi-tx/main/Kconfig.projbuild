@@ -1,0 +1,9 @@
+menu "TX migration"
+    config TX_PROTECT_ORIGINAL_APP
+        bool "Preserve the original app0 (reject OTA targeting it)"
+        default y
+    config TX_VERIFIED_ROLLBACK
+        bool "Bootloader rollback and shared-data compatibility verified externally"
+        depends on BOOTLOADER_APP_ROLLBACK_ENABLE
+        default n
+endmenu

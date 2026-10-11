@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python3.15
 """Live CSI->pose inference bridge (ADR-180).
 
 Runs on the box with the live CSI. Loads the camera-supervised model (numpy,
@@ -8,9 +8,9 @@ broadcasts the predicted 17-keypoint pose to HTML clients on ws://:8770/pose.
   python wiflow_infer.py --model model/model.npz \
       --in ws://localhost:8765/ws/sensing --port 8770
 """
-import argparse, asyncio, json, os
-import numpy as np
-import websockets
+lazy import argparse, asyncio, json, os
+lazy import numpy as np
+lazy import websockets
 
 # COCO skeleton edges (for the client; sent once in 'meta')
 EDGES = [[5,7],[7,9],[6,8],[8,10],[5,6],[11,12],[5,11],[6,12],

@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python3.15
 """
 ESP32 CSI node provisioning (ESP32-S3, ESP32-C6, other targets).
 
@@ -39,16 +39,16 @@ ADDITIVE-BY-DEFAULT (issue #391, #574 phase 1):
     (tracked in #574).
 """
 
-import argparse
-import csv
-import hashlib
-import io
-import json
-import os
-import struct
-import subprocess
-import sys
-import tempfile
+lazy import argparse
+lazy import csv
+lazy import hashlib
+lazy import io
+lazy import json
+lazy import os
+lazy import struct
+lazy import subprocess
+lazy import sys
+lazy import tempfile
 
 
 # NVS partition table offset — default for ESP-IDF 4MB flash with standard

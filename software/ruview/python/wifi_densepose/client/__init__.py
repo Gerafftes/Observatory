@@ -37,12 +37,12 @@ from __future__ import annotations
 # `from wifi_densepose.client import HABlueprintHelper` still works
 # even if the user hasn't installed `[client]` extras yet (HABlueprint
 # is pure stdlib).
-from wifi_densepose.client.ha import (
+lazy from wifi_densepose.client.ha import (
     HaDiscoveryPayload,
     HaEntity,
     HABlueprintHelper,
 )
-from wifi_densepose.client.primitives import (
+lazy from wifi_densepose.client.primitives import (
     SemanticPrimitive,
     SemanticPrimitiveEvent,
     SemanticPrimitiveListener,

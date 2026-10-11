@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python3.15
 """Audit one mmWave session together with before/after runtime snapshots.
 
 The session JSONL contains accepted packets only. Server-side status snapshots
@@ -8,14 +8,14 @@ are therefore required for a fail-closed verdict: content rejects such as
 
 from __future__ import annotations
 
-import argparse
-import json
-import math
-import sys
-from collections import deque
-from dataclasses import dataclass
-from pathlib import Path
-from typing import Any
+lazy import argparse
+lazy import json
+lazy import math
+lazy import sys
+lazy from collections import deque
+lazy from dataclasses import dataclass
+lazy from pathlib import Path
+lazy from typing import Any
 
 
 UINT32_MASK = (1 << 32) - 1

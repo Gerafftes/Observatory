@@ -18,6 +18,9 @@ mod classification_evaluation;
 mod coarse_localization;
 #[cfg(test)]
 pub mod csi;
+mod csi_diagnostics;
+mod csi_identity;
+mod csi_sample_timing;
 mod d5_presence;
 mod d6_fingerprint;
 mod engine_bridge;
@@ -72,7 +75,7 @@ use wifi_densepose_sensing_server::{
 
 use ruvector_mincut::{DynamicMinCut, MinCutBuilder};
 use std::collections::{BTreeMap, HashMap, VecDeque};
-use std::net::SocketAddr;
+use std::net::{Ipv4Addr, SocketAddr};
 use std::path::{Path as FilePath, PathBuf};
 use std::sync::Arc;
 use std::time::Duration;
@@ -149,6 +152,10 @@ struct Args {
     /// UDP port for HLK-LD2450 packets from the ESP32-C3 node.
     #[arg(long, default_value_t = mmwave_calibration::DEFAULT_UDP_PORT)]
     mmwave_udp_port: u16,
+
+    /// IPv4 address for the mmWave UDP receiver and its acknowledgement source.
+    #[arg(long, default_value_t = Ipv4Addr::UNSPECIFIED)]
+    mmwave_udp_bind_addr: Ipv4Addr,
 
     /// Kernel receive buffer requested for the mmWave UDP socket.
     #[arg(long, default_value_t = runtime_tasks::DEFAULT_MMWAVE_RECEIVE_BUFFER_BYTES, env = "MMWAVE_UDP_RECEIVE_BUFFER_BYTES")]
@@ -355,6 +362,16 @@ struct Args {
         value_name = "MHZ,ANTENNAS,SUBCARRIERS,PPDU,FLAGS"
     )]
     csi_grid_pin: Option<CsiGridPin>,
+
+    /// Expected SHA-256 of the controlled transmitter's six-byte WiFi MAC.
+    /// Required for live ESP32 ingress unless a sealed position setup supplies
+    /// the same authority.
+    #[arg(
+        long,
+        env = "SENSING_TX_SOURCE_BINDING_SHA256",
+        value_name = "LOWERCASE_SHA256"
+    )]
+    tx_source_binding_sha256: Option<String>,
 
     /// Activate live fingerprint positioning with this validated position index.
     #[arg(long, value_name = "POSITION_INDEX")]
@@ -1010,6 +1027,12 @@ fn validated_complete_source_binding(
     if !observation.complete {
         return Err("TX-source binding is incomplete; exactly 0x07 is required".to_string());
     }
+    if !observation.matches_setup {
+        return Err(
+            "TX-source binding is unknown; supply a sealed setup or --tx-source-binding-sha256"
+                .to_string(),
+        );
+    }
     Ok(observation)
 }
 
@@ -1043,6 +1066,10 @@ struct PerNodeFeatureInfo {
     rssi_dbm: f64,
     last_seen_ms: u64,
     frame_rate_hz: f64,
+    /// Callback/receive-clock cadence diagnostics for this RX, independent of
+    /// the mesh-sync rate in `frame_rate_hz`.
+    #[serde(default)]
+    capture_timing: csi_sample_timing::CsiSampleTimingSnapshot,
     stale: bool,
     /// ADR-084 Pass 3 cluster-Pi novelty score in `[0.0, 1.0]`.
     /// `0.0` = exact-match-in-bank, `1.0` = no overlap with recent
@@ -1160,6 +1187,7 @@ fn build_node_features(
                 } else {
                     0.0
                 },
+                capture_timing: ns.csi_sample_timing.snapshot(),
                 stale,
                 novelty_score: ns.last_novelty_score,
             }
@@ -2335,7 +2363,22 @@ fn observe_frame_for_presence(
     frame: &Esp32Frame,
     frame_now: std::time::Instant,
     phase: d5_presence::CalibrationPhase,
+    host_receive_monotonic_ns: u64,
 ) -> (FeatureInfo, ClassificationInfo) {
+    let timing = ns.csi_sample_timing.observe(
+        frame.sequence,
+        frame.device_callback_started_us,
+        host_receive_monotonic_ns,
+    );
+    // The 20 Hz fallback is only the short warm-up assumption for the first
+    // frame; diagnostics remain unset until a real interval is observed.
+    let sample_rate_hz = timing.snapshot.rate_hz.unwrap_or(20.0);
+    let vital_rate_changed = ns.vital_detector.set_sample_rate(sample_rate_hz);
+    if timing.discontinuity || vital_rate_changed {
+        ns.frame_history.clear();
+        ns.vital_detector.reset();
+    }
+
     ns.observe_accepted_csi_frame(frame.sequence, frame_now);
     ns.update_novelty(&frame.amplitudes);
 
@@ -2344,7 +2387,6 @@ fn observe_frame_for_presence(
         ns.frame_history.pop_front();
     }
 
-    let sample_rate_hz = 1000.0 / 500.0_f64;
     let (features, mut classification, _, _, raw_motion) =
         extract_features_from_frame(frame, &ns.frame_history, sample_rate_hz);
     smooth_and_classify_node(ns, &mut classification, raw_motion);
@@ -2392,6 +2434,17 @@ mod motion_classification_tests {
             rssi: -50,
             noise_floor: -90,
             ppdu_type: wifi_densepose_hardware::PpduType::HtLegacy,
+            protocol_version: None,
+            device_callback_started_us: None,
+            driver_rx_timestamp_us: None,
+            quality_flags: None,
+            rx_state: None,
+            antenna_index: None,
+            gain_db: None,
+            csi_config_flags: None,
+            sync_age_ms: None,
+            invalid_prefix_pairs: 0,
+            interpolated_prefix_pairs: 0,
             phases: vec![0.0; amplitudes.len()],
             amplitudes,
         }
@@ -3493,6 +3546,17 @@ fn generate_simulated_frame(tick: u64) -> Esp32Frame {
         rssi: (-40.0 + 5.0 * (t * 0.2).sin()) as i8,
         noise_floor: -90,
         ppdu_type: wifi_densepose_hardware::PpduType::HtLegacy,
+        protocol_version: None,
+        device_callback_started_us: None,
+        driver_rx_timestamp_us: None,
+        quality_flags: None,
+        rx_state: None,
+        antenna_index: None,
+        gain_db: None,
+        csi_config_flags: None,
+        sync_age_ms: None,
+        invalid_prefix_pairs: 0,
+        interpolated_prefix_pairs: 0,
         amplitudes,
         phases,
     }
@@ -4521,11 +4585,15 @@ fn witness_hex(w: [u8; 32]) -> String {
     })
 }
 
-fn position_setup_readiness_json(identity: Option<(&str, &str)>) -> serde_json::Value {
+fn position_setup_readiness_json(
+    identity: Option<(&str, &str)>,
+    cable_revision: Option<serde_json::Value>,
+) -> serde_json::Value {
     serde_json::json!({
         "active": identity.is_some(),
         "setup_id": identity.map(|(setup_id, _)| setup_id),
         "setup_sha256": identity.map(|(_, setup_sha256)| setup_sha256),
+        "cable_revision": cable_revision,
     })
 }
 
@@ -4546,6 +4614,7 @@ async fn health_ready(State(state): State<SharedState>) -> Json<serde_json::Valu
         "source": s.effective_source(),
         "position_setup": position_setup_readiness_json(
             position_setup.map(|setup| (setup.setup_id(), setup.setup_sha256())),
+            position_setup.map(|setup| setup.cable_revision_status()),
         ),
         "position_index": position_index_readiness_json(
             position_runtime.map(|runtime| (runtime.index_sha256(), runtime.setup_id())),
@@ -4578,16 +4647,21 @@ mod position_readiness_tests {
 
     #[test]
     fn setup_and_index_readiness_are_independent_and_path_free() {
-        let inactive_setup = position_setup_readiness_json(None);
+        let inactive_setup = position_setup_readiness_json(None, None);
         assert_eq!(inactive_setup["active"], false);
         assert!(inactive_setup["setup_id"].is_null());
         assert!(inactive_setup["setup_sha256"].is_null());
 
-        let active_setup = position_setup_readiness_json(Some(("setup-0123", "setup-sha")));
+        let active_setup = position_setup_readiness_json(
+            Some(("setup-0123", "setup-sha")),
+            Some(serde_json::json!({"status": "not_recorded"})),
+        );
         assert_eq!(active_setup["active"], true);
         assert_eq!(active_setup["setup_id"], "setup-0123");
         assert_eq!(active_setup["setup_sha256"], "setup-sha");
         assert!(active_setup.get("path").is_none());
+        assert_eq!(active_setup["cable_revision"]["status"], "not_recorded");
+        assert!(active_setup["cable_revision"].get("revision").is_none());
 
         let inactive_index = position_index_readiness_json(None);
         assert_eq!(inactive_index["active"], false);
@@ -4635,8 +4709,28 @@ async fn health_version() -> Json<serde_json::Value> {
 
 async fn health_metrics(State(state): State<SharedState>) -> Json<serde_json::Value> {
     let s = state.read().await;
+    let csi_ingress = s.csi_ingress_diagnostics.snapshot();
     Json(serde_json::json!({
         "tick": s.tick,
+        "csi_ingress": {
+            "counters": csi_ingress,
+            "identity_rejections": {
+                "duplicates": s.csi_identity_registry.duplicate_packets,
+                "out_of_order": s.csi_identity_registry.out_of_order_packets,
+                "conflicting_boots": s.csi_identity_registry.conflicting_boots,
+                "unknown_nodes": s.csi_identity_registry.unknown_nodes
+            },
+            "balance": "csi_datagrams_received = csi_frames_discarded + csi_duplicate_datagrams + csi_frames_accepted_new + csi_processing_current",
+            "timing_semantics": {
+                "device_capture_time": "protocol_v3_callback_started_us; device-local clock, not mapped to the host epoch",
+                "device_driver_receive_time": "optional protocol_v3 driver timestamp; device-local and not mapped to the host epoch",
+                "server_receive_time": "captured_immediately_after_recv_from",
+                "udp_queue_age": "server_receive_to_queue_dequeue, measured separately from processing",
+                "processing_duration": "queue_dequeue_to_terminal_ingress_outcome, excluding queue wait",
+                "csi_processing_duration": "CSI-only subset of queue_dequeue_to_terminal_ingress_outcome",
+                "estimated_common_time": "derived from validated sync packets; synchronization accuracy has not been measured"
+            }
+        }
     }))
 }
 
@@ -5723,6 +5817,14 @@ fn requested_position_offline_mode(args: &Args) -> Result<Option<PositionOffline
 }
 
 fn validate_position_setup_server_mode(args: &Args) -> Result<(), String> {
+    if let Some(sha256) = args.tx_source_binding_sha256.as_deref() {
+        if !is_lowercase_sha256(sha256) {
+            return Err(
+                "--tx-source-binding-sha256 must be exactly 64 lowercase hexadecimal characters"
+                    .to_string(),
+            );
+        }
+    }
     if args.position_index.is_some() != args.position_index_sha256.is_some() {
         return Err(
             "--position-index and --position-index-sha256 must be supplied together".to_string(),
@@ -5862,6 +5964,46 @@ fn run_experiment_offline_mode(mode: ExperimentOfflineMode) -> Result<PathBuf, S
 }
 
 #[cfg(test)]
+mod mmwave_udp_bind_tests {
+    use super::*;
+
+    #[test]
+    fn defaults_to_wildcard_ipv4() {
+        let args = Args::try_parse_from(["sensing-server"]).unwrap();
+        assert_eq!(args.mmwave_udp_bind_addr, Ipv4Addr::UNSPECIFIED);
+    }
+
+    #[test]
+    fn explicit_address_is_separate_from_other_listeners() {
+        let args = Args::try_parse_from([
+            "sensing-server",
+            "--mmwave-udp-bind-addr",
+            "192.0.2.50",
+            "--bind-addr",
+            "127.0.0.1",
+        ])
+        .unwrap();
+        assert_eq!(args.mmwave_udp_bind_addr, Ipv4Addr::new(192, 0, 2, 50));
+        assert_eq!(args.mmwave_udp_port, mmwave_calibration::DEFAULT_UDP_PORT);
+        assert_eq!(args.bind_addr, "127.0.0.1");
+        assert_eq!(
+            (args.http_port, args.ws_port, args.udp_port),
+            (8080, 8765, 5005)
+        );
+    }
+
+    #[test]
+    fn rejects_non_ipv4_addresses_and_embedded_ports() {
+        for address in ["localhost", "::1", "127.0.0.1:55010", "256.0.0.1"] {
+            assert!(
+                Args::try_parse_from(["sensing-server", "--mmwave-udp-bind-addr", address,])
+                    .is_err()
+            );
+        }
+    }
+}
+
+#[cfg(test)]
 mod position_offline_cli_tests {
     use super::*;
 
@@ -5875,6 +6017,26 @@ mod position_offline_cli_tests {
             requested_position_offline_mode(&parse(&["sensing-server"])).unwrap(),
             None
         );
+    }
+
+    #[test]
+    fn explicit_tx_binding_authority_requires_canonical_sha256() {
+        let digest = "a".repeat(64);
+        let valid = Args::try_parse_from([
+            "sensing-server",
+            "--tx-source-binding-sha256",
+            digest.as_str(),
+        ])
+        .unwrap();
+        validate_position_setup_server_mode(&valid).unwrap();
+
+        let uppercase = Args::try_parse_from([
+            "sensing-server",
+            "--tx-source-binding-sha256",
+            "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+        ])
+        .unwrap();
+        assert!(validate_position_setup_server_mode(&uppercase).is_err());
     }
 
     #[test]
@@ -7325,33 +7487,8 @@ async fn main() {
         }
     });
 
-    let mmwave_experiment = position_setup.as_deref().and_then(|setup| {
-        setup.mmwave()?;
-        let receiver_positions_m = setup.receiver_positions_m();
-        let calibration_receiver_positions_m = setup.receiver_calibration_positions_m();
-        let calibration_rx_positions_m = calibration_receiver_positions_m
-            .iter()
-            .any(|position| position.is_some())
-            .then(|| {
-                calibration_receiver_positions_m
-                    .into_iter()
-                    .zip(receiver_positions_m)
-                    .map(|(calibration, device)| calibration.unwrap_or(device))
-                    .collect()
-            });
-        Some(mmwave_calibration::ExperimentContext {
-            setup_id: setup.setup_id().to_string(),
-            setup_sha256: setup.setup_sha256().to_string(),
-            server_version: env!("CARGO_PKG_VERSION").to_string(),
-            geometry: position_capture::PositionCaptureGeometry {
-                room_dimensions_m: setup.room_dimensions_m(),
-                tx_position_m: setup.transmitter_position_m(),
-                rx_positions_m: receiver_positions_m.to_vec(),
-            },
-            calibration_tx_position_m: setup.transmitter_calibration_position_m(),
-            calibration_rx_positions_m,
-        })
-    });
+    let mmwave_experiment = position_setup.as_deref()
+        .and_then(mmwave_calibration::ExperimentContext::from_setup);
     let restored_mmwave_profile = if position_setup.is_none() {
         if let Some(store) = &experiment_store {
             match store.list_profiles().await {
@@ -7400,7 +7537,7 @@ async fn main() {
             let (origin_x_mm, origin_z_mm, yaw_mdeg, raw_x_inverted) = definition.transform();
             mmwave_calibration::ExpectedNode {
                 node_id: node_id.clone(),
-                mounting_position_m: Some(definition.mounting_position_m()),
+                mounting_position_m: position_setup.as_ref().and_then(|setup| setup.mmwave_mounting_position_m(&node_id)),
                 transform: mmwave_calibration::CoordinateFrame {
                     local: "x_right_y_forward_mm".to_string(),
                     room: "x_length_z_width_mm".to_string(),
@@ -7457,6 +7594,7 @@ async fn main() {
         room_dimensions: runtime_position_geometry.room_dimensions,
         position_setup: position_setup.clone(),
         csi_grid_pin: args.csi_grid_pin,
+        expected_tx_source_binding_sha256: args.tx_source_binding_sha256.clone(),
         mmwave_node_diagnostics: mmwave_manager
             .node_ids()
             .into_iter()
@@ -7532,6 +7670,8 @@ async fn main() {
                 })
                 .filter(|m| adaptive_model_is_trusted(m.training_accuracy)),
         node_states: HashMap::new(),
+        csi_ingress_diagnostics: Arc::new(csi_diagnostics::CsiIngressDiagnostics::default()),
+        csi_identity_registry: csi_identity::Registry::default(),
         d5_presence: initial_d5_presence,
         active_calibration_bundle: restored_calibration,
         active_calibration_source: Some("restored".to_string())
@@ -7604,6 +7744,7 @@ async fn main() {
     }
     tokio::spawn(mmwave_receiver_task(
         state.clone(),
+        args.mmwave_udp_bind_addr,
         args.mmwave_udp_port,
         args.mmwave_receive_buffer_bytes,
         args.mmwave_reorder_hold_ms,
@@ -7613,7 +7754,12 @@ async fn main() {
         args.mmwave_udp_port,
         mmwave_token.clone(),
     );
-    spawn_mmwave_node_diagnostics_poller(state.clone(), args.mmwave_node_url.clone(), mmwave_token);
+    spawn_mmwave_node_diagnostics_poller(
+        state.clone(),
+        args.mmwave_udp_bind_addr,
+        args.mmwave_node_url.clone(),
+        mmwave_token,
+    );
     spawn_mmwave_session_ticker(state.clone());
 
     // ADR-166: Parse bind address once, use for all listeners

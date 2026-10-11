@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python3.15
 """
 QEMU Multi-Node Mesh Validation (ADR-061 Layer 3)
 
@@ -22,14 +22,14 @@ Exit codes:
     3  Fatal (crash or missing nodes)
 """
 
-import argparse
-import json
-import re
-import sys
-from dataclasses import dataclass, field
-from enum import IntEnum
-from pathlib import Path
-from typing import Dict, List, Optional
+lazy import argparse
+lazy import json
+lazy import re
+lazy import sys
+lazy from dataclasses import dataclass, field
+lazy from enum import IntEnum
+lazy from pathlib import Path
+lazy from typing import Dict, List, Optional
 
 
 # ---------------------------------------------------------------------------

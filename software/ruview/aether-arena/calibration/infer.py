@@ -6,11 +6,11 @@
 Omit --adapter to run the uncalibrated (zero-shot) base. With a room adapter, expect SOTA-level
 accuracy in that room/person; without one, zero-shot degrades in unseen rooms (ADR-150 §3.6).
 """
-import argparse
-import numpy as np
-import torch
+lazy import argparse
+lazy import numpy as np
+lazy import torch
 
-from model import PoseNet, standardize
+lazy from model import PoseNet, standardize
 
 
 def main():

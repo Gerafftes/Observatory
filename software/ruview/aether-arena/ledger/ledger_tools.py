@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python3.15
 """AetherArena append-only, tamper-evident results ledger (ADR-149 §2.3/§2.4).
 
 Each row is hash-chained to the previous one: ``row_hash = sha256(canonical_row
@@ -12,10 +12,10 @@ Usage:
     python ledger_tools.py verify      # verify the whole chain  -> exit 0 / 1
     python ledger_tools.py append '<json-row>'   # append one scored row
 """
-import hashlib
-import json
-import sys
-from pathlib import Path
+lazy import hashlib
+lazy import json
+lazy import sys
+lazy from pathlib import Path
 
 LEDGER = Path(__file__).parent / "ledger.jsonl"
 GENESIS_PREV = "0" * 64

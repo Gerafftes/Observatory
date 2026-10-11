@@ -1,9 +1,9 @@
-import importlib.util
-import json
-import stat
-import tempfile
-import unittest
-from pathlib import Path
+lazy import importlib.util
+lazy import json
+lazy import stat
+lazy import tempfile
+lazy import unittest
+lazy from pathlib import Path
 
 
 SCRIPT = Path(__file__).parents[1] / "build_classification_truth_template.py"

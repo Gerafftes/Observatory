@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python3.15
 """Segmented overnight empty-room CSI capture (ADR-135 baseline / MAE corpus).
 
 Binds UDP once and writes fixed-duration JSONL segments with explicit names —
@@ -8,12 +8,12 @@ Usage:
     python scripts/overnight-empty-capture.py --segments 8 --segment-seconds 3300
 """
 
-import argparse
-import json
-import os
-import socket
-import struct
-import time
+lazy import argparse
+lazy import json
+lazy import os
+lazy import socket
+lazy import struct
+lazy import time
 
 
 def parse_csi_packet(data):

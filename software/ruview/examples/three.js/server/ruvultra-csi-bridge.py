@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python3.15
 """ruvultra → browser CSI bridge.
 
 Reads adaptive_ctrl tick lines from the ESP32-S3 RuView firmware on
@@ -22,13 +22,13 @@ Output JSON (per tick):
 Run on ruvultra:
     python3 -u ruvultra-csi-bridge.py
 """
-import asyncio
-import builtins
-import json
-import re
-import sys
-import time
-from contextlib import suppress
+lazy import asyncio
+lazy import builtins
+lazy import json
+lazy import re
+lazy import sys
+lazy import time
+lazy from contextlib import suppress
 
 # Force every print to flush — we're often piped to a log file
 _orig_print = builtins.print
@@ -37,8 +37,8 @@ def _print(*a, **kw):
     return _orig_print(*a, **kw)
 builtins.print = _print
 
-import serial
-import websockets
+lazy import serial
+lazy import websockets
 
 PORT = "/dev/ttyACM0"
 BAUD = 115200

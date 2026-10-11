@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python3.15
 """R5 — per-subcarrier input×gradient saliency for the count + pose cogs.
 
 See docs/research/sota-2026-05-22/R5-subcarrier-saliency.md for context.
@@ -23,13 +23,13 @@ Method (per ADR/research note):
 
 from __future__ import annotations
 
-import argparse
-import json
-import struct
-from pathlib import Path
-from typing import Tuple
+lazy import argparse
+lazy import json
+lazy import struct
+lazy from pathlib import Path
+lazy from typing import Tuple
 
-import numpy as np
+lazy import numpy as np
 
 
 N_SUB, N_FRAMES = 56, 20

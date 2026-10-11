@@ -31,16 +31,13 @@ classifiers = [
     "Intended Audience :: Science/Research",
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.9",
-    "Programming Language :: Python :: 3.10",
-    "Programming Language :: Python :: 3.11",
-    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.15",
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
     "Topic :: Scientific/Engineering :: Image Processing",
     "Topic :: System :: Networking",
     "Topic :: Software Development :: Libraries :: Python Modules",
 ]
-requires-python = ">=3.9"
+requires-python = ">=3.15.0rc2"
 dependencies = [
     # Core framework
     "fastapi>=0.104.0",
@@ -58,9 +55,8 @@ dependencies = [
     "redis>=5.0.0",
     "aioredis>=2.0.0",
     
-    # Neural networks and ML
-    "torch>=2.1.0",
-    "torchvision>=0.16.0",
+    # Numerical and classical ML. PyTorch stays in the optional `gpu` extra
+    # until upstream publishes CPython 3.15 wheels.
     "numpy>=1.24.0",
     "opencv-python>=4.8.0",
     "pillow>=10.0.0",
@@ -111,8 +107,8 @@ dependencies = [
     "pytest-mock>=3.12.0",
     "pytest-xdist>=3.3.0",
     "pytest-bdd>=7.0.0",
-    "black>=23.9.0",
-    "isort>=5.12.0",
+    "black>=26.5.0",
+    "isort>=9.0.0",
     "flake8>=6.1.0",
     "mypy>=1.6.0",
 ]
@@ -129,8 +125,8 @@ dev = [
     "pytest-clarity>=1.0.1",
     "pytest-sugar>=0.9.7",
     "coverage[toml]>=7.3.0",
-    "black>=23.9.0",
-    "isort>=5.12.0",
+    "black>=26.5.0",
+    "isort>=9.0.0",
     "flake8>=6.1.0",
     "mypy>=1.6.0",
     "pre-commit>=3.5.0",
@@ -202,7 +198,7 @@ exclude = ["tests*", "docs*", "scripts*"]
 
 [tool.black]
 line-length = 88
-target-version = ['py39', 'py310', 'py311', 'py312']
+target-version = ['py315']
 include = '\.pyi?$'
 extend-exclude = '''
 /(
@@ -240,7 +236,7 @@ known_third_party = [
 ]
 
 [tool.mypy]
-python_version = "3.9"
+python_version = "3.15"
 warn_return_any = true
 warn_unused_configs = true
 disallow_untyped_defs = true
@@ -360,7 +356,9 @@ per-file-ignores = [
 
 [tool.ruff]
 line-length = 88
-target-version = "py39"
+target-version = "py315"
+
+[tool.ruff.lint]
 select = [
     "E",  # pycodestyle errors
     "W",  # pycodestyle warnings
@@ -376,11 +374,11 @@ ignore = [
     "C901",  # too complex
 ]
 
-[tool.ruff.per-file-ignores]
+[tool.ruff.lint.per-file-ignores]
 "__init__.py" = ["F401"]
 "tests/*" = ["S101"]
 
-[tool.ruff.isort]
+[tool.ruff.lint.isort]
 known-first-party = ["src"]
 
 # Alembic configuration

@@ -23,17 +23,17 @@ it deliberately inlines its helpers. The reference implementations (upstream
 import shim, >1GB np.load mmap patch, key-remap loader, canonical evaluate
 loop) live in benchmarks/wiflow-std/_bench_common.py — keep copies in sync.
 """
-import argparse
-import copy
-import json
-import os
-import random
-import sys
-import time
+lazy import argparse
+lazy import copy
+lazy import json
+lazy import os
+lazy import random
+lazy import sys
+lazy import time
 
-import numpy as np
-import torch
-from torch.utils.data import DataLoader, Subset
+lazy import numpy as np
+lazy import torch
+lazy from torch.utils.data import DataLoader, Subset
 
 # csi_windows.npy is ~13 GB; mmap large arrays instead of eagerly loading
 # ~15 GB into RAM (same patch as _bench_common._np_load_mmap).
@@ -54,10 +54,10 @@ SWEEP = os.path.join(BENCH, 'sweep')
 sys.path.insert(0, os.path.join(BENCH, 'upstream'))
 sys.path.insert(0, SWEEP)
 
-from dataset import PreprocessedCSIKeypointsDataset, create_preprocessed_train_val_test_loaders  # noqa: E402
-from losses.pose_loss import PoseLoss          # noqa: E402
-from utils.metrics import calculate_pck, calculate_mpjpe  # noqa: E402
-from model_compact import CompactWiFlowPoseModel, describe  # noqa: E402
+lazy from dataset import PreprocessedCSIKeypointsDataset, create_preprocessed_train_val_test_loaders  # noqa: E402
+lazy from losses.pose_loss import PoseLoss          # noqa: E402
+lazy from utils.metrics import calculate_pck, calculate_mpjpe  # noqa: E402
+lazy from model_compact import CompactWiFlowPoseModel, describe  # noqa: E402
 
 VARIANTS = [
     # name, tcn_channels, conv_channels, attn_groups, groups_mode, input_pw_groups

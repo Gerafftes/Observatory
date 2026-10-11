@@ -29,6 +29,7 @@ pub(crate) fn load_token(env_name: &str) -> Option<String> {
         "data/mmwave-node-token.txt",
         "../private/mmwave-ota-token.txt",
         "../../private/mmwave-ota-token.txt",
+        "../../../private/mmwave-ota-token.txt",
     ]
     .iter()
     .find_map(|path| {
@@ -61,6 +62,10 @@ fn neighbors() -> Vec<String> {
             .map(|output| String::from_utf8_lossy(&output.stdout).into_owned())
             .unwrap_or_default()
     };
+    neighbor_urls(&text)
+}
+
+fn neighbor_urls(text: &str) -> Vec<String> {
     let mut urls: Vec<_> = text
         .split_whitespace()
         .filter_map(private_neighbor)
@@ -68,13 +73,13 @@ fn neighbors() -> Vec<String> {
         .collect();
     urls.sort();
     urls.dedup();
-    urls.truncate(16);
     urls
 }
 
 fn read_status(url: &str) -> Result<Value, String> {
     let response = ureq::AgentBuilder::new()
         .redirects(0)
+        .timeout_connect(Duration::from_millis(1200))
         .build()
         .get(&format!("{}/ota/status", url.trim_end_matches('/')))
         .timeout(Duration::from_millis(1200))
@@ -97,7 +102,10 @@ fn read_status(url: &str) -> Result<Value, String> {
     Ok(value)
 }
 
-fn receiver_address(url: &str, port: u16) -> Option<String> {
+fn receiver_address(url: &str, bind_addr: Ipv4Addr, port: u16) -> Option<String> {
+    if !bind_addr.is_unspecified() {
+        return Some(SocketAddrV4::new(bind_addr, port).to_string());
+    }
     let authority = url.strip_prefix("http://")?.split('/').next()?;
     let ip: Ipv4Addr = authority.split(':').next()?.parse().ok()?;
     let socket = UdpSocket::bind("0.0.0.0:0").ok()?;
@@ -152,6 +160,7 @@ fn repair_transport(url: &str, token: &str, receiver: &str) -> Result<(), String
 pub(crate) fn probe(
     preferred: Option<&str>,
     expected_node: Option<&str>,
+    bind_addr: Ipv4Addr,
     port: u16,
     token: Option<&str>,
     auto_repair: bool,
@@ -165,17 +174,24 @@ pub(crate) fn probe(
         found = None;
     }
     if found.is_none() {
-        let candidates: Vec<_> = std::thread::scope(|scope| {
-            let handles: Vec<_> = neighbors()
-                .into_iter()
-                .map(|url| scope.spawn(move || read_status(&url).ok().map(|value| (url, value))))
-                .collect();
-            handles
-                .into_iter()
-                .filter_map(|handle| handle.join().ok().flatten())
-                .filter(|(_, value)| expected_node.is_none_or(|id| value["node_id"] == id))
-                .collect()
-        });
+        let mut candidates = Vec::new();
+        // Bound concurrent requests, not the set of discoverable nodes. On
+        // hosts with LAN and WiFi, the radar can sort after 16 LAN neighbors.
+        for batch in neighbors().chunks(16) {
+            candidates.extend(std::thread::scope(|scope| {
+                let handles: Vec<_> = batch
+                    .iter()
+                    .map(|url| {
+                        scope.spawn(move || read_status(url).ok().map(|value| (url.clone(), value)))
+                    })
+                    .collect();
+                handles
+                    .into_iter()
+                    .filter_map(|handle| handle.join().ok().flatten())
+                    .filter(|(_, value)| expected_node.is_none_or(|id| value["node_id"] == id))
+                    .collect::<Vec<_>>()
+            }));
+        }
         if candidates.len() == 1 {
             found = candidates.into_iter().next();
         } else if candidates.len() > 1 {
@@ -196,7 +212,7 @@ pub(crate) fn probe(
         };
     };
     let target = value["target"].as_str().map(str::to_string);
-    let receiver = receiver_address(&url, port);
+    let receiver = receiver_address(&url, bind_addr, port);
     let mut repair_hint = None;
     if auto_repair {
         if let (Some(target), Some(receiver), Some(token)) =
@@ -253,6 +269,145 @@ pub(crate) fn probe(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::io::{BufRead, BufReader, Write};
+    use std::net::TcpListener;
+    use std::sync::atomic::{AtomicBool, Ordering};
+    use std::sync::Arc;
+    use std::time::Instant;
+
+    fn probe_local_status(target: &str, token: Option<&str>) -> (Probe, Vec<(String, Value)>) {
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        listener.set_nonblocking(true).unwrap();
+        let url = format!("http://{}", listener.local_addr().unwrap());
+        let stopped = Arc::new(AtomicBool::new(false));
+        let server_stopped = stopped.clone();
+        let mut target = target.to_string();
+        let server = std::thread::spawn(move || {
+            let deadline = Instant::now() + Duration::from_secs(5);
+            let mut requests = Vec::new();
+            while !server_stopped.load(Ordering::SeqCst) && Instant::now() < deadline {
+                let (mut stream, _) = match listener.accept() {
+                    Ok(connection) => connection,
+                    Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {
+                        std::thread::sleep(Duration::from_millis(1));
+                        continue;
+                    }
+                    Err(error) => panic!("local HTTP fixture: {error}"),
+                };
+                stream
+                    .set_read_timeout(Some(Duration::from_secs(1)))
+                    .unwrap();
+                let mut reader = BufReader::new(&stream);
+                let mut line = String::new();
+                reader.read_line(&mut line).unwrap();
+                let request = line.trim().to_string();
+                let mut length = 0;
+                loop {
+                    line.clear();
+                    assert!(reader.read_line(&mut line).unwrap() > 0);
+                    if line == "\r\n" {
+                        break;
+                    }
+                    if let Some((name, value)) = line.split_once(':') {
+                        if name.eq_ignore_ascii_case("content-length") {
+                            length = value.trim().parse::<usize>().unwrap();
+                        }
+                    }
+                }
+                assert!(length <= 4096);
+                let mut bytes = vec![0; length];
+                reader.read_exact(&mut bytes).unwrap();
+                let body = if bytes.is_empty() {
+                    Value::Null
+                } else {
+                    serde_json::from_slice(&bytes).unwrap()
+                };
+                if request.starts_with("PUT /transport ") {
+                    target = format!(
+                        "{}:{}",
+                        body["target_host"].as_str().unwrap(),
+                        body["target_port"]
+                    );
+                }
+                requests.push((request, body));
+                let response = serde_json::json!({
+                    "sensor": "HLK-LD2450", "node_id": "fixture-radar",
+                    "target": target, "diagnostics": {},
+                })
+                .to_string();
+                write!(stream, "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}", response.len(), response).unwrap();
+            }
+            requests
+        });
+        let result = probe(
+            Some(&url),
+            Some("fixture-radar"),
+            Ipv4Addr::new(192, 0, 2, 50),
+            55010,
+            token,
+            true,
+        );
+        stopped.store(true, Ordering::SeqCst);
+        (result, server.join().unwrap())
+    }
+
+    #[test]
+    fn explicit_receiver_does_not_depend_on_node_url_or_route() {
+        for url in ["http://127.0.0.1:8032", "not a radar URL"] {
+            assert_eq!(
+                receiver_address(url, Ipv4Addr::new(192, 0, 2, 50), 55010),
+                Some("192.0.2.50:55010".to_string())
+            );
+        }
+    }
+
+    #[test]
+    fn wildcard_receiver_keeps_route_selected_address() {
+        assert_eq!(
+            receiver_address("http://127.0.0.1:8032", Ipv4Addr::UNSPECIFIED, 55010),
+            Some("127.0.0.1:55010".to_string())
+        );
+        assert_eq!(
+            receiver_address("invalid", Ipv4Addr::UNSPECIFIED, 55010),
+            None
+        );
+    }
+
+    #[test]
+    fn matching_explicit_receiver_has_no_mismatch_or_put() {
+        let (probe, requests) = probe_local_status("192.0.2.50:55010", Some("fixture-token"));
+        assert!(probe.status.reachable);
+        assert_eq!(probe.status.receiver.as_deref(), Some("192.0.2.50:55010"));
+        assert!(!probe.status.hint.contains("Radar sendet an"));
+        assert_eq!(requests.len(), 1);
+        assert!(requests[0].0.starts_with("GET /ota/status "));
+    }
+
+    #[test]
+    fn tokenless_mismatch_never_puts() {
+        let (probe, requests) = probe_local_status("192.0.2.9:55010", None);
+        assert_eq!(probe.status.target.as_deref(), Some("192.0.2.9:55010"));
+        assert_eq!(probe.status.receiver.as_deref(), Some("192.0.2.50:55010"));
+        assert!(probe.status.hint.contains("nur erkennen, nicht ändern"));
+        assert_eq!(requests.len(), 1);
+        assert!(requests[0].0.starts_with("GET /ota/status "));
+    }
+
+    #[test]
+    fn mismatched_target_repairs_to_explicit_receiver() {
+        let (probe, requests) = probe_local_status("192.0.2.9:55010", Some("fixture-token"));
+        assert_eq!(probe.status.target.as_deref(), Some("192.0.2.50:55010"));
+        assert_eq!(probe.status.receiver.as_deref(), Some("192.0.2.50:55010"));
+        assert!(!probe.status.hint.contains("Radar sendet an"));
+        assert_eq!(requests.len(), 3);
+        assert!(requests[0].0.starts_with("GET /ota/status "));
+        assert!(requests[1].0.starts_with("PUT /transport "));
+        assert_eq!(
+            requests[1].1,
+            serde_json::json!({"target_host": "192.0.2.50", "target_port": 55010})
+        );
+        assert!(requests[2].0.starts_with("GET /ota/status "));
+    }
 
     #[test]
     fn discovery_is_bounded_to_private_neighbors() {
@@ -263,6 +418,22 @@ mod tests {
         for value in ["127.0.0.1", "8.8.8.8", "192.168.4.255", "garbage"] {
             assert_eq!(private_neighbor(value), None);
         }
+    }
+
+    #[test]
+    fn discovery_keeps_radar_after_sixteen_lan_neighbors() {
+        let mut arp = (1..=20)
+            .map(|host| format!("? (192.168.178.{host}) at aa:bb:cc:dd:ee:ff on en5"))
+            .collect::<Vec<_>>()
+            .join("\n");
+        arp.push_str("\n? (192.168.4.5) at aa:bb:cc:dd:ee:ff on en0");
+        arp.push_str("\n? (192.168.4.5) at aa:bb:cc:dd:ee:ff on en0");
+        arp.push_str("\n? (8.8.8.8) at aa:bb:cc:dd:ee:ff on en5");
+
+        let urls = neighbor_urls(&arp);
+        assert_eq!(urls.len(), 21);
+        assert_eq!(urls.last().unwrap(), "http://192.168.4.5:8032");
+        assert!(neighbor_urls("").is_empty());
     }
 
     #[test]

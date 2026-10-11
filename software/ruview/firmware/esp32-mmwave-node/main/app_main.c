@@ -41,12 +41,26 @@ static void wifi_event_handler(void *argument, esp_event_base_t base,
                                int32_t event_id, void *event_data)
 {
     (void)argument;
-    (void)event_data;
     if (base == WIFI_EVENT && event_id == WIFI_EVENT_STA_START) {
-        esp_wifi_connect();
+#if CONFIG_MMWAVE_WIFI_LIMIT_TX_POWER
+        // The setter requires started WiFi. Apply it here before connect(),
+        // not after esp_wifi_start(), which races this event handler.
+        ESP_ERROR_CHECK(esp_wifi_set_max_tx_power(CONFIG_MMWAVE_WIFI_MAX_TX_POWER));
+        int8_t power;
+        ESP_ERROR_CHECK(esp_wifi_get_max_tx_power(&power));
+        ESP_LOGI(TAG, "WiFi maximum TX power: %d quarter-dBm", power);
+#endif
+        ESP_ERROR_CHECK_WITHOUT_ABORT(esp_wifi_connect());
+    } else if (base == WIFI_EVENT && event_id == WIFI_EVENT_STA_CONNECTED) {
+        const wifi_event_sta_connected_t *event = event_data;
+        ESP_LOGI(TAG, "WiFi associated: channel=%u auth=%d; waiting for IP",
+                 event->channel, event->authmode);
     } else if (base == WIFI_EVENT && event_id == WIFI_EVENT_STA_DISCONNECTED) {
+        const wifi_event_sta_disconnected_t *event = event_data;
+        ESP_LOGW(TAG, "WiFi disconnected, reason=%u rssi=%d",
+                 (unsigned)event->reason, event->rssi);
         xEventGroupClearBits(s_wifi_events, WIFI_CONNECTED_BIT);
-        esp_wifi_connect();
+        ESP_ERROR_CHECK_WITHOUT_ABORT(esp_wifi_connect());
     } else if (base == IP_EVENT && event_id == IP_EVENT_STA_GOT_IP) {
         xEventGroupSetBits(s_wifi_events, WIFI_CONNECTED_BIT);
     }

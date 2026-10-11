@@ -1,8 +1,8 @@
 # Transfer Learning System for WiFi DensePose
 # Based on the teacher-student learning approach from the paper
 
-import numpy as np
-from typing import Dict, List, Tuple, Optional
+lazy import numpy as np
+lazy from typing import Dict, List, Tuple, Optional
 
 class TransferLearningSystem:
     """

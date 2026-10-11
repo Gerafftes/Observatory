@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
-import importlib.util
-from pathlib import Path
-import os
-import unittest
-from unittest import mock
+lazy import importlib.util
+lazy from pathlib import Path
+lazy import os
+lazy import unittest
+lazy from unittest import mock
 
 
 SCRIPT = Path(__file__).resolve().parents[1] / "ruview-sensing-server.py"

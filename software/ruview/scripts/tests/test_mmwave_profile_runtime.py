@@ -2,18 +2,18 @@
 
 Build the debug sensing-server first. Uses only temporary data and loopback ports.
 """
-import json
-import os
-from pathlib import Path
-import secrets
-import socket
-import subprocess
-import tempfile
-import threading
-import time
-import unittest
-from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-from urllib.request import Request, urlopen
+lazy import json
+lazy import os
+lazy from pathlib import Path
+lazy import secrets
+lazy import socket
+lazy import subprocess
+lazy import tempfile
+lazy import threading
+lazy import time
+lazy import unittest
+lazy from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+lazy from urllib.request import Request, urlopen
 
 
 ROOT = Path(__file__).resolve().parents[2]

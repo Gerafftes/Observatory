@@ -6,18 +6,18 @@ Exercises the committed CLI end-to-end on synthetic data (CPU, no GPU, no real c
 
 Run:  python test_calibration.py    (or via pytest)
 """
-import json
-import subprocess
-import sys
-import tempfile
-from pathlib import Path
+lazy import json
+lazy import subprocess
+lazy import sys
+lazy import tempfile
+lazy from pathlib import Path
 
-import numpy as np
-import torch
+lazy import numpy as np
+lazy import torch
 
 HERE = Path(__file__).parent
 sys.path.insert(0, str(HERE))
-from model import PoseNet, standardize  # noqa: E402
+lazy from model import PoseNet, standardize  # noqa: E402
 
 
 def _make_base(path: Path):

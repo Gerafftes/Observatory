@@ -2,18 +2,19 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import test from 'node:test';
 
+import { DEVICE_IDENTITIES, UNKNOWN_DEVICE_THREE_COLOR } from '../device-identity.js';
+
 const mobileView = fs.readFileSync(
   new URL('../mobile/src/assets/webview/gaussian-splats.html', import.meta.url),
   'utf8',
 );
 
 test('mobile 3D view uses the canonical device colors', () => {
-  assert.match(mobileView, /TX1:\s*0xff9f0a/);
-  assert.match(mobileView, /RX1:\s*0x0a84ff/);
-  assert.match(mobileView, /RX2:\s*0x30d158/);
-  assert.match(mobileView, /RX3:\s*0xff375f/);
-  assert.match(mobileView, /RX4:\s*0xbf5af2/);
-  assert.match(mobileView, /UNKNOWN_DEVICE_COLOR\s*=\s*0x68737a/);
+  for (const { id, threeColor } of Object.values(DEVICE_IDENTITIES)) {
+    const hex = threeColor.toString(16).padStart(6, '0');
+    assert.match(mobileView, new RegExp(`${id}:\\s*0x${hex}\\b`));
+  }
+  assert.match(mobileView, new RegExp(`UNKNOWN_DEVICE_COLOR\\s*=\\s*0x${UNKNOWN_DEVICE_THREE_COLOR.toString(16)}\\b`));
 });
 
 test('mobile 3D view keeps one marker per stable node identity', () => {

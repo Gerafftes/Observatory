@@ -16,11 +16,14 @@ use super::raw_csi_recording::{
 };
 
 const MIN_SETUP_SCHEMA_VERSION: u16 = 1;
-const SETUP_SCHEMA_VERSION: u16 = 3;
+const SETUP_SCHEMA_VERSION: u16 = 5;
 const SETUP_ARTIFACT_KIND: &str = "ruview.position-setup";
 const SETUP_HASH_DOMAIN_V1: &[u8] = b"ruview.position-setup.v1\0";
 const SETUP_HASH_DOMAIN_V2: &[u8] = b"ruview.position-setup.v2\0";
 const SETUP_HASH_DOMAIN_V3: &[u8] = b"ruview.position-setup.v3\0";
+const SETUP_HASH_DOMAIN_V4: &[u8] = b"ruview.position-setup.v4\0";
+const SETUP_HASH_DOMAIN_V5: &[u8] = b"ruview.position-setup.v5\0";
+const CAD_EXTERIOR_RULE: &str = "horizontal-euclidean-distance-to-room-contour-inclusive-v1";
 const COORDINATE_SYSTEM: &str = "x_length_y_height_z_width_lower_left_floor";
 const RECORDING_HOST_KIND: &str = "mac";
 /// SHA-256 over exactly the six binary MAC bytes written to the RX NVS
@@ -31,14 +34,13 @@ const EXPECTED_RX_IDS: [u8; 4] = [1, 2, 3, 4];
 const POSITION_LAYOUT_FLAGS_MASK: u8 = !0x10;
 const SHA256_HEX_LEN: usize = 64;
 const OBSERVATORY_SETUP_DRAFT_KIND: &str = "ruview.position-setup-draft";
-const OBSERVATORY_SETUP_DRAFT_MISSING_SECTIONS: [&str; 7] = [
+const OBSERVATORY_SETUP_DRAFT_MISSING_SECTIONS: [&str; 6] = [
     "transmitter.firmware",
     "receivers[*].firmware",
     "receivers[*].expected_grid",
     "recording_host",
     "radio.tx_filter_identity",
     "mmwave_sensors[*].firmware",
-    "mmwave_sensors[*].transform",
 ];
 
 /// Strict input document consumed by `--position-create-setup`.
@@ -48,6 +50,8 @@ pub(crate) struct PositionSetupSpec {
     schema_version: u16,
     coordinate_system: String,
     room_dimensions_mm: [u32; 3],
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    cad: Option<CadSetupBinding>,
     transmitter: TransmitterDefinition,
     receivers: Vec<ReceiverDefinition>,
     recording_host: RecordingHostDefinition,
@@ -66,6 +70,8 @@ pub(crate) struct PositionSetupDefinition {
     schema_version: u16,
     coordinate_system: String,
     room_dimensions_mm: [u32; 3],
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    cad: Option<CadSetupBinding>,
     transmitter: TransmitterDefinition,
     receivers: Vec<ReceiverDefinition>,
     recording_host: RecordingHostDefinition,
@@ -76,6 +82,96 @@ pub(crate) struct PositionSetupDefinition {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     mmwave_sensors: Vec<MmwaveDefinition>,
     server: ServerBuildIdentity,
+}
+
+/// Immutable CAD source, not a second independently editable radius setting.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct CadSetupBinding {
+    profile_id: String,
+    version: i64,
+    revision_id: String,
+    profile_sha256: String,
+    target_rule: String,
+    document: serde_json::Value,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub(crate) struct CadExteriorRule {
+    pub(crate) revision_id: String,
+    pub(crate) profile_sha256: String,
+    pub(crate) target_rule: String,
+    pub(crate) sensor_mount_radius_m: f64,
+}
+
+impl CadSetupBinding {
+    fn from_profile(profile: &super::experiment::SetupProfile) -> Result<Self, String> {
+        let binding = Self {
+            profile_id: profile.id.clone(),
+            version: profile.version,
+            revision_id: profile.revision_id.clone(),
+            profile_sha256: profile.profile_sha256.clone(),
+            target_rule: CAD_EXTERIOR_RULE.to_string(),
+            document: profile.document.clone(),
+        };
+        binding.validate()?;
+        Ok(binding)
+    }
+
+    fn validate(&self) -> Result<(), String> {
+        validate_public_identifier("cad.profile_id", &self.profile_id)?;
+        if self.version < 1 || self.revision_id != format!("{}-v{}", self.profile_id, self.version)
+        {
+            return Err("CAD revision must bind profile_id and positive version".to_string());
+        }
+        validate_sha256("cad.profile_sha256", &self.profile_sha256)?;
+        if super::experiment::profile_hash(&self.document)? != self.profile_sha256 {
+            return Err("CAD document does not match profile_sha256".to_string());
+        }
+        if self.target_rule != CAD_EXTERIOR_RULE {
+            return Err("unsupported CAD target_rule".to_string());
+        }
+        if self
+            .document
+            .get("schema_version")
+            .and_then(serde_json::Value::as_u64)
+            != Some(1)
+            || self
+                .document
+                .get("profile_kind")
+                .and_then(serde_json::Value::as_str)
+                != Some("ruview.setup-profile")
+        {
+            return Err(
+                "CAD binding requires the saved metre-based setup-profile v1 document".to_string(),
+            );
+        }
+        if self.document.get("mmwave").is_some()
+            || self
+                .document
+                .get("mmwave_sensors")
+                .and_then(serde_json::Value::as_array)
+                .is_none()
+        {
+            return Err("sealed CAD requires canonical mmwave_sensors".to_string());
+        }
+        // Older CAD imports may have a default. A new seal must never use it.
+        if self.document.get("sensor_mount_radius_m").is_none() {
+            return Err("CAD sensor_mount_radius_m is required explicitly in metres".to_string());
+        }
+        super::experiment::sensor_mount_radius_m(&self.document)?;
+        Ok(())
+    }
+
+    fn exterior_rule(&self) -> CadExteriorRule {
+        CadExteriorRule {
+            revision_id: self.revision_id.clone(),
+            profile_sha256: self.profile_sha256.clone(),
+            target_rule: self.target_rule.clone(),
+            sensor_mount_radius_m: super::experiment::sensor_mount_radius_m(&self.document)
+                .expect("sealed CAD binding was validated"),
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -108,7 +204,27 @@ struct RecordingHostDefinition {
     kind: String,
     position_mm: [u32; 3],
     placement_revision: String,
-    cable_revision: String,
+    cable_revision: CableRevision,
+}
+
+/// Legacy strings keep their exact JSON encoding. New omissions must be explicit.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(untagged)]
+enum CableRevision {
+    Recorded(String),
+    NotRecorded(UnrecordedCableRevision),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct UnrecordedCableRevision {
+    status: CableRevisionOmission,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+enum CableRevisionOmission {
+    NotRecorded,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -221,6 +337,41 @@ impl SealedPositionSetup {
         &self.definition
     }
 
+    pub(crate) fn cable_revision_status(&self) -> serde_json::Value {
+        match &self.definition.recording_host.cable_revision {
+            CableRevision::Recorded(revision) => serde_json::json!({
+                "status": "recorded", "revision": revision,
+            }),
+            CableRevision::NotRecorded(_) => serde_json::json!({"status": "not_recorded"}),
+        }
+    }
+
+    /// v4 preserves the CAD mount at its original precision. The integer fields
+    /// remain the projected transform origin used by both radar paths.
+    pub(crate) fn mmwave_mounting_position_m(&self, node_id: &str) -> Option<[f64; 3]> {
+        let definition = self
+            .mmwave_sensors()
+            .into_iter()
+            .find(|node| node.node_id() == node_id)?;
+        match &self.definition.cad {
+            None => Some(definition.mounting_position_m()),
+            Some(cad) => {
+                let sensors = cad.document.get("mmwave_sensors")?.as_array()?;
+                let sensor = sensors
+                    .iter()
+                    .find(|sensor| sensor["node_id"].as_str() == Some(node_id))?;
+                serde_json::from_value(sensor["mounting_position_m"].clone()).ok()
+            }
+        }
+    }
+
+    pub(crate) fn cad_exterior_rule(&self) -> Option<CadExteriorRule> {
+        self.definition
+            .cad
+            .as_ref()
+            .map(CadSetupBinding::exterior_rule)
+    }
+
     pub(crate) fn room_dimensions_m(&self) -> [f64; 3] {
         millimetres_to_metres(self.definition.room_dimensions_mm)
     }
@@ -293,6 +444,11 @@ impl SealedPositionSetup {
         &self,
         document: &serde_json::Value,
     ) -> Result<(), String> {
+        if let Some(cad) = &self.definition.cad {
+            if super::experiment::profile_hash(document)? != cad.profile_sha256 {
+                return Err("setup profile does not match sealed CAD document".to_string());
+            }
+        }
         let room = profile_triplet_mm(document.get("room_dimensions_m"), "room_dimensions_m")?;
         if room != self.definition.room_dimensions_mm {
             return Err(
@@ -457,12 +613,27 @@ impl SealedPositionSetup {
                     "setup profile {field}.sensor does not match the active sealed setup"
                 ));
             }
-            if profile_triplet_mm(
+            if profile_triplet_mm_with_projection(
                 profile_mmwave.get("mounting_position_m"),
                 &format!("{field}.mounting_position_m"),
+                self.schema_version >= 4,
             )? != sealed_mmwave.mounting_position_mm
             {
                 return Err(format!("setup profile {field} mounting position does not match the active sealed setup"));
+            }
+            if self.schema_version >= 4
+                && (profile_mmwave
+                    .get("yaw_mdeg")
+                    .and_then(serde_json::Value::as_i64)
+                    != Some(i64::from(sealed_mmwave.transform.yaw_mdeg))
+                    || profile_mmwave
+                        .get("raw_x_inverted")
+                        .and_then(serde_json::Value::as_bool)
+                        != Some(sealed_mmwave.transform.raw_x_inverted))
+            {
+                return Err(format!(
+                    "setup profile {field} transform does not match sealed CAD"
+                ));
             }
             if profile_mmwave
                 .get("mounting_revision")
@@ -629,6 +800,9 @@ impl SealedPositionSetup {
             ));
         }
         validate_definition(&self.definition)?;
+        if let Some(cad) = &self.definition.cad {
+            self.validate_observatory_profile(&cad.document)?;
+        }
         let expected_sha256 = definition_sha256(&self.definition)?;
         if self.setup_sha256 != expected_sha256 {
             return Err(
@@ -645,13 +819,15 @@ impl SealedPositionSetup {
     }
 }
 
-/// Build a deliberately incomplete schema-v2 specification from the exact
+/// Build a deliberately incomplete schema-v5 specification from the exact
 /// geometry and deployment metadata saved by the Observatory CAD editor.
 /// Hardware identities stay null so this draft cannot be mistaken for a
 /// sealable setup specification.
 pub(crate) fn observatory_profile_setup_draft(
-    document: &serde_json::Value,
+    profile: &super::experiment::SetupProfile,
 ) -> Result<serde_json::Value, String> {
+    let cad = CadSetupBinding::from_profile(profile)?;
+    let document = &profile.document;
     let room = profile_triplet_mm(document.get("room_dimensions_m"), "room_dimensions_m")?;
     if room.contains(&0) {
         return Err("setup profile room dimensions must all be greater than zero".to_string());
@@ -793,9 +969,10 @@ pub(crate) fn observatory_profile_setup_draft(
         if !node_ids.insert(node_id) {
             return Err(format!("setup profile repeats mmWave node_id {node_id:?}"));
         }
-        let position = profile_triplet_mm(
+        let position = profile_triplet_mm_with_projection(
             mmwave.get("mounting_position_m"),
             &format!("{field}.mounting_position_m"),
+            true,
         )?;
         validate_position(&format!("{field}.mounting_position_mm"), position, room)?;
         let mounting_revision = profile_public_identifier(
@@ -808,7 +985,17 @@ pub(crate) fn observatory_profile_setup_draft(
             "firmware": null,
             "mounting_position_mm": position,
             "mounting_revision": mounting_revision,
-            "transform": null,
+            "transform": {
+                "origin_x_mm": position[0],
+                "origin_z_mm": position[2],
+                "yaw_mdeg": mmwave.get("yaw_mdeg")
+                    .and_then(serde_json::Value::as_i64)
+                    .filter(|yaw| (-360000..=360000).contains(yaw))
+                    .ok_or_else(|| format!("{field}.yaw_mdeg is required in millidegrees"))?,
+                "raw_x_inverted": mmwave.get("raw_x_inverted")
+                    .and_then(serde_json::Value::as_bool)
+                    .ok_or_else(|| format!("{field}.raw_x_inverted is required"))?,
+            },
         }));
     }
 
@@ -818,7 +1005,8 @@ pub(crate) fn observatory_profile_setup_draft(
         "ready_to_seal": false,
         "missing_sections": OBSERVATORY_SETUP_DRAFT_MISSING_SECTIONS,
         "spec": {
-            "schema_version": 3,
+            "schema_version": SETUP_SCHEMA_VERSION,
+            "cad": cad,
             "coordinate_system": COORDINATE_SYSTEM,
             "room_dimensions_mm": room,
             "transmitter": {
@@ -871,6 +1059,14 @@ fn profile_mmwave_sensors(
 }
 
 fn profile_triplet_mm(value: Option<&serde_json::Value>, field: &str) -> Result<[u32; 3], String> {
+    profile_triplet_mm_with_projection(value, field, false)
+}
+
+fn profile_triplet_mm_with_projection(
+    value: Option<&serde_json::Value>,
+    field: &str,
+    project_cad_mount: bool,
+) -> Result<[u32; 3], String> {
     let coordinates = value
         .and_then(serde_json::Value::as_array)
         .ok_or_else(|| format!("setup profile {field} must be an array"))?;
@@ -887,7 +1083,11 @@ fn profile_triplet_mm(value: Option<&serde_json::Value>, field: &str) -> Result<
             .ok_or_else(|| format!("setup profile {field}[{index}] must be non-negative"))?;
         let millimetres = metres * 1_000.0;
         let rounded = millimetres.round();
-        if (millimetres - rounded).abs() > 1e-6 || rounded > f64::from(u32::MAX) {
+        // CAD preview already projects mount coordinates with f64::round.
+        // v4 stores the exact CAD document as well; legacy precision is unchanged.
+        if (!project_cad_mount && (millimetres - rounded).abs() > 1e-6)
+            || rounded > f64::from(u32::MAX)
+        {
             return Err(format!(
                 "setup profile {field}[{index}] must resolve to an exact whole millimetre"
             ));
@@ -986,6 +1186,7 @@ fn create_position_setup_with_executable(
         schema_version: spec.schema_version,
         coordinate_system: spec.coordinate_system,
         room_dimensions_mm: spec.room_dimensions_mm,
+        cad: spec.cad,
         transmitter: spec.transmitter,
         receivers: spec.receivers,
         recording_host: spec.recording_host,
@@ -1035,6 +1236,7 @@ fn validate_spec(spec: &PositionSetupSpec) -> Result<(), String> {
         schema_version: spec.schema_version,
         coordinate_system: spec.coordinate_system.clone(),
         room_dimensions_mm: spec.room_dimensions_mm,
+        cad: spec.cad.clone(),
         transmitter: spec.transmitter.clone(),
         receivers: spec.receivers.clone(),
         recording_host: spec.recording_host.clone(),
@@ -1057,6 +1259,14 @@ fn validate_definition(definition: &PositionSetupDefinition) -> Result<(), Strin
             definition.schema_version
         ));
     }
+    match (&definition.cad, definition.schema_version) {
+        (Some(cad), 4 | 5) => cad.validate()?,
+        (None, 4 | 5) => return Err("schema v4/v5 requires a complete CAD binding".to_string()),
+        (Some(_), _) => {
+            return Err("legacy setup schemas must not contain a CAD binding".to_string())
+        }
+        (None, _) => {}
+    }
     match definition.schema_version {
         1 if definition.mmwave.is_none() && definition.mmwave_sensors.is_empty() => {}
         1 => return Err("schema v1 must not contain mmWave sensors".to_string()),
@@ -1068,7 +1278,7 @@ fn validate_definition(definition: &PositionSetupDefinition) -> Result<(), Strin
             definition.room_dimensions_mm,
         )?,
         2 => return Err("schema v2 must use the legacy mmwave object".to_string()),
-        3 if definition.mmwave.is_none() => {
+        3..=5 if definition.mmwave.is_none() => {
             if definition.mmwave_sensors.is_empty() || definition.mmwave_sensors.len() > 2 {
                 return Err("schema v3 mmwave_sensors must contain one or two sensors".to_string());
             }
@@ -1089,7 +1299,7 @@ fn validate_definition(definition: &PositionSetupDefinition) -> Result<(), Strin
                 }
             }
         }
-        3 => return Err("schema v3 must use mmwave_sensors, not mmwave".to_string()),
+        3..=5 => return Err("schema v3/v4/v5 must use mmwave_sensors, not mmwave".to_string()),
         _ => unreachable!("schema range checked above"),
     }
     if definition.coordinate_system != COORDINATE_SYSTEM {
@@ -1178,10 +1388,15 @@ fn validate_definition(definition: &PositionSetupDefinition) -> Result<(), Strin
         "recording_host.placement_revision",
         &definition.recording_host.placement_revision,
     )?;
-    validate_public_identifier(
-        "recording_host.cable_revision",
-        &definition.recording_host.cable_revision,
-    )?;
+    match &definition.recording_host.cable_revision {
+        CableRevision::Recorded(revision) => {
+            validate_public_identifier("recording_host.cable_revision", revision)?;
+        }
+        CableRevision::NotRecorded(_) if definition.schema_version >= 5 => {}
+        CableRevision::NotRecorded(_) => {
+            return Err("schema v1-v4 requires a recorded cable_revision".to_string());
+        }
+    }
 
     if !(1..=13).contains(&definition.radio.channel) {
         return Err("radio.channel must be a 2.4 GHz WiFi channel from 1 to 13".to_string());
@@ -1342,6 +1557,8 @@ fn definition_sha256(definition: &PositionSetupDefinition) -> Result<String, Str
         1 => SETUP_HASH_DOMAIN_V1,
         2 => SETUP_HASH_DOMAIN_V2,
         3 => SETUP_HASH_DOMAIN_V3,
+        4 => SETUP_HASH_DOMAIN_V4,
+        5 => SETUP_HASH_DOMAIN_V5,
         _ => return Err("unsupported setup schema for hashing".to_string()),
     };
     let mut sealed = Vec::with_capacity(domain.len() + canonical.len());
@@ -1359,7 +1576,7 @@ fn tx_filter_identity_sha256(filter_mac_bytes: [u8; 6]) -> String {
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use super::*;
     use crate::raw_csi_recording::{
         IqPair, SourceBinding, RAW_CSI_SCHEMA_VERSION, SOURCE_BINDING_FLAG_FILTER_CONFIGURED,
@@ -1718,6 +1935,373 @@ mod tests {
         })
     }
 
+    fn bound_test_profile(mut document: Value) -> super::super::experiment::SetupProfile {
+        document["sensor_mount_radius_m"] = json!(0.5);
+        document["schema_version"] = json!(1);
+        document["profile_kind"] = json!("ruview.setup-profile");
+        if document.get("mmwave_sensors").is_none() {
+            let mut sensor = document.as_object_mut().unwrap().remove("mmwave").unwrap();
+            sensor["node_id"] = json!("MMWAVE1");
+            sensor["yaw_mdeg"] = json!(0);
+            sensor["raw_x_inverted"] = json!(false);
+            document["mmwave_sensors"] = json!([sensor]);
+        }
+        super::super::experiment::SetupProfile {
+            id: "cad-test".into(),
+            version: 22,
+            revision_id: "cad-test-v22".into(),
+            profile_sha256: super::super::experiment::profile_hash(&document).unwrap(),
+            profile_context_sha256: hash('a'),
+            document,
+            label: "Synthetic regression".into(),
+            created_at: String::new(),
+            updated_at: String::new(),
+        }
+    }
+
+    pub(crate) fn cad_setup_fixture(
+    ) -> (super::super::experiment::SetupProfile, SealedPositionSetup) {
+        cad_setup_fixture_with_mount([0.0, 1.2, 0.0])
+    }
+
+    pub(crate) fn cad_setup_fixture_with_mount(
+        mount: [f64; 3],
+    ) -> (super::super::experiment::SetupProfile, SealedPositionSetup) {
+        let mut document = matching_observatory_profile();
+        document["mmwave"]["mounting_position_m"] = json!(mount);
+        let profile = bound_test_profile(document);
+        let spec = complete_cad_spec(&profile);
+        let directory = TempDir::new().unwrap();
+        let executable = executable_fixture(&directory, b"CAD regression binary");
+        let setup =
+            create_position_setup_with_executable(parse_spec(spec).unwrap(), &executable).unwrap();
+        let path = directory.path().join("synthetic-seal.json");
+        std::fs::write(&path, deterministic_pretty_json(&setup).unwrap()).unwrap();
+        (profile, load_position_setup(&path).unwrap())
+    }
+
+    fn complete_cad_spec(profile: &super::super::experiment::SetupProfile) -> Value {
+        let old = valid_spec_value();
+        let mut spec = observatory_profile_setup_draft(profile).unwrap()["spec"].clone();
+        // Retain the original v4 fixture; v5 tests opt in explicitly.
+        spec["schema_version"] = json!(4);
+        spec["transmitter"]["firmware"] = old["transmitter"]["firmware"].clone();
+        for index in 0..4 {
+            spec["receivers"][index]["firmware"] = old["receivers"][index]["firmware"].clone();
+            spec["receivers"][index]["expected_grid"] =
+                old["receivers"][index]["expected_grid"].clone();
+        }
+        spec["recording_host"] = old["recording_host"].clone();
+        spec["radio"]["tx_filter_identity"] = old["radio"]["tx_filter_identity"].clone();
+        spec["mmwave_sensors"][0]["firmware"] = json!({
+            "target": "esp32c3", "version": "synthetic-v1", "artifact_sha256": hash('1')
+        });
+        spec
+    }
+
+    #[test]
+    fn v5_explicit_cable_omission_is_validated_hashed_loaded_and_reported() {
+        let (profile, _) = cad_setup_fixture();
+        assert_eq!(
+            observatory_profile_setup_draft(&profile).unwrap()["spec"]["schema_version"],
+            5
+        );
+        let mut value = complete_cad_spec(&profile);
+        value["schema_version"] = json!(5);
+        let directory = TempDir::new().unwrap();
+        let executable = executable_fixture(&directory, b"cable contract v5");
+        let recorded =
+            create_position_setup_with_executable(parse_spec(value.clone()).unwrap(), &executable)
+                .unwrap();
+        assert_eq!(
+            recorded.cable_revision_status(),
+            json!({"status": "recorded", "revision": "ethernet-left-v1"})
+        );
+        value["recording_host"]["cable_revision"] = json!({"status": "not_recorded"});
+        let omitted =
+            create_position_setup_with_executable(parse_spec(value.clone()).unwrap(), &executable)
+                .unwrap();
+        assert_ne!(recorded.setup_sha256(), omitted.setup_sha256());
+        assert_eq!(
+            omitted.cable_revision_status(),
+            json!({"status": "not_recorded"})
+        );
+        let path = directory.path().join("synthetic-v5.json");
+        std::fs::write(&path, deterministic_pretty_json(&omitted).unwrap()).unwrap();
+        assert_eq!(load_position_setup(&path).unwrap(), omitted);
+        let mut tampered = serde_json::to_value(&omitted).unwrap();
+        tampered["definition"]["recording_host"]["cable_revision"] = json!("ethernet-left-v1");
+        assert!(serde_json::from_value::<SealedPositionSetup>(tampered)
+            .unwrap()
+            .validate()
+            .is_err());
+        let mut missing = value.clone();
+        missing["recording_host"]
+            .as_object_mut()
+            .unwrap()
+            .remove("cable_revision");
+        assert!(parse_spec(missing).is_err());
+        for invalid in [
+            json!(null),
+            json!(false),
+            json!(12),
+            json!([]),
+            json!({}),
+            json!({"status": "recorded"}),
+            json!({"status": "not_recorded", "revision": "fake"}),
+            json!(""),
+            json!(" space "),
+        ] {
+            let mut changed = value.clone();
+            changed["recording_host"]["cable_revision"] = invalid;
+            assert!(parse_spec(changed)
+                .map_err(|error| error.to_string())
+                .and_then(|spec| validate_spec(&spec))
+                .is_err());
+        }
+        for field in ["cad", "transmitter", "receivers", "radio", "environment"] {
+            let mut missing = value.clone();
+            missing.as_object_mut().unwrap().remove(field);
+            assert!(parse_spec(missing)
+                .map_err(|error| error.to_string())
+                .and_then(|spec| validate_spec(&spec))
+                .is_err());
+        }
+    }
+
+    #[test]
+    fn v1_through_v4_keep_recorded_cables_and_original_hash_domains() {
+        let (profile, _) = cad_setup_fixture();
+        let directory = TempDir::new().unwrap();
+        let executable = executable_fixture(&directory, b"legacy cable contracts");
+        for version in 1..=4 {
+            let mut value = complete_cad_spec(&profile);
+            value["schema_version"] = json!(version);
+            if version < 4 {
+                value.as_object_mut().unwrap().remove("cad");
+            }
+            if version == 1 {
+                value.as_object_mut().unwrap().remove("mmwave_sensors");
+            }
+            if version == 2 {
+                value["mmwave"] = value["mmwave_sensors"][0].clone();
+                value.as_object_mut().unwrap().remove("mmwave_sensors");
+            }
+            let setup = create_position_setup_with_executable(
+                parse_spec(value.clone()).unwrap(),
+                &executable,
+            )
+            .unwrap();
+            let encoded = serde_json::to_value(setup.definition()).unwrap();
+            assert_eq!(
+                encoded["recording_host"]["cable_revision"],
+                json!("ethernet-left-v1")
+            );
+            assert_eq!(encoded["recording_host"].as_object().unwrap().len(), 4);
+            let mut bytes = format!("ruview.position-setup.v{version}\0").into_bytes();
+            bytes.extend(deterministic_pretty_json(setup.definition()).unwrap());
+            assert_eq!(sha256_bytes(&bytes), setup.setup_sha256());
+            let path = directory.path().join(format!("synthetic-v{version}.json"));
+            std::fs::write(&path, deterministic_pretty_json(&setup).unwrap()).unwrap();
+            assert_eq!(load_position_setup(&path).unwrap(), setup);
+            value["recording_host"]["cable_revision"] = json!({"status": "not_recorded"});
+            assert!(validate_spec(&parse_spec(value.clone()).unwrap()).is_err());
+            value["recording_host"]
+                .as_object_mut()
+                .unwrap()
+                .remove("cable_revision");
+            assert!(parse_spec(value).is_err());
+        }
+    }
+
+    #[test]
+    #[ignore = "requires a private spec and its independently frozen file digest; never creates a seal"]
+    fn validate_saved_spec_without_sealing() {
+        let path = std::env::var("RUVIEW_SETUP_SPEC_INPUT").expect("private spec input");
+        let expected = std::env::var("RUVIEW_SETUP_SPEC_SHA256").expect("spec file digest");
+        let bytes = std::fs::read(path).unwrap();
+        assert_eq!(sha256_bytes(&bytes), expected);
+        let spec: PositionSetupSpec = serde_json::from_slice(&bytes).unwrap();
+        validate_spec(&spec).unwrap();
+        assert_eq!(spec.schema_version, 5);
+        println!("validated_spec_file_sha256={expected}; sealed=false");
+    }
+
+    #[test]
+    fn cad_v4_import_seal_load_and_legacy_contracts() {
+        let (profile, setup) = cad_setup_fixture();
+        assert_eq!(setup.schema_version, 4);
+        setup.validate().unwrap();
+        let rule = setup.cad_exterior_rule().unwrap();
+        assert_eq!(rule.sensor_mount_radius_m, 0.5);
+        assert_eq!(rule.profile_sha256, profile.profile_sha256);
+        let directory = TempDir::new().unwrap();
+        let legacy = valid_v2_setup(&directory);
+        assert!(legacy.cad_exterior_rule().is_none());
+        assert!(!deterministic_pretty_json(&legacy)
+            .unwrap()
+            .windows(5)
+            .any(|s| s == b"\"cad\""));
+        // No new field in the old canonical definition, and the old hash domain remains exact.
+        let mut bytes = SETUP_HASH_DOMAIN_V2.to_vec();
+        bytes.extend(deterministic_pretty_json(&legacy.definition).unwrap());
+        assert_eq!(legacy.setup_sha256(), sha256_bytes(&bytes));
+        let mut old = serde_json::to_value(&legacy).unwrap();
+        old["definition"]["cad"] = serde_json::to_value(&setup.definition.cad).unwrap();
+        assert!(serde_json::from_value::<SealedPositionSetup>(old)
+            .unwrap()
+            .validate()
+            .is_err());
+    }
+
+    #[test]
+    fn cad_v4_rejects_missing_invalid_or_unbound_contract_fields() {
+        let (profile, setup) = cad_setup_fixture();
+        let directory = TempDir::new().unwrap();
+        let executable = executable_fixture(&directory, b"CAD negative test");
+        let spec = complete_cad_spec(&profile);
+        let reject = |value: Value| {
+            assert!(parse_spec(value)
+                .map_err(|e| e.to_string())
+                .and_then(|spec| create_position_setup_with_executable(spec, &executable))
+                .is_err());
+        };
+        for field in ["cad", "recording_host", "receivers", "radio"] {
+            let mut missing = spec.clone();
+            missing.as_object_mut().unwrap().remove(field);
+            reject(missing);
+        }
+        for field in [
+            "profile_id",
+            "version",
+            "revision_id",
+            "profile_sha256",
+            "target_rule",
+            "document",
+        ] {
+            let mut missing = spec.clone();
+            missing["cad"].as_object_mut().unwrap().remove(field);
+            reject(missing);
+        }
+        for (pointer, value) in [
+            ("/cad/revision_id", json!("cad-test-v21")),
+            ("/cad/profile_sha256", json!(hash('f'))),
+            ("/cad/target_rule", json!("axis-expanded-box")),
+            ("/room_dimensions_mm", json!([5000, 2590, 3440])),
+            ("/mmwave_sensors/0/transform/yaw_mdeg", json!(1000)),
+            ("/mmwave_sensors/0/transform/raw_x_inverted", json!(true)),
+            ("/transmitter/position_mm", json!([1, 1, 1])),
+        ] {
+            let mut altered = spec.clone();
+            *altered.pointer_mut(pointer).unwrap() = value;
+            reject(altered);
+        }
+        for radius in [
+            json!(-0.5),
+            json!(500),
+            json!("500mm"),
+            json!("0.5"),
+            Value::Null,
+        ] {
+            let mut bad = spec.clone();
+            bad["cad"]["document"]["sensor_mount_radius_m"] = radius;
+            bad["cad"]["profile_sha256"] =
+                json!(super::super::experiment::profile_hash(&bad["cad"]["document"]).unwrap());
+            reject(bad);
+        }
+        let mut missing = spec.clone();
+        missing["cad"]["document"]
+            .as_object_mut()
+            .unwrap()
+            .remove("sensor_mount_radius_m");
+        missing["cad"]["document"]["sensor_mount_radius_mm"] = json!(500);
+        missing["cad"]["profile_sha256"] =
+            json!(super::super::experiment::profile_hash(&missing["cad"]["document"]).unwrap());
+        reject(missing);
+        for radius in [json!(0.499), json!(0.501)] {
+            let mut tampered = serde_json::to_value(&setup).unwrap();
+            tampered["definition"]["cad"]["document"]["sensor_mount_radius_m"] = radius;
+            tampered["definition"]["cad"]["profile_sha256"] = json!(
+                super::super::experiment::profile_hash(&tampered["definition"]["cad"]["document"])
+                    .unwrap()
+            );
+            assert!(serde_json::from_value::<SealedPositionSetup>(tampered)
+                .unwrap()
+                .validate()
+                .is_err());
+        }
+        let mut altered_profile = profile.document.clone();
+        altered_profile["sensor_mount_radius_m"] = json!(0.501);
+        assert!(setup
+            .validate_observatory_profile(&altered_profile)
+            .is_err());
+    }
+
+    #[test]
+    #[ignore = "requires private immutable CAD input and a fresh private output path"]
+    fn export_saved_cad_draft_without_sealing() {
+        let input = std::env::var("RUVIEW_CAD_DRAFT_INPUT").expect("private input");
+        let output = std::env::var("RUVIEW_CAD_DRAFT_OUTPUT").expect("private output");
+        let value: Value = serde_json::from_slice(&std::fs::read(input).unwrap()).unwrap();
+        let profile = super::super::experiment::SetupProfile {
+            id: value["id"].as_str().unwrap().into(),
+            version: value["version"].as_i64().unwrap(),
+            revision_id: value["revision_id"].as_str().unwrap().into(),
+            profile_sha256: value["profile_sha256"].as_str().unwrap().into(),
+            profile_context_sha256: value["profile_context_sha256"].as_str().unwrap().into(),
+            document: value["document"].clone(),
+            label: String::new(),
+            created_at: String::new(),
+            updated_at: String::new(),
+        };
+        let draft = observatory_profile_setup_draft(&profile).unwrap();
+        assert_eq!(draft["spec"]["cad"]["document"], profile.document);
+        assert!(parse_spec(draft["spec"].clone()).is_err());
+        let file = std::fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(output)
+            .unwrap();
+        serde_json::to_writer_pretty(file, &draft).unwrap();
+    }
+
+    #[test]
+    #[ignore = "requires private historical seals; never changes them or their binary binding"]
+    fn saved_legacy_seals_keep_their_original_hashes() {
+        let input = std::env::var("RUVIEW_LEGACY_SETUP_INPUT").expect("private input list");
+        let entries: Vec<Value> = serde_json::from_slice(&std::fs::read(input).unwrap()).unwrap();
+        for entry in entries {
+            let path = Path::new(entry["path"].as_str().unwrap());
+            let before = std::fs::read(path).unwrap();
+            let loaded = load_position_setup(path).unwrap();
+            assert!(loaded.cad_exterior_rule().is_none());
+            assert_eq!(before, std::fs::read(path).unwrap());
+        }
+    }
+
+    #[test]
+    fn cad_v4_retains_fractional_mounts_and_projects_only_the_wire_transform() {
+        let mut document = matching_observatory_profile();
+        document["mmwave"]["mounting_position_m"] = json!([0.123177, 1.2, 0.456846]);
+        let profile = bound_test_profile(document);
+        let directory = TempDir::new().unwrap();
+        let executable = executable_fixture(&directory, b"fractional CAD fixture");
+        let setup = create_position_setup_with_executable(
+            parse_spec(complete_cad_spec(&profile)).unwrap(),
+            &executable,
+        )
+        .unwrap();
+        assert_eq!(
+            setup.mmwave_mounting_position_m("MMWAVE1"),
+            Some([0.123177, 1.2, 0.456846])
+        );
+        assert_eq!(setup.mmwave().unwrap().transform(), (123, 457, 0, false));
+        assert_eq!(
+            setup.definition.cad.as_ref().unwrap().document,
+            profile.document
+        );
+    }
+
     fn valid_source_binding() -> SourceBinding {
         SourceBinding {
             trailer_version: TX_SOURCE_BINDING_VERSION,
@@ -1747,6 +2331,7 @@ mod tests {
             flags,
             mesh_timestamp_us: None,
             source_binding: Some(valid_source_binding()),
+            protocol_identity: None,
             iq_pairs: vec![IqPair { i: 1, q: -1 }; 64],
         }
     }
@@ -1846,7 +2431,7 @@ mod tests {
     fn observatory_setup_draft_reuses_cad_geometry_but_cannot_be_sealed() {
         let profile = matching_observatory_profile();
 
-        let draft = observatory_profile_setup_draft(&profile).unwrap();
+        let draft = observatory_profile_setup_draft(&bound_test_profile(profile)).unwrap();
 
         assert_eq!(draft["kind"], OBSERVATORY_SETUP_DRAFT_KIND);
         assert_eq!(draft["ready_to_seal"], false);
@@ -1881,9 +2466,11 @@ mod tests {
         let mut profile = matching_observatory_profile();
         profile["mmwave"]["mounting_position_m"] = json!([-0.25, 1.2, 1.72]);
 
-        assert!(observatory_profile_setup_draft(&profile)
-            .unwrap_err()
-            .contains("non-negative"));
+        assert!(
+            observatory_profile_setup_draft(&bound_test_profile(profile))
+                .unwrap_err()
+                .contains("non-negative")
+        );
     }
 
     #[test]

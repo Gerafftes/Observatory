@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python3.15
 """R7 — multi-link consistency detection via Stoer-Wagner-style mincut.
 
 See docs/research/sota-2026-05-22/R7-multilink-consistency.md.
@@ -30,10 +30,10 @@ Usage:
 
 from __future__ import annotations
 
-import argparse
-import json
-from pathlib import Path
-import numpy as np
+lazy import argparse
+lazy import json
+lazy from pathlib import Path
+lazy import numpy as np
 
 N_SUB, N_FRAMES = 56, 20
 

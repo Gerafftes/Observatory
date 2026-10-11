@@ -2,7 +2,7 @@
  * @file edge_processing.h
  * @brief ADR-039 Edge Intelligence — dual-core CSI processing pipeline.
  *
- * Core 0 (WiFi): Produces CSI frames into a lock-free SPSC ring buffer.
+ * CSI transport task: Produces CSI frames into a lock-free SPSC ring buffer.
  * Core 1 (DSP):  Consumes frames, runs signal processing, extracts vitals.
  *
  * Features:
@@ -218,8 +218,8 @@ typedef struct {
 esp_err_t edge_processing_init(const edge_config_t *cfg);
 
 /**
- * Enqueue a CSI frame from the WiFi callback (Core 0).
- * Lock-free SPSC push — safe to call from ISR context.
+ * Enqueue a CSI frame from the current producer task.
+ * Lock-free SPSC push with a bounded copy and no wait.
  *
  * @param iq_data   Raw I/Q data from wifi_csi_info_t.buf.
  * @param iq_len    Length of I/Q data in bytes.
@@ -229,6 +229,11 @@ esp_err_t edge_processing_init(const edge_config_t *cfg);
  */
 bool edge_enqueue_csi(const uint8_t *iq_data, uint16_t iq_len,
                       int8_t rssi, uint8_t channel);
+
+/** Enqueue CSI while preserving its callback-entry monotonic timestamp. */
+bool edge_enqueue_csi_at(const uint8_t *iq_data, uint16_t iq_len,
+                         int8_t rssi, uint8_t channel,
+                         uint32_t callback_started_at_us);
 
 /**
  * Get the latest vitals packet (thread-safe copy).

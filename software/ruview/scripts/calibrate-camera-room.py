@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python3.15
 """Two-checkerboard camera-room calibration for WiFi pose training (ADR-152 S2.1.3).
 
 Aligns the ADR-079 ground-truth camera and the ESP32 WiFi transceivers in
@@ -29,18 +29,18 @@ Usage:
 
 from __future__ import annotations
 
-import argparse
-import glob
-import json
-import sys
-from datetime import datetime
-from pathlib import Path
+lazy import argparse
+lazy import glob
+lazy import json
+lazy import sys
+lazy from datetime import datetime
+lazy from pathlib import Path
 
-import cv2
-import numpy as np
+lazy import cv2
+lazy import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-import calibration_lib as cal  # noqa: E402
+lazy import calibration_lib as cal  # noqa: E402
 
 INTRINSICS_CACHE = Path("data") / ".cache" / "camera_intrinsics.json"
 

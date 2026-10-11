@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python3.15
 """Camera-room calibration library for WiFi pose ground truth (ADR-152 S2.1.3).
 
 Implements the PerceptAlign-style two-checkerboard alignment adopted in
@@ -30,13 +30,13 @@ alongside the room-frame rays so training can choose either representation.
 
 from __future__ import annotations
 
-import hashlib
-import json
-from datetime import datetime, timezone
-from pathlib import Path
+lazy import hashlib
+lazy import json
+lazy from datetime import datetime, timezone
+lazy from pathlib import Path
 
-import cv2
-import numpy as np
+lazy import cv2
+lazy import numpy as np
 
 BUNDLE_SCHEMA_VERSION = 1
 BUNDLE_METHOD = "two-checkerboard"

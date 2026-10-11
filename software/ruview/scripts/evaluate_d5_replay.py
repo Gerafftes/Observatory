@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python3.15
 """
 Evaluate candidate D5 presence detectors against the four labeled D4 runs.
 
@@ -14,15 +14,15 @@ written to stdout; a short human-readable summary is written to stderr.
 
 from __future__ import annotations
 
-import argparse
-import json
-import math
-import statistics
-import sys
-from collections import deque
-from dataclasses import asdict, dataclass, replace
-from pathlib import Path
-from typing import Any, Iterable, TextIO
+lazy import argparse
+lazy import json
+lazy import math
+lazy import statistics
+lazy import sys
+lazy from collections import deque
+lazy from dataclasses import asdict, dataclass, replace
+lazy from pathlib import Path
+lazy from typing import Any, Iterable, TextIO
 
 
 SCRIPT_DIR = Path(__file__).resolve().parent

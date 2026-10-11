@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python3.15
 """
 Lightweight ESP32 CSI UDP recorder (ADR-079).
 
@@ -9,13 +9,13 @@ Usage:
     python scripts/record-csi-udp.py --duration 300 --output data/recordings
 """
 
-import argparse
-import json
-import os
-import socket
-import struct
-import time
-from datetime import datetime, timezone
+lazy import argparse
+lazy import json
+lazy import os
+lazy import socket
+lazy import struct
+lazy import time
+lazy from datetime import datetime, timezone
 
 
 def parse_csi_packet(data):

@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python3.15
 """
 ADR-069: ESP32 CSI → Cognitum Seed RVF Ingest Bridge
 
@@ -29,19 +29,19 @@ and extracts a simplified 8-dim feature vector from the raw data.
 
 from __future__ import annotations
 
-import argparse
-import hashlib
-import json
-import logging
-import os
-import socket
-import struct
-import sys
-import time
-import urllib.error
-import urllib.request
-import math
-import ssl
+lazy import argparse
+lazy import hashlib
+lazy import json
+lazy import logging
+lazy import os
+lazy import socket
+lazy import struct
+lazy import sys
+lazy import time
+lazy import urllib.error
+lazy import urllib.request
+lazy import math
+lazy import ssl
 
 logging.basicConfig(
     level=logging.INFO,

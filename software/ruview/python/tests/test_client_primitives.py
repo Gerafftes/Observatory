@@ -5,9 +5,9 @@ Pure routing tests — no MQTT broker needed.
 
 from __future__ import annotations
 
-import json
+lazy import json
 
-from wifi_densepose.client import (
+lazy from wifi_densepose.client import (
     SemanticPrimitive,
     SemanticPrimitiveEvent,
     SemanticPrimitiveListener,

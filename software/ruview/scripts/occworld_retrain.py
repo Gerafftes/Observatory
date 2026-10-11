@@ -32,12 +32,12 @@ Requirements:
 
 from __future__ import annotations
 
-import argparse
-import logging
-import os
-import sys
-import time
-from pathlib import Path
+lazy import argparse
+lazy import logging
+lazy import os
+lazy import sys
+lazy import time
+lazy from pathlib import Path
 
 log = logging.getLogger(__name__)
 

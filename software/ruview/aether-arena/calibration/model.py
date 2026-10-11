@@ -8,9 +8,9 @@ The calibration service freezes this base and fits a tiny per-room **LoRA adapte
 input projection + pose head ≈ 11 KB) from ~100–200 labeled in-room samples. Empirically that lifts
 cross-subject 64→72% and cross-environment 11→73% (ADR-150 §3.3–3.6).
 """
-import numpy as np
-import torch
-import torch.nn as nn
+lazy import numpy as np
+lazy import torch
+lazy import torch.nn as nn
 
 # COCO-17 skeleton edges for the graph-refinement head.
 EDGES = [(0, 1), (0, 2), (1, 3), (2, 4), (5, 6), (5, 7), (7, 9), (6, 8), (8, 10),

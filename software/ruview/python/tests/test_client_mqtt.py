@@ -15,14 +15,14 @@ broker on every CI run.
 
 from __future__ import annotations
 
-import json
-from types import SimpleNamespace
-from typing import Any
+lazy import json
+lazy from types import SimpleNamespace
+lazy from typing import Any
 
-import pytest
+lazy import pytest
 
-from wifi_densepose.client import RuViewMqttClient
-from wifi_densepose.client.mqtt import _topic_matches
+lazy from wifi_densepose.client import RuViewMqttClient
+lazy from wifi_densepose.client.mqtt import _topic_matches
 
 
 # ─── Topic wildcard matcher ──────────────────────────────────────────

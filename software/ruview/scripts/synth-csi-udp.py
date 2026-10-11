@@ -1,16 +1,16 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python3.15
 """Synthetic CSI UDP emitter for testing the calibration CLI end-to-end.
 
 Emits the same 0xC511_0001 frame format the ESP32-S3 firmware produces, so the
 `wifi-densepose calibrate` CLI can be exercised without a live ESP32 in the
 loop. Generates HT20 frames (52 active subcarriers, 1 antenna) at 20 Hz.
 """
-import argparse
-import math
-import random
-import socket
-import struct
-import time
+lazy import argparse
+lazy import math
+lazy import random
+lazy import socket
+lazy import struct
+lazy import time
 
 
 MAGIC = 0xC511_0001

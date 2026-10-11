@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python3.15
 """
 WiFi-DensePose Model Benchmarking
 
@@ -31,16 +31,16 @@ Prerequisites:
 
 from __future__ import annotations
 
-import argparse
-import json
-import os
-import sys
-import time
-from dataclasses import dataclass, field, asdict
-from pathlib import Path
-from typing import Optional
+lazy import argparse
+lazy import json
+lazy import os
+lazy import sys
+lazy import time
+lazy from dataclasses import dataclass, field, asdict
+lazy from pathlib import Path
+lazy from typing import Optional
 
-import numpy as np
+lazy import numpy as np
 
 try:
     import onnxruntime as ort

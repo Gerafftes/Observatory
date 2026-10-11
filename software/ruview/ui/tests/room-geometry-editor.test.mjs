@@ -42,10 +42,13 @@ test('CAD room dimensions are a title above the X axis label', () => {
   assert.ok(container.innerHTML.indexOf('occ-cad-room-title') < container.innerHTML.indexOf('X \/ LÄNGE \(m\)'));
 });
 
-test('CAD geometry editor exposes TX, all four RX markers, and the mmWave mount', () => {
+test('CAD geometry editor exposes TX, all four RX markers, and both mmWave mounts', () => {
   const profile = defaultSetupProfileDocument();
-  assert.deepEqual(geometryEntities(profile).map((entity) => entity.id), ['TX', 'RX1', 'RX2', 'RX3', 'RX4', 'MMWAVE']);
-  assert.deepEqual(geometryEntities(profile).at(-1).position_m, profile.mmwave.mounting_position_m);
+  const entities = geometryEntities(profile);
+  assert.deepEqual(entities.map((entity) => entity.id), ['TX', 'RX1', 'RX2', 'RX3', 'RX4', 'MMWAVE1', 'MMWAVE2']);
+  for (const sensor of profile.mmwave_sensors) {
+    assert.deepEqual(entities.find((entity) => entity.id === sensor.node_id).position_m, sensor.mounting_position_m);
+  }
   assert.equal(validateGeometryDraft(profile).valid, true);
 });
 
@@ -57,16 +60,28 @@ test('CAD validation rejects malformed mmWave orientation metadata', () => {
   const validation = validateGeometryDraft(profile);
 
   assert.equal(validation.valid, false);
-  assert.match(validation.errors.join(' '), /mmwave\.yaw_mdeg/);
-  assert.match(validation.errors.join(' '), /mmwave\.raw_x_inverted/);
+  assert.match(validation.errors.join(' '), /MMWAVE1\.yaw_mdeg/);
+  assert.match(validation.errors.join(' '), /MMWAVE1\.raw_x_inverted/);
 });
 
-test('legacy profiles without mmWave metadata get a safe editor fallback', () => {
+test('profiles without mmWave metadata get a safe helper fallback without inventing a sensor', () => {
   const profile = defaultSetupProfileDocument();
   delete profile.mmwave;
+  delete profile.mmwave_sensors;
 
   assert.deepEqual(mmwaveMountingPosition(profile), [0.0, 1.2, 1.72]);
-  assert.deepEqual(geometryEntities(profile).at(-1).position_m, [0.0, 1.2, 1.72]);
+  assert.equal(geometryEntities(profile).some((entity) => entity.role === 'mmwave'), false);
+  assert.equal(validateGeometryDraft(profile).valid, true);
+});
+
+test('legacy single-mmWave profiles keep their position under the MMWAVE1 identity', () => {
+  const profile = defaultSetupProfileDocument();
+  delete profile.mmwave_sensors;
+
+  const sensors = geometryEntities(profile).filter((entity) => entity.role === 'mmwave');
+  assert.deepEqual(sensors.map((entity) => entity.id), ['MMWAVE1']);
+  assert.deepEqual(sensors[0].position_m, profile.mmwave.mounting_position_m);
+  assert.equal(validateGeometryDraft(profile).valid, true);
 });
 
 test('optimal mmWave placement covers the complete default room and every TX/RX reference', () => {
@@ -139,13 +154,15 @@ test('CAD view renders an editable mmWave marker, view cone, and orientation ins
   const container = { innerHTML: '' };
   const editor = new RoomGeometryEditor(container, { document: defaultSetupProfileDocument() });
 
-  editor._select('MMWAVE');
+  editor._select('MMWAVE1');
   editor.render();
 
-  assert.match(container.innerHTML, /data-geometry-id="MMWAVE"/);
+  assert.match(container.innerHTML, /data-geometry-id="MMWAVE1"/);
+  assert.match(container.innerHTML, /data-geometry-id="MMWAVE2"/);
   assert.match(container.innerHTML, /occ-cad-marker-mmwave/);
-  assert.match(container.innerHTML, /occ-cad-swatch-mmwave/);
-  assert.match(container.innerHTML, /MMWAVE \[x \/ y \/ z\] m/);
+  assert.match(container.innerHTML, /occ-cad-swatch-mmwave1/);
+  assert.match(container.innerHTML, /occ-cad-swatch-mmwave2/);
+  assert.match(container.innerHTML, /MMWAVE1 \[x \/ y \/ z\] m/);
   assert.match(container.innerHTML, /data-cad-mmwave-fov/);
   assert.match(container.innerHTML, /data-cad-mmwave-centerline/);
   assert.match(container.innerHTML, /data-cad-yaw-handle/);
@@ -213,8 +230,9 @@ test('CAD view shows the setup-bound calibrated yaw without overwriting the base
   const container = { innerHTML: '' };
   const editor = new RoomGeometryEditor(container, {
     document: profile,
-    selectedIds: ['MMWAVE'],
+    selectedIds: ['MMWAVE1'],
     yawCalibration: {
+      node_id: 'MMWAVE1',
       base_yaw_mdeg: 217400,
       optimized_yaw_mdeg: 223400,
       correction_mdeg: 6000,
@@ -281,7 +299,7 @@ test('CAD orientation inspector applies exact yaw, RX1 aim, and raw-X mirror', (
     document: defaultSetupProfileDocument(),
     onChange: (document) => { changedDocument = document; },
   });
-  editor._select('MMWAVE');
+  editor._select('MMWAVE1');
 
   editor._handleFormChange({
     target: {
@@ -320,10 +338,10 @@ test('yaw handle supports direct pointer adjustment and keyboard steps', () => {
   const editor = new RoomGeometryEditor(container, {
     document: defaultSetupProfileDocument(),
     onChange: (document) => { changedDocument = document; },
-    selectedIds: ['MMWAVE'],
+    selectedIds: ['MMWAVE1'],
   });
   editor._svgPoint = () => ({ x: 162, y: 400 });
-  editor.drag = { kind: 'yaw', pointerId: 7 };
+  editor.drag = { kind: 'yaw', id: 'MMWAVE1', pointerId: 7 };
 
   editor._handlePointerMove({ pointerId: 7 });
   editor._handlePointerUp({ pointerId: 7 });
@@ -336,10 +354,40 @@ test('yaw handle supports direct pointer adjustment and keyboard steps', () => {
     shiftKey: false,
     preventDefault() {},
     target: {
-      closest(selector) { return selector === '[data-cad-yaw-handle]' ? {} : null; },
+      closest(selector) { return selector === '[data-cad-yaw-handle]' ? { dataset: { cadYawNode: 'MMWAVE1' } } : null; },
     },
   });
   assert.equal(changedDocument.mmwave.yaw_mdeg, (afterPointer + 1000) % 360000);
+});
+
+test('yaw keyboard steps update MMWAVE2 without changing MMWAVE1', () => {
+  const profile = defaultSetupProfileDocument();
+  const container = { innerHTML: '' };
+  let changedDocument = null;
+  const editor = new RoomGeometryEditor(container, {
+    document: profile,
+    selectedIds: ['MMWAVE2'],
+    onChange: (document) => { changedDocument = document; },
+  });
+
+  editor._handleKeyDown({
+    key: 'ArrowRight',
+    shiftKey: true,
+    preventDefault() {},
+    target: {
+      closest(selector) {
+        return selector === '[data-cad-yaw-handle]'
+          ? { dataset: { cadYawNode: 'MMWAVE2' } }
+          : null;
+      },
+    },
+  });
+
+  assert.equal(mmwaveYawMdeg(changedDocument, 'MMWAVE2'), 190000);
+  assert.deepEqual(changedDocument.mmwave, profile.mmwave);
+  assert.deepEqual(changedDocument.mmwave_sensors[0], profile.mmwave_sensors[0]);
+  assert.match(container.innerHTML, /MMWAVE2 \[x \/ y \/ z\] m/);
+  assert.match(container.innerHTML, /data-cad-mmwave-yaw value="190"/);
 });
 
 test('position drags publish the current MMWAVE2 draft before pointerup', () => {
@@ -517,7 +565,7 @@ test('CAD geometry validates the mmWave mount with the same room and exterior-ra
   profile.mmwave.mounting_position_m[0] = -0.51;
   const invalid = validateGeometryDraft(profile);
   assert.equal(invalid.valid, false);
-  assert.match(invalid.errors.join(' '), /MMWAVE: Außenradius von 0\.50 m überschritten/);
+  assert.match(invalid.errors.join(' '), /MMWAVE1: Außenradius von 0\.50 m überschritten/);
 });
 
 test('CAD geometry rejects an exterior mmWave mount in interior-only mode', () => {
@@ -532,7 +580,24 @@ test('CAD geometry rejects an exterior mmWave mount in interior-only mode', () =
   const validation = validateGeometryDraft(profile);
 
   assert.equal(validation.valid, false);
-  assert.match(validation.errors.join(' '), /MMWAVE: Montage ist auf den Innenraum beschränkt/);
+  assert.match(validation.errors.join(' '), /MMWAVE1: Montage ist auf den Innenraum beschränkt/);
+});
+
+test('MMWAVE2 validation applies its own orientation and interior-only gates', () => {
+  const profile = defaultSetupProfileDocument();
+  const sensor = profile.mmwave_sensors[1];
+  sensor.yaw_mdeg = 360001;
+  sensor.raw_x_inverted = 'true';
+  sensor.allow_exterior = false;
+  sensor.mounting_position_m[0] += 0.01;
+
+  const validation = validateGeometryDraft(profile);
+
+  assert.equal(validation.valid, false);
+  assert.match(validation.errors.join(' '), /MMWAVE2\.yaw_mdeg/);
+  assert.match(validation.errors.join(' '), /MMWAVE2\.raw_x_inverted/);
+  assert.match(validation.errors.join(' '), /MMWAVE2: Montage ist auf den Innenraum beschränkt/);
+  assert.doesNotMatch(validation.errors.join(' '), /MMWAVE1/);
 });
 
 test('CAD geometry validation requires the canonical four receiver IDs', () => {
@@ -633,11 +698,12 @@ test('plan distance moves only the second marker and preserves its height', () =
 test('plan distance moves the mmWave mount and preserves its height', () => {
   const profile = defaultSetupProfileDocument();
   const originalY = profile.mmwave.mounting_position_m[1];
-  const result = setPlanDistance(profile, 'TX', 'MMWAVE', 1.25);
+  const result = setPlanDistance(profile, 'TX', 'MMWAVE1', 1.25);
 
   assert.equal(result.error, '');
   assert.ok(Math.abs(planDistance(result.document.transmitter.position_m, result.document.mmwave.mounting_position_m) - 1.25) < 1e-9);
   assert.equal(result.document.mmwave.mounting_position_m[1], originalY);
+  assert.deepEqual(result.document.mmwave_sensors[1], profile.mmwave_sensors[1]);
 });
 
 test('plan distance rejects a target that would leave the room', () => {

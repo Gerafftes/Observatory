@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python3.15
 """ESP32 WASM Module On-Device Test Suite
 
 Uploads WASM edge modules to the ESP32-S3 and captures execution proof.
@@ -9,15 +9,15 @@ Usage:
     python scripts/esp32_wasm_test.py --discover  # scan subnet for ESP32
 """
 
-import argparse
-import json
-import struct
-import sys
-import time
-import urllib.request
-import urllib.error
-import socket
-import datetime
+lazy import argparse
+lazy import json
+lazy import struct
+lazy import sys
+lazy import time
+lazy import urllib.request
+lazy import urllib.error
+lazy import socket
+lazy import datetime
 
 
 # ─── WASM Module Generators ─────────────────────────────────────────────────

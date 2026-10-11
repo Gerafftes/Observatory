@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python3.15
 """Replay Raw-CSI-v2 timing evidence through the 60 ms queue matcher.
 
 This tool is deliberately diagnostic-only. Historical captures can exercise
@@ -8,14 +8,14 @@ but they cannot validate a sealed live setup or produce calibration evidence.
 
 from __future__ import annotations
 
-import argparse
-import hashlib
-import json
-import math
-import sys
-from dataclasses import dataclass
-from pathlib import Path
-from typing import Any, Iterable
+lazy import argparse
+lazy import hashlib
+lazy import json
+lazy import math
+lazy import sys
+lazy from dataclasses import dataclass
+lazy from pathlib import Path
+lazy from typing import Any, Iterable
 
 
 DEFAULT_GUARD_US = 60_000

@@ -38,19 +38,19 @@ Usage:
   .venv/Scripts/python.exe export_to_safetensors.py
 """
 
-import json
-import os
-import re
+lazy import json
+lazy import os
+lazy import re
 
-import numpy as np
-import torch
-from safetensors.torch import save_file
+lazy import numpy as np
+lazy import torch
+lazy from safetensors.torch import save_file
 
-from _bench_common import RESULTS, import_upstream, remap_legacy_keys
+lazy from _bench_common import RESULTS, import_upstream, remap_legacy_keys
 
 import_upstream()  # sys.path + models stub
 
-from models.pose_model import WiFlowPoseModel  # noqa: E402
+lazy from models.pose_model import WiFlowPoseModel  # noqa: E402
 
 CHECKPOINT = os.path.join(RESULTS, "retrained_best_pose_model.pth")
 

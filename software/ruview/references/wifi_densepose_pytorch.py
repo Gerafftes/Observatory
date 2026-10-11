@@ -2,13 +2,13 @@
 # Based on "DensePose From WiFi" by Carnegie Mellon University
 # Paper: https://arxiv.org/pdf/2301.00250
 
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
-import numpy as np
-import math
-from typing import Dict, List, Tuple, Optional
-from collections import OrderedDict
+lazy import torch
+lazy import torch.nn as nn
+lazy import torch.nn.functional as F
+lazy import numpy as np
+lazy import math
+lazy from typing import Dict, List, Tuple, Optional
+lazy from collections import OrderedDict
 
 class CSIPhaseProcessor:
     """

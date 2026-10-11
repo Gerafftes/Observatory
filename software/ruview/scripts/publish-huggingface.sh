@@ -6,7 +6,7 @@
 #
 # Prerequisites:
 #   - gcloud CLI authenticated with access to cognitum-20260110
-#   - Python 3.8+ with pip
+#   - Python 3.15+ with pip
 #   - Model files present in dist/models/
 #
 # Usage:

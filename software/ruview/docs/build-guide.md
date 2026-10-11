@@ -18,7 +18,7 @@ Covers every way to build, run, and deploy the system -- from a zero-hardware ve
 
 ## 1. Quick Start (Verification Only -- No Hardware)
 
-The fastest way to confirm the signal processing pipeline is real and deterministic. Requires only Python 3.8+, numpy, and scipy. No WiFi hardware, no GPU, no Docker.
+The fastest way to confirm the signal processing pipeline is real and deterministic. Requires only Python 3.15+, numpy, and scipy. No WiFi hardware, no GPU, no Docker.
 
 ```bash
 # From the repository root:
@@ -76,7 +76,7 @@ The Python pipeline lives under `v1/` and provides the full API server, signal p
 
 ### Prerequisites
 
-- Python 3.8+
+- Python 3.15+
 - pip
 
 ### Install (verification-only -- lightweight)
@@ -93,7 +93,7 @@ This installs only the four packages needed for deterministic pipeline verificat
 pip install -r requirements.txt
 ```
 
-This pulls in FastAPI, uvicorn, torch, OpenCV, SQLAlchemy, Redis client, and all other runtime dependencies.
+This pulls in FastAPI, uvicorn, OpenCV, SQLAlchemy, Redis client, and the other Python 3.15 runtime dependencies. PyTorch remains optional until upstream publishes CPython 3.15 wheels.
 
 ### Verify the pipeline
 

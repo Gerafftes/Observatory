@@ -39,12 +39,76 @@ menu "CSI Node Configuration"
         help
             WiFi channel to listen on for CSI data.
 
+    config CSI_SELF_PING_ENABLE
+        bool "Enable gateway ping CSI traffic source"
+        default y
+        help
+            Generate a bounded ICMP traffic source for repeatable CSI capture.
+            Disable in the comparison build to measure ambient/TX-only capture.
+
+    config CSI_SELF_PING_INTERVAL_MS
+        int "Gateway ping interval (ms)"
+        default 20
+        range 10 10000
+        depends on CSI_SELF_PING_ENABLE
+
+    config CSI_SELF_PING_TIMEOUT_MS
+        int "Gateway ping timeout (ms)"
+        default 1000
+        range 10 10000
+        depends on CSI_SELF_PING_ENABLE
+
+    config CSI_RAW_PROFILE
+        bool "Raw CSI receiver profile"
+        default n
+        help
+            Keep CSI capture, bounded transport, identity, OTA/status and
+            diagnostics, while skipping local DSP, WASM, display, swarm,
+            adaptive-controller and duty-cycle tasks. mmWave initialization
+            remains unchanged.
+
+    config CSI_CAPTURE_RATE_LIMIT_HZ
+        int "CSI callback admission rate limit (Hz)"
+        default 50
+        range 20 100
+        help
+            Maximum admitted CSI callback rate. Keep 50 Hz for baseline runs;
+            100 Hz is an experiment-only variant requiring measured validation.
+
+    config CSI_TRANSPORT_CAPTURE_SLOTS
+        int "CSI transport capture slots"
+        default 8
+        range 4 32
+        help
+            Number of fixed-size CSI capture slots shared by the queue and
+            processing task. Larger values consume more static RAM.
+
+    config CSI_TRANSPORT_TASK_STACK_BYTES
+        int "CSI transport task stack (bytes)"
+        default 8192
+        range 4096 32768
+
+    config CSI_TRANSPORT_TASK_PRIORITY
+        int "CSI transport task priority"
+        default 5
+        range 1 24
+
+    config CSI_TRANSPORT_TASK_CORE
+        int "CSI transport task core (-1 = unpinned)"
+        default -1
+        range -1 1
+        depends on IDF_TARGET_ESP32S3
+        help
+            Core pinning experiment for dual-core ESP32-S3 only. The C6 build
+            stays unpinned because it has one application core.
+
 endmenu
 
 menu "Edge Intelligence (ADR-039)"
 
     config EDGE_TIER
         int "Edge processing tier (0=raw, 1=basic, 2=full)"
+        default 0 if CSI_RAW_PROFILE
         default 2
         range 0 2
         help
@@ -175,6 +239,7 @@ menu "AMOLED Display (ADR-045)"
     config DISPLAY_ENABLE
         bool "Enable AMOLED display support"
         default y
+        depends on !CSI_RAW_PROFILE
         help
             Enable RM67162 QSPI AMOLED display and LVGL UI.
             Auto-detects at boot; gracefully skips if no display hardware.
@@ -256,6 +321,7 @@ menu "WASM Programmable Sensing (ADR-040)"
     config WASM_ENABLE
         bool "Enable WASM Tier 3 runtime"
         default y
+        depends on !CSI_RAW_PROFILE
         help
             Enable the WASM3 interpreter for hot-loadable sensing modules.
             Requires WASM3 source in components/wasm3/wasm3-src/.

@@ -87,7 +87,7 @@ quirks (nexmon_csi cross-compile is a known dead end; see step 3).
 | Pi OS Bookworm (Lite) | 64-bit, kernel 6.6+ | Use the Lite image — Desktop slows boot and burns SD writes |
 | Tailscale | ≥1.60 | Mesh networking across the cluster |
 | Rust toolchain | 1.78+ on workstation, 1.78+ on each Pi | For ruvector + adapter binaries |
-| Python 3.11+ | system Python on workstation | numpy required |
+| Python 3.15+ | system Python on workstation | numpy required |
 | systemd-user | already present | Workstation timers run as user units |
 
 ---

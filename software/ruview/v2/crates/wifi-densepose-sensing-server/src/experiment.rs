@@ -1444,6 +1444,21 @@ fn finite_triplet(value: Option<&Value>, field: &str) -> Result<[f64; 3], String
     Ok(result)
 }
 
+/// The one CAD radius value shared by mount and radar-target validation.
+pub(crate) fn sensor_mount_radius_m(document: &Value) -> Result<f64, String> {
+    match document.get("sensor_mount_radius_m") {
+        None => Ok(DEFAULT_SENSOR_MOUNT_RADIUS_M),
+        Some(value) => value
+            .as_f64()
+            .filter(|number| {
+                number.is_finite() && *number >= 0.0 && *number <= MAX_SENSOR_MOUNT_RADIUS_M
+            })
+            .ok_or_else(|| {
+                format!("sensor_mount_radius_m must be between 0 and {MAX_SENSOR_MOUNT_RADIUS_M} m")
+            }),
+    }
+}
+
 fn normalize_profile_document(document: &Value) -> Result<Value, String> {
     let object = document
         .as_object()
@@ -1452,17 +1467,7 @@ fn normalize_profile_document(document: &Value) -> Result<Value, String> {
     if dimensions.iter().any(|number| *number <= 0.0) {
         return Err("room_dimensions_m must contain positive values".to_string());
     }
-    let sensor_mount_radius = match object.get("sensor_mount_radius_m") {
-        None => DEFAULT_SENSOR_MOUNT_RADIUS_M,
-        Some(value) => value
-            .as_f64()
-            .filter(|number| {
-                number.is_finite() && *number >= 0.0 && *number <= MAX_SENSOR_MOUNT_RADIUS_M
-            })
-            .ok_or_else(|| {
-                format!("sensor_mount_radius_m must be between 0 and {MAX_SENSOR_MOUNT_RADIUS_M} m")
-            })?,
-    };
+    let sensor_mount_radius = sensor_mount_radius_m(document)?;
     let transmitter = object
         .get("transmitter")
         .and_then(Value::as_object)
@@ -1684,7 +1689,7 @@ fn normalize_profile_document(document: &Value) -> Result<Value, String> {
     Ok(normalized)
 }
 
-fn profile_hash(document: &Value) -> Result<String, String> {
+pub(crate) fn profile_hash(document: &Value) -> Result<String, String> {
     deterministic_profile_bytes(document)
         .map(|bytes| sha256_bytes(&bytes))
         .map_err(|error| format!("canonicalize setup profile: {error}"))

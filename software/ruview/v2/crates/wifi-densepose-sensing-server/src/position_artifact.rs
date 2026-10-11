@@ -683,6 +683,7 @@ mod tests {
             flags: 3,
             mesh_timestamp_us: Some(42),
             source_binding: None,
+            protocol_identity: None,
             iq_pairs: vec![
                 IqPair { i: 1, q: 2 },
                 IqPair { i: 3, q: 4 },

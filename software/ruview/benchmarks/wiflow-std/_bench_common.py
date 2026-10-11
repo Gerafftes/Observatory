@@ -21,14 +21,14 @@ them, treat this module as the reference implementation and keep the copies
 in sync.
 """
 
-import os
-import random
-import sys
-import time
-import types
+lazy import os
+lazy import random
+lazy import sys
+lazy import time
+lazy import types
 
-import numpy as np
-import torch
+lazy import numpy as np
+lazy import torch
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 UPSTREAM = os.path.join(HERE, "upstream")

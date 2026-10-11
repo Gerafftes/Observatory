@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python3.15
 """
 RuView Medical Vitals Suite — 10 capabilities from a single mmWave sensor
 
@@ -18,13 +18,13 @@ Usage:
     python examples/medical/vitals_suite.py --port COM4 --duration 120
 """
 
-import argparse
-import collections
-import math
-import re
-import serial
-import sys
-import time
+lazy import argparse
+lazy import collections
+lazy import math
+lazy import re
+lazy import serial
+lazy import sys
+lazy import time
 
 try:
     import numpy as np

@@ -8,7 +8,7 @@ real end-to-end install + import test inside an ephemeral venv.
 
 from __future__ import annotations
 
-import pathlib
+lazy import pathlib
 
 
 TOMBSTONE = pathlib.Path(__file__).parent.parent / "src" / "wifi_densepose" / "__init__.py"

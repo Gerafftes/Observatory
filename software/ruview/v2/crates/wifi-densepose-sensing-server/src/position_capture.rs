@@ -1710,6 +1710,7 @@ mod tests {
             flags,
             mesh_timestamp_us: None,
             source_binding: Some(valid_source_binding()),
+            protocol_identity: None,
             iq_pairs: (0..8).map(|_| IqPair { i: residual, q: 2 }).collect(),
         }
     }

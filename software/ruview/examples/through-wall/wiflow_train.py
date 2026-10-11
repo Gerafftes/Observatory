@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python3.15
 """Train a CSI->pose model on the camera-supervised dataset (ADR-079/180).
 
 Input  : 410-d CSI vector (4 global feats + 6 per-node + 400 signal-field).
@@ -9,9 +9,9 @@ Reports HONEST held-out PCK@k + MPJPE on a chronological val split (the last
 Usage (ruvultra venv):
     python wiflow_train.py --data ~/wiflow-room/dataset.jsonl --out ~/wiflow-room/model.pt
 """
-import argparse, json, math, os, sys
-import numpy as np
-import torch, torch.nn as nn
+lazy import argparse, json, math, os, sys
+lazy import numpy as np
+lazy import torch, torch.nn as nn
 
 
 def load(path):

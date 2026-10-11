@@ -975,7 +975,13 @@ fn process_frame(
         node.observe_csi_frame_arrival(now);
         return Ok(false);
     }
-    let _ = observe_frame_for_presence(node, &frame, now, phase);
+    let _ = observe_frame_for_presence(
+        node,
+        &frame,
+        now,
+        phase,
+        recorded.frame.host_monotonic_ns.unwrap_or_default(),
+    );
     Ok(true)
 }
 

@@ -9,22 +9,157 @@
 
 #include "esp_stubs.h"
 #include "edge_processing.h"
+#include "csi_transport.h"
 #include "wasm_runtime.h"
 #include <stdint.h>
 #include <string.h>
 
 /** Monotonically increasing microsecond counter for esp_timer_get_time(). */
 static int64_t s_fake_time_us = 0;
+static int64_t s_fake_time_step_us = 50000;
 
 int64_t esp_timer_get_time(void)
 {
-    /* Advance by 50ms each call (~20 Hz CSI rate simulation). */
-    s_fake_time_us += 50000;
-    return s_fake_time_us;
+    int64_t step_us = __atomic_load_n(&s_fake_time_step_us, __ATOMIC_RELAXED);
+    return __atomic_add_fetch(&s_fake_time_us, step_us, __ATOMIC_RELAXED);
+}
+
+void esp_test_set_time_us(int64_t time_us) {
+    __atomic_store_n(&s_fake_time_us, time_us, __ATOMIC_RELAXED);
+}
+void esp_test_set_time_step_us(int64_t step_us) {
+    __atomic_store_n(&s_fake_time_step_us, step_us, __ATOMIC_RELAXED);
+}
+void esp_test_advance_time_us(int64_t delta_us) {
+    (void)__atomic_add_fetch(&s_fake_time_us, delta_us, __ATOMIC_RELAXED);
+}
+
+QueueHandle_t xQueueCreateStatic(size_t capacity, size_t item_size,
+                                uint8_t *storage, StaticQueue_t *control)
+{
+    if (capacity == 0 || item_size == 0 || storage == NULL || control == NULL) {
+        return NULL;
+    }
+    control->storage = storage;
+    control->item_size = item_size;
+    control->capacity = capacity;
+    control->head = 0;
+    control->tail = 0;
+    control->count = 0;
+#ifdef CSI_DIAGNOSTICS_THREAD_SAFE_STUBS
+    if (control->lock_initialized) {
+        (void)pthread_mutex_destroy(&control->lock);
+    }
+    (void)pthread_mutex_init(&control->lock, NULL);
+    control->lock_initialized = true;
+#endif
+    return control;
+}
+
+BaseType_t xQueueSend(QueueHandle_t queue, const void *item, uint32_t wait_ticks)
+{
+    (void)wait_ticks;
+    if (queue == NULL || item == NULL) {
+        return pdFALSE;
+    }
+#ifdef CSI_DIAGNOSTICS_THREAD_SAFE_STUBS
+    (void)pthread_mutex_lock(&queue->lock);
+#endif
+    if (queue->count == queue->capacity) {
+#ifdef CSI_DIAGNOSTICS_THREAD_SAFE_STUBS
+        (void)pthread_mutex_unlock(&queue->lock);
+#endif
+        return pdFALSE;
+    }
+    memcpy(queue->storage + queue->tail * queue->item_size, item, queue->item_size);
+    queue->tail = (queue->tail + 1) % queue->capacity;
+    queue->count++;
+#ifdef CSI_DIAGNOSTICS_THREAD_SAFE_STUBS
+    (void)pthread_mutex_unlock(&queue->lock);
+#endif
+    return pdTRUE;
+}
+
+BaseType_t xQueueReceive(QueueHandle_t queue, void *item, uint32_t wait_ticks)
+{
+    (void)wait_ticks;
+    if (queue == NULL || item == NULL) {
+        return pdFALSE;
+    }
+#ifdef CSI_DIAGNOSTICS_THREAD_SAFE_STUBS
+    (void)pthread_mutex_lock(&queue->lock);
+#endif
+    if (queue->count == 0) {
+#ifdef CSI_DIAGNOSTICS_THREAD_SAFE_STUBS
+        (void)pthread_mutex_unlock(&queue->lock);
+#endif
+        return pdFALSE;
+    }
+    memcpy(item, queue->storage + queue->head * queue->item_size, queue->item_size);
+    queue->head = (queue->head + 1) % queue->capacity;
+    queue->count--;
+#ifdef CSI_DIAGNOSTICS_THREAD_SAFE_STUBS
+    (void)pthread_mutex_unlock(&queue->lock);
+#endif
+    return pdTRUE;
+}
+
+size_t uxQueueMessagesWaiting(QueueHandle_t queue)
+{
+    if (queue == NULL) {
+        return 0;
+    }
+#ifdef CSI_DIAGNOSTICS_THREAD_SAFE_STUBS
+    (void)pthread_mutex_lock(&queue->lock);
+#endif
+    size_t count = queue->count;
+#ifdef CSI_DIAGNOSTICS_THREAD_SAFE_STUBS
+    (void)pthread_mutex_unlock(&queue->lock);
+#endif
+    return count;
+}
+
+SemaphoreHandle_t xSemaphoreCreateMutexStatic(StaticSemaphore_t *storage)
+{
+    if (storage == NULL) {
+        return NULL;
+    }
+#ifdef CSI_DIAGNOSTICS_THREAD_SAFE_STUBS
+    (void)pthread_mutex_init(storage, NULL);
+#else
+    *storage = 0;
+#endif
+    return storage;
+}
+
+BaseType_t xSemaphoreTake(SemaphoreHandle_t semaphore, uint32_t wait_ticks)
+{
+    (void)wait_ticks;
+    if (semaphore == NULL) {
+        return pdFALSE;
+    }
+#ifdef CSI_DIAGNOSTICS_THREAD_SAFE_STUBS
+    return pthread_mutex_lock(semaphore) == 0 ? pdTRUE : pdFALSE;
+#else
+    return pdTRUE;
+#endif
+}
+
+BaseType_t xSemaphoreGive(SemaphoreHandle_t semaphore)
+{
+    if (semaphore == NULL) {
+        return pdFALSE;
+    }
+#ifdef CSI_DIAGNOSTICS_THREAD_SAFE_STUBS
+    return pthread_mutex_unlock(semaphore) == 0 ? pdTRUE : pdFALSE;
+#else
+    return pdTRUE;
+#endif
 }
 
 /* ---- stream_sender stubs ---- */
 
+#ifndef CSI_DIAGNOSTICS_REAL_TRANSPORT
 int stream_sender_send(const uint8_t *data, size_t len)
 {
     (void)data;
@@ -45,6 +180,30 @@ int stream_sender_init_with(const char *ip, uint16_t port)
 void stream_sender_deinit(void)
 {
 }
+
+esp_err_t csi_transport_start(void)
+{
+    return ESP_OK;
+}
+
+void csi_transport_stop(void)
+{
+}
+
+bool csi_transport_enqueue_capture(const wifi_csi_info_t *info,
+                                   int64_t callback_started_at_us)
+{
+    (void)callback_started_at_us;
+    return info != NULL && info->buf != NULL && info->len > 0;
+}
+
+void csi_transport_get_stats(csi_transport_stats_t *stats)
+{
+    if (stats != NULL) {
+        memset(stats, 0, sizeof(*stats));
+    }
+}
+#endif
 
 /* ---- wasm_runtime stubs ---- */
 
@@ -87,6 +246,7 @@ bool c6_sync_espnow_is_valid(void) { return false; }
 uint64_t c6_sync_espnow_get_epoch_us(void) { return 0; }
 bool c6_sync_espnow_is_leader(void) { return false; }
 int64_t c6_sync_espnow_get_offset_us_smoothed(void) { return 0; }
+uint32_t c6_sync_espnow_get_age_ms(void) { return UINT32_MAX; }
 
 bool edge_enqueue_csi(const uint8_t *iq_data, uint16_t iq_len,
                       int8_t rssi, uint8_t channel)
@@ -96,6 +256,45 @@ bool edge_enqueue_csi(const uint8_t *iq_data, uint16_t iq_len,
     (void)rssi;
     (void)channel;
     return true;
+}
+
+static uint32_t s_edge_enqueue_count;
+static uint32_t s_edge_timestamp_us;
+static bool s_edge_enqueue_result = true;
+
+bool edge_enqueue_csi_at(const uint8_t *iq_data, uint16_t iq_len,
+                         int8_t rssi, uint8_t channel,
+                         uint32_t callback_started_at_us)
+{
+    (void)iq_data;
+    (void)iq_len;
+    (void)rssi;
+    (void)channel;
+    __atomic_add_fetch(&s_edge_enqueue_count, 1, __ATOMIC_RELAXED);
+    __atomic_store_n(&s_edge_timestamp_us, callback_started_at_us, __ATOMIC_RELAXED);
+    return __atomic_load_n(&s_edge_enqueue_result, __ATOMIC_RELAXED);
+}
+
+void esp_test_reset_edge_enqueue(void)
+{
+    __atomic_store_n(&s_edge_enqueue_count, 0, __ATOMIC_RELAXED);
+    __atomic_store_n(&s_edge_timestamp_us, 0, __ATOMIC_RELAXED);
+    __atomic_store_n(&s_edge_enqueue_result, true, __ATOMIC_RELAXED);
+}
+
+void esp_test_set_edge_enqueue_result(bool accepted)
+{
+    __atomic_store_n(&s_edge_enqueue_result, accepted, __ATOMIC_RELAXED);
+}
+
+uint32_t esp_test_edge_enqueue_count(void)
+{
+    return __atomic_load_n(&s_edge_enqueue_count, __ATOMIC_RELAXED);
+}
+
+uint32_t esp_test_edge_timestamp_us(void)
+{
+    return __atomic_load_n(&s_edge_timestamp_us, __ATOMIC_RELAXED);
 }
 
 /* ---- Mbed TLS SHA-256 test double ---- */

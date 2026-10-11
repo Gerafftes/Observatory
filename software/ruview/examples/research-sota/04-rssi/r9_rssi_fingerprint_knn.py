@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python3.15
 """R9 — RSSI fingerprint topology: does temporal proximity = feature proximity?
 
 See docs/research/sota-2026-05-22/R9-rssi-fingerprint-knn.md.
@@ -28,12 +28,12 @@ Usage:
 
 from __future__ import annotations
 
-import argparse
-import json
-from datetime import datetime, timezone
-from pathlib import Path
+lazy import argparse
+lazy import json
+lazy from datetime import datetime, timezone
+lazy from pathlib import Path
 
-import numpy as np
+lazy import numpy as np
 
 N_SUB, N_FRAMES = 56, 20
 
