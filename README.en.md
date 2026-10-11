@@ -12,16 +12,14 @@
   <a href="#what-observatory-can-do">Features</a> ·
   <a href="experiment-reports/README.en.md">Results</a> ·
   <a href="hardware/README.en.md">Hardware</a> ·
+  <a href="docs/research/rf-sensing-sources.md">Sources</a> ·
   <a href="README.md">Deutsch</a>
 </p>
 
 <p align="center">
   <a href="https://stardance.hackclub.com/projects/25673"><img src="https://img.shields.io/badge/Hack%20Club-Stardance-ec3750?style=flat-square&amp;logo=hackclub&amp;logoColor=white" alt="Hack Club Stardance"></a>
-  <a href="https://www.espressif.com/en/products/socs/esp32"><img src="https://img.shields.io/badge/ESP32-E7352C?style=flat-square&amp;logo=espressif&amp;logoColor=white" alt="ESP32"></a>
   <a href="#current-validation-status"><img src="https://img.shields.io/badge/status-experimental-orange" alt="Experimental status"></a>
   <a href="LICENSE.md"><img src="https://img.shields.io/badge/License-PolyForm%20Noncommercial%201.0.0-blue.svg" alt="PolyForm Noncommercial 1.0.0 license"></a>
-  <a href="https://github.com/Gerafftes/Observatory"><img src="https://img.shields.io/github/repo-size/Gerafftes/Observatory?style=flat-square&amp;label=project%20size" alt="Project size"></a>
-  <a href="https://octocounts.com/github/Gerafftes/Observatory/tree/main"><img src="https://api.octocounts.com/badge/Gerafftes/Observatory/branch/main?type=lines&amp;v=3" alt="Lines"></a>
 </p>
 
 <table>
@@ -62,7 +60,7 @@ documents what has been verified and which hardware gate comes next.
 > motionless, if you change the signal… we’ll find *you*.
 
 *Inspired by the opening monologue of the TV series
-[*Person of Interest*](https://warnertv.de/serie/sendungen/person-of-interest).*
+[*Person of Interest*](https://en.wikipedia.org/wiki/Person_of_Interest_(TV_series)).*
 
 ## Table of contents
 
@@ -79,7 +77,6 @@ documents what has been verified and which hardware gate comes next.
 - [Documentation](#documentation)
 - [License](#license)
 - [Credits](#credits)
-- [Documentation rules](#documentation-rules)
 
 ## Quick start
 
@@ -113,6 +110,7 @@ The main entry points are:
 3. [Result reports](experiment-reports/)
 4. [PCB-01 manufacturing files](hardware/pcb-01/)
 5. [PCB-03 manufacturing files and KiCad sources](hardware/pcb-03/)
+6. [MMWAVE1/2: USB/OTA upload](software/ruview/firmware/esp32-mmwave-node/README.md#mmwave1-and-mmwave2-upload) · [Firmware source](software/ruview/firmware/esp32-mmwave-node/main/)
 
 The software is based on [ruvnet/RuView](https://github.com/ruvnet/RuView), but
 the Observatory changes and required subprojects are included directly in this
@@ -122,8 +120,8 @@ documented in [`06-ruview-anpassungen.md`](docs/project/06-ruview-anpassungen.md
 
 ## What Observatory can do
 
-- Capture Raw CSI from four ESP32-S3 receivers without loss and bind each
-  capture to a specific physical setup.
+- Capture Raw CSI from four ESP32-S3 receivers in a shared subcarrier grid and
+  bind valid recordings to a sealed setup version.
 - Check packet source, RX identity, subcarrier grid, data rate, and drops
   before a measurement.
 - Treat movement, still presence, and position as separate evidence stages.
@@ -191,10 +189,15 @@ cockpit page](software/experiment-cockpit.en.md).
 
 ## How it works
 
-WiFi CSI is evaluated against an empty-room reference and discrete position
-fingerprints; mmWave remains an independent reference. The [architecture and
-data-flow page](experiment-reports/architecture/architecture.en.md) explains the flow and evidence separation
-in detail.
+WiFi CSI is evaluated against a setup-bound empty-room reference and discrete
+position fingerprints; mmWave remains an independent reference. The
+[architecture and data-flow page](experiment-reports/architecture/architecture.en.md)
+explains the flow and evidence separation in detail.
+
+<p align="center">
+  <a href="experiment-reports/architecture/architecture.en.md"><img src="experiment-reports/architecture/figures/mmwave-connection/01-ack-verbindungsfluss.png" alt="BKLIT diagram of the mmWave ACK connection flow from the HLK-LD2450 through the ESP32-C3 and WiFi to the Sensing Server" width="760"></a>
+</p>
+<p align="center"><sub><strong>mmWave only:</strong> The diagram shows only the reference path from the HLK-LD2450 through the ESP32-C3 to the Sensing Server. The WiFi CSI flow for TX and RX1 through RX4 is not yet shown here.</sub></p>
 
 ## Verified results
 
@@ -220,9 +223,6 @@ enclosure notes.
 - [Breadboard CAD, fastening hardware, and mmWave BOM](hardware/breadboard/README.en.md)
 
 ## Documentation
-
-The detailed project documentation linked below is currently written in
-German.
 
 | File | Contents |
 |---|---|
@@ -263,12 +263,3 @@ under [`software/ruview/`](software/ruview/).
   and is offered under the MakerWorld Standard Digital File License.
 - The cinematic prologue is inspired by the opening monologue of the TV series
   [*Person of Interest*](https://warnertv.de/serie/sendungen/person-of-interest).
-
-## Documentation rules
-
-- Failed experiments remain documented because they reveal technical and
-  physical limitations.
-- Raw data is published only after its scope, privacy, and reproducibility have
-  been reviewed.
-- Secrets, WiFi credentials, and private device identifiers are not included
-  in published material.
