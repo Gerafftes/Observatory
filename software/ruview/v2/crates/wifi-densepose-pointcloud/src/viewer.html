@@ -496,6 +496,14 @@
             fetchTimer = setTimeout(fetchCloud, delayMs);
         }
 
+        // Backend/query values are text, never HTML (including error paths).
+        function infoElement(tag, className, text) {
+            var element = document.createElement(tag);
+            element.className = className;
+            element.textContent = text;
+            return element;
+        }
+
         async function fetchCloud() {
             // Demo-only mode: never hit the network. Use the normal cadence.
             if (backendArg === "demo" || networkDisabled) {
@@ -518,8 +526,13 @@
                 consecutiveFailures += 1;
                 lastBackendError = err && err.message ? err.message : String(err);
                 if (requireLive) {
-                    document.getElementById("stats").innerHTML =
-                        '<span class="demo">&#9679; OFFLINE</span><br>Live backend required (?live=1) but unreachable.<br><span class="label">' + lastBackendError + '</span>';
+                    document.getElementById("stats").replaceChildren(
+                        infoElement("span", "demo", "● OFFLINE"),
+                        document.createElement("br"),
+                        "Live backend required (?live=1) but unreachable.",
+                        document.createElement("br"),
+                        infoElement("span", "label", lastBackendError)
+                    );
                     // Even strict-live: back off so we don't spam.
                     currentIntervalMs = Math.min(currentIntervalMs * 2, MAX_INTERVAL_MS);
                     scheduleNextFetch(currentIntervalMs);
@@ -588,23 +601,28 @@
                     }
 
                     // Build info panel — badge reflects active transport
-                    var mode;
+                    var stats = document.getElementById("stats");
+                    var mode, modeText;
                     if (transportMode === "live") {
-                        mode = '<span class="live">&#9679; LIVE</span> Local Backend';
+                        mode = infoElement("span", "live", "● LIVE");
+                        modeText = " Local Backend";
                     } else if (transportMode === "remote") {
-                        mode = '<span class="live">&#9679; REMOTE</span> ' + backendArg;
+                        mode = infoElement("span", "live", "● REMOTE");
+                        modeText = " " + backendArg;
                     } else if (data.source === "face-mesh") {
-                        mode = '<span class="face">&#9679; DEMO</span> Your Face (MediaPipe)';
+                        mode = infoElement("span", "face", "● DEMO");
+                        modeText = " Your Face (MediaPipe)";
                     } else {
-                        mode = '<span class="demo">&#9679; DEMO</span> Synthetic';
+                        mode = infoElement("span", "demo", "● DEMO");
+                        modeText = " Synthetic";
                     }
+                    stats.replaceChildren(mode, modeText);
                     if (data._faceOverlay) {
-                        mode += ' <span class="face">+ face overlay</span>';
+                        stats.append(" ", infoElement("span", "face", "+ face overlay"));
                     }
                     var splatCount = rendered ? rendered.length : data.count;
-                    var html = mode + "<br>"
-                        + "Splats: " + splatCount + "<br>"
-                        + "Frame: " + data.frame;
+                    stats.append(document.createElement("br"), "Splats: " + splatCount,
+                        document.createElement("br"), "Frame: " + data.frame);
 
                     // Unreachable backend banner — explicit ?backend=<url> failed
                     // to connect. Show actionable guidance instead of leaving the
@@ -612,64 +630,70 @@
                     // feed isn't visible.
                     if (data._backendUnreachable) {
                         var nextSec = Math.round((data._retryInMs || 1000) / 1000);
-                        html += '<div class="section">'
-                            + '<span class="demo">&#9679; ' + data._backendUrl + '</span> unreachable'
-                            + '<br><span class="label">' + (data._backendError || "connection failed") + '</span>'
-                            + '<br><span class="label">retry in ' + nextSec + 's</span>'
-                            + '<br><br><span class="label">start the server:</span>'
-                            + '<br><code style="color:#e8a634">cargo run -p wifi-densepose-pointcloud --release \\<br>&nbsp;&nbsp;-- serve --bind 127.0.0.1:9880</code>'
-                            + '</div>';
+                        var unreachable = infoElement("div", "section", "");
+                        var command = infoElement("code", "", "cargo run -p wifi-densepose-pointcloud --release \\\n  -- serve --bind 127.0.0.1:9880");
+                        command.style.color = "#e8a634";
+                        command.style.whiteSpace = "pre-wrap";
+                        unreachable.append(
+                            infoElement("span", "demo", "● " + data._backendUrl), " unreachable",
+                            document.createElement("br"),
+                            infoElement("span", "label", data._backendError || "connection failed"),
+                            document.createElement("br"),
+                            infoElement("span", "label", "retry in " + nextSec + "s"),
+                            document.createElement("br"), document.createElement("br"),
+                            infoElement("span", "label", "start the server:"),
+                            document.createElement("br"), command
+                        );
+                        stats.append(unreachable);
                     }
 
                     // CSI frame rate
-                    html += '<div class="section">'
-                        + '<span class="label">CSI Rate:</span> '
-                        + frameRateVal + " fps</div>";
+                    var rate = infoElement("div", "section", "");
+                    rate.append(infoElement("span", "label", "CSI Rate:"), " " + frameRateVal + " fps");
+                    stats.append(rate);
 
                     // Skeleton confidence
                     if (pipe && pipe.skeleton && pipe.skeleton.confidence !== undefined) {
                         var conf = (pipe.skeleton.confidence * 100).toFixed(0);
-                        html += '<div class="section">'
-                            + '<span class="label">Skeleton:</span> '
-                            + conf + "% confidence</div>";
+                        var skeleton = infoElement("div", "section", "");
+                        skeleton.append(infoElement("span", "label", "Skeleton:"), " " + conf + "% confidence");
+                        stats.append(skeleton);
                     }
 
                     // Weather data
                     if (pipe && pipe.weather) {
                         var w = pipe.weather;
-                        html += '<div class="section">'
-                            + '<span class="label">Weather:</span> ';
+                        var weather = infoElement("div", "section", "");
+                        weather.append(infoElement("span", "label", "Weather:"), " ");
                         if (w.temperature !== undefined) {
-                            html += w.temperature + "&deg;C";
+                            weather.append(w.temperature + "°C");
                         }
                         if (w.conditions) {
-                            html += " " + w.conditions;
+                            weather.append(" " + w.conditions);
                         }
-                        html += "</div>";
+                        stats.append(weather);
                     }
 
                     // Building count from geo
                     if (pipe && pipe.geo && pipe.geo.building_count !== undefined) {
-                        html += '<div class="section">'
-                            + '<span class="label">Buildings:</span> '
-                            + pipe.geo.building_count + "</div>";
+                        var buildings = infoElement("div", "section", "");
+                        buildings.append(infoElement("span", "label", "Buildings:"), " " + pipe.geo.building_count);
+                        stats.append(buildings);
                     }
 
                     // Vitals
                     if (pipe && pipe.vitals) {
                         var v = pipe.vitals;
-                        html += '<div class="section">'
-                            + '<span class="label">Vitals:</span> ';
+                        var vitals = infoElement("div", "section", "");
+                        vitals.append(infoElement("span", "label", "Vitals:"), " ");
                         if (v.breathing_rate !== undefined) {
-                            html += "BR " + v.breathing_rate + "/min";
+                            vitals.append("BR " + v.breathing_rate + "/min");
                         }
                         if (v.motion_score !== undefined) {
-                            html += " Motion " + (v.motion_score * 100).toFixed(0) + "%";
+                            vitals.append(" Motion " + (v.motion_score * 100).toFixed(0) + "%");
                         }
-                        html += "</div>";
+                        stats.append(vitals);
                     }
-
-                    document.getElementById("stats").innerHTML = html;
                 }
             } catch(e) {}
         }

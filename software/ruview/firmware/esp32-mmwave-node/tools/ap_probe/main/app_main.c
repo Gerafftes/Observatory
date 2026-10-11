@@ -19,12 +19,13 @@ static const char *TAG = "mmwave2_ap_probe";
 ESP_EVENT_DEFINE_BASE(PROBE_EVENT);
 static portMUX_TYPE s_lock = portMUX_INITIALIZER_UNLOCKED;
 static esp_netif_t *s_ap;
-static struct {
+typedef struct {
     bool started;
     unsigned starts, stops, joins, leaves, leases, probes, ticks;
     int last_probe_rssi;
     int64_t last_probe_us;
-} s_events;
+} probe_events_t;
+static probe_events_t s_events;
 
 static void event_handler(void *argument, esp_event_base_t base,
                           int32_t id, void *data)
@@ -80,7 +81,7 @@ static void heartbeat(void)
     static bool tick_posted;
     int64_t now = esp_timer_get_time();
     portENTER_CRITICAL(&s_lock);
-    typeof(s_events) e = s_events;
+    probe_events_t e = s_events;
     portEXIT_CRITICAL(&s_lock);
     ESP_LOGI(TAG, "HEARTBEAT uptime_ms=%" PRId64 " started=%d starts=%u stops=%u joins=%u leaves=%u leases=%u probes=%u probe_rssi=%d probe_age_ms=%" PRId64 " ticks=%u",
              now / 1000, e.started, e.starts, e.stops, e.joins, e.leaves, e.leases,

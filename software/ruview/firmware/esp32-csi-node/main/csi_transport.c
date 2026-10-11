@@ -516,15 +516,16 @@ esp_err_t csi_transport_start(void)
     s_processing_task = task;
     s_accepting = true;
     portEXIT_CRITICAL(&s_lock);
+#if defined(CONFIG_CSI_TRANSPORT_TASK_CORE)
+    const int task_core = CONFIG_CSI_TRANSPORT_TASK_CORE;
+#else
+    const int task_core = -1;
+#endif
     ESP_LOGI(TAG, "capture processor ready (slots=%u, stack=%u, priority=%u, core=%d, max_age=%u ms)",
              (unsigned)CSI_TRANSPORT_CAPTURE_SLOTS,
              (unsigned)CSI_TRANSPORT_TASK_STACK_BYTES,
              (unsigned)CONFIG_CSI_TRANSPORT_TASK_PRIORITY,
-#if defined(CONFIG_CSI_TRANSPORT_TASK_CORE)
-             CONFIG_CSI_TRANSPORT_TASK_CORE,
-#else
-             -1,
-#endif
+             task_core,
              (unsigned)(CSI_TRANSPORT_MAX_AGE_US / 1000));
     return ESP_OK;
 }

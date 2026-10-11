@@ -484,14 +484,19 @@ function pushSpark(v) {
 // =====================================================================
 const banner = $('banner');
 function setBannerLive(source, nodeCount) {
+    const detail = document.createElement('span');
+    detail.className = 'src';
     if (source === 'esp32') {
         banner.className = 'live';
-        banner.innerHTML = 'LIVE — real ESP32 CSI <span class="src">(source=' + source + ', ' + nodeCount + ' node' + (nodeCount === 1 ? '' : 's') + ')</span>';
+        banner.textContent = 'LIVE — real ESP32 CSI ';
+        detail.textContent = '(source=' + source + ', ' + nodeCount + ' node' + (nodeCount === 1 ? '' : 's') + ')';
     } else {
         // anything not esp32 = explicitly NOT real, badged
         banner.className = 'sim';
-        banner.innerHTML = 'SIMULATED — not real <span class="src">(source=' + source + ' — start an ESP32 for live CSI)</span>';
+        banner.textContent = 'SIMULATED — not real ';
+        detail.textContent = '(source=' + source + ' — start an ESP32 for live CSI)';
     }
+    banner.append(detail);
 }
 function setBannerNoServer() {
     banner.className = 'noserver';
