@@ -33,7 +33,7 @@ jobs:
         language: [c-cpp, javascript-typescript, python, rust]
     steps:
       - name: Check out published sources
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           persist-credentials: false
           submodules: false
@@ -79,7 +79,7 @@ jobs:
       SEMGREP_ENABLE_VERSION_CHECK: '0'
     steps:
       - name: Check out published sources
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           persist-credentials: false
           submodules: false
@@ -100,7 +100,22 @@ jobs:
             --exclude='**/data/recordings/**' \
             --exclude='**/.codex/**' --exclude='**/.agents/**' \
             --sarif --output="$RUNNER_TEMP/semgrep.sarif" \
+            --json-output="$RUNNER_TEMP/semgrep.json" \
             software/ruview project_tools tools
+      # Keep --strict: unsupported syntax must not look like a complete scan.
+      # Only diagnostic metadata is printed, never source or secret snippets.
+      - name: Summarize Semgrep coverage errors
+        if: always() && !cancelled()
+        run: |
+          if [ -f "$RUNNER_TEMP/semgrep.json" ]; then
+            jq -r '
+              (.errors // []) as $errors |
+              "Semgrep coverage errors: \($errors | length)",
+              ($errors[] | "code=\(.code) path=\(.path // "unknown")")
+            ' "$RUNNER_TEMP/semgrep.json" | tee -a "$GITHUB_STEP_SUMMARY"
+          else
+            echo "Semgrep produced no diagnostic JSON; inspect the scan step." >> "$GITHUB_STEP_SUMMARY"
+          fi
       - name: Upload Semgrep findings
         if: always() && !cancelled()
         uses: github/codeql-action/upload-sarif@24c54180a607b1449ed407dd24f251e4e9147c8d # v4
@@ -118,7 +133,7 @@ jobs:
       security-events: write
     steps:
       - name: Check out published sources
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           persist-credentials: false
           submodules: false
