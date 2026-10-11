@@ -31,7 +31,23 @@ codebase still depends on.
 
 ## Quick reference for the load-bearing paths
 
+`sample_csi_data.json` is synthetic input generated on demand, not tracked
+source or a real measurement. Python verification, the CIR runner, and witness
+generation create it when missing and validate existing data before use. Keep
+Python 3 and NumPy available (`PYTHON` selects the CIR runner's interpreter).
+The archived Python proof also needs SciPy; pinned versions are in
+`v1/requirements-lock.txt`.
+
+`v1/data/proof/expected_reference.sha256` covers every input field after
+rounding floats to 9 decimals to ignore platform libm jitter. This does not
+change the existing pipeline/CIR feature hashes or their comparison rules.
+An invalid cache fails rather than being overwritten; move it aside before
+regenerating. The small metadata and expected hashes remain tracked.
+
 ```bash
+# Optional: prepare/validate the local data cache without running the pipeline
+python archive/v1/data/proof/generate_reference_signal.py --ensure
+
 # Run the deterministic Python proof (must print VERDICT: PASS)
 python archive/v1/data/proof/verify.py
 

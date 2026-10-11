@@ -9,7 +9,7 @@ This script verifies that the signal processing pipeline produces
 DETERMINISTIC, REPRODUCIBLE output from a known reference signal.
 
 Steps:
-  1. Load the published reference CSI signal from sample_csi_data.json
+  1. Generate/validate synthetic sample_csi_data.json, then load it
   2. Feed each frame through the ACTUAL CSI processor feature extraction
   3. Collect all feature outputs into a canonical byte representation
   4. Compute SHA-256 hash of the full feature output
@@ -44,6 +44,7 @@ import time
 from datetime import datetime, timezone
 
 import numpy as np
+from generate_reference_signal import ensure_reference_signal
 
 # Add the v1 directory to sys.path so we can import the actual modules
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -498,7 +499,6 @@ def main():
     print_banner()
 
     # Locate data file
-    data_path = os.path.join(SCRIPT_DIR, "sample_csi_data.json")
     hash_path = os.path.join(SCRIPT_DIR, "expected_features.sha256")
 
     # ---------------------------------------------------------------
@@ -511,9 +511,10 @@ def main():
     # Step 1: Load and describe reference signal
     # ---------------------------------------------------------------
     print("[1/4] LOADING REFERENCE SIGNAL")
-    if not os.path.exists(data_path):
-        print(f"  FAIL: Reference data not found at {data_path}")
-        print("  Run generate_reference_signal.py first.")
+    try:
+        data_path = ensure_reference_signal()
+    except (OSError, ValueError) as error:
+        print(f"  FAIL: Reference signal unavailable: {error}")
         sys.exit(1)
     print(f"    Path: {data_path}")
     print(f"    Size: {os.path.getsize(data_path):,} bytes")

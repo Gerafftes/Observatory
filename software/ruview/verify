@@ -102,7 +102,7 @@ echo "  HEAD:   $git_head"
 # ------------------------------------------------------------------
 if [ $RUN_PYTHON -eq 1 ]; then
     phase 1 "Python signal-processing pipeline (SHA-256 round-trip)"
-    if [ -f "$VERIFY_PY" ] && [ -f "$PROOF_DIR/sample_csi_data.json" ]; then
+    if [ -f "$VERIFY_PY" ]; then
         $PYTHON -c "import numpy, scipy" 2>/dev/null \
             || { echo -e "  ${RED}numpy or scipy missing — pip install numpy scipy${RESET}"; note_skip "Phase 1: missing numpy/scipy"; }
         if $PYTHON -c "import numpy, scipy" 2>/dev/null; then
@@ -115,7 +115,7 @@ if [ $RUN_PYTHON -eq 1 ]; then
             esac
         fi
     else
-        note_skip "Phase 1: verify.py or reference signal not present"
+        note_skip "Phase 1: verify.py not present"
     fi
 fi
 

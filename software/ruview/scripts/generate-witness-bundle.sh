@@ -24,6 +24,7 @@ echo "  Time:   ${TIMESTAMP}"
 echo ""
 
 # Create bundle directory
+python3 "$REPO_ROOT/archive/v1/data/proof/generate_reference_signal.py" --ensure
 rm -rf "$BUNDLE_DIR"
 mkdir -p "$BUNDLE_DIR"
 
@@ -41,6 +42,7 @@ echo "[2/7] Copying proof system..."
 mkdir -p "$BUNDLE_DIR/proof"
 cp "$REPO_ROOT/archive/v1/data/proof/verify.py" "$BUNDLE_DIR/proof/"
 cp "$REPO_ROOT/archive/v1/data/proof/expected_features.sha256" "$BUNDLE_DIR/proof/"
+cp "$REPO_ROOT/archive/v1/data/proof/expected_reference.sha256" "$BUNDLE_DIR/proof/"
 cp "$REPO_ROOT/archive/v1/data/proof/generate_reference_signal.py" "$BUNDLE_DIR/proof/"
 # Reference signal is large (~10 MB) — include metadata only
 python3 -c "
