@@ -402,7 +402,8 @@ async function ingestToSeed(embedding, meta) {
         'Authorization': `Bearer ${token}`,
         'Content-Length': Buffer.byteLength(payload),
       },
-      rejectUnauthorized: false,
+      // Trust private Seed CAs via NODE_EXTRA_CA_CERTS, never by disabling TLS.
+      rejectUnauthorized: true,
     }, (res) => {
       let body = '';
       res.on('data', (chunk) => body += chunk);

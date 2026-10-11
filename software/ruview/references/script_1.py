@@ -1,3 +1,4 @@
 # Install required packages
-!pip install torch torchvision numpy scipy matplotlib
+# Run in a notebook cell or shell before this Python reference:
+# pip install torch torchvision numpy scipy matplotlib
 print("Packages installed successfully!")

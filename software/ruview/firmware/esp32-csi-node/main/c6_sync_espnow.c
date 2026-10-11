@@ -99,17 +99,8 @@ static void send_beacon(void)
     }
 }
 
-/* IDF v5.4 ESP-NOW recv callback signature uses esp_now_recv_info_t.
- * Falls back to the older signature on older IDF via ifdef. */
-#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 0, 0)
-static void on_recv(const esp_now_recv_info_t *info,
-                    const uint8_t *data, int len)
+static void on_recv_data(const uint8_t *src_mac, const uint8_t *data, int len)
 {
-    const uint8_t *src_mac = info ? info->src_addr : NULL;
-#else
-static void on_recv(const uint8_t *src_mac, const uint8_t *data, int len)
-{
-#endif
     s_rx_count++;
     if (data == NULL || len < (int)sizeof(espnow_beacon_t)) return;
     const espnow_beacon_t *b = (const espnow_beacon_t *)data;
@@ -144,6 +135,20 @@ static void on_recv(const uint8_t *src_mac, const uint8_t *data, int len)
         }
     }
 }
+
+/* Keep each IDF callback a complete function so static parsers see both modes. */
+#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 0, 0)
+static void on_recv(const esp_now_recv_info_t *info,
+                    const uint8_t *data, int len)
+{
+    on_recv_data(info ? info->src_addr : NULL, data, len);
+}
+#else
+static void on_recv(const uint8_t *src_mac, const uint8_t *data, int len)
+{
+    on_recv_data(src_mac, data, len);
+}
+#endif
 
 /* Issue #944: ESP-IDF v6.0 changed `esp_now_send_cb_t` from
  *   void (*)(const uint8_t *mac, esp_now_send_status_t status)

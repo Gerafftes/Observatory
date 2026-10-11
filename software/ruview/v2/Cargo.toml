@@ -85,6 +85,7 @@ members = [
 # excluded for the same reason. Build separately:
 #   cargo build --target wasm32-unknown-unknown --release -p homecore-plugin-example
 exclude = [
+    "patches/ruvector-crv", # Independent patch crate, not a workspace member.
     "crates/wifi-densepose-wasm-edge",
     "crates/homecore-plugin-example",
     "crates/worldgraph",   # ruvnet/worldgraph submodule — its own workspace (geo/worldgraph/worldmodel)

@@ -152,7 +152,7 @@ const CONFIG = {
 };
 
 // ---------------------------------------------------------------------------
-// Seed API client (HTTPS with self-signed cert support)
+// Seed API client (private CAs can be trusted via NODE_EXTRA_CA_CERTS)
 // ---------------------------------------------------------------------------
 
 class SeedClient {
@@ -173,7 +173,7 @@ class SeedClient {
       if (this.token) headers['Authorization'] = `Bearer ${this.token}`;
 
       const req = https.get(url, {
-        rejectUnauthorized: false,  // self-signed cert on Seed
+        rejectUnauthorized: true,
         headers,
         timeout: 5000,
       }, (res) => {
@@ -204,7 +204,7 @@ class SeedClient {
         port: url.port,
         path: url.pathname,
         method: 'POST',
-        rejectUnauthorized: false,
+        rejectUnauthorized: true,
         headers,
         timeout: 10000,
       };
@@ -283,7 +283,7 @@ class SeedClient {
       if (this.token) headers['Authorization'] = `Bearer ${this.token}`;
 
       const req = https.get(url, {
-        rejectUnauthorized: false,
+        rejectUnauthorized: true,
         headers,
         timeout: durationMs + 5000,
       }, (res) => {
