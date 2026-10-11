@@ -50,3 +50,14 @@ software/ruview/archive/**/data/*.db
 software/ruview/vendor/ruvector/ui/ruvocal/.env.ci
 **/*.kicad_prl
 **/*.lck
+
+# Local refactoring skills, working documentation, and validation records.
+/.codex/skills/
+/.agents/skills/
+/skills/
+**/bll-refactoring/
+**/refactoring/
+**/*refactoring*.md
+/test-reports/
+/test-results/
+/evidence/
