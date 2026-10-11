@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python3.15
 """Headless tests for the camera-room calibration pipeline (ADR-152 S2.1.3).
 
 Covers calibration_lib.py end to end on synthetic data -- no camera, no
@@ -16,13 +16,13 @@ Run:  python -m pytest scripts/tests/ -q
 
 from __future__ import annotations
 
-import json
+lazy import json
 
-import cv2
-import numpy as np
-import pytest
+lazy import cv2
+lazy import numpy as np
+lazy import pytest
 
-import calibration_lib as cal
+lazy import calibration_lib as cal
 
 # ---------------------------------------------------------------------------
 # Synthetic scene fixtures

@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python3.15
 """R20.2 — Threshold-based hand-off fix for ADR-114 Bayesian fusion.
 
 See docs/research/sota-2026-05-22/R20_2-threshold-handoff.md.
@@ -16,15 +16,15 @@ Pure NumPy. Reuses R20.1 simulators.
 
 from __future__ import annotations
 
-import argparse
-import json
-from pathlib import Path
-import sys
-import numpy as np
+lazy import argparse
+lazy import json
+lazy from pathlib import Path
+lazy import sys
+lazy import numpy as np
 
 # Reuse R20.1 simulator functions by importing them
 sys.path.insert(0, str(Path(__file__).parent))
-from r20_1_quantum_classical_fusion import (
+lazy from r20_1_quantum_classical_fusion import (
     simulate_csi_breathing,
     simulate_nv_cardiac,
     estimate_rate_from_signal,

@@ -56,7 +56,7 @@ Eight incremental iterations landed in PR #797 on the `feat/adr-125-apple-fabric
 ### Prerequisites
 
 - **Hardware**: ESP32-C6 running CSI firmware (rev v0.7.0+) on the same WiFi network as your Mac and HomePod.
-- **Software**: Python 3.8+ on a Mac that's already paired into your Home app (iCloud account).
+- **Software**: Python 3.15+ on a Mac that's already paired into your Home app (iCloud account).
 - **Network**: Mac, HomePod, and ESP32-C6 must all be on the same LAN subnet (e.g., `192.168.1.0/24`).
 
 ### Step 1: Provision the ESP32-C6

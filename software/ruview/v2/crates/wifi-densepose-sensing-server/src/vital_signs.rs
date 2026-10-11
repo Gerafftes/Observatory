@@ -346,6 +346,25 @@ impl VitalSignDetector {
         self.frame_count = 0;
     }
 
+    /// Apply a measured live CSI cadence. A material change clears temporal
+    /// samples so an FFT never combines data collected at different rates.
+    pub fn set_sample_rate(&mut self, sample_rate_hz: f64) -> bool {
+        if !sample_rate_hz.is_finite() || !(1.0..=100.0).contains(&sample_rate_hz) {
+            return false;
+        }
+        if (sample_rate_hz - self.sample_rate).abs() / self.sample_rate.max(1.0) < 0.05 {
+            return false;
+        }
+
+        self.sample_rate = sample_rate_hz;
+        self.breathing_capacity = (sample_rate_hz * self.breathing_window_secs).ceil() as usize;
+        self.heartbeat_capacity = (sample_rate_hz * self.heartbeat_window_secs).ceil() as usize;
+        self.breathing_buffer = VecDeque::with_capacity(self.breathing_capacity.max(1));
+        self.heartbeat_buffer = VecDeque::with_capacity(self.heartbeat_capacity.max(1));
+        self.frame_count = 0;
+        true
+    }
+
     /// Current buffer fill levels for diagnostics.
     /// Returns (breathing_len, breathing_capacity, heartbeat_len, heartbeat_capacity).
     pub fn buffer_status(&self) -> (usize, usize, usize, usize) {
@@ -822,6 +841,41 @@ mod tests {
                 "breathing rate {rate:.1} BPM should be near {target_bpm} BPM (error={error:.1})"
             );
         }
+    }
+
+    #[test]
+    fn synthetic_breathing_frequency_is_preserved_at_supported_sample_rates() {
+        let target_hz = 0.25;
+        for sample_rate_hz in [20.0, 25.0, 50.0, 100.0] {
+            let sample_count = (sample_rate_hz * 30.0) as usize;
+            let signal: Vec<f64> = (0..sample_count)
+                .map(|sample| (2.0 * PI * target_hz * sample as f64 / sample_rate_hz).sin())
+                .collect();
+            let detector = VitalSignDetector::new(sample_rate_hz);
+            let (rate_bpm, _) = detector.compute_fft_peak(&signal, 0.1, 0.5);
+            let measured = rate_bpm.expect("synthetic breathing peak");
+            assert!(
+                (measured - 15.0).abs() < 1.0,
+                "{sample_rate_hz} Hz produced {measured:.2} BPM"
+            );
+        }
+    }
+
+    #[test]
+    fn material_sample_rate_change_resizes_and_clears_temporal_buffers() {
+        let mut detector = VitalSignDetector::new(20.0);
+        let amplitudes = vec![10.0; 56];
+        let phases = vec![0.0; 56];
+        for _ in 0..50 {
+            detector.process_frame(&amplitudes, &phases);
+        }
+        assert!(detector.set_sample_rate(100.0));
+        assert_eq!(detector.buffer_status(), (0, 3_000, 0, 1_500));
+        assert!(!detector.set_sample_rate(0.0));
+        assert!(!detector.set_sample_rate(f64::NAN));
+        assert!(detector.set_sample_rate(50.0));
+        assert_eq!(detector.buffer_status(), (0, 1_500, 0, 750));
+        assert!(!detector.set_sample_rate(50.0));
     }
 
     #[test]

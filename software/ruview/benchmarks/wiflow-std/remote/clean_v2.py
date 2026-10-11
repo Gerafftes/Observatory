@@ -1,4 +1,4 @@
-import numpy as np, os
+lazy import numpy as np, os
 d = os.path.expanduser('~/wiflow-std-bench/preprocessed_csi_data')
 csi = np.load(os.path.join(d, 'csi_windows.npy'), mmap_mode='r+')
 zeroed = 0

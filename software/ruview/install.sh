@@ -206,22 +206,23 @@ detect_toolchains() {
     echo ""
 
     # Python
-    if command -v python3 &>/dev/null; then
+    if command -v python3.15 &>/dev/null; then
+        PYTHON_CMD=python3.15
+    elif command -v python3 &>/dev/null; then
         PYTHON_CMD=python3
-        HAS_PYTHON=true
-        PY_VER="$($PYTHON_CMD --version 2>&1)"
-        ok "Python: ${PY_VER}"
     elif command -v python &>/dev/null; then
-        PY_VER="$(python --version 2>&1)"
-        if [[ "$PY_VER" == *"3."* ]]; then
-            PYTHON_CMD=python
+        PYTHON_CMD=python
+    fi
+    if [[ -n "${PYTHON_CMD:-}" ]]; then
+        PY_VER="$($PYTHON_CMD --version 2>&1)"
+        if $PYTHON_CMD -c 'import sys; raise SystemExit(sys.version_info < (3, 15))'; then
             HAS_PYTHON=true
             ok "Python: ${PY_VER}"
         else
-            fail "Python 2 found but Python 3 required"
+            fail "${PY_VER} found but Python 3.15+ required"
         fi
     else
-        need "Python 3.8+ not found (install: https://python.org)"
+        need "Python 3.15+ not found (install: https://python.org)"
     fi
 
     # Check Python packages
@@ -237,7 +238,7 @@ detect_toolchains() {
         else
             need "Python packages: numpy/scipy missing (pip install numpy scipy)"
         fi
-        if $TORCH_OK; then ok "PyTorch: installed"; else info "PyTorch: not installed (needed for full pipeline)"; fi
+        if $TORCH_OK; then ok "PyTorch: installed"; else info "PyTorch: optional; cp315 wheels are not published upstream yet"; fi
         if $FASTAPI_OK; then ok "FastAPI: installed"; else info "FastAPI: not installed (needed for API server)"; fi
     fi
 

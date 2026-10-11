@@ -6,12 +6,12 @@ records 35 s of serial output to per-port log files and prints
 a summary of the time-sync state machine, TWT events, and CSI
 metadata at the end.
 """
-import serial
-import threading
-import time
-import re
-import sys
-from pathlib import Path
+lazy import serial
+lazy import threading
+lazy import time
+lazy import re
+lazy import sys
+lazy from pathlib import Path
 
 PORTS = ['COM6', 'COM9', 'COM12']
 DURATION_SECONDS = 35

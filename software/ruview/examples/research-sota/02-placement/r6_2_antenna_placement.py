@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python3.15
 """R6.2 — Fresnel-aware antenna placement for room-scale CSI sensing.
 
 See docs/research/sota-2026-05-22/R6_2-fresnel-antenna-placement.md.
@@ -30,10 +30,10 @@ Example usage:
 
 from __future__ import annotations
 
-import argparse
-import json
-from pathlib import Path
-import numpy as np
+lazy import argparse
+lazy import json
+lazy from pathlib import Path
+lazy import numpy as np
 
 C = 2.998e8
 

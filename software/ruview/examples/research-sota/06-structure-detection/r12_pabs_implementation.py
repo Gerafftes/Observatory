@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python3.15
 """R12 PABS — Physics-Anchored Background Subtraction structure detection.
 
 See docs/research/sota-2026-05-22/R12-pabs-implementation.md.
@@ -24,10 +24,10 @@ This is the experiment R12 wanted but couldn't run without R6.1. Pure NumPy.
 
 from __future__ import annotations
 
-import argparse
-import json
-from pathlib import Path
-import numpy as np
+lazy import argparse
+lazy import json
+lazy from pathlib import Path
+lazy import numpy as np
 
 C = 2.998e8
 

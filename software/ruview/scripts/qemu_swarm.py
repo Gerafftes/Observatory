@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python3.15
 """
 QEMU ESP32-S3 Swarm Configurator (ADR-062)
 
@@ -14,20 +14,20 @@ Usage:
     python3 qemu_swarm.py --config custom.yaml --dry-run
 """
 
-import argparse
-import atexit
-import json
-import os
-import platform
-import re
-import shutil
-import signal
-import subprocess
-import sys
-import time
-from dataclasses import dataclass, field
-from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+lazy import argparse
+lazy import atexit
+lazy import json
+lazy import os
+lazy import platform
+lazy import re
+lazy import shutil
+lazy import signal
+lazy import subprocess
+lazy import sys
+lazy import time
+lazy from dataclasses import dataclass, field
+lazy from pathlib import Path
+lazy from typing import Any, Dict, List, Optional, Tuple
 
 # ---------------------------------------------------------------------------
 # Optional YAML import with helpful error

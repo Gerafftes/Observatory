@@ -26,12 +26,12 @@ Response JSON (one line):
 
 from __future__ import annotations
 
-import json
-import logging
-import os
-import signal
-import socket
-import sys
+lazy import json
+lazy import logging
+lazy import os
+lazy import signal
+lazy import socket
+lazy import sys
 
 # Phase 3 — RuViewOccDataset available for callers that want to build
 # training tensors directly from WorldGraph snapshots (see occworld_retrain.py).
@@ -43,12 +43,12 @@ try:
     _DATASET_AVAILABLE = True
 except ImportError:
     _DATASET_AVAILABLE = False
-import time
-import traceback
-from typing import Any
+lazy import time
+lazy import traceback
+lazy from typing import Any
 
-import numpy as np
-import torch
+lazy import numpy as np
+lazy import torch
 
 # ---------------------------------------------------------------------------
 # Logging

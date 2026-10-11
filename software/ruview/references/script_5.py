@@ -1,11 +1,11 @@
 # WiFi DensePose Implementation - Fixed version
 # Based on "DensePose From WiFi" by Carnegie Mellon University
 
-import numpy as np
-import math
-from typing import Dict, List, Tuple, Optional
-from collections import OrderedDict
-import json
+lazy import numpy as np
+lazy import math
+lazy from typing import Dict, List, Tuple, Optional
+lazy from collections import OrderedDict
+lazy import json
 
 class CSIPhaseProcessor:
     """

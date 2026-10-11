@@ -28,15 +28,15 @@ Usage (as OccWorld dataset replacement):
 
 from __future__ import annotations
 
-import argparse
-import json
-import math
-import os
-import struct
-from pathlib import Path
-from typing import Any
+lazy import argparse
+lazy import json
+lazy import math
+lazy import os
+lazy import struct
+lazy from pathlib import Path
+lazy from typing import Any
 
-import numpy as np
+lazy import numpy as np
 
 # ── OccWorld voxel grid constants ───────────────────────────────────────────
 GRID_H = 200        # X (east)

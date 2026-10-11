@@ -2,7 +2,7 @@
 #
 # This is the PyO3+maturin replacement for the legacy pure-Python
 # `wifi-densepose==1.1.0` (last release 2025-06-07). One compiled
-# extension module per OS/arch covers Python 3.10–3.13 via abi3.
+# extension module per OS/arch targets Python 3.15+ via abi3.
 
 [build-system]
 requires = ["maturin>=1.7,<2.0"]
@@ -13,7 +13,7 @@ name = "wifi-densepose"
 version = "2.0.0a1"
 description = "WiFi-based human pose estimation, vital sign extraction, and ambient intelligence from Channel State Information (CSI). PyO3 bindings for the Rust core."
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.15.0rc2"
 license = { text = "MIT" }
 authors = [
     { name = "rUv", email = "ruv@ruv.net" },
@@ -29,10 +29,7 @@ classifiers = [
     "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.10",
-    "Programming Language :: Python :: 3.11",
-    "Programming Language :: Python :: 3.12",
-    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.15",
     "Programming Language :: Rust",
     "Topic :: Scientific/Engineering",
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
@@ -52,7 +49,7 @@ client = [
 dev = [
     "pytest>=8.0",
     "pytest-asyncio>=0.23",
-    "ruff>=0.7",
+    "ruff>=0.15.6",
     "mypy>=1.13",
 ]
 
@@ -87,13 +84,13 @@ asyncio_mode = "auto"
 
 [tool.ruff]
 line-length = 100
-target-version = "py310"
+target-version = "py315"
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "UP", "B"]
 
 [tool.mypy]
-python_version = "3.10"
+python_version = "3.15"
 strict = true
 warn_unused_ignores = true
 warn_redundant_casts = true

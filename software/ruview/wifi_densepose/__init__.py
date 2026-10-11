@@ -12,9 +12,9 @@ Usage:
 
 __version__ = "1.2.0"
 
-import sys
-import os
-import logging
+lazy import sys
+lazy import os
+lazy import logging
 
 logger = logging.getLogger(__name__)
 

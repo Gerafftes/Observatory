@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python3.15
 """Render the firmware 0.1.5/0.1.6 sequence-loss comparison.
 
 The source values are preserved in
@@ -8,9 +8,9 @@ The static renderer keeps counts and percentages on separate zero-based scales.
 
 from __future__ import annotations
 
-from pathlib import Path
+lazy from pathlib import Path
 
-from PIL import Image, ImageDraw, ImageFont
+lazy from PIL import Image, ImageDraw, ImageFont
 
 
 PROJECT_DIR = Path(__file__).resolve().parent.parent

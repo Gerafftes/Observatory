@@ -2,18 +2,18 @@
 
 from __future__ import annotations
 
-import json
-import os
-import sys
-import tempfile
-import unittest
-from pathlib import Path
+lazy import json
+lazy import os
+lazy import sys
+lazy import tempfile
+lazy import unittest
+lazy from pathlib import Path
 
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.dirname(os.path.dirname(HERE)))
 
-from scripts import audit_mmwave_runtime as audit  # noqa: E402
+lazy from scripts import audit_mmwave_runtime as audit  # noqa: E402
 
 
 TRANSFORM = {

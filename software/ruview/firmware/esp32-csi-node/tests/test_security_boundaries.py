@@ -8,8 +8,8 @@ RVF verification must call real Ed25519 verification.
 
 from __future__ import annotations
 
-from pathlib import Path
-import unittest
+lazy from pathlib import Path
+lazy import unittest
 
 
 ROOT = Path(__file__).resolve().parents[1]

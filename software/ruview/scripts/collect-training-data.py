@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python3.15
 """
 WiFi-DensePose Training Data Collector
 
@@ -27,23 +27,23 @@ Usage:
 
 Prerequisites:
     - ESP32 nodes streaming CSI on UDP (see firmware/esp32-csi-node)
-    - Python 3.9+
+    - Python 3.15+
 """
 
 from __future__ import annotations
 
-import argparse
-import json
-import logging
-import os
-import socket
-import struct
-import sys
-import time
-import signal
-from datetime import datetime, timezone
-from pathlib import Path
-from typing import Optional
+lazy import argparse
+lazy import json
+lazy import logging
+lazy import os
+lazy import socket
+lazy import struct
+lazy import sys
+lazy import time
+lazy import signal
+lazy from datetime import datetime, timezone
+lazy from pathlib import Path
+lazy from typing import Optional
 
 logging.basicConfig(
     level=logging.INFO,

@@ -1,6 +1,7 @@
 //! Background runtime tasks and ordered shutdown/finalization.
 
 use super::*;
+use crate::csi_diagnostics::CsiIngressDiagnostics;
 
 pub(crate) async fn windows_wifi_task(state: SharedState, tick_ms: u64) {
     let mut interval = tokio::time::interval(Duration::from_millis(tick_ms));
@@ -90,6 +91,17 @@ pub(crate) async fn windows_wifi_task(state: SharedState, tick_ms: u64) {
             rssi: first_rssi.clamp(-128.0, 127.0) as i8,
             noise_floor: -90,
             ppdu_type: wifi_densepose_hardware::PpduType::HtLegacy,
+            protocol_version: None,
+            device_callback_started_us: None,
+            driver_rx_timestamp_us: None,
+            quality_flags: None,
+            rx_state: None,
+            antenna_index: None,
+            gain_db: None,
+            csi_config_flags: None,
+            sync_age_ms: None,
+            invalid_prefix_pairs: 0,
+            interpolated_prefix_pairs: 0,
             amplitudes: multi_ap_frame.amplitudes.clone(),
             phases: multi_ap_frame.phases.clone(),
         };
@@ -272,6 +284,17 @@ async fn windows_wifi_fallback_tick(state: &SharedState, seq: u32) {
         rssi: rssi_dbm as i8,
         noise_floor: -90,
         ppdu_type: wifi_densepose_hardware::PpduType::HtLegacy,
+        protocol_version: None,
+        device_callback_started_us: None,
+        driver_rx_timestamp_us: None,
+        quality_flags: None,
+        rx_state: None,
+        antenna_index: None,
+        gain_db: None,
+        csi_config_flags: None,
+        sync_age_ms: None,
+        invalid_prefix_pairs: 0,
+        interpolated_prefix_pairs: 0,
         amplitudes: vec![signal_pct],
         phases: vec![0.0],
     };
@@ -421,6 +444,7 @@ pub(crate) async fn probe_esp32(port: u16) -> bool {
 
 pub(crate) fn spawn_mmwave_node_diagnostics_poller(
     state: SharedState,
+    bind_addr: Ipv4Addr,
     configured_url: Option<String>,
     token: Option<String>,
 ) {
@@ -455,6 +479,7 @@ pub(crate) fn spawn_mmwave_node_diagnostics_poller(
                     mmwave_connection::probe(
                         preferred.as_deref(),
                         Some(&expected),
+                        bind_addr,
                         port,
                         token_for_probe.as_deref(),
                         true,
@@ -667,10 +692,10 @@ async fn process_mmwave_batch(
     }
 }
 
-fn bind_mmwave_socket(address: &str, receive_buffer_bytes: usize) -> std::io::Result<UdpSocket> {
-    let address: SocketAddr = address
-        .parse()
-        .map_err(|error| std::io::Error::new(std::io::ErrorKind::InvalidInput, error))?;
+fn bind_mmwave_socket(
+    address: SocketAddr,
+    receive_buffer_bytes: usize,
+) -> std::io::Result<UdpSocket> {
     let socket = socket2::Socket::new(
         socket2::Domain::IPV4,
         socket2::Type::DGRAM,
@@ -685,12 +710,13 @@ fn bind_mmwave_socket(address: &str, receive_buffer_bytes: usize) -> std::io::Re
 
 pub(crate) async fn mmwave_receiver_task(
     state: SharedState,
+    bind_addr: Ipv4Addr,
     port: u16,
     receive_buffer_bytes: usize,
     reorder_hold_ms: u64,
 ) {
-    let address = format!("0.0.0.0:{port}");
-    let socket = match bind_mmwave_socket(&address, receive_buffer_bytes) {
+    let address = SocketAddr::from((bind_addr, port));
+    let socket = match bind_mmwave_socket(address, receive_buffer_bytes) {
         Ok(socket) => socket,
         Err(error) => {
             error!("Could not bind mmWave UDP receiver to {address}: {error}");
@@ -789,10 +815,43 @@ pub(crate) async fn mmwave_receiver_task(
 #[cfg(test)]
 mod mmwave_udp_order_tests {
     use super::{
-        compare_mmwave_sequence, mmwave_ack, mmwave_order_disposition, mmwave_sequence_is_newer,
-        MmwaveOrderDisposition, MmwavePacketOrder,
+        bind_mmwave_socket, compare_mmwave_sequence, mmwave_ack, mmwave_order_disposition,
+        mmwave_sequence_is_newer, MmwaveOrderDisposition, MmwavePacketOrder,
     };
     use std::collections::HashMap;
+    use std::net::{Ipv4Addr, SocketAddr};
+
+    #[tokio::test]
+    async fn mmwave_udp_bind_preserves_ack_source_endpoint() {
+        let receiver =
+            bind_mmwave_socket(SocketAddr::from((Ipv4Addr::LOCALHOST, 0)), 64 * 1024).unwrap();
+        let address = receiver.local_addr().unwrap();
+        assert_eq!(address.ip(), Ipv4Addr::LOCALHOST);
+        let sender = tokio::net::UdpSocket::bind((Ipv4Addr::LOCALHOST, 0))
+            .await
+            .unwrap();
+        let packet = br#"{"node_id":"MMWAVE1","boot_id":7,"sequence":42}"#;
+        sender.send_to(packet, address).await.unwrap();
+        let mut bytes = [0_u8; 256];
+        let (length, source) = tokio::time::timeout(
+            std::time::Duration::from_secs(1),
+            receiver.recv_from(&mut bytes),
+        )
+        .await
+        .unwrap()
+        .unwrap();
+        let order = serde_json::from_slice::<MmwavePacketOrder>(&bytes[..length]).unwrap();
+        receiver.send_to(&mmwave_ack(&order), source).await.unwrap();
+        let (length, ack_source) = tokio::time::timeout(
+            std::time::Duration::from_secs(1),
+            sender.recv_from(&mut bytes),
+        )
+        .await
+        .unwrap()
+        .unwrap();
+        assert_eq!(ack_source, address);
+        assert_eq!(&bytes[..length], &mmwave_ack(&order));
+    }
 
     #[test]
     fn acknowledgement_matches_firmware_wire_contract() {
@@ -1071,6 +1130,18 @@ pub(crate) async fn settle_recording_on_shutdown(
 
 // ── UDP receiver task ────────────────────────────────────────────────────────
 
+const CSI_UDP_INGRESS_QUEUE_CAPACITY: usize = 256;
+const CSI_UDP_MAX_QUEUE_AGE: Duration = Duration::from_millis(250);
+
+struct QueuedUdpDatagram {
+    bytes: Vec<u8>,
+    source: SocketAddr,
+    received_at: std::time::Instant,
+    server_receive_time: Option<server_clock::HostTimestamp>,
+    is_csi: bool,
+    csi_observation: Option<csi_diagnostics::CsiDatagramObservation>,
+}
+
 pub(crate) async fn udp_receiver_task(state: SharedState, udp_port: u16) {
     let addr = format!("0.0.0.0:{udp_port}");
     let socket = match UdpSocket::bind(&addr).await {
@@ -1083,522 +1154,654 @@ pub(crate) async fn udp_receiver_task(state: SharedState, udp_port: u16) {
             return;
         }
     };
+    let ingress_diagnostics = state.read().await.csi_ingress_diagnostics.clone();
+    let (queue_tx, mut queue_rx) =
+        mpsc::channel::<QueuedUdpDatagram>(CSI_UDP_INGRESS_QUEUE_CAPACITY);
+    let receive_diagnostics = Arc::clone(&ingress_diagnostics);
 
-    let mut buf = [0u8; 4096];
-    loop {
-        match socket.recv_from(&mut buf).await {
-            Ok((len, src)) => {
-                // ADR-039: Try edge vitals packet first (magic 0xC511_0002).
-                if let Some(vitals) = parse_esp32_vitals(&buf[..len]) {
-                    debug!(
-                        "ESP32 vitals from {src}: node={} br={:.1} hr={:.1} pres={}",
-                        vitals.node_id,
-                        vitals.breathing_rate_bpm,
-                        vitals.heartrate_bpm,
-                        vitals.presence
-                    );
-                    let mut s = state.write().await;
-                    if !edge_vitals_measurement_input_allowed(s.position_setup.is_some()) {
-                        // A sealed experiment accepts only exact raw CSI whose
-                        // TX-source trailer matches the setup. Do not touch
-                        // global/per-RX liveness, RSSI, features, D4/D5/D6,
-                        // position state, or the raw recorder for this packet.
-                        debug!(
+    tokio::spawn(async move {
+        let mut receive_buffer = [0u8; 4096];
+        loop {
+            match socket.recv_from(&mut receive_buffer).await {
+                Ok((len, source)) => {
+                    let received_at = std::time::Instant::now();
+                    receive_diagnostics.note_udp_datagram_from_os(len);
+                    let is_csi = has_esp32_csi_magic(&receive_buffer[..len]);
+                    let server_receive_time = is_csi.then(server_clock::now);
+                    let csi_observation = server_receive_time.as_ref().map(|timestamp| {
+                        receive_diagnostics
+                            .begin_csi_datagram(timestamp.host_unix_ns, timestamp.host_monotonic_ns)
+                    });
+                    let datagram = QueuedUdpDatagram {
+                        bytes: receive_buffer[..len].to_vec(),
+                        source,
+                        received_at,
+                        server_receive_time,
+                        is_csi,
+                        csi_observation,
+                    };
+                    match try_enqueue_udp_datagram(&queue_tx, &receive_diagnostics, datagram) {
+                        DatagramEnqueueResult::Enqueued | DatagramEnqueueResult::Full => {}
+                        DatagramEnqueueResult::Closed => break,
+                    }
+                }
+                Err(error) => {
+                    receive_diagnostics.note_udp_receive_error();
+                    warn!("UDP recv error: {error}");
+                    tokio::time::sleep(Duration::from_millis(100)).await;
+                }
+            }
+        }
+    });
+
+    while let Some(datagram) = queue_rx.recv().await {
+        let Some(datagram) = dequeue_fresh_udp_datagram(datagram, &ingress_diagnostics) else {
+            continue;
+        };
+        let QueuedUdpDatagram {
+            bytes,
+            source: src,
+            server_receive_time,
+            mut csi_observation,
+            ..
+        } = datagram;
+        let len = bytes.len();
+        let buf = bytes.as_slice();
+        if let Some(observation) = csi_observation.as_mut() {
+            observation.begin_processing();
+        }
+        let _processing_observation = ingress_diagnostics.begin_udp_processing();
+
+        // ADR-039: Try edge vitals packet first (magic 0xC511_0002).
+        if let Some(vitals) = parse_esp32_vitals(&buf[..len]) {
+            debug!(
+                "ESP32 vitals from {src}: node={} br={:.1} hr={:.1} pres={}",
+                vitals.node_id, vitals.breathing_rate_bpm, vitals.heartrate_bpm, vitals.presence
+            );
+            let mut s = state.write().await;
+            if !edge_vitals_measurement_input_allowed(s.position_setup.is_some()) {
+                // A sealed experiment accepts only exact raw CSI whose
+                // TX-source trailer matches the setup. Do not touch
+                // global/per-RX liveness, RSSI, features, D4/D5/D6,
+                // position state, or the raw recorder for this packet.
+                debug!(
                             "ignoring edge-vitals packet from node {} while a sealed position setup is active",
                             vitals.node_id
                         );
+                continue;
+            }
+            // Issue #323: Also emit a sensing_update so the UI renders
+            // detections for ESP32 nodes running the edge DSP pipeline
+            // (Tier 2+).  Without this, vitals arrive but the UI shows
+            // "no detection" because it only renders sensing_update msgs.
+            s.source = "esp32".to_string();
+            s.last_esp32_frame = Some(std::time::Instant::now());
+
+            // ── Per-node state for edge vitals (issue #249) ──────
+            let node_id = vitals.node_id;
+            let calibration_bundle = s.active_calibration_bundle.clone();
+            let ns = s.node_states.entry(node_id).or_insert_with(|| {
+                NodeState::new_with_calibration(node_id, calibration_bundle.as_deref())
+            });
+            ns.last_frame_time = Some(std::time::Instant::now());
+            ns.edge_vitals = Some(vitals.clone());
+            ns.rssi_history.push_back(vitals.rssi as f64);
+            if ns.rssi_history.len() > 60 {
+                ns.rssi_history.pop_front();
+            }
+
+            // Store per-node person count from edge vitals.
+            let node_est = if vitals.presence {
+                (vitals.n_persons as usize).max(1)
+            } else {
+                0
+            };
+            ns.prev_person_count = node_est;
+
+            s.tick += 1;
+            let tick = s.tick;
+
+            let now = std::time::Instant::now();
+            let mut classification = edge_vitals_classification(&vitals);
+
+            // Edge-vitals is a useful fallback when a node does not
+            // provide raw CSI. Once D6 is calibrated, however, the
+            // static CSI fingerprints remain authoritative for room
+            // presence. Otherwise an interleaved vitals packet could
+            // overwrite a valid D6 position with the edge classifier.
+            if s.d5_presence.phase() == d5_presence::CalibrationPhase::Ready {
+                let sref: &mut AppStateInner = &mut s;
+                classification =
+                    aggregate_node_classification(&sref.node_states, now, &mut sref.d5_presence);
+            } else {
+                let n_active = s
+                    .node_states
+                    .values()
+                    .filter(|ns| {
+                        ns.last_frame_time
+                            .is_some_and(|t| now.duration_since(t).as_secs() < 10)
+                    })
+                    .count();
+                if n_active > 1 {
+                    classification.confidence = (classification.confidence
+                        * (1.0 + 0.15 * (n_active as f64 - 1.0)))
+                        .clamp(0.0, 1.0);
+                }
+            }
+            classification = apply_position_setup_classification_gate(
+                s.position_setup.is_some(),
+                s.d5_presence.phase(),
+                classification,
+            );
+            let public_vitals = public_edge_vitals_packet(&vitals, &classification);
+            if let Ok(json) = serde_json::to_string(&serde_json::json!({
+                "type": "edge_vitals",
+                "node_id": public_vitals.node_id,
+                "presence": public_vitals.presence,
+                "fall_detected": public_vitals.fall_detected,
+                "motion": public_vitals.motion,
+                "breathing_rate_bpm": public_vitals.breathing_rate_bpm,
+                "heartrate_bpm": public_vitals.heartrate_bpm,
+                "n_persons": public_vitals.n_persons,
+                "motion_energy": public_vitals.motion_energy,
+                "presence_score": public_vitals.presence_score,
+                "rssi": public_vitals.rssi,
+            })) {
+                let _ = s.tx.send(json);
+            }
+
+            // Aggregate person count only after the authoritative
+            // presence decision, matching the raw-CSI path.
+            let _total_persons = if classification.presence {
+                let dedup = s.dedup_factor;
+                let (fused, fallback_count) = multistatic_bridge::fuse_or_fallback(
+                    &s.multistatic_fuser,
+                    &s.node_states,
+                    dedup,
+                );
+                match fused {
+                    Some(ref f) => {
+                        let score = multistatic_bridge::compute_person_score_from_amplitudes(
+                            &f.fused_amplitude,
+                        );
+                        s.smoothed_person_score = s.smoothed_person_score * 0.90 + score * 0.10;
+                        // #803: don't let the saturating activity score
+                        // discard count-aware per-node estimates.
+                        let count = aggregate_person_count(s.person_count(), &s.node_states);
+                        s.prev_person_count = count;
+                        count.max(1) // presence=true => at least 1
+                    }
+                    None => {
+                        aggregate_person_count(fallback_count.unwrap_or(0), &s.node_states).max(1)
+                    }
+                }
+            } else {
+                s.prev_person_count = 0;
+                0
+            };
+
+            // Governed trust cycle (ADR-135..146): run the same live
+            // frames through the privacy/provenance/witness control
+            // plane. Trust state is recorded on the bridge (exposed on
+            // /api/v1/status); engine errors are counted + rate-limit
+            // logged instead of being swallowed (review finding 1).
+            // Split-borrow the two distinct fields off the guard.
+            {
+                let sref: &mut AppStateInner = &mut s;
+                let now_ms = std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .map(|d| d.as_millis() as i64)
+                    .unwrap_or(0);
+                sref.engine_bridge.observe_cycle(&sref.node_states, now_ms);
+            }
+
+            // Feed field model calibration if active (use per-node history for ESP32).
+            if let Some(frame_history) = s
+                .node_states
+                .get(&node_id)
+                .map(|ns| ns.frame_history.clone())
+            {
+                if let Some(ref mut fm) = s.field_model {
+                    field_bridge::maybe_feed_calibration(fm, &frame_history);
+                }
+            }
+
+            // Build nodes array with all active nodes.
+            let configured_positions = s.multistatic_fuser.node_positions().to_vec();
+            let mut active_nodes: Vec<NodeInfo> = s
+                .node_states
+                .iter()
+                .filter(|(_, n)| {
+                    n.last_frame_time
+                        .is_some_and(|t| now.duration_since(t).as_secs() < 10)
+                })
+                .map(|(&id, n)| NodeInfo {
+                    node_id: id,
+                    rssi_dbm: n.rssi_history.back().copied().unwrap_or(0.0),
+                    position: configured_node_position(id, &configured_positions),
+                    amplitude: vec![],
+                    subcarrier_count: 0,
+                    // Vitals-only path; still expose the sync snapshot
+                    // if the node also speaks ESP-NOW.
+                    sync: n.sync_snapshot(),
+                })
+                .collect();
+            active_nodes.sort_by_key(|node| node.node_id);
+
+            let features = FeatureInfo {
+                mean_rssi: vitals.rssi as f64,
+                variance: vitals.motion_energy as f64,
+                motion_band_power: vitals.motion_energy as f64,
+                breathing_band_power: if vitals.presence { 0.5 } else { 0.0 },
+                dominant_freq_hz: vitals.breathing_rate_bpm / 60.0,
+                change_points: 0,
+                spectral_power: vitals.motion_energy as f64,
+            };
+
+            // Store latest features on node for cross-node fusion.
+            if let Some(ns) = s.node_states.get_mut(&node_id) {
+                ns.latest_features = Some(features.clone());
+            }
+
+            // Cross-node fusion: combine features from all active nodes.
+            let fused_features = fuse_multi_node_features(&features, &s.node_states);
+
+            // Edge-vitals packets contain classifications and vital
+            // estimates but no per-subcarrier fingerprints of their
+            // own. Reuse only fresh D6 evidence already held by the
+            // raw-CSI path; the estimator fails closed otherwise.
+            let localization = estimate_live_localization(
+                &s.node_states,
+                now,
+                &classification,
+                s.tx_position,
+                s.room_dimensions,
+                &configured_positions,
+            );
+            let signal_field = signal_field_from_localization(&localization);
+            let candidate_position_estimate = match raw_csi_recording::now_unix_ns() {
+                Ok(now_unix_ns) => s.live_position_tracker.expire_if_raw_stale(now_unix_ns),
+                Err(error) => s.live_position_tracker.reject_input(format!(
+                    "could not verify raw CSI freshness for edge vitals: {error}"
+                )),
+            };
+            let position_estimate = gate_mmwave_candidate_for_publication(
+                candidate_position_estimate,
+                s.mmwave.position_publication_allowed(),
+            );
+            let has_valid_position = classification.presence
+                && matches!(
+                    &position_estimate,
+                    position_live::LivePositionState::Position { .. }
+                );
+
+            let mut update = SensingUpdate {
+                msg_type: "sensing_update".to_string(),
+                timestamp: chrono::Utc::now().timestamp_millis() as f64 / 1000.0,
+                source: "esp32".to_string(),
+                tick,
+                tx_position: s.tx_position,
+                room_dimensions: s.room_dimensions,
+                nodes: active_nodes,
+                features: fused_features.clone(),
+                classification,
+                signal_field,
+                localization: Some(localization),
+                position_estimate: Some(position_estimate),
+                vital_signs: Some(VitalSigns {
+                    breathing_rate_bpm: if vitals.breathing_rate_bpm > 0.0 {
+                        Some(vitals.breathing_rate_bpm)
+                    } else {
+                        None
+                    },
+                    heart_rate_bpm: if vitals.heartrate_bpm > 0.0 {
+                        Some(vitals.heartrate_bpm)
+                    } else {
+                        None
+                    },
+                    breathing_confidence: if vitals.presence { 0.7 } else { 0.0 },
+                    heartbeat_confidence: if vitals.presence { 0.7 } else { 0.0 },
+                    signal_quality: vitals.presence_score as f64,
+                }),
+                enhanced_motion: None,
+                enhanced_breathing: None,
+                posture: None,
+                signal_quality_score: None,
+                quality_verdict: None,
+                bssid_count: None,
+                pose_keypoints: None,
+                model_status: None,
+                persons: None,
+                estimated_persons: has_valid_position.then_some(1),
+                // ADR-084 Pass 3.6: surface per-node novelty_score
+                // (and the rest of the per-node feature snapshot)
+                // on the WebSocket envelope so cluster-Pi consumers
+                // can implement model-wake gating without round-
+                // tripping back to the server.
+                node_features: build_node_features(
+                    &s.node_states,
+                    now,
+                    s.d5_presence.phase(),
+                    s.position_setup.is_some(),
+                ),
+            };
+
+            let persons = derive_pose_from_sensing(&update);
+            s.pose_tracker = PoseTracker::new();
+            s.last_tracker_instant = None;
+            if !persons.is_empty() {
+                update.persons = Some(persons);
+            }
+            // ESP32 persons are exact discrete markers, never tracked
+            // synthetic skeletons or coarse signal-field peaks.
+            attach_field_positions(&mut update);
+
+            if let Ok(json) = serde_json::to_string(&update) {
+                let _ = s.tx.send(json);
+            }
+            s.latest_update = Some(update);
+            s.edge_vitals = Some(vitals);
+            continue;
+        }
+
+        // ADR-110 §A0.12: Try sync packet (magic 0xC511_A110).
+        // A 32-byte UDP datagram carrying mesh-aligned epoch + sequence
+        // high-water from the node's c6_sync_espnow EMA-smoothed offset.
+        // Stored per-node so subsequent CSI frames with byte 19 bit 4
+        // set can have an aligned timestamp recovered downstream.
+        if len >= wifi_densepose_hardware::SYNC_PACKET_SIZE {
+            let magic = u32::from_le_bytes([buf[0], buf[1], buf[2], buf[3]]);
+            if magic == wifi_densepose_hardware::SYNC_PACKET_MAGIC {
+                match wifi_densepose_hardware::SyncPacket::from_bytes(&buf[..len]) {
+                    Ok(sync) => {
+                        debug!(
+                            "ESP32 sync from {src}: node={} leader={} valid={} smoothed={} \
+                                        seq={} offset_us={}",
+                            sync.node_id,
+                            sync.flags.is_leader,
+                            sync.flags.is_valid,
+                            sync.flags.smoothed_used,
+                            sync.sequence,
+                            sync.local_minus_epoch_us()
+                        );
+                        let mut s = state.write().await;
+                        let node_id = sync.node_id;
+                        let calibration_bundle = s.active_calibration_bundle.clone();
+                        let ns = s.node_states.entry(node_id).or_insert_with(|| {
+                            NodeState::new_with_calibration(node_id, calibration_bundle.as_deref())
+                        });
+                        ns.apply_sync_packet(sync, std::time::Instant::now());
                         continue;
                     }
-                    // Issue #323: Also emit a sensing_update so the UI renders
-                    // detections for ESP32 nodes running the edge DSP pipeline
-                    // (Tier 2+).  Without this, vitals arrive but the UI shows
-                    // "no detection" because it only renders sensing_update msgs.
-                    s.source = "esp32".to_string();
-                    s.last_esp32_frame = Some(std::time::Instant::now());
-
-                    // ── Per-node state for edge vitals (issue #249) ──────
-                    let node_id = vitals.node_id;
-                    let calibration_bundle = s.active_calibration_bundle.clone();
-                    let ns = s.node_states.entry(node_id).or_insert_with(|| {
-                        NodeState::new_with_calibration(node_id, calibration_bundle.as_deref())
-                    });
-                    ns.last_frame_time = Some(std::time::Instant::now());
-                    ns.edge_vitals = Some(vitals.clone());
-                    ns.rssi_history.push_back(vitals.rssi as f64);
-                    if ns.rssi_history.len() > 60 {
-                        ns.rssi_history.pop_front();
-                    }
-
-                    // Store per-node person count from edge vitals.
-                    let node_est = if vitals.presence {
-                        (vitals.n_persons as usize).max(1)
-                    } else {
-                        0
-                    };
-                    ns.prev_person_count = node_est;
-
-                    s.tick += 1;
-                    let tick = s.tick;
-
-                    let now = std::time::Instant::now();
-                    let mut classification = edge_vitals_classification(&vitals);
-
-                    // Edge-vitals is a useful fallback when a node does not
-                    // provide raw CSI. Once D6 is calibrated, however, the
-                    // static CSI fingerprints remain authoritative for room
-                    // presence. Otherwise an interleaved vitals packet could
-                    // overwrite a valid D6 position with the edge classifier.
-                    if s.d5_presence.phase() == d5_presence::CalibrationPhase::Ready {
-                        let sref: &mut AppStateInner = &mut s;
-                        classification = aggregate_node_classification(
-                            &sref.node_states,
-                            now,
-                            &mut sref.d5_presence,
-                        );
-                    } else {
-                        let n_active = s
-                            .node_states
-                            .values()
-                            .filter(|ns| {
-                                ns.last_frame_time
-                                    .is_some_and(|t| now.duration_since(t).as_secs() < 10)
-                            })
-                            .count();
-                        if n_active > 1 {
-                            classification.confidence = (classification.confidence
-                                * (1.0 + 0.15 * (n_active as f64 - 1.0)))
-                                .clamp(0.0, 1.0);
-                        }
-                    }
-                    classification = apply_position_setup_classification_gate(
-                        s.position_setup.is_some(),
-                        s.d5_presence.phase(),
-                        classification,
-                    );
-                    let public_vitals = public_edge_vitals_packet(&vitals, &classification);
-                    if let Ok(json) = serde_json::to_string(&serde_json::json!({
-                        "type": "edge_vitals",
-                        "node_id": public_vitals.node_id,
-                        "presence": public_vitals.presence,
-                        "fall_detected": public_vitals.fall_detected,
-                        "motion": public_vitals.motion,
-                        "breathing_rate_bpm": public_vitals.breathing_rate_bpm,
-                        "heartrate_bpm": public_vitals.heartrate_bpm,
-                        "n_persons": public_vitals.n_persons,
-                        "motion_energy": public_vitals.motion_energy,
-                        "presence_score": public_vitals.presence_score,
-                        "rssi": public_vitals.rssi,
-                    })) {
-                        let _ = s.tx.send(json);
-                    }
-
-                    // Aggregate person count only after the authoritative
-                    // presence decision, matching the raw-CSI path.
-                    let _total_persons = if classification.presence {
-                        let dedup = s.dedup_factor;
-                        let (fused, fallback_count) = multistatic_bridge::fuse_or_fallback(
-                            &s.multistatic_fuser,
-                            &s.node_states,
-                            dedup,
-                        );
-                        match fused {
-                            Some(ref f) => {
-                                let score =
-                                    multistatic_bridge::compute_person_score_from_amplitudes(
-                                        &f.fused_amplitude,
-                                    );
-                                s.smoothed_person_score =
-                                    s.smoothed_person_score * 0.90 + score * 0.10;
-                                // #803: don't let the saturating activity score
-                                // discard count-aware per-node estimates.
-                                let count =
-                                    aggregate_person_count(s.person_count(), &s.node_states);
-                                s.prev_person_count = count;
-                                count.max(1) // presence=true => at least 1
-                            }
-                            None => {
-                                aggregate_person_count(fallback_count.unwrap_or(0), &s.node_states)
-                                    .max(1)
-                            }
-                        }
-                    } else {
-                        s.prev_person_count = 0;
-                        0
-                    };
-
-                    // Governed trust cycle (ADR-135..146): run the same live
-                    // frames through the privacy/provenance/witness control
-                    // plane. Trust state is recorded on the bridge (exposed on
-                    // /api/v1/status); engine errors are counted + rate-limit
-                    // logged instead of being swallowed (review finding 1).
-                    // Split-borrow the two distinct fields off the guard.
-                    {
-                        let sref: &mut AppStateInner = &mut s;
-                        let now_ms = std::time::SystemTime::now()
-                            .duration_since(std::time::UNIX_EPOCH)
-                            .map(|d| d.as_millis() as i64)
-                            .unwrap_or(0);
-                        sref.engine_bridge.observe_cycle(&sref.node_states, now_ms);
-                    }
-
-                    // Feed field model calibration if active (use per-node history for ESP32).
-                    if let Some(frame_history) = s
-                        .node_states
-                        .get(&node_id)
-                        .map(|ns| ns.frame_history.clone())
-                    {
-                        if let Some(ref mut fm) = s.field_model {
-                            field_bridge::maybe_feed_calibration(fm, &frame_history);
-                        }
-                    }
-
-                    // Build nodes array with all active nodes.
-                    let configured_positions = s.multistatic_fuser.node_positions().to_vec();
-                    let mut active_nodes: Vec<NodeInfo> = s
-                        .node_states
-                        .iter()
-                        .filter(|(_, n)| {
-                            n.last_frame_time
-                                .is_some_and(|t| now.duration_since(t).as_secs() < 10)
-                        })
-                        .map(|(&id, n)| NodeInfo {
-                            node_id: id,
-                            rssi_dbm: n.rssi_history.back().copied().unwrap_or(0.0),
-                            position: configured_node_position(id, &configured_positions),
-                            amplitude: vec![],
-                            subcarrier_count: 0,
-                            // Vitals-only path; still expose the sync snapshot
-                            // if the node also speaks ESP-NOW.
-                            sync: n.sync_snapshot(),
-                        })
-                        .collect();
-                    active_nodes.sort_by_key(|node| node.node_id);
-
-                    let features = FeatureInfo {
-                        mean_rssi: vitals.rssi as f64,
-                        variance: vitals.motion_energy as f64,
-                        motion_band_power: vitals.motion_energy as f64,
-                        breathing_band_power: if vitals.presence { 0.5 } else { 0.0 },
-                        dominant_freq_hz: vitals.breathing_rate_bpm / 60.0,
-                        change_points: 0,
-                        spectral_power: vitals.motion_energy as f64,
-                    };
-
-                    // Store latest features on node for cross-node fusion.
-                    if let Some(ns) = s.node_states.get_mut(&node_id) {
-                        ns.latest_features = Some(features.clone());
-                    }
-
-                    // Cross-node fusion: combine features from all active nodes.
-                    let fused_features = fuse_multi_node_features(&features, &s.node_states);
-
-                    // Edge-vitals packets contain classifications and vital
-                    // estimates but no per-subcarrier fingerprints of their
-                    // own. Reuse only fresh D6 evidence already held by the
-                    // raw-CSI path; the estimator fails closed otherwise.
-                    let localization = estimate_live_localization(
-                        &s.node_states,
-                        now,
-                        &classification,
-                        s.tx_position,
-                        s.room_dimensions,
-                        &configured_positions,
-                    );
-                    let signal_field = signal_field_from_localization(&localization);
-                    let candidate_position_estimate = match raw_csi_recording::now_unix_ns() {
-                        Ok(now_unix_ns) => s.live_position_tracker.expire_if_raw_stale(now_unix_ns),
-                        Err(error) => s.live_position_tracker.reject_input(format!(
-                            "could not verify raw CSI freshness for edge vitals: {error}"
-                        )),
-                    };
-                    let position_estimate = gate_mmwave_candidate_for_publication(
-                        candidate_position_estimate,
-                        s.mmwave.position_publication_allowed(),
-                    );
-                    let has_valid_position = classification.presence
-                        && matches!(
-                            &position_estimate,
-                            position_live::LivePositionState::Position { .. }
-                        );
-
-                    let mut update = SensingUpdate {
-                        msg_type: "sensing_update".to_string(),
-                        timestamp: chrono::Utc::now().timestamp_millis() as f64 / 1000.0,
-                        source: "esp32".to_string(),
-                        tick,
-                        tx_position: s.tx_position,
-                        room_dimensions: s.room_dimensions,
-                        nodes: active_nodes,
-                        features: fused_features.clone(),
-                        classification,
-                        signal_field,
-                        localization: Some(localization),
-                        position_estimate: Some(position_estimate),
-                        vital_signs: Some(VitalSigns {
-                            breathing_rate_bpm: if vitals.breathing_rate_bpm > 0.0 {
-                                Some(vitals.breathing_rate_bpm)
-                            } else {
-                                None
-                            },
-                            heart_rate_bpm: if vitals.heartrate_bpm > 0.0 {
-                                Some(vitals.heartrate_bpm)
-                            } else {
-                                None
-                            },
-                            breathing_confidence: if vitals.presence { 0.7 } else { 0.0 },
-                            heartbeat_confidence: if vitals.presence { 0.7 } else { 0.0 },
-                            signal_quality: vitals.presence_score as f64,
-                        }),
-                        enhanced_motion: None,
-                        enhanced_breathing: None,
-                        posture: None,
-                        signal_quality_score: None,
-                        quality_verdict: None,
-                        bssid_count: None,
-                        pose_keypoints: None,
-                        model_status: None,
-                        persons: None,
-                        estimated_persons: has_valid_position.then_some(1),
-                        // ADR-084 Pass 3.6: surface per-node novelty_score
-                        // (and the rest of the per-node feature snapshot)
-                        // on the WebSocket envelope so cluster-Pi consumers
-                        // can implement model-wake gating without round-
-                        // tripping back to the server.
-                        node_features: build_node_features(
-                            &s.node_states,
-                            now,
-                            s.d5_presence.phase(),
-                            s.position_setup.is_some(),
-                        ),
-                    };
-
-                    let persons = derive_pose_from_sensing(&update);
-                    s.pose_tracker = PoseTracker::new();
-                    s.last_tracker_instant = None;
-                    if !persons.is_empty() {
-                        update.persons = Some(persons);
-                    }
-                    // ESP32 persons are exact discrete markers, never tracked
-                    // synthetic skeletons or coarse signal-field peaks.
-                    attach_field_positions(&mut update);
-
-                    if let Ok(json) = serde_json::to_string(&update) {
-                        let _ = s.tx.send(json);
-                    }
-                    s.latest_update = Some(update);
-                    s.edge_vitals = Some(vitals);
-                    continue;
-                }
-
-                // ADR-110 §A0.12: Try sync packet (magic 0xC511_A110).
-                // A 32-byte UDP datagram carrying mesh-aligned epoch + sequence
-                // high-water from the node's c6_sync_espnow EMA-smoothed offset.
-                // Stored per-node so subsequent CSI frames with byte 19 bit 4
-                // set can have an aligned timestamp recovered downstream.
-                if len >= wifi_densepose_hardware::SYNC_PACKET_SIZE {
-                    let magic = u32::from_le_bytes([buf[0], buf[1], buf[2], buf[3]]);
-                    if magic == wifi_densepose_hardware::SYNC_PACKET_MAGIC {
-                        match wifi_densepose_hardware::SyncPacket::from_bytes(&buf[..len]) {
-                            Ok(sync) => {
-                                debug!("ESP32 sync from {src}: node={} leader={} valid={} smoothed={} \
-                                        seq={} offset_us={}",
-                                       sync.node_id, sync.flags.is_leader, sync.flags.is_valid,
-                                       sync.flags.smoothed_used, sync.sequence,
-                                       sync.local_minus_epoch_us());
-                                let mut s = state.write().await;
-                                let node_id = sync.node_id;
-                                let calibration_bundle = s.active_calibration_bundle.clone();
-                                let ns = s.node_states.entry(node_id).or_insert_with(|| {
-                                    NodeState::new_with_calibration(
-                                        node_id,
-                                        calibration_bundle.as_deref(),
-                                    )
-                                });
-                                ns.apply_sync_packet(sync, std::time::Instant::now());
-                                continue;
-                            }
-                            Err(e) => {
-                                debug!("Sync packet decode error from {src}: {e}");
-                                // Fall through — magic matched but decode failed; not a CSI frame.
-                                continue;
-                            }
-                        }
+                    Err(e) => {
+                        debug!("Sync packet decode error from {src}: {e}");
+                        // Fall through — magic matched but decode failed; not a CSI frame.
+                        continue;
                     }
                 }
+            }
+        }
 
-                // ADR-063: Try edge fused vitals packet (magic 0xC511_0004).
-                // Must come BEFORE the WASM parser — issue #928: these two
-                // packet types shared a magic and the WASM parser was eating
-                // fused-vitals frames on the C6+mmWave config. The reassign of
-                // WASM_OUTPUT_MAGIC → 0xC511_0007 (firmware side) plus this
-                // dedicated parser resolve the collision.
-                if let Some(fused) = parse_edge_fused_vitals(&buf[..len]) {
-                    debug!(
-                        "Edge fused vitals from {src}: node={} br={:.1} hr={:.1} \
+        // ADR-063: Try edge fused vitals packet (magic 0xC511_0004).
+        // Must come BEFORE the WASM parser — issue #928: these two
+        // packet types shared a magic and the WASM parser was eating
+        // fused-vitals frames on the C6+mmWave config. The reassign of
+        // WASM_OUTPUT_MAGIC → 0xC511_0007 (firmware side) plus this
+        // dedicated parser resolve the collision.
+        if let Some(fused) = parse_edge_fused_vitals(&buf[..len]) {
+            debug!(
+                "Edge fused vitals from {src}: node={} br={:.1} hr={:.1} \
                          mmwave_targets={} fusion_conf={}",
-                        fused.node_id,
-                        fused.breathing_rate_bpm,
-                        fused.heartrate_bpm,
-                        fused.mmwave_targets,
-                        fused.fusion_confidence,
+                fused.node_id,
+                fused.breathing_rate_bpm,
+                fused.heartrate_bpm,
+                fused.mmwave_targets,
+                fused.fusion_confidence,
+            );
+            let s = state.write().await;
+            if let Ok(json) = serde_json::to_string(&serde_json::json!({
+                "type": "edge_fused_vitals",
+                "node_id": fused.node_id,
+                "breathing_rate_bpm": fused.breathing_rate_bpm,
+                "heartrate_bpm": fused.heartrate_bpm,
+                "n_persons": fused.n_persons,
+                "fusion_confidence": fused.fusion_confidence,
+                "mmwave": {
+                    "hr_bpm": fused.mmwave_hr_bpm,
+                    "br_bpm": fused.mmwave_br_bpm,
+                    "distance_cm": fused.mmwave_distance_cm,
+                    "targets": fused.mmwave_targets,
+                    "confidence": fused.mmwave_confidence,
+                    "type": fused.mmwave_type,
+                },
+                "motion_energy": fused.motion_energy,
+                "presence_score": fused.presence_score,
+                "timestamp_ms": fused.timestamp_ms,
+            })) {
+                let _ = s.tx.send(json);
+            }
+            continue;
+        }
+
+        // ADR-040: Try WASM output packet (magic 0xC511_0007 post-#928).
+        if let Some(wasm_output) = parse_wasm_output(&buf[..len]) {
+            debug!(
+                "WASM output from {src}: node={} module={} events={}",
+                wasm_output.node_id,
+                wasm_output.module_id,
+                wasm_output.events.len()
+            );
+            let mut s = state.write().await;
+            // Broadcast WASM events via WebSocket.
+            if let Ok(json) = serde_json::to_string(&serde_json::json!({
+                "type": "wasm_event",
+                "node_id": wasm_output.node_id,
+                "module_id": wasm_output.module_id,
+                "events": wasm_output.events,
+            })) {
+                let _ = s.tx.send(json);
+            }
+            s.latest_wasm_events = Some(wasm_output);
+            continue;
+        }
+
+        if let Some(frame) = parse_esp32_frame(&buf[..len]) {
+            debug!(
+                "ESP32 frame from {src}: node={}, subs={}, seq={}",
+                frame.node_id, frame.n_subcarriers, frame.sequence
+            );
+
+            let mut s = state.write().await;
+            let frame_now = std::time::Instant::now();
+
+            // Decode the exact raw frame for live positioning on every
+            // CSI packet before it can affect source liveness,
+            // classification, D4/D5/D6, positioning, or recording.
+            let mesh_timestamp_us = s
+                .node_states
+                .get(&frame.node_id)
+                .and_then(|node| node.mesh_aligned_us_for_csi_frame(frame.sequence));
+            let Some(host_time) = server_receive_time.as_ref() else {
+                warn!("parsed ESP32 CSI frame from {src} had no CSI ingress timestamp");
+                continue;
+            };
+            let live_position_timestamp_ns = host_time.host_unix_ns;
+            let context = raw_csi_recording::RawCsiFrameContext {
+                host_timestamp_unix_ns: live_position_timestamp_ns,
+                host_monotonic_ns: Some(host_time.host_monotonic_ns),
+                clock_epoch_id: Some(host_time.clock_epoch_id.clone()),
+                mesh_timestamp_us,
+                ..Default::default()
+            };
+            let position_setup = s.position_setup.clone();
+            let raw_frame = match raw_csi_recording::RawCsiFrame::from_packet(&buf[..len], context)
+            {
+                Ok(raw_frame) => raw_frame,
+                Err(error) => {
+                    reject_raw_csi_ingress(
+                        &mut s,
+                        Some(frame.node_id),
+                        format!("exact raw CSI validation failed: {error}"),
                     );
-                    let s = state.write().await;
-                    if let Ok(json) = serde_json::to_string(&serde_json::json!({
-                        "type": "edge_fused_vitals",
-                        "node_id": fused.node_id,
-                        "breathing_rate_bpm": fused.breathing_rate_bpm,
-                        "heartrate_bpm": fused.heartrate_bpm,
-                        "n_persons": fused.n_persons,
-                        "fusion_confidence": fused.fusion_confidence,
-                        "mmwave": {
-                            "hr_bpm": fused.mmwave_hr_bpm,
-                            "br_bpm": fused.mmwave_br_bpm,
-                            "distance_cm": fused.mmwave_distance_cm,
-                            "targets": fused.mmwave_targets,
-                            "confidence": fused.mmwave_confidence,
-                            "type": fused.mmwave_type,
-                        },
-                        "motion_energy": fused.motion_energy,
-                        "presence_score": fused.presence_score,
-                        "timestamp_ms": fused.timestamp_ms,
-                    })) {
-                        let _ = s.tx.send(json);
+                    warn!(
+                        "node {}: parsed CSI datagram rejected by exact raw validation: {}",
+                        frame.node_id, error
+                    );
+                    continue;
+                }
+            };
+            let protocol_identity = match raw_csi_recording::csi_protocol_identity(&buf[..len]) {
+                Ok(Some(identity)) => identity,
+                Ok(None) => {
+                    reject_raw_csi_ingress(
+                        &mut s,
+                        Some(frame.node_id),
+                        "CSI protocol v2 boot identity is missing".to_string(),
+                    );
+                    continue;
+                }
+                Err(error) => {
+                    reject_raw_csi_ingress(
+                        &mut s,
+                        Some(frame.node_id),
+                        format!("invalid CSI boot identity: {error}"),
+                    );
+                    continue;
+                }
+            };
+            let (rebooted, ip_changed) = match s.csi_identity_registry.admit(
+                frame.node_id,
+                protocol_identity.boot_id,
+                frame.sequence,
+                src,
+                frame_now,
+            ) {
+                csi_identity::Admission::Accepted {
+                    rebooted,
+                    ip_changed,
+                } => (rebooted, ip_changed),
+                csi_identity::Admission::Duplicate => {
+                    debug!(
+                        "node {} boot {:016x}: duplicate sequence {} ignored",
+                        frame.node_id, protocol_identity.boot_id, frame.sequence
+                    );
+                    if let Some(observation) = csi_observation.take() {
+                        observation.finish(csi_diagnostics::CsiDatagramOutcome::Duplicate);
                     }
                     continue;
                 }
-
-                // ADR-040: Try WASM output packet (magic 0xC511_0007 post-#928).
-                if let Some(wasm_output) = parse_wasm_output(&buf[..len]) {
-                    debug!(
-                        "WASM output from {src}: node={} module={} events={}",
-                        wasm_output.node_id,
-                        wasm_output.module_id,
-                        wasm_output.events.len()
+                csi_identity::Admission::OutOfOrder => {
+                    s.csi_ingress_diagnostics.note_csi_order_error();
+                    reject_raw_csi_ingress(
+                        &mut s,
+                        Some(frame.node_id),
+                        format!(
+                            "RX{} sequence {} arrived behind the active sequence high-water",
+                            frame.node_id, frame.sequence
+                        ),
                     );
-                    let mut s = state.write().await;
-                    // Broadcast WASM events via WebSocket.
-                    if let Ok(json) = serde_json::to_string(&serde_json::json!({
-                        "type": "wasm_event",
-                        "node_id": wasm_output.node_id,
-                        "module_id": wasm_output.module_id,
-                        "events": wasm_output.events,
-                    })) {
-                        let _ = s.tx.send(json);
-                    }
-                    s.latest_wasm_events = Some(wasm_output);
                     continue;
                 }
-
-                if let Some(frame) = parse_esp32_frame(&buf[..len]) {
-                    debug!(
-                        "ESP32 frame from {src}: node={}, subs={}, seq={}",
-                        frame.node_id, frame.n_subcarriers, frame.sequence
+                csi_identity::Admission::UnknownNode => {
+                    reject_raw_csi_ingress(
+                        &mut s,
+                        Some(frame.node_id),
+                        format!("unknown RX node_id {}; expected RX1-RX4", frame.node_id),
                     );
-
-                    let mut s = state.write().await;
-                    let frame_now = std::time::Instant::now();
-
-                    // Decode the exact raw frame for live positioning on every
-                    // CSI packet before it can affect source liveness,
-                    // classification, D4/D5/D6, positioning, or recording.
-                    let mesh_timestamp_us = s
-                        .node_states
-                        .get(&frame.node_id)
-                        .and_then(|node| node.mesh_aligned_us_for_csi_frame(frame.sequence));
-                    let host_time = server_clock::now();
-                    let live_position_timestamp_ns = host_time.host_unix_ns;
-                    let context = raw_csi_recording::RawCsiFrameContext {
-                        host_timestamp_unix_ns: live_position_timestamp_ns,
-                        host_monotonic_ns: Some(host_time.host_monotonic_ns),
-                        clock_epoch_id: Some(host_time.clock_epoch_id),
-                        mesh_timestamp_us,
-                        ..Default::default()
-                    };
-                    let position_setup = s.position_setup.clone();
-                    let raw_frame =
-                        match raw_csi_recording::RawCsiFrame::from_packet(&buf[..len], context) {
-                            Ok(raw_frame) => raw_frame,
-                            Err(error) => {
-                                reject_raw_csi_ingress(
-                                    &mut s,
-                                    Some(frame.node_id),
-                                    format!("exact raw CSI validation failed: {error}"),
-                                );
-                                warn!(
-                                "node {}: parsed CSI datagram rejected by exact raw validation: {}",
-                                frame.node_id, error
-                            );
-                                continue;
-                            }
-                        };
-                    let matches_sealed_grid = if let Some(setup) = position_setup.as_deref() {
-                        if let Err(error) = setup.validate_raw_csi_source_identity(&raw_frame) {
-                            reject_raw_csi_ingress(
-                                &mut s,
-                                Some(frame.node_id),
-                                format!("sealed position setup rejected source identity: {error}"),
-                            );
-                            warn!(
-                                "node {}: sealed position setup rejected raw CSI source identity: {}",
-                                frame.node_id, error
-                            );
-                            continue;
-                        }
-                        match setup.raw_csi_frame_matches_expected_grid(&raw_frame) {
-                            Ok(matches) => matches,
-                            Err(error) => {
-                                reject_raw_csi_ingress(
-                                    &mut s,
-                                    Some(frame.node_id),
-                                    format!("sealed position setup rejected receiver: {error}"),
-                                );
-                                continue;
-                            }
-                        }
-                    } else {
-                        true
-                    };
-                    let matches_pinned_grid = s
-                        .csi_grid_pin
-                        .is_none_or(|grid_pin| grid_pin.matches(&raw_frame));
-                    let matches_runtime_grid = matches_sealed_grid && matches_pinned_grid;
-                    let source_binding_observation = match validated_complete_source_binding(
-                        raw_frame.source_binding.as_ref(),
-                        frame_now,
-                        position_setup.is_some(),
-                    ) {
-                        Ok(observation) => observation,
-                        Err(error) => {
-                            reject_raw_csi_ingress(
-                                &mut s,
-                                Some(frame.node_id),
-                                format!("TX-source binding validation failed: {error}"),
-                            );
-                            continue;
-                        }
-                    };
-
-                    // A valid controlled transmitter can emit multiple CSI
-                    // symbol grids. Keep its binding fresh, but never mix an
-                    // off-grid frame into D5/D6, recording, or live position.
-                    let calibration_bundle = s.active_calibration_bundle.clone();
-                    let grid_accepted = s
-                        .node_states
-                        .entry(frame.node_id)
-                        .or_insert_with(|| {
-                            NodeState::new_with_calibration(
-                                frame.node_id,
-                                calibration_bundle.as_deref(),
-                            )
-                        })
-                        .observe_validated_grid(
-                            source_binding_observation,
-                            frame.grid(),
-                            matches_runtime_grid,
+                    continue;
+                }
+                csi_identity::Admission::ConflictingBoot => {
+                    reject_raw_csi_ingress(
+                        &mut s,
+                        Some(frame.node_id),
+                        format!(
+                            "duplicate RX{} identity: conflicting boot {:016x} is active",
+                            frame.node_id, protocol_identity.boot_id
+                        ),
+                    );
+                    continue;
+                }
+            };
+            if rebooted {
+                s.node_states.remove(&frame.node_id);
+                info!(
+                    "RX{} reboot accepted with new boot {:016x}; only this RX state was reset",
+                    frame.node_id, protocol_identity.boot_id
+                );
+            }
+            let matches_sealed_grid = if let Some(setup) = position_setup.as_deref() {
+                if let Err(error) = setup.validate_raw_csi_source_identity(&raw_frame) {
+                    reject_raw_csi_ingress(
+                        &mut s,
+                        Some(frame.node_id),
+                        format!("sealed position setup rejected source identity: {error}"),
+                    );
+                    warn!(
+                        "node {}: sealed position setup rejected raw CSI source identity: {}",
+                        frame.node_id, error
+                    );
+                    continue;
+                }
+                match setup.raw_csi_frame_matches_expected_grid(&raw_frame) {
+                    Ok(matches) => matches,
+                    Err(error) => {
+                        reject_raw_csi_ingress(
+                            &mut s,
+                            Some(frame.node_id),
+                            format!("sealed position setup rejected receiver: {error}"),
                         );
+                        continue;
+                    }
+                }
+            } else {
+                true
+            };
+            let matches_pinned_grid = s
+                .csi_grid_pin
+                .is_none_or(|grid_pin| grid_pin.matches(&raw_frame));
+            let matches_runtime_grid = matches_sealed_grid && matches_pinned_grid;
+            let binding_matches_authority = position_setup.is_some()
+                || s.expected_tx_source_binding_sha256
+                    .as_deref()
+                    .zip(raw_frame.source_binding.as_ref())
+                    .is_some_and(|(expected, observed)| observed.tx_filter_sha256 == expected);
+            let source_binding_observation = match validated_complete_source_binding(
+                raw_frame.source_binding.as_ref(),
+                frame_now,
+                binding_matches_authority,
+            ) {
+                Ok(observation) => observation,
+                Err(error) => {
+                    reject_raw_csi_ingress(
+                        &mut s,
+                        Some(frame.node_id),
+                        format!("TX-source binding validation failed: {error}"),
+                    );
+                    continue;
+                }
+            };
 
-                    if !grid_accepted {
-                        debug!(
+            // A valid controlled transmitter can emit multiple CSI
+            // symbol grids. Keep its binding fresh, but never mix an
+            // off-grid frame into D5/D6, recording, or live position.
+            let calibration_bundle = s.active_calibration_bundle.clone();
+            let node_state = s.node_states.entry(frame.node_id).or_insert_with(|| {
+                NodeState::new_with_calibration(frame.node_id, calibration_bundle.as_deref())
+            });
+            node_state.observe_transport_identity(
+                protocol_identity.protocol_version,
+                protocol_identity.boot_id,
+                src,
+                ip_changed,
+            );
+            let grid_accepted = node_state.observe_validated_grid(
+                source_binding_observation,
+                frame.grid(),
+                matches_runtime_grid,
+            );
+
+            if !grid_accepted {
+                debug!(
                             "node {}: filtering {}-subcarrier {:?} frame (active grid {:?}, sealed grid match {}, pinned grid match {})",
                             frame.node_id,
                             frame.n_subcarriers,
@@ -1609,408 +1812,525 @@ pub(crate) async fn udp_receiver_task(state: SharedState, udp_port: u16) {
                             matches_sealed_grid,
                             matches_pinned_grid,
                         );
-                        continue;
-                    }
+                continue;
+            }
 
-                    s.mmwave.observe_csi(&raw_frame);
+            s.mmwave.observe_csi(&raw_frame);
 
-                    s.source = "esp32".to_string();
-                    s.last_esp32_frame = Some(frame_now);
+            s.source = "esp32".to_string();
+            s.last_esp32_frame = Some(frame_now);
 
-                    if s.recording_active
-                        && s.raw_csi_tx
-                            .send(RawCsiIngress::Frame(raw_frame.clone()))
-                            .is_err()
-                    {
-                        warn!(
-                            "node {}: active raw recorder has no receiver",
-                            frame.node_id
-                        );
-                    }
-                    let live_position_input_accepted = match route_raw_frame_to_live_position(
-                        &mut s.live_position_tracker,
-                        position_setup.as_deref(),
-                        true,
-                        raw_frame,
-                    ) {
-                        Ok(()) => {
-                            s.last_raw_csi_frame = Some(frame_now);
-                            true
-                        }
-                        Err(error) => {
-                            let estimate = s.live_position_tracker.current().clone();
-                            replace_latest_esp32_position_estimate(&mut s, estimate);
-                            debug!(
-                                "node {}: live position rejected raw frame: {}",
-                                frame.node_id, error
-                            );
-                            false
-                        }
-                    };
-
-                    // Also maintain global frame_history for backward compat
-                    // (simulation path, REST endpoints, etc.).
-                    s.frame_history.push_back(frame.amplitudes.clone());
-                    if s.frame_history.len() > FRAME_HISTORY_CAPACITY {
-                        s.frame_history.pop_front();
-                    }
-
-                    // ── ADR-099: real-time introspection tap ────────────────
-                    // Per-frame update of the attractor / DTW pipeline running
-                    // parallel to the window-aggregated event path. Placed
-                    // BEFORE the per-node `&mut` borrow of `s.node_states` so
-                    // `s.intro` / `s.intro_tx` stay reachable. Never window-
-                    // blocked; `/ws/introspection` sees a fresh snapshot on
-                    // every accepted frame.
-                    {
-                        let intro_feature = if frame.amplitudes.is_empty() {
-                            0.0
-                        } else {
-                            frame.amplitudes.iter().copied().sum::<f64>()
-                                / frame.amplitudes.len() as f64
-                        };
-                        let intro_ts_ns = std::time::SystemTime::now()
-                            .duration_since(std::time::UNIX_EPOCH)
-                            .map(|d| d.as_nanos() as u64)
-                            .unwrap_or(0);
-                        let _ = s.intro.update(intro_ts_ns, intro_feature);
-                        if let Ok(intro_json) = serde_json::to_string(s.intro.snapshot()) {
-                            let _ = s.intro_tx.send(intro_json);
-                        }
-                    }
-
-                    // ── Per-node processing (issue #249) ──────────────────
-                    // Process entirely within per-node state so different
-                    // ESP32 nodes never mix their smoothing/vitals buffers.
-                    // We scope the mutable borrow of node_states so we can
-                    // access other AppStateInner fields afterward.
-                    let node_id = frame.node_id;
-                    // Clone adaptive model before mutable borrow of node_states
-                    // to avoid unsafe raw pointer (review finding #2).
-                    let adaptive_model_clone = s.adaptive_model.clone();
-                    let d5_phase = s.d5_presence.phase();
-                    let calibration_bundle = s.active_calibration_bundle.clone();
-
-                    let ns = s.node_states.entry(node_id).or_insert_with(|| {
-                        NodeState::new_with_calibration(node_id, calibration_bundle.as_deref())
-                    });
-                    let (features, mut classification) =
-                        observe_frame_for_presence(ns, &frame, frame_now, d5_phase);
-                    ns.observe_live_fusion_frame(&frame.amplitudes, host_time.host_monotonic_ns);
-
-                    // Adaptive override using cloned model (safe, no raw pointers).
-                    if let Some(ref model) = adaptive_model_clone {
-                        let amps = ns.frame_history.back().map(|v| v.as_slice()).unwrap_or(&[]);
-                        let feat_arr = adaptive_classifier::features_from_runtime(
-                            &serde_json::json!({
-                                "variance": features.variance,
-                                "motion_band_power": features.motion_band_power,
-                                "breathing_band_power": features.breathing_band_power,
-                                "spectral_power": features.spectral_power,
-                                "dominant_freq_hz": features.dominant_freq_hz,
-                                "change_points": features.change_points,
-                                "mean_rssi": features.mean_rssi,
-                            }),
-                            amps,
-                        );
-                        let (label, conf) = model.classify(&feat_arr);
-                        classification.motion_level = label.to_string();
-                        classification.presence = label != "absent";
-                        classification.confidence =
-                            (conf * 0.7 + classification.confidence * 0.3).clamp(0.0, 1.0);
-                    }
-                    ns.motion_confidence = classification.confidence;
-
-                    ns.rssi_history.push_back(features.mean_rssi);
-                    if ns.rssi_history.len() > 60 {
-                        ns.rssi_history.pop_front();
-                    }
-
-                    let raw_vitals = ns
-                        .vital_detector
-                        .process_frame(&frame.amplitudes, &frame.phases);
-                    let vitals = smooth_vitals_node(ns, &raw_vitals);
-                    ns.latest_vitals = vitals.clone();
-
-                    // DynamicMinCut person estimation from subcarrier correlation.
-                    let corr_persons = estimate_persons_from_correlation(&ns.frame_history);
-                    // #803: map the min-cut count onto a threshold-aligned score
-                    // so it round-trips back to the same count. The old
-                    // `corr_persons / 3.0` left 2 people at 0.667 — under the
-                    // 0.70 up-threshold — so the count was pinned at 1.
-                    let raw_score = corr_persons_to_score(corr_persons);
-                    ns.smoothed_person_score = ns.smoothed_person_score * 0.92 + raw_score * 0.08;
-                    if classification.presence {
-                        let count =
-                            score_to_person_count(ns.smoothed_person_score, ns.prev_person_count);
-                        ns.prev_person_count = count;
-                    } else {
-                        ns.prev_person_count = 0;
-                    }
-
-                    // Store latest features on node for cross-node fusion.
-                    ns.latest_features = Some(features.clone());
-
-                    // Done with per-node mutable borrow; now read aggregated
-                    // state from all nodes (the borrow of `ns` ends here).
-                    // (We re-borrow node_states immutably via `s` below.)
-
-                    s.rssi_history.push_back(features.mean_rssi);
-                    if s.rssi_history.len() > 60 {
-                        s.rssi_history.pop_front();
-                    }
-                    s.latest_vitals = vitals.clone();
-
-                    // Cross-node fusion: combine features from all active nodes.
-                    let fused_features = fuse_multi_node_features(&features, &s.node_states);
-                    let now = frame_now;
-
-                    // The room-level classification is a consensus across all
-                    // live RX links, not the result of the last UDP packet.
-                    let classification = {
-                        let sref: &mut AppStateInner = &mut s;
-                        aggregate_node_classification(&sref.node_states, now, &mut sref.d5_presence)
-                    };
-                    let classification = apply_position_setup_classification_gate(
-                        s.position_setup.is_some(),
-                        s.d5_presence.phase(),
-                        classification,
+            if s.recording_active
+                && s.raw_csi_tx
+                    .send(RawCsiIngress::Frame(raw_frame.clone()))
+                    .is_err()
+            {
+                warn!(
+                    "node {}: active raw recorder has no receiver",
+                    frame.node_id
+                );
+            }
+            let live_position_input_accepted = match route_raw_frame_to_live_position(
+                &mut s.live_position_tracker,
+                position_setup.as_deref(),
+                true,
+                raw_frame,
+            ) {
+                Ok(()) => {
+                    s.last_raw_csi_frame = Some(frame_now);
+                    true
+                }
+                Err(error) => {
+                    let estimate = s.live_position_tracker.current().clone();
+                    replace_latest_esp32_position_estimate(&mut s, estimate);
+                    debug!(
+                        "node {}: live position rejected raw frame: {}",
+                        frame.node_id, error
                     );
-                    let position_gate =
-                        live_position_presence_gate(&s.node_states, now, &s.d5_presence);
-                    let candidate_position_estimate = if live_position_input_accepted {
-                        s.live_position_tracker
-                            .tick(live_position_timestamp_ns, position_gate)
-                    } else {
-                        s.live_position_tracker.current().clone()
-                    };
-                    // A freshly generated mmWave-gated model remains usable
-                    // inside the held-back evaluator but cannot become public
-                    // before every blind-position gate passes.
-                    let position_estimate = gate_mmwave_candidate_for_publication(
-                        candidate_position_estimate,
-                        s.mmwave.position_publication_allowed(),
-                    );
-                    let has_valid_position = classification.presence
-                        && matches!(
-                            &position_estimate,
-                            position_live::LivePositionState::Position { .. }
-                        );
+                    false
+                }
+            };
 
-                    s.tick += 1;
-                    let tick = s.tick;
+            // Also maintain global frame_history for backward compat
+            // (simulation path, REST endpoints, etc.).
+            s.frame_history.push_back(frame.amplitudes.clone());
+            if s.frame_history.len() > FRAME_HISTORY_CAPACITY {
+                s.frame_history.pop_front();
+            }
 
-                    // Aggregate person count: gate on presence first (matching WiFi path).
-                    let _total_persons = if classification.presence {
-                        let dedup = s.dedup_factor;
-                        let (fused, fallback_count) = multistatic_bridge::fuse_or_fallback(
-                            &s.multistatic_fuser,
-                            &s.node_states,
-                            dedup,
-                        );
-                        match fused {
-                            Some(ref f) => {
-                                let score =
-                                    multistatic_bridge::compute_person_score_from_amplitudes(
-                                        &f.fused_amplitude,
-                                    );
-                                s.smoothed_person_score =
-                                    s.smoothed_person_score * 0.90 + score * 0.10;
-                                // #803: don't let the saturating activity score
-                                // discard count-aware per-node estimates.
-                                let count =
-                                    aggregate_person_count(s.person_count(), &s.node_states);
-                                s.prev_person_count = count;
-                                count.max(1)
-                            }
-                            None => {
-                                aggregate_person_count(fallback_count.unwrap_or(0), &s.node_states)
-                                    .max(1)
-                            }
-                        }
-                    } else {
-                        s.prev_person_count = 0;
-                        0
-                    };
-
-                    // Governed trust cycle (ADR-135..146): run the same live
-                    // frames through the privacy/provenance/witness control
-                    // plane. Trust state is recorded on the bridge (exposed on
-                    // /api/v1/status); engine errors are counted + rate-limit
-                    // logged instead of being swallowed (review finding 1).
-                    // Split-borrow the two distinct fields off the guard.
-                    {
-                        let sref: &mut AppStateInner = &mut s;
-                        let now_ms = std::time::SystemTime::now()
-                            .duration_since(std::time::UNIX_EPOCH)
-                            .map(|d| d.as_millis() as i64)
-                            .unwrap_or(0);
-                        sref.engine_bridge.observe_cycle(&sref.node_states, now_ms);
-                    }
-
-                    // Feed field model calibration if active (use per-node history for ESP32).
-                    if let Some(frame_history) = s
-                        .node_states
-                        .get(&node_id)
-                        .map(|ns| ns.frame_history.clone())
-                    {
-                        if let Some(ref mut fm) = s.field_model {
-                            field_bridge::maybe_feed_calibration(fm, &frame_history);
-                        }
-                    }
-
-                    // Build nodes array with all active nodes. ADR-141 output
-                    // gating (review finding 1c): when the governed engine
-                    // emitted this cycle at class Restricted (base mode, or a
-                    // contradiction/mesh-risk demotion below the configured
-                    // class), the per-node raw amplitude vectors are suppressed
-                    // from the live publish — the same field mapping bfld's
-                    // privacy gate applies at Restricted (drop amplitude/phase
-                    // proxies).
-                    let suppress_raw = s.engine_bridge.suppress_raw_outputs();
-                    let configured_positions = s.multistatic_fuser.node_positions().to_vec();
-                    let mut active_nodes: Vec<NodeInfo> = s
-                        .node_states
-                        .iter()
-                        .filter(|(_, n)| {
-                            n.last_frame_time
-                                .is_some_and(|t| now.duration_since(t).as_secs() < 10)
-                        })
-                        .map(|(&id, n)| NodeInfo {
-                            node_id: id,
-                            rssi_dbm: n.rssi_history.back().copied().unwrap_or(0.0),
-                            position: configured_node_position(id, &configured_positions),
-                            amplitude: if suppress_raw {
-                                vec![]
-                            } else {
-                                n.frame_history
-                                    .back()
-                                    .map(|a| a.iter().take(56).cloned().collect())
-                                    .unwrap_or_default()
-                            },
-                            subcarrier_count: if suppress_raw {
-                                0
-                            } else {
-                                n.frame_history.back().map_or(0, |a| a.len())
-                            },
-                            // ADR-110 iter 23 / iter 30 — single source of truth.
-                            sync: n.sync_snapshot(),
-                        })
-                        .collect();
-                    active_nodes.sort_by_key(|node| node.node_id);
-                    let localization = estimate_live_localization(
-                        &s.node_states,
-                        now,
-                        &classification,
-                        s.tx_position,
-                        s.room_dimensions,
-                        &configured_positions,
-                    );
-                    let signal_field = signal_field_from_localization(&localization);
-
-                    let mut update = SensingUpdate {
-                        msg_type: "sensing_update".to_string(),
-                        timestamp: chrono::Utc::now().timestamp_millis() as f64 / 1000.0,
-                        source: "esp32".to_string(),
-                        tick,
-                        tx_position: s.tx_position,
-                        room_dimensions: s.room_dimensions,
-                        nodes: active_nodes,
-                        features: fused_features.clone(),
-                        classification,
-                        signal_field,
-                        localization: Some(localization),
-                        position_estimate: Some(position_estimate),
-                        vital_signs: Some(vitals),
-                        enhanced_motion: None,
-                        enhanced_breathing: None,
-                        posture: None,
-                        signal_quality_score: None,
-                        quality_verdict: None,
-                        bssid_count: None,
-                        pose_keypoints: None,
-                        model_status: None,
-                        persons: None,
-                        estimated_persons: has_valid_position.then_some(1),
-                        // ADR-084 Pass 3.6: surface per-node novelty_score
-                        // (and the rest of the per-node feature snapshot)
-                        // on the WebSocket envelope so cluster-Pi consumers
-                        // can implement model-wake gating without round-
-                        // tripping back to the server.
-                        node_features: build_node_features(
-                            &s.node_states,
-                            now,
-                            s.d5_presence.phase(),
-                            s.position_setup.is_some(),
-                        ),
-                    };
-
-                    let persons = derive_pose_from_sensing(&update);
-                    s.pose_tracker = PoseTracker::new();
-                    s.last_tracker_instant = None;
-                    if !persons.is_empty() {
-                        update.persons = Some(persons);
-                    }
-                    // ESP32 persons are exact discrete markers, never tracked
-                    // synthetic skeletons or coarse signal-field peaks.
-                    attach_field_positions(&mut update);
-
-                    if let Ok(json) = serde_json::to_string(&update) {
-                        let _ = s.tx.send(json);
-                    }
-
-                    // ── ADR-262 P3: emit a signed RuField FieldEvent ────────
-                    // Join this cycle's SensingUpdate (features / classification
-                    // / signal_field) with the governed engine's trust state
-                    // (effective_class / demoted, recorded by `observe_cycle`
-                    // above) into a `SensingSnapshot`, and surface it on
-                    // `/api/field` + `/ws/field` via the P1 bridge. Only cycles
-                    // whose mapped privacy class clears the §10 network egress
-                    // gate are surfaced (P1/P2); a `Derived → P4/P5` cycle is
-                    // held edge-local. `presence == false` ⇒ no phantom event.
-                    emit_rufield_event(&s, &update, node_id);
-
-                    s.latest_update = Some(update);
-
-                    // Evict stale nodes every 100 ticks to prevent memory leak.
-                    if tick % 100 == 0 {
-                        let stale = Duration::from_secs(60);
-                        let before = s.node_states.len();
-                        s.node_states.retain(|_id, ns| {
-                            ns.last_frame_time
-                                .is_some_and(|t| now.duration_since(t) < stale)
-                        });
-                        let evicted = before - s.node_states.len();
-                        if evicted > 0 {
-                            info!(
-                                "Evicted {} stale node(s), {} active",
-                                evicted,
-                                s.node_states.len()
-                            );
-                        }
-                    }
-                } else if has_esp32_csi_magic(&buf[..len]) {
-                    // The CSI magic is authoritative even when the derived
-                    // parser cannot safely construct a frame (for example a
-                    // truncated I/Q payload). Treat it as rejected CSI rather
-                    // than an unrelated UDP packet so an active capture cannot
-                    // silently remain "complete". Only byte 4 is used as RX ID
-                    // when it is actually present.
-                    let rx_id = esp32_csi_header_rx_id(&buf[..len]);
-                    let mut s = state.write().await;
-                    reject_raw_csi_ingress(
-                        &mut s,
-                        rx_id,
-                        "CSI datagram has valid magic but an invalid or truncated frame payload",
-                    );
-                    warn!("malformed ESP32 CSI datagram from {src} rejected before sensing");
+            // ── ADR-099: real-time introspection tap ────────────────
+            // Per-frame update of the attractor / DTW pipeline running
+            // parallel to the window-aggregated event path. Placed
+            // BEFORE the per-node `&mut` borrow of `s.node_states` so
+            // `s.intro` / `s.intro_tx` stay reachable. Never window-
+            // blocked; `/ws/introspection` sees a fresh snapshot on
+            // every accepted frame.
+            {
+                let intro_feature = if frame.amplitudes.is_empty() {
+                    0.0
+                } else {
+                    frame.amplitudes.iter().copied().sum::<f64>() / frame.amplitudes.len() as f64
+                };
+                let intro_ts_ns = std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .map(|d| d.as_nanos() as u64)
+                    .unwrap_or(0);
+                let _ = s.intro.update(intro_ts_ns, intro_feature);
+                if let Ok(intro_json) = serde_json::to_string(s.intro.snapshot()) {
+                    let _ = s.intro_tx.send(intro_json);
                 }
             }
-            Err(e) => {
-                warn!("UDP recv error: {e}");
-                tokio::time::sleep(Duration::from_millis(100)).await;
+
+            // ── Per-node processing (issue #249) ──────────────────
+            // Process entirely within per-node state so different
+            // ESP32 nodes never mix their smoothing/vitals buffers.
+            // We scope the mutable borrow of node_states so we can
+            // access other AppStateInner fields afterward.
+            let node_id = frame.node_id;
+            // Clone adaptive model before mutable borrow of node_states
+            // to avoid unsafe raw pointer (review finding #2).
+            let adaptive_model_clone = s.adaptive_model.clone();
+            let d5_phase = s.d5_presence.phase();
+            let calibration_bundle = s.active_calibration_bundle.clone();
+
+            let ns = s.node_states.entry(node_id).or_insert_with(|| {
+                NodeState::new_with_calibration(node_id, calibration_bundle.as_deref())
+            });
+            let (features, mut classification) = observe_frame_for_presence(
+                ns,
+                &frame,
+                frame_now,
+                d5_phase,
+                host_time.host_monotonic_ns,
+            );
+            ns.observe_live_fusion_frame(&frame.amplitudes, host_time.host_monotonic_ns);
+
+            // Adaptive override using cloned model (safe, no raw pointers).
+            if let Some(ref model) = adaptive_model_clone {
+                let amps = ns.frame_history.back().map(|v| v.as_slice()).unwrap_or(&[]);
+                let feat_arr = adaptive_classifier::features_from_runtime(
+                    &serde_json::json!({
+                        "variance": features.variance,
+                        "motion_band_power": features.motion_band_power,
+                        "breathing_band_power": features.breathing_band_power,
+                        "spectral_power": features.spectral_power,
+                        "dominant_freq_hz": features.dominant_freq_hz,
+                        "change_points": features.change_points,
+                        "mean_rssi": features.mean_rssi,
+                    }),
+                    amps,
+                );
+                let (label, conf) = model.classify(&feat_arr);
+                classification.motion_level = label.to_string();
+                classification.presence = label != "absent";
+                classification.confidence =
+                    (conf * 0.7 + classification.confidence * 0.3).clamp(0.0, 1.0);
             }
+            ns.motion_confidence = classification.confidence;
+
+            ns.rssi_history.push_back(features.mean_rssi);
+            if ns.rssi_history.len() > 60 {
+                ns.rssi_history.pop_front();
+            }
+
+            let raw_vitals = ns
+                .vital_detector
+                .process_frame(&frame.amplitudes, &frame.phases);
+            let vitals = smooth_vitals_node(ns, &raw_vitals);
+            ns.latest_vitals = vitals.clone();
+
+            // DynamicMinCut person estimation from subcarrier correlation.
+            let corr_persons = estimate_persons_from_correlation(&ns.frame_history);
+            // #803: map the min-cut count onto a threshold-aligned score
+            // so it round-trips back to the same count. The old
+            // `corr_persons / 3.0` left 2 people at 0.667 — under the
+            // 0.70 up-threshold — so the count was pinned at 1.
+            let raw_score = corr_persons_to_score(corr_persons);
+            ns.smoothed_person_score = ns.smoothed_person_score * 0.92 + raw_score * 0.08;
+            if classification.presence {
+                let count = score_to_person_count(ns.smoothed_person_score, ns.prev_person_count);
+                ns.prev_person_count = count;
+            } else {
+                ns.prev_person_count = 0;
+            }
+
+            // Store latest features on node for cross-node fusion.
+            ns.latest_features = Some(features.clone());
+
+            // Done with per-node mutable borrow; now read aggregated
+            // state from all nodes (the borrow of `ns` ends here).
+            // (We re-borrow node_states immutably via `s` below.)
+
+            s.rssi_history.push_back(features.mean_rssi);
+            if s.rssi_history.len() > 60 {
+                s.rssi_history.pop_front();
+            }
+            s.latest_vitals = vitals.clone();
+
+            // Cross-node fusion: combine features from all active nodes.
+            let fused_features = fuse_multi_node_features(&features, &s.node_states);
+            let now = frame_now;
+
+            // The room-level classification is a consensus across all
+            // live RX links, not the result of the last UDP packet.
+            let classification = {
+                let sref: &mut AppStateInner = &mut s;
+                aggregate_node_classification(&sref.node_states, now, &mut sref.d5_presence)
+            };
+            let classification = apply_position_setup_classification_gate(
+                s.position_setup.is_some(),
+                s.d5_presence.phase(),
+                classification,
+            );
+            let position_gate = live_position_presence_gate(&s.node_states, now, &s.d5_presence);
+            let candidate_position_estimate = if live_position_input_accepted {
+                s.live_position_tracker
+                    .tick(live_position_timestamp_ns, position_gate)
+            } else {
+                s.live_position_tracker.current().clone()
+            };
+            // A freshly generated mmWave-gated model remains usable
+            // inside the held-back evaluator but cannot become public
+            // before every blind-position gate passes.
+            let position_estimate = gate_mmwave_candidate_for_publication(
+                candidate_position_estimate,
+                s.mmwave.position_publication_allowed(),
+            );
+            let has_valid_position = classification.presence
+                && matches!(
+                    &position_estimate,
+                    position_live::LivePositionState::Position { .. }
+                );
+
+            s.tick += 1;
+            let tick = s.tick;
+
+            // Aggregate person count: gate on presence first (matching WiFi path).
+            let _total_persons = if classification.presence {
+                let dedup = s.dedup_factor;
+                let (fused, fallback_count) = multistatic_bridge::fuse_or_fallback(
+                    &s.multistatic_fuser,
+                    &s.node_states,
+                    dedup,
+                );
+                match fused {
+                    Some(ref f) => {
+                        let score = multistatic_bridge::compute_person_score_from_amplitudes(
+                            &f.fused_amplitude,
+                        );
+                        s.smoothed_person_score = s.smoothed_person_score * 0.90 + score * 0.10;
+                        // #803: don't let the saturating activity score
+                        // discard count-aware per-node estimates.
+                        let count = aggregate_person_count(s.person_count(), &s.node_states);
+                        s.prev_person_count = count;
+                        count.max(1)
+                    }
+                    None => {
+                        aggregate_person_count(fallback_count.unwrap_or(0), &s.node_states).max(1)
+                    }
+                }
+            } else {
+                s.prev_person_count = 0;
+                0
+            };
+
+            // Governed trust cycle (ADR-135..146): run the same live
+            // frames through the privacy/provenance/witness control
+            // plane. Trust state is recorded on the bridge (exposed on
+            // /api/v1/status); engine errors are counted + rate-limit
+            // logged instead of being swallowed (review finding 1).
+            // Split-borrow the two distinct fields off the guard.
+            {
+                let sref: &mut AppStateInner = &mut s;
+                let now_ms = std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .map(|d| d.as_millis() as i64)
+                    .unwrap_or(0);
+                sref.engine_bridge.observe_cycle(&sref.node_states, now_ms);
+            }
+
+            // Feed field model calibration if active (use per-node history for ESP32).
+            if let Some(frame_history) = s
+                .node_states
+                .get(&node_id)
+                .map(|ns| ns.frame_history.clone())
+            {
+                if let Some(ref mut fm) = s.field_model {
+                    field_bridge::maybe_feed_calibration(fm, &frame_history);
+                }
+            }
+
+            // Build nodes array with all active nodes. ADR-141 output
+            // gating (review finding 1c): when the governed engine
+            // emitted this cycle at class Restricted (base mode, or a
+            // contradiction/mesh-risk demotion below the configured
+            // class), the per-node raw amplitude vectors are suppressed
+            // from the live publish — the same field mapping bfld's
+            // privacy gate applies at Restricted (drop amplitude/phase
+            // proxies).
+            let suppress_raw = s.engine_bridge.suppress_raw_outputs();
+            let configured_positions = s.multistatic_fuser.node_positions().to_vec();
+            let mut active_nodes: Vec<NodeInfo> = s
+                .node_states
+                .iter()
+                .filter(|(_, n)| {
+                    n.last_frame_time
+                        .is_some_and(|t| now.duration_since(t).as_secs() < 10)
+                })
+                .map(|(&id, n)| NodeInfo {
+                    node_id: id,
+                    rssi_dbm: n.rssi_history.back().copied().unwrap_or(0.0),
+                    position: configured_node_position(id, &configured_positions),
+                    amplitude: if suppress_raw {
+                        vec![]
+                    } else {
+                        n.frame_history
+                            .back()
+                            .map(|a| a.iter().take(56).cloned().collect())
+                            .unwrap_or_default()
+                    },
+                    subcarrier_count: if suppress_raw {
+                        0
+                    } else {
+                        n.frame_history.back().map_or(0, |a| a.len())
+                    },
+                    // ADR-110 iter 23 / iter 30 — single source of truth.
+                    sync: n.sync_snapshot(),
+                })
+                .collect();
+            active_nodes.sort_by_key(|node| node.node_id);
+            let localization = estimate_live_localization(
+                &s.node_states,
+                now,
+                &classification,
+                s.tx_position,
+                s.room_dimensions,
+                &configured_positions,
+            );
+            let signal_field = signal_field_from_localization(&localization);
+
+            let mut update = SensingUpdate {
+                msg_type: "sensing_update".to_string(),
+                timestamp: chrono::Utc::now().timestamp_millis() as f64 / 1000.0,
+                source: "esp32".to_string(),
+                tick,
+                tx_position: s.tx_position,
+                room_dimensions: s.room_dimensions,
+                nodes: active_nodes,
+                features: fused_features.clone(),
+                classification,
+                signal_field,
+                localization: Some(localization),
+                position_estimate: Some(position_estimate),
+                vital_signs: Some(vitals),
+                enhanced_motion: None,
+                enhanced_breathing: None,
+                posture: None,
+                signal_quality_score: None,
+                quality_verdict: None,
+                bssid_count: None,
+                pose_keypoints: None,
+                model_status: None,
+                persons: None,
+                estimated_persons: has_valid_position.then_some(1),
+                // ADR-084 Pass 3.6: surface per-node novelty_score
+                // (and the rest of the per-node feature snapshot)
+                // on the WebSocket envelope so cluster-Pi consumers
+                // can implement model-wake gating without round-
+                // tripping back to the server.
+                node_features: build_node_features(
+                    &s.node_states,
+                    now,
+                    s.d5_presence.phase(),
+                    s.position_setup.is_some(),
+                ),
+            };
+
+            let persons = derive_pose_from_sensing(&update);
+            s.pose_tracker = PoseTracker::new();
+            s.last_tracker_instant = None;
+            if !persons.is_empty() {
+                update.persons = Some(persons);
+            }
+            // ESP32 persons are exact discrete markers, never tracked
+            // synthetic skeletons or coarse signal-field peaks.
+            attach_field_positions(&mut update);
+
+            if let Ok(json) = serde_json::to_string(&update) {
+                let _ = s.tx.send(json);
+            }
+
+            // ── ADR-262 P3: emit a signed RuField FieldEvent ────────
+            // Join this cycle's SensingUpdate (features / classification
+            // / signal_field) with the governed engine's trust state
+            // (effective_class / demoted, recorded by `observe_cycle`
+            // above) into a `SensingSnapshot`, and surface it on
+            // `/api/field` + `/ws/field` via the P1 bridge. Only cycles
+            // whose mapped privacy class clears the §10 network egress
+            // gate are surfaced (P1/P2); a `Derived → P4/P5` cycle is
+            // held edge-local. `presence == false` ⇒ no phantom event.
+            emit_rufield_event(&s, &update, node_id);
+
+            s.latest_update = Some(update);
+            if let Some(observation) = csi_observation.take() {
+                observation.finish(csi_diagnostics::CsiDatagramOutcome::AcceptedNew);
+            }
+
+            // Evict stale nodes every 100 ticks to prevent memory leak.
+            if tick % 100 == 0 {
+                let stale = Duration::from_secs(60);
+                let before = s.node_states.len();
+                s.node_states.retain(|_id, ns| {
+                    ns.last_frame_time
+                        .is_some_and(|t| now.duration_since(t) < stale)
+                });
+                let evicted = before - s.node_states.len();
+                if evicted > 0 {
+                    info!(
+                        "Evicted {} stale node(s), {} active",
+                        evicted,
+                        s.node_states.len()
+                    );
+                }
+            }
+        } else if has_esp32_csi_magic(&buf[..len]) {
+            // The CSI magic is authoritative even when the derived
+            // parser cannot safely construct a frame (for example a
+            // truncated I/Q payload). Treat it as rejected CSI rather
+            // than an unrelated UDP packet so an active capture cannot
+            // silently remain "complete". Only byte 4 is used as RX ID
+            // when it is actually present.
+            let rx_id = esp32_csi_header_rx_id(&buf[..len]);
+            let mut s = state.write().await;
+            reject_raw_csi_ingress(
+                &mut s,
+                rx_id,
+                "CSI datagram has valid magic but an invalid or truncated frame payload",
+            );
+            warn!("malformed ESP32 CSI datagram from {src} rejected before sensing");
         }
+    }
+}
+
+fn dequeue_fresh_udp_datagram(
+    datagram: QueuedUdpDatagram,
+    diagnostics: &CsiIngressDiagnostics,
+) -> Option<QueuedUdpDatagram> {
+    diagnostics.note_queue_dequeued(datagram.received_at);
+    if datagram.received_at.elapsed() <= CSI_UDP_MAX_QUEUE_AGE {
+        return Some(datagram);
+    }
+
+    if datagram.is_csi {
+        diagnostics.note_csi_stale_in_queue();
+    } else {
+        diagnostics.note_non_csi_stale_in_queue();
+    }
+    drop(datagram);
+    None
+}
+
+enum DatagramEnqueueResult {
+    Enqueued,
+    Full,
+    Closed,
+}
+
+fn try_enqueue_udp_datagram(
+    queue_tx: &mpsc::Sender<QueuedUdpDatagram>,
+    diagnostics: &CsiIngressDiagnostics,
+    datagram: QueuedUdpDatagram,
+) -> DatagramEnqueueResult {
+    match queue_tx.try_reserve() {
+        Ok(permit) => {
+            diagnostics.note_queue_enqueued();
+            permit.send(datagram);
+            DatagramEnqueueResult::Enqueued
+        }
+        Err(mpsc::error::TrySendError::Full(())) => {
+            diagnostics.note_queue_overflow(datagram.is_csi);
+            drop(datagram);
+            DatagramEnqueueResult::Full
+        }
+        Err(mpsc::error::TrySendError::Closed(())) => {
+            drop(datagram);
+            DatagramEnqueueResult::Closed
+        }
+    }
+}
+
+#[cfg(test)]
+mod udp_ingress_queue_tests {
+    use super::*;
+
+    fn datagram(rx_id: u8, sequence: u8) -> QueuedUdpDatagram {
+        QueuedUdpDatagram {
+            bytes: vec![rx_id, sequence],
+            source: SocketAddr::from(([127, 0, 0, 1], 5005)),
+            received_at: std::time::Instant::now(),
+            server_receive_time: None,
+            is_csi: true,
+            csi_observation: None,
+        }
+    }
+
+    #[tokio::test]
+    async fn slow_consumer_keeps_four_rx_burst_order_and_drops_at_capacity() {
+        let diagnostics = Arc::new(CsiIngressDiagnostics::default());
+        let (queue_tx, mut queue_rx) = mpsc::channel(4);
+
+        for rx_id in 1..=4 {
+            assert!(matches!(
+                try_enqueue_udp_datagram(&queue_tx, &diagnostics, datagram(rx_id, 17)),
+                DatagramEnqueueResult::Enqueued
+            ));
+        }
+        assert!(matches!(
+            try_enqueue_udp_datagram(&queue_tx, &diagnostics, datagram(1, 18)),
+            DatagramEnqueueResult::Full
+        ));
+
+        let full = diagnostics.snapshot();
+        assert_eq!(full.udp_queue_depth, 4);
+        assert_eq!(full.udp_queue_high_watermark, 4);
+        assert_eq!(full.udp_queue_enqueued, 4);
+        assert_eq!(full.udp_queue_overflow_datagrams, 1);
+        assert_eq!(full.csi_queue_overflow_datagrams, 1);
+
+        for rx_id in 1..=4 {
+            let datagram = queue_rx.recv().await.expect("queued RX burst frame");
+            assert_eq!(datagram.bytes, vec![rx_id, 17]);
+            diagnostics.note_queue_dequeued(datagram.received_at);
+        }
+
+        let drained = diagnostics.snapshot();
+        assert_eq!(drained.udp_queue_depth, 0);
+        assert_eq!(drained.udp_queue_age_samples, 4);
+        assert_eq!(drained.udp_queue_stale_datagrams, 0);
+    }
+
+    #[test]
+    fn stale_csi_datagram_is_counted_and_dropped_before_processing() {
+        let diagnostics = Arc::new(CsiIngressDiagnostics::default());
+        let mut datagram = datagram(1, 17);
+        datagram.received_at = std::time::Instant::now()
+            .checked_sub(CSI_UDP_MAX_QUEUE_AGE + Duration::from_millis(1))
+            .expect("subtract queue-age fixture from current instant");
+        diagnostics.note_udp_datagram_from_os(datagram.bytes.len());
+        diagnostics.note_queue_enqueued();
+        datagram.csi_observation = Some(diagnostics.begin_csi_datagram(10, 20));
+
+        assert!(dequeue_fresh_udp_datagram(datagram, &diagnostics).is_none());
+
+        let snapshot = diagnostics.snapshot();
+        assert_eq!(snapshot.udp_queue_depth, 0);
+        assert_eq!(snapshot.udp_queue_age_samples, 1);
+        assert_eq!(snapshot.udp_queue_stale_datagrams, 1);
+        assert_eq!(snapshot.csi_queue_stale_datagrams, 1);
+        assert_eq!(snapshot.csi_frames_discarded, 1);
+        assert_eq!(snapshot.csi_processing_current, 0);
+        assert_eq!(snapshot.csi_processing_duration_samples, 0);
+        assert!(snapshot.csi_balance_closed);
     }
 }
 

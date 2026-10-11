@@ -2,9 +2,9 @@
  * Dedicated mmWave/RX comparison view for the Sensing tab.
  *
  * The two sources deliberately stay separate:
- *   - signal red = mmWave target / Ground Truth
+ *   - yellow frame = valid mmWave target / Ground Truth
  *   - black      = WiFi CSI/RX position estimate
- *   - red wireframe = live radar target outside the room
+ *   - red frame = live radar target outside the room
  *
  * This module has no dependency on the position-point contract. It is a
  * transport/debug view, so it can show a continuous radar coordinate even
@@ -23,7 +23,11 @@ export const DEFAULT_ROOM_DIMENSIONS = [4.02, 2.59, 3.44];
 
 const MM_TO_M = 0.001;
 const EPSILON = 1e-6;
-const SIGNAL_RED = 0xe51c23;
+export const MMWAVE_FRAME_COLORS = Object.freeze({
+  white: 0xffffff, // Available for a future state; currently unused.
+  yellow: 0xb88900,
+  red: 0xe51c23,
+});
 const INK_BLACK = 0x111111;
 const HARDWARE_GREY = 0x68737a;
 const ROOM_GREY = 0x707070;
@@ -414,6 +418,56 @@ function createMarkerLabel(text, color, THREE) {
   return sprite;
 }
 
+/** A camera-facing target frame, anchored at the radar's floor coordinate. */
+function createRadarTargetFrame(THREE, frameColor) {
+  const canvas = document.createElement('canvas');
+  canvas.width = 256;
+  canvas.height = 256;
+  const context = canvas.getContext('2d');
+  if (!context) return null;
+
+  const color = `#${frameColor.toString(16).padStart(6, '0')}`;
+  context.strokeStyle = color;
+  context.lineWidth = 5;
+  context.lineCap = 'square';
+
+  // Broken perimeter and solid corners echo the Person of Interest reticle.
+  context.setLineDash([10, 9]);
+  context.strokeRect(32, 32, 192, 192);
+  context.setLineDash([]);
+  context.lineWidth = 10;
+  context.beginPath();
+  for (const [x, y, horizontal, vertical] of [
+    [32, 32, 25, 25], [224, 32, -25, 25],
+    [32, 224, 25, -25], [224, 224, -25, -25],
+  ]) {
+    context.moveTo(x + horizontal, y);
+    context.lineTo(x, y);
+    context.lineTo(x, y + vertical);
+  }
+  context.stroke();
+  // Short inward marks at the middle of each side.
+  context.lineWidth = 5;
+  context.beginPath();
+  context.moveTo(128, 32); context.lineTo(128, 52);
+  context.moveTo(128, 224); context.lineTo(128, 204);
+  context.moveTo(32, 128); context.lineTo(52, 128);
+  context.moveTo(224, 128); context.lineTo(204, 128);
+  context.stroke();
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.minFilter = THREE.LinearFilter;
+  const sprite = new THREE.Sprite(new THREE.SpriteMaterial({
+    map: texture,
+    transparent: true,
+    depthTest: false,
+  }));
+  sprite.position.y = 0.34;
+  sprite.scale.set(0.625, 0.625, 1);
+  sprite.renderOrder = 10;
+  return sprite;
+}
+
 export class MmwaveDebugView {
   constructor(container, options = {}) {
     this.container = container;
@@ -662,8 +716,11 @@ export class MmwaveDebugView {
       group.remove(child);
       if (child.children?.length) this._clearGroup(child);
       child.geometry?.dispose?.();
-      if (Array.isArray(child.material)) child.material.forEach((material) => material.dispose?.());
-      else child.material?.dispose?.();
+      const materials = Array.isArray(child.material) ? child.material : [child.material];
+      materials.forEach((material) => {
+        material?.map?.dispose?.();
+        material?.dispose?.();
+      });
     }
   }
 
@@ -729,23 +786,17 @@ export class MmwaveDebugView {
       this._txMarker = null;
     }
 
-    const accepted = new THREE.Mesh(
-      new THREE.SphereGeometry(0.12, 16, 16),
-      new THREE.MeshBasicMaterial({ color: SIGNAL_RED }),
-    );
-    const acceptedLabel = createMarkerLabel('RADAR TARGET', SIGNAL_RED, THREE);
-    if (acceptedLabel) accepted.add(acceptedLabel);
+    const accepted = new THREE.Group();
+    const targetFrame = createRadarTargetFrame(THREE, MMWAVE_FRAME_COLORS.yellow);
+    if (targetFrame) accepted.add(targetFrame);
     this._mmwaveMarker = accepted;
     this._mmwaveMarker.visible = false;
     this._markerGroup.add(this._mmwaveMarker);
 
-    this._rejectedMarkers = Array.from({ length: 3 }, (_, index) => {
-      const rejected = new THREE.Mesh(
-        new THREE.OctahedronGeometry(0.14, 0),
-        new THREE.MeshBasicMaterial({ color: SIGNAL_RED, wireframe: true, transparent: true, opacity: 0.95 }),
-      );
-      const rejectedLabel = createMarkerLabel(`OUTSIDE ${index + 1}`, SIGNAL_RED, THREE);
-      if (rejectedLabel) rejected.add(rejectedLabel);
+    this._rejectedMarkers = Array.from({ length: 3 }, () => {
+      const rejected = new THREE.Group();
+      const outsideFrame = createRadarTargetFrame(THREE, MMWAVE_FRAME_COLORS.red);
+      if (outsideFrame) rejected.add(outsideFrame);
       rejected.visible = false;
       this._markerGroup.add(rejected);
       return rejected;
@@ -1080,6 +1131,7 @@ export class MmwaveDebugView {
         : status.label;
     radarValue.textContent = radarLabel;
     radarValue.dataset.state = radarLabel.toLowerCase().replace(/\s+/g, '-');
+    radarValue.closest('.sensing-mmwave-debug-fact-radar')?.classList.toggle('is-outside', radarLabel === 'OUTSIDE ROOM');
     radarPosition.textContent = status.accepted
       ? formatRadarCoordinates(status.targetPositionMm)
       : status.rejectionVisible

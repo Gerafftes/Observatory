@@ -5,16 +5,16 @@ Pure parsing tests — no MQTT broker needed.
 
 from __future__ import annotations
 
-import json
+lazy import json
 
-import pytest
+lazy import pytest
 
-from wifi_densepose.client import (
+lazy from wifi_densepose.client import (
     HABlueprintHelper,
     HaDiscoveryPayload,
     HaEntity,
 )
-from wifi_densepose.client.ha import (
+lazy from wifi_densepose.client.ha import (
     parse_discovery_payload,
     parse_discovery_topic,
 )

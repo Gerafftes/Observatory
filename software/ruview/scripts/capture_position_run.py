@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python3.15
 """Run one setup-bound, lossless fixed-room CSI capture.
 
 The request body deliberately contains only the recording ID. Point labels and
@@ -8,15 +8,15 @@ that prediction never received the answer.
 
 from __future__ import annotations
 
-import argparse
-import json
-import re
-import sys
-import time
-import urllib.error
-import urllib.request
-from dataclasses import dataclass
-from typing import Any
+lazy import argparse
+lazy import json
+lazy import re
+lazy import sys
+lazy import time
+lazy import urllib.error
+lazy import urllib.request
+lazy from dataclasses import dataclass
+lazy from typing import Any
 
 
 EXPECTED_RX_IDS = {1, 2, 3, 4}

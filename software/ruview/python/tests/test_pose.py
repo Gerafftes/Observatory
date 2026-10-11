@@ -5,9 +5,9 @@ Run with: cd python && .venv/Scripts/python -m pytest tests/test_pose.py -v
 
 from __future__ import annotations
 
-import pytest
+lazy import pytest
 
-from wifi_densepose import (
+lazy from wifi_densepose import (
     BoundingBox,
     Keypoint,
     KeypointType,

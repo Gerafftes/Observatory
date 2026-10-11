@@ -47,6 +47,8 @@ uint64_t c6_sync_espnow_get_epoch_us(void);
 bool    c6_sync_espnow_is_leader(void);
 bool    c6_sync_espnow_is_valid(void);
 int64_t c6_sync_espnow_get_offset_us(void);
+/** Age of the last leader observation, or UINT32_MAX when unavailable. */
+uint32_t c6_sync_espnow_get_age_ms(void);
 
 /**
  * EMA-smoothed offset (α=1/8, ~8-sample effective window at the 10 Hz

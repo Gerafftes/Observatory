@@ -26,9 +26,9 @@ Usage:
 Override the WS endpoint with a query param, e.g.:
     http://localhost:8080/examples/through-wall/index.html?ws=ws://192.168.1.20:8765/ws/sensing
 """
-from http.server import ThreadingHTTPServer, SimpleHTTPRequestHandler
-import os
-import sys
+lazy from http.server import ThreadingHTTPServer, SimpleHTTPRequestHandler
+lazy import os
+lazy import sys
 
 PORT = int(os.environ.get("PORT", 8080))
 

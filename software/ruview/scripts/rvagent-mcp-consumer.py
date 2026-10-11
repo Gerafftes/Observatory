@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python3.15
 """
 rvagent-mcp-consumer.py — ADR-125 tier1+2 iter 5: end-to-end agentic loop.
 
@@ -28,11 +28,11 @@ ruview-sensing-server.py on :3000):
       python3 rvagent-mcp-consumer.py
 """
 from __future__ import annotations
-import json
-import os
-import sys
-import time
-import subprocess
+lazy import json
+lazy import os
+lazy import sys
+lazy import time
+lazy import subprocess
 
 NODE_ID = os.environ.get("RVAGENT_TEST_NODE", "12")
 SENSING_URL = os.environ.get("RVAGENT_SENSING_URL", "http://localhost:3000")

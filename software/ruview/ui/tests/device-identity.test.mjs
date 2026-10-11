@@ -7,6 +7,7 @@ import {
   UNKNOWN_DEVICE_COLOR,
   deviceColor,
   deviceIdentity,
+  deviceThreeColor,
   receiverIdentity,
   receiverLabel,
 } from '../device-identity.js';
@@ -48,6 +49,7 @@ test('firmware and UI share the exact canonical RGB palette', () => {
       `label = "${identity.id}", \\.red = ${red}, \\.green = ${green}, \\.blue = ${blue}`,
     );
     assert.match(rxSource, firmwareEntry);
+    assert.equal(deviceThreeColor(identity.id), Number.parseInt(identity.color.slice(1), 16));
   }
 
   assert.match(txSource, /kIdentityRed = 255/);

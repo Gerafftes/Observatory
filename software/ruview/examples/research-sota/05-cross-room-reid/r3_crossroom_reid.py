@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python3.15
 """R3 — Cross-room CSI re-identification: simulation of the embedding-overlap problem.
 
 See docs/research/sota-2026-05-22/R3-crossroom-reid.md.
@@ -24,10 +24,10 @@ assumptions about embedding dimensions and noise floors.
 
 from __future__ import annotations
 
-import argparse
-import json
-import numpy as np
-from pathlib import Path
+lazy import argparse
+lazy import json
+lazy import numpy as np
+lazy from pathlib import Path
 
 
 def generate_synthetic_embeddings(n_subjects: int, n_rooms: int,

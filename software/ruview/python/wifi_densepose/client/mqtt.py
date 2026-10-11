@@ -31,11 +31,11 @@ loop and `.stop()` to disconnect cleanly. Both are idempotent.
 
 from __future__ import annotations
 
-import json
-import logging
-import threading
-import uuid
-from typing import Any, Callable, Optional
+lazy import json
+lazy import logging
+lazy import threading
+lazy import uuid
+lazy from typing import Any, Callable, Optional
 
 try:
     import paho.mqtt.client as mqtt  # type: ignore[import-not-found]

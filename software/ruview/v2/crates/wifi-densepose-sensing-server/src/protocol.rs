@@ -19,6 +19,17 @@ pub(crate) struct Esp32Frame {
     /// ADR-110 byte 18: PPDU type the CSI was sampled from. Pre-ADR-110
     /// firmware sends 0 ⇒ `PpduType::HtLegacy`.
     pub(crate) ppdu_type: wifi_densepose_hardware::PpduType,
+    pub(crate) protocol_version: Option<u8>,
+    pub(crate) device_callback_started_us: Option<u64>,
+    pub(crate) driver_rx_timestamp_us: Option<u32>,
+    pub(crate) quality_flags: Option<u8>,
+    pub(crate) rx_state: Option<u8>,
+    pub(crate) antenna_index: Option<u8>,
+    pub(crate) gain_db: Option<i8>,
+    pub(crate) csi_config_flags: Option<u32>,
+    pub(crate) sync_age_ms: Option<u32>,
+    pub(crate) invalid_prefix_pairs: u8,
+    pub(crate) interpolated_prefix_pairs: u8,
     pub(crate) amplitudes: Vec<f64>,
     pub(crate) phases: Vec<f64>,
 }
@@ -384,14 +395,42 @@ pub(crate) fn parse_esp32_frame(buf: &[u8]) -> Option<Esp32Frame> {
         return None;
     }
 
+    let identity = raw_csi_recording::csi_protocol_identity(buf).ok().flatten();
+    let q_first = identity.is_some_and(|identity| {
+        identity.protocol_version >= raw_csi_recording::CSI_PROTOCOL_VERSION
+    });
+    let invalid_prefix_pairs = if identity
+        .and_then(|identity| identity.quality_flags)
+        .is_some_and(|flags| flags & raw_csi_recording::CSI_QUALITY_FIRST_WORD_INVALID != 0)
+        || buf[19] & (1 << 5) != 0
+    {
+        2usize.min(n_pairs)
+    } else {
+        0
+    };
+    if invalid_prefix_pairs > 0 && n_pairs < 3 {
+        return None;
+    }
+
     let mut amplitudes = Vec::with_capacity(n_pairs);
     let mut phases = Vec::with_capacity(n_pairs);
 
     for k in 0..n_pairs {
-        let i_val = buf[iq_start + k * 2] as i8 as f64;
-        let q_val = buf[iq_start + k * 2 + 1] as i8 as f64;
+        let first = buf[iq_start + k * 2] as i8 as f64;
+        let second = buf[iq_start + k * 2 + 1] as i8 as f64;
+        let (i_val, q_val) = if q_first {
+            (second, first)
+        } else {
+            (first, second)
+        };
         amplitudes.push((i_val * i_val + q_val * q_val).sqrt());
         phases.push(q_val.atan2(i_val));
+    }
+    if invalid_prefix_pairs > 0 {
+        let first_valid_amplitude = amplitudes[2];
+        let first_valid_phase = phases[2];
+        amplitudes[..invalid_prefix_pairs].fill(first_valid_amplitude);
+        phases[..invalid_prefix_pairs].fill(first_valid_phase);
     }
 
     Some(Esp32Frame {
@@ -404,9 +443,81 @@ pub(crate) fn parse_esp32_frame(buf: &[u8]) -> Option<Esp32Frame> {
         rssi,
         noise_floor,
         ppdu_type,
+        protocol_version: identity.map(|identity| identity.protocol_version),
+        device_callback_started_us: identity.and_then(|identity| identity.callback_started_us),
+        driver_rx_timestamp_us: identity.and_then(|identity| identity.driver_rx_timestamp_us),
+        quality_flags: identity.and_then(|identity| identity.quality_flags),
+        rx_state: identity.and_then(|identity| identity.rx_state),
+        antenna_index: identity.and_then(|identity| identity.antenna_index),
+        gain_db: identity.and_then(|identity| identity.gain_db),
+        csi_config_flags: identity.and_then(|identity| identity.csi_config_flags),
+        sync_age_ms: identity.and_then(|identity| identity.sync_age_ms),
+        invalid_prefix_pairs: invalid_prefix_pairs as u8,
+        interpolated_prefix_pairs: invalid_prefix_pairs as u8,
         amplitudes,
         phases,
     })
+}
+
+#[cfg(test)]
+mod rx_protocol_v3_tests {
+    use super::*;
+
+    fn v3_packet(samples_q_i: &[(i8, i8)], first_word_invalid: bool) -> Vec<u8> {
+        let mut packet = Vec::new();
+        packet.extend_from_slice(&0xC511_0001u32.to_le_bytes());
+        packet.extend_from_slice(&[1, 1]);
+        packet.extend_from_slice(&(samples_q_i.len() as u16).to_le_bytes());
+        packet.extend_from_slice(&2437u32.to_le_bytes());
+        packet.extend_from_slice(&7u32.to_le_bytes());
+        packet.extend_from_slice(&[(-48i8) as u8, (-92i8) as u8, 0]);
+        packet.push(if first_word_invalid { 1 << 5 } else { 0 });
+        for (q, i) in samples_q_i {
+            packet.extend_from_slice(&[*q as u8, *i as u8]);
+        }
+        packet.extend_from_slice(&0xC511_A060u32.to_le_bytes());
+        packet.extend_from_slice(&[1, 0]);
+        packet.extend_from_slice(&40u16.to_le_bytes());
+        packet.extend_from_slice(&[0; 32]);
+        packet.extend_from_slice(&0xC511_A061u32.to_le_bytes());
+        packet.extend_from_slice(&[3, 1]);
+        packet.extend_from_slice(&48u16.to_le_bytes());
+        packet.extend_from_slice(&1u64.to_le_bytes());
+        packet.extend_from_slice(&1234u64.to_le_bytes());
+        packet.extend_from_slice(&1200u32.to_le_bytes());
+        let quality = raw_csi_recording::CSI_QUALITY_NOISE_FLOOR_VALID
+            | raw_csi_recording::CSI_QUALITY_RX_STATE_VALID
+            | if first_word_invalid {
+                raw_csi_recording::CSI_QUALITY_FIRST_WORD_INVALID
+            } else {
+                0
+            };
+        packet.extend_from_slice(&[quality, 0, 0, i8::MIN as u8]);
+        packet.extend_from_slice(&1u32.to_le_bytes());
+        packet.extend_from_slice(&u32::MAX.to_le_bytes());
+        packet.extend_from_slice(&[0; 8]);
+        packet
+    }
+
+    #[test]
+    fn v3_decodes_espressif_imaginary_real_order() {
+        let frame = parse_esp32_frame(&v3_packet(&[(1, 0)], false)).unwrap();
+        assert!((frame.phases[0] - std::f64::consts::FRAC_PI_2).abs() < 1e-12);
+        assert_eq!(frame.protocol_version, Some(3));
+    }
+
+    #[test]
+    fn invalid_first_word_is_marked_and_interpolated_from_first_valid_pair() {
+        let frame = parse_esp32_frame(&v3_packet(&[(0, 0), (0, 0), (4, 3)], true)).unwrap();
+        assert_eq!(frame.invalid_prefix_pairs, 2);
+        assert_eq!(frame.interpolated_prefix_pairs, 2);
+        assert_eq!(frame.amplitudes, vec![5.0, 5.0, 5.0]);
+        let expected = 4.0f64.atan2(3.0);
+        assert!(frame
+            .phases
+            .iter()
+            .all(|phase| (*phase - expected).abs() < 1e-12));
+    }
 }
 
 #[cfg(test)]

@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python3.15
 """Firewall-free CSI UDP relay for local Windows ESP32 testing.
 
 On Windows, a freshly-built binary (e.g. `wifi-densepose calibrate-serve`) is
@@ -16,9 +16,9 @@ Then run the calibration server on the loopback port:
 
 Frames are passed through byte-for-byte; the relay never parses or mutates them.
 """
-import argparse
-import socket
-import time
+lazy import argparse
+lazy import socket
+lazy import time
 
 
 def main() -> None:

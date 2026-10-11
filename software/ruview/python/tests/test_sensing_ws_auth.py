@@ -3,17 +3,17 @@
 Run with SENSING_SERVER_BIN=/absolute/path/to/sensing-server pytest -q
 tests/test_sensing_ws_auth.py. The binary runs in a temporary directory.
 """
-import contextlib
-import http.client
-import importlib.util
-import os
-from pathlib import Path
-import socket
-import subprocess
-import sys
-import time
+lazy import contextlib
+lazy import http.client
+lazy import importlib.util
+lazy import os
+lazy from pathlib import Path
+lazy import socket
+lazy import subprocess
+lazy import sys
+lazy import time
 
-import pytest
+lazy import pytest
 # This client is pure Python. Load its source directly so this security check
 # doesn't require building the unrelated PyO3 DSP extension.
 spec = importlib.util.spec_from_file_location(

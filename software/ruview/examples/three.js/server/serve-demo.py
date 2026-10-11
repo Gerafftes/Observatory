@@ -9,8 +9,8 @@ Usage:
     python examples/three.js/server/serve-demo.py
     open http://localhost:8765/examples/three.js/demos/05-skinned-realtime.html
 """
-from http.server import ThreadingHTTPServer, SimpleHTTPRequestHandler
-import os, sys
+lazy from http.server import ThreadingHTTPServer, SimpleHTTPRequestHandler
+lazy import os, sys
 
 PORT = int(os.environ.get("PORT", 8765))
 # Always serve from the repo root regardless of where the script is launched.

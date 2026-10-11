@@ -2,7 +2,7 @@
  * @file edge_processing.c
  * @brief ADR-039 Edge Intelligence — dual-core CSI processing pipeline.
  *
- * Core 0 (WiFi path): Pushes raw CSI frames into lock-free SPSC ring buffer.
+ * CSI transport task: Pushes raw CSI frames into lock-free SPSC ring buffer.
  * Second core when present (DSP task): pops frames, runs signal processing pipeline.
  * On unicore targets (e.g. ESP32-C6), the DSP task is pinned to core 0.
  *   1. Phase extraction from I/Q pairs
@@ -19,6 +19,7 @@
  */
 
 #include "edge_processing.h"
+#include "csi_samples.h"
 #include "nvs_config.h"
 #include "csi_collector.h"  /* csi_collector_get_node_id() - defensive #390 */
 #include "mmwave_sensor.h"
@@ -52,7 +53,8 @@ static float s_scratch_br[EDGE_PHASE_HISTORY_LEN];
 static float s_scratch_hr[EDGE_PHASE_HISTORY_LEN];
 
 static inline bool ring_push(const uint8_t *iq, uint16_t len,
-                             int8_t rssi, uint8_t channel)
+                             int8_t rssi, uint8_t channel,
+                             uint32_t timestamp_us)
 {
     uint32_t next = (s_ring.head + 1) % EDGE_RING_SLOTS;
     if (next == s_ring.tail) {
@@ -66,7 +68,7 @@ static inline bool ring_push(const uint8_t *iq, uint16_t len,
     slot->iq_len = copy_len;
     slot->rssi = rssi;
     slot->channel = channel;
-    slot->timestamp_us = (uint32_t)(esp_timer_get_time() & 0xFFFFFFFF);
+    slot->timestamp_us = timestamp_us;
 
     /* Memory barrier: ensure slot data is visible before advancing head. */
     __sync_synchronize();
@@ -135,9 +137,7 @@ static inline float biquad_process(edge_biquad_t *bq, float x)
 /** Extract phase (radians) from an I/Q pair at byte offset. */
 static inline float extract_phase(const uint8_t *iq, uint16_t idx)
 {
-    int8_t i_val = (int8_t)iq[idx * 2];
-    int8_t q_val = (int8_t)iq[idx * 2 + 1];
-    return atan2f((float)q_val, (float)i_val);
+    return csi_sample_phase(&iq[idx * 2]);
 }
 
 /** Unwrap phase to maintain continuity (avoid 2*pi jumps). */
@@ -1237,9 +1237,7 @@ static void process_frame(const edge_ring_slot_t *slot)
         /* Extract amplitudes from I/Q for WASM host API. */
         float amplitudes[EDGE_MAX_SUBCARRIERS];
         for (uint16_t sc = 0; sc < n_subcarriers; sc++) {
-            int8_t i_val = (int8_t)slot->iq_data[sc * 2];
-            int8_t q_val = (int8_t)slot->iq_data[sc * 2 + 1];
-            amplitudes[sc] = sqrtf((float)(i_val * i_val + q_val * q_val));
+            amplitudes[sc] = csi_sample_amplitude(&slot->iq_data[sc * 2]);
         }
 
         /* Build variance array from Welford state. */
@@ -1304,7 +1302,15 @@ static void edge_task(void *arg)
 bool edge_enqueue_csi(const uint8_t *iq_data, uint16_t iq_len,
                       int8_t rssi, uint8_t channel)
 {
-    return ring_push(iq_data, iq_len, rssi, channel);
+    uint32_t now_us = (uint32_t)(esp_timer_get_time() & 0xFFFFFFFF);
+    return ring_push(iq_data, iq_len, rssi, channel, now_us);
+}
+
+bool edge_enqueue_csi_at(const uint8_t *iq_data, uint16_t iq_len,
+                         int8_t rssi, uint8_t channel,
+                         uint32_t callback_started_at_us)
+{
+    return ring_push(iq_data, iq_len, rssi, channel, callback_started_at_us);
 }
 
 bool edge_get_vitals(edge_vitals_pkt_t *pkt)

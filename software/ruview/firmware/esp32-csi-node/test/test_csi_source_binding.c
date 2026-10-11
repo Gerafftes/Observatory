@@ -33,6 +33,15 @@ static uint32_t read_u32_le(const uint8_t *bytes)
         | ((uint32_t)bytes[3] << 24);
 }
 
+static uint64_t read_u64_le(const uint8_t *bytes)
+{
+    uint64_t value = 0;
+    for (size_t index = 0; index < 8; ++index) {
+        value |= (uint64_t)bytes[index] << (index * 8);
+    }
+    return value;
+}
+
 static wifi_csi_info_t test_info(const uint8_t source_mac[6], int8_t *iq)
 {
     wifi_csi_info_t info;
@@ -67,6 +76,7 @@ static void configure_filter(bool enabled)
                sizeof(g_nvs_config.filter_mac));
     }
     csi_collector_set_node_id(3);
+    csi_collector_set_boot_id(UINT64_C(0x0102030405060708));
 }
 
 static void test_matching_source_binding(void)
@@ -80,8 +90,8 @@ static void test_matching_source_binding(void)
     const size_t iq_end = CSI_HEADER_SIZE + sizeof(iq);
     const uint8_t *binding = &packet[iq_end];
 
-    CHECK(packet_len == iq_end + CSI_SOURCE_BINDING_SIZE,
-          "serialized size includes the 40-byte source-binding trailer");
+    CHECK(packet_len == iq_end + CSI_SOURCE_BINDING_SIZE + CSI_IDENTITY_TRAILER_SIZE,
+          "serialized size includes binding and boot-identity trailers");
     CHECK(packet[4] == 3, "early-captured node ID is serialized");
     CHECK(memcmp(&packet[CSI_HEADER_SIZE], iq, sizeof(iq)) == 0,
           "I/Q bytes remain unchanged before the trailer");
@@ -96,6 +106,17 @@ static void test_matching_source_binding(void)
     CHECK(memcmp(&binding[8], TEST_FILTER_SHA256,
                  sizeof(TEST_FILTER_SHA256)) == 0,
           "filter identity uses SHA-256 of exactly six binary MAC bytes");
+    const uint8_t *identity = binding + CSI_SOURCE_BINDING_SIZE;
+    CHECK(read_u32_le(&identity[0]) == CSI_IDENTITY_MAGIC,
+          "boot-identity magic matches");
+    CHECK(identity[4] == CSI_PROTOCOL_VERSION,
+          "CSI protocol version is explicit");
+    CHECK(identity[5] == CSI_IDENTITY_ROLE_RX,
+          "identity role is RX");
+    CHECK(read_u16_le(&identity[6]) == CSI_IDENTITY_TRAILER_SIZE,
+          "boot-identity trailer length matches");
+    CHECK(read_u64_le(&identity[8]) == UINT64_C(0x0102030405060708),
+          "boot ID round-trips exactly");
 }
 
 static void test_mismatched_source_is_not_attested_as_matched(void)
@@ -111,7 +132,8 @@ static void test_mismatched_source_is_not_attested_as_matched(void)
     size_t packet_len = csi_serialize_frame(&info, packet, sizeof(packet));
     const uint8_t *binding = &packet[CSI_HEADER_SIZE + sizeof(iq)];
 
-    CHECK(packet_len == CSI_HEADER_SIZE + sizeof(iq) + CSI_SOURCE_BINDING_SIZE,
+    CHECK(packet_len == CSI_HEADER_SIZE + sizeof(iq) + CSI_SOURCE_BINDING_SIZE
+                        + CSI_IDENTITY_TRAILER_SIZE,
           "mismatched source still serializes safely for direct contract testing");
     CHECK(binding[5]
               == (CSI_SOURCE_BINDING_FLAG_FILTER_ENFORCED
@@ -133,7 +155,8 @@ static void test_unfiltered_binding_is_explicit_and_zeroed(void)
     const uint8_t *binding = &packet[CSI_HEADER_SIZE + sizeof(iq)];
     uint8_t zeros[32] = {0};
 
-    CHECK(packet_len == CSI_HEADER_SIZE + sizeof(iq) + CSI_SOURCE_BINDING_SIZE,
+    CHECK(packet_len == CSI_HEADER_SIZE + sizeof(iq) + CSI_SOURCE_BINDING_SIZE
+                        + CSI_IDENTITY_TRAILER_SIZE,
           "unfiltered frames still carry the fixed-size trailer");
     CHECK(binding[5] == 0, "unfiltered frame has no source-binding claims");
     CHECK(memcmp(&binding[8], zeros, sizeof(zeros)) == 0,
@@ -144,7 +167,7 @@ static void test_trailer_capacity_is_required(void)
 {
     int8_t iq[4] = {0};
     uint8_t too_small[CSI_HEADER_SIZE + sizeof(iq)
-                      + CSI_SOURCE_BINDING_SIZE - 1];
+                      + CSI_SOURCE_BINDING_SIZE + CSI_IDENTITY_TRAILER_SIZE - 1];
     configure_filter(true);
     wifi_csi_info_t info = test_info(TEST_FILTER_MAC, iq);
 

@@ -32,27 +32,27 @@ Usage:
 Writes/merges into results/edge_optimization.json under key "onnx_static_ptq".
 """
 
-import argparse
-import collections
-import json
-import os
-import platform
-import statistics
-import sys
-import time
+lazy import argparse
+lazy import collections
+lazy import json
+lazy import os
+lazy import platform
+lazy import statistics
+lazy import sys
+lazy import time
 
-import numpy as np
-import torch
+lazy import numpy as np
+lazy import torch
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 
-from _bench_common import RESULTS  # noqa: E402
+lazy from _bench_common import RESULTS  # noqa: E402
 # quantize_bench sets up upstream imports + the np.load mmap patch
 # (both via _bench_common.import_upstream)
-from quantize_bench import build_test_subset  # noqa: E402
-import quantize_bench as qb  # noqa: E402
-from eval_ort_accuracy import evaluate_ort  # noqa: E402
+lazy from quantize_bench import build_test_subset  # noqa: E402
+lazy import quantize_bench as qb  # noqa: E402
+lazy from eval_ort_accuracy import evaluate_ort  # noqa: E402
 
 FP32_ONNX = os.path.join(RESULTS, "retrained_fp32_dynamic.onnx")
 DYN_INT8_ONNX = os.path.join(RESULTS, "retrained_int8_ort_dynamic.onnx")

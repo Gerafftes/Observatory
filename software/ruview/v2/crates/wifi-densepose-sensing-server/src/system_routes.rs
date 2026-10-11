@@ -515,7 +515,7 @@ pub(crate) fn public_node_summaries(
                     .source_binding_observation
                     .as_ref()
                     .is_some_and(|binding| binding.matches_setup);
-            let rssi = ns.rssi_history.back().copied();
+            let rssi = ns.rssi_history.back().copied().filter(|_| !stale);
             let classification = classifications.get(&id);
             let motion_level = classification
                 .map(|classification| classification.motion_level.as_str())
@@ -533,10 +533,16 @@ pub(crate) fn public_node_summaries(
                 "node_id": id,
                 "display_name": format!("RX{id}"),
                 "role": "receiver",
+                "protocol_version": ns.protocol_version,
+                "boot_id": ns.boot_id.map(|value| format!("{value:016x}")),
+                "transport_ip": ns.source_address.as_deref(),
+                "ip_change_count": ns.ip_change_count,
                 "status": status,
                 "last_seen_ms": elapsed_ms,
                 "rssi_dbm": rssi,
-                "frame_rate_hz": (ns.csi_fps_samples > 0).then_some(ns.csi_fps_ema),
+                "frame_rate_hz": if stale { Some(0.0) } else {
+                    (ns.csi_fps_samples > 0).then_some(ns.csi_fps_ema)
+                },
                 "frame_rate_samples": ns.csi_fps_samples,
                 "latest_sequence": ns.latest_sequence,
                 "accepted_csi_frames": ns.accepted_csi_frames,
@@ -577,6 +583,66 @@ pub(crate) fn public_node_summaries(
             .unwrap_or(u64::MAX)
     });
     nodes
+}
+
+#[cfg(test)]
+mod node_freshness_tests {
+    use super::*;
+    use wifi_densepose_hardware::{SyncPacket, SyncPacketFlags};
+
+    #[test]
+    fn stale_node_has_no_current_rssi_or_csi_rate() {
+        let now = std::time::Instant::now();
+        let mut node = NodeState::new();
+        node.last_frame_time = Some(now);
+        node.rssi_history.push_back(-39.0);
+        node.csi_fps_ema = 22.1;
+        node.csi_fps_samples = 42;
+        let nodes = HashMap::from([(4, node)]);
+        let fresh = public_node_summaries(&nodes, now, d5_presence::CalibrationPhase::Ready, false);
+        assert_eq!(fresh[0]["status"], "active");
+        assert_eq!(fresh[0]["rssi_dbm"], -39.0);
+        assert_eq!(fresh[0]["frame_rate_hz"], 22.1);
+
+        let stale = public_node_summaries(
+            &nodes,
+            now + std::time::Duration::from_millis(5001),
+            d5_presence::CalibrationPhase::Ready,
+            false,
+        );
+        assert_eq!(stale[0]["status"], "stale");
+        assert!(stale[0]["rssi_dbm"].is_null());
+        assert_eq!(stale[0]["frame_rate_hz"], 0.0);
+        assert_eq!(stale[0]["frame_rate_samples"], 42);
+    }
+
+    #[test]
+    fn sync_snapshot_expires_even_when_firmware_flag_was_valid() {
+        let now = std::time::Instant::now();
+        let mut node = NodeState::new();
+        node.apply_sync_packet(
+            SyncPacket {
+                node_id: 4,
+                proto_ver: 1,
+                flags: SyncPacketFlags {
+                    is_leader: true,
+                    is_valid: true,
+                    smoothed_used: false,
+                },
+                local_us: 100,
+                epoch_us: 108,
+                sequence: 20,
+            },
+            now,
+        );
+        assert!(node.sync_snapshot().unwrap().is_valid);
+        node.latest_sync_at = Some(now - state::MESH_SYNC_MAX_AGE - std::time::Duration::from_secs(1));
+        let stale = node.sync_snapshot().unwrap();
+        assert!(!stale.is_valid);
+        assert_eq!(stale.offset_us, -8);
+        node.latest_sync_at = None;
+        assert!(!node.sync_snapshot().unwrap().is_valid);
+    }
 }
 
 // ── ADR-044 §5.3: dedup_factor runtime configuration endpoints ────────────────

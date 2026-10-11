@@ -145,13 +145,15 @@ impl PpduType {
 ///   bit 2   : STBC
 ///   bit 3   : LDPC (reserved — not yet populated by firmware)
 ///   bit 4   : 802.15.4 time-sync valid (C6 only)
-///   bit 5-7 : reserved
+///   bit 5   : ESP-IDF reported the first four CSI bytes invalid
+///   bit 6-7 : reserved
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Adr018Flags {
     pub bw40: bool,
     pub stbc: bool,
     pub ldpc: bool,
     pub ieee802154_sync_valid: bool,
+    pub first_word_invalid: bool,
 }
 
 impl Adr018Flags {
@@ -161,6 +163,7 @@ impl Adr018Flags {
             stbc: (b & 0x04) != 0,
             ldpc: (b & 0x08) != 0,
             ieee802154_sync_valid: (b & 0x10) != 0,
+            first_word_invalid: (b & 0x20) != 0,
         }
     }
     pub fn to_byte(self) -> u8 {
@@ -169,13 +172,20 @@ impl Adr018Flags {
         if self.stbc { b |= 0x04; }
         if self.ldpc { b |= 0x08; }
         if self.ieee802154_sync_valid { b |= 0x10; }
+        if self.first_word_invalid { b |= 0x20; }
         b
     }
 }
 
 impl Default for Adr018Flags {
     fn default() -> Self {
-        Self { bw40: false, stbc: false, ldpc: false, ieee802154_sync_valid: false }
+        Self {
+            bw40: false,
+            stbc: false,
+            ldpc: false,
+            ieee802154_sync_valid: false,
+            first_word_invalid: false,
+        }
     }
 }
 

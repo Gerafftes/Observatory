@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python3.15
 """
 c6-presence-watcher.py — ADR-125 iter 2.
 
@@ -39,16 +39,16 @@ Usage:
     python3 c6-presence-watcher.py [--port 5005] [--toggle /tmp/ruview-motion]
 """
 from __future__ import annotations
-import argparse
-import json
-import os
-import signal
-import socket
-import struct
-import sys
-import time
-import zlib
-from collections import deque
+lazy import argparse
+lazy import json
+lazy import os
+lazy import signal
+lazy import socket
+lazy import struct
+lazy import sys
+lazy import time
+lazy import zlib
+lazy from collections import deque
 
 RV_FEATURE_STATE_MAGIC = 0xC5110006
 RV_QFLAG_PRESENCE_VALID = 1 << 0

@@ -359,6 +359,7 @@ mod tests {
                     flags: 0,
                     mesh_timestamp_us: None,
                     source_binding: Some(source_binding()),
+                    protocol_identity: None,
                     iq_pairs: (0..8)
                         .map(|_| IqPair {
                             i: rx_id as i8,

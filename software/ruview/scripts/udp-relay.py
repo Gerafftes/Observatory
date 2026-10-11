@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python3.15
 """
 UDP relay for Docker Desktop on Windows (issue #374, #386).
 
@@ -23,10 +23,10 @@ Usage:
     python scripts/udp-relay.py --verbose
 """
 
-import argparse
-import socket
-import sys
-import time
+lazy import argparse
+lazy import socket
+lazy import sys
+lazy import time
 
 
 def run_relay(listen_host: str, listen_port: int, forward_host: str,

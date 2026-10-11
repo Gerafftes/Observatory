@@ -10,16 +10,16 @@ bool node_identity_resolve(uint8_t wire_id, node_identity_t *identity)
 
     switch (wire_id) {
     case 1:
-        *identity = (node_identity_t){.label = "RX1", .red = 10, .green = 132, .blue = 255};
+        *identity = (node_identity_t){.label = "RX1", .red = 0, .green = 0, .blue = 255};
         return true;
     case 2:
-        *identity = (node_identity_t){.label = "RX2", .red = 48, .green = 209, .blue = 88};
+        *identity = (node_identity_t){.label = "RX2", .red = 0, .green = 255, .blue = 0};
         return true;
     case 3:
-        *identity = (node_identity_t){.label = "RX3", .red = 255, .green = 55, .blue = 95};
+        *identity = (node_identity_t){.label = "RX3", .red = 255, .green = 0, .blue = 0};
         return true;
     case 4:
-        *identity = (node_identity_t){.label = "RX4", .red = 191, .green = 90, .blue = 242};
+        *identity = (node_identity_t){.label = "RX4", .red = 160, .green = 0, .blue = 255};
         return true;
     default:
         *identity = (node_identity_t){0};

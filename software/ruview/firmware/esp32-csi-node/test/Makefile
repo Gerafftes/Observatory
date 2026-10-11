@@ -45,11 +45,18 @@ FUZZ_JOBS     ?= 1
 
 .PHONY: all clean run_serialize run_edge run_nvs run_all test_adr110 run_adr110 \
         test_vitals run_vitals test_mmwave_detect run_mmwave_detect \
-        test_csi_source_binding run_csi_source_binding test_node_identity \
-        run_node_identity host_tests
+	        test_csi_source_binding run_csi_source_binding test_node_identity \
+	        run_node_identity test_rx_diagnostics run_rx_diagnostics \
+	        test_rx_raw_profile run_rx_raw_profile test_csi_samples run_csi_samples host_tests
 
 all: fuzz_serialize fuzz_edge fuzz_nvs test_adr110 test_vitals test_mmwave_detect \
-     test_csi_source_binding test_node_identity
+     test_csi_source_binding test_node_identity test_csi_samples
+
+test_csi_samples: test_csi_samples.c $(MAIN_DIR)/csi_samples.h
+	cc -std=c99 -Wall -Wextra -I$(MAIN_DIR) $< -o $@ -lm
+
+run_csi_samples: test_csi_samples
+	./test_csi_samples
 
 # --- Stable RX identity and LED palette ---
 test_node_identity: test_node_identity.c $(MAIN_DIR)/node_identity.c $(MAIN_DIR)/node_identity.h
@@ -107,8 +114,47 @@ test_csi_source_binding: test_csi_source_binding.c $(MAIN_DIR)/csi_collector.c $
 run_csi_source_binding: test_csi_source_binding
 	./test_csi_source_binding
 
-host_tests: run_adr110 run_vitals run_mmwave_detect run_csi_source_binding run_node_identity
-	@echo "Host tests passed (ADR-110 + vitals + mmwave detect + CSI source binding + identity)"
+# --- RX callback/queue/sender diagnostic accounting ---
+test_rx_diagnostics: test_rx_diagnostics.c $(MAIN_DIR)/csi_collector.c \
+		$(MAIN_DIR)/csi_transport.c $(MAIN_DIR)/stream_sender.c $(STUBS_SRC)
+	cc -std=c99 -Wall -Wextra -Istubs -I$(MAIN_DIR) \
+	    -DCONFIG_CSI_NODE_ID=1 \
+	    -DCONFIG_CSI_WIFI_CHANNEL=6 \
+	    -DCONFIG_CSI_WIFI_SSID=\"test\" \
+	    -DCONFIG_CSI_TARGET_IP=\"192.0.2.1\" \
+	    -DCONFIG_CSI_TARGET_PORT=5500 \
+	    -DCONFIG_ESP_WIFI_CSI_ENABLED=1 \
+	    -DCONFIG_CSI_FRAME_HE_TAGGING=1 \
+	    -DCSI_DIAGNOSTICS_TEST=1 \
+	    -DCSI_DIAGNOSTICS_REAL_TRANSPORT=1 \
+	    -DCSI_DIAGNOSTICS_THREAD_SAFE_STUBS=1 \
+	    $^ -o $@ -lm -pthread
+
+run_rx_diagnostics: test_rx_diagnostics
+	./test_rx_diagnostics
+
+test_rx_raw_profile: test_rx_diagnostics.c $(MAIN_DIR)/csi_collector.c \
+		$(MAIN_DIR)/csi_transport.c $(MAIN_DIR)/stream_sender.c $(STUBS_SRC)
+	cc -std=c99 -Wall -Wextra -Istubs -I$(MAIN_DIR) \
+	    -DCONFIG_CSI_NODE_ID=1 \
+	    -DCONFIG_CSI_WIFI_CHANNEL=6 \
+	    -DCONFIG_CSI_WIFI_SSID=\"test\" \
+	    -DCONFIG_CSI_TARGET_IP=\"192.0.2.1\" \
+	    -DCONFIG_CSI_TARGET_PORT=5500 \
+	    -DCONFIG_ESP_WIFI_CSI_ENABLED=1 \
+	    -DCONFIG_CSI_FRAME_HE_TAGGING=1 \
+	    -DCONFIG_CSI_RAW_PROFILE=1 \
+	    -DCSI_DIAGNOSTICS_TEST=1 \
+	    -DCSI_DIAGNOSTICS_REAL_TRANSPORT=1 \
+	    -DCSI_DIAGNOSTICS_THREAD_SAFE_STUBS=1 \
+	    $^ -o $@ -lm -pthread
+
+run_rx_raw_profile: test_rx_raw_profile
+	./test_rx_raw_profile
+
+host_tests: run_adr110 run_vitals run_mmwave_detect run_csi_source_binding run_node_identity \
+		run_rx_diagnostics run_rx_raw_profile run_csi_samples
+	@echo "Host tests passed (ADR-110 + vitals + mmwave detect + CSI source binding + identity + RX diagnostics + raw RX profile)"
 
 # --- Serialize fuzzer ---
 # Tests csi_serialize_frame() with random wifi_csi_info_t inputs.
@@ -145,5 +191,6 @@ run_all: run_serialize run_edge run_nvs
 
 clean:
 	rm -f fuzz_serialize fuzz_edge fuzz_nvs test_adr110 test_vitals \
-	      test_mmwave_detect test_csi_source_binding test_node_identity
+	      test_mmwave_detect test_csi_source_binding test_node_identity \
+	      test_rx_diagnostics test_rx_raw_profile test_csi_samples
 	rm -rf corpus_serialize/ corpus_edge/ corpus_nvs/

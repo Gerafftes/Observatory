@@ -33,11 +33,11 @@ Usage:
       [--data-dir <dir containing csi_windows.npy>] [--out-dir results]
 """
 
-import argparse
-import os
-import sys
+lazy import argparse
+lazy import os
+lazy import sys
 
-import numpy as np
+lazy import numpy as np
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 RESULTS = os.path.join(HERE, "results")

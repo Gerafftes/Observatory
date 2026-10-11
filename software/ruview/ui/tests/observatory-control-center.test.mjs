@@ -5,6 +5,7 @@ import { apiService } from '../services/api.service.js';
 import { experimentService } from '../services/experiment.service.js';
 import {
   generateThreeByThreePoints,
+  mmwaveStatusSummary,
   mmwaveYawToReceiverMdeg,
   ObservatoryControlCenter,
   defaultSetupProfileDocument,
@@ -184,6 +185,40 @@ test('room editor presents mmWave as the primary calibration route', () => {
   assert.match(container.innerHTML, /P01–P09-Raster/);
   assert.match(container.innerHTML, /Legacy/);
   assert.doesNotMatch(container.innerHTML, />Trainingspunkte P01–P09/);
+});
+
+test('CAD raster snap stays off when the control center refreshes', () => {
+  const editorHost = {
+    innerHTML: '',
+    addEventListener() {},
+    removeEventListener() {},
+    querySelector() { return null; },
+  };
+  const container = {
+    innerHTML: '',
+    querySelector(selector) {
+      return selector === '#occRoomCadEditor' ? editorHost : null;
+    },
+  };
+  const controlCenter = new ObservatoryControlCenter(container);
+  controlCenter._mounted = true;
+  controlCenter._render();
+
+  controlCenter.geometryEditor._handleClick({
+    target: {
+      closest(selector) {
+        return selector === '[data-cad-action]'
+          ? { dataset: { cadAction: 'toggle-snap' } }
+          : null;
+      },
+    },
+  });
+  assert.equal(controlCenter.geometryEditor.snap, false);
+
+  controlCenter._render();
+
+  assert.equal(controlCenter.geometryEditor.snap, false);
+  assert.match(editorHost.innerHTML, /Rasterfang AUS/);
 });
 
 test('profile details defer mmWave orientation editing to the CAD inspector', () => {
@@ -812,6 +847,7 @@ test('cockpit treats raw mmWave UDP as active even when geometry rejects targets
     classification_calibration: { phase: 'uncalibrated' },
     mmwave: {
       state: 'invalid',
+      packet_age_ms: 10,
       raw_udp_packets: 18,
       packets_received: 0,
       packets_rejected: 18,
@@ -823,6 +859,83 @@ test('cockpit treats raw mmWave UDP as active even when geometry rejects targets
   assert.match(markup, /occ-metric-state">AKTIV · PRÜFEN</);
   assert.match(markup, /<strong>UDP empfangen<\/strong>/);
   assert.doesNotMatch(markup, /nicht verbunden/);
+});
+
+test('mmWave activity expires even when lifetime counters are nonzero', () => {
+  for (const packetAge of [null, undefined, 1001, 48_000_000]) {
+    const summary = mmwaveStatusSummary({ mmwave: {
+      state: 'valid', raw_udp_packets: 44473, packets_received: 44462,
+      packet_age_ms: packetAge,
+    } });
+    assert.equal(summary.active, false);
+    assert.equal(summary.value, 'offline');
+  }
+  for (const state of ['valid', 'invalid', 'no_target', 'multi_target']) {
+    assert.equal(mmwaveStatusSummary({ mmwave: {
+      state, raw_udp_packets: 12, packet_age_ms: 1000,
+    } }).active, true);
+  }
+  assert.equal(mmwaveStatusSummary({ mmwave: {
+    state: 'stale', raw_udp_packets: 12, packet_age_ms: 10,
+  } }).active, false);
+});
+
+test('HTTP reachability without fresh radar packets only confirms the ESP', () => {
+  const summary = mmwaveStatusSummary({ mmwave: {
+    raw_udp_packets: 12, packets_received: 12, packet_age_ms: 48_000_000,
+    connection: { reachable: true },
+  } });
+  assert.equal(summary.active, false);
+  assert.equal(summary.value, 'ESP erreichbar');
+  assert.equal(summary.state, 'WARTET');
+});
+
+test('offline receivers hide historical measurements and valid sync flags', () => {
+  const controlCenter = new ObservatoryControlCenter(null);
+  controlCenter.status = { nodes: [{
+    node_id: 4, status: 'stale', last_seen_ms: 48_000_000,
+    rssi_dbm: -39, frame_rate_hz: 22.1, packet_loss_percent: 72.8,
+    latest_sequence: 392424, sync: { is_valid: true, offset_us: -8 },
+  }] };
+  const markup = controlCenter._nodesMarkup();
+  assert.match(markup, />offline</);
+  assert.match(markup, /zuletzt vor 13 h/);
+  assert.match(markup, /0.0 Hz/);
+  assert.match(markup, /zuletzt empfangen/);
+  assert.doesNotMatch(markup, /-39.0 dBm|22.1 Hz|72.8%|gültig|µs/);
+});
+
+test('active receivers keep current measurements but expire an old sync', () => {
+  const controlCenter = new ObservatoryControlCenter(null);
+  const node = {
+    node_id: 4, status: 'active', last_seen_ms: 100,
+    rssi_dbm: -39, frame_rate_hz: 22.1,
+    sync: { is_valid: true, offset_us: -8, staleness_ms: 100 },
+  };
+  controlCenter.status = { nodes: [node] };
+  assert.match(controlCenter._nodesMarkup(), /-39.0 dBm/);
+  assert.match(controlCenter._nodesMarkup(), /22.1 Hz/);
+  assert.match(controlCenter._nodesMarkup(), /gültig · -8 µs/);
+  node.sync.staleness_ms = 48_000_000;
+  assert.match(controlCenter._nodesMarkup(), /veraltet · -8 µs/);
+});
+
+test('a failed status request clears previously active hardware indicators', async () => {
+  const original = experimentService.getControlCenterStatus;
+  const controlCenter = new ObservatoryControlCenter({ innerHTML: '' });
+  controlCenter._mounted = true;
+  controlCenter.status = { mmwave: {
+    raw_udp_packets: 12, packets_received: 12, packet_age_ms: 10,
+  } };
+  try {
+    experimentService.getControlCenterStatus = async () => { throw new Error('offline'); };
+    await controlCenter.refresh();
+    assert.equal(controlCenter.status, null);
+    assert.equal(controlCenter.connectionState, 'offline');
+    assert.doesNotMatch(controlCenter._overviewMarkup(), /<strong>verbunden<\/strong>/);
+  } finally {
+    experimentService.getControlCenterStatus = original;
+  }
 });
 
 test('artifact inputs explain the prediction-truth boundary', () => {

@@ -96,6 +96,17 @@ pub struct Esp32Frame {
     /// HE-LTF symbol grids are NOT comparable bin-for-bin). Pre-ADR-110
     /// firmware sends 0 ⇒ `PpduType::HtLegacy`.
     pub ppdu_type: PpduType,
+    pub protocol_version: Option<u8>,
+    pub device_callback_started_us: Option<u64>,
+    pub driver_rx_timestamp_us: Option<u32>,
+    pub quality_flags: Option<u8>,
+    pub rx_state: Option<u8>,
+    pub antenna_index: Option<u8>,
+    pub gain_db: Option<i8>,
+    pub csi_config_flags: Option<u32>,
+    pub sync_age_ms: Option<u32>,
+    pub invalid_prefix_pairs: u8,
+    pub interpolated_prefix_pairs: u8,
     pub amplitudes: Vec<f64>,
     pub phases: Vec<f64>,
 }

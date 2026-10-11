@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python3.15
 """
 QEMU Swarm Health Oracle (ADR-062)
 
@@ -11,12 +11,12 @@ Usage:
     python3 swarm_health.py --log-dir build/swarm_logs/ --assertions all_nodes_boot no_crashes
 """
 
-import argparse
-import re
-import sys
-from dataclasses import dataclass, field
-from pathlib import Path
-from typing import Any, Dict, List, Optional
+lazy import argparse
+lazy import re
+lazy import sys
+lazy from dataclasses import dataclass, field
+lazy from pathlib import Path
+lazy from typing import Any, Dict, List, Optional
 
 try:
     import yaml

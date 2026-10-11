@@ -27,7 +27,7 @@ jobs:
 
       - uses: actions/setup-python@v6
         with:
-          python-version: '3.11'
+          python-version: '3.15.0-rc.2'
 
       - name: Validate the manifest is well-formed JSON
         run: python -c "import json; json.load(open('scripts/fix-markers.json')); print('manifest OK')"

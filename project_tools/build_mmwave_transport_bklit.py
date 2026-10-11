@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python3.15
 """Render the mmWave transport comparison in the repository's Bklit style.
 
 The values are copied from the checked before/after and redundancy tables in
@@ -10,9 +10,9 @@ the different units in separate panels instead of inventing a combined score.
 
 from __future__ import annotations
 
-from pathlib import Path
+lazy from pathlib import Path
 
-from PIL import Image, ImageDraw, ImageFont
+lazy from PIL import Image, ImageDraw, ImageFont
 
 
 PROJECT_DIR = Path(__file__).resolve().parent.parent

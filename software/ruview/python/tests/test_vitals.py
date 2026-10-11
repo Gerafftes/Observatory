@@ -16,13 +16,13 @@ release the GIL safely.
 
 from __future__ import annotations
 
-import math
-from random import Random
+lazy import math
+lazy from random import Random
 
-import pytest
+lazy import pytest
 
-import wifi_densepose
-from wifi_densepose import (
+lazy import wifi_densepose
+lazy from wifi_densepose import (
     BreathingExtractor,
     HeartRateExtractor,
     VitalEstimate,

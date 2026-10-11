@@ -15,7 +15,7 @@ config MMWAVE_TARGET_HOST
 config MMWAVE_TARGET_PORT
     int "UDP collector port"
     range 1 65535
-    default 5010
+    default 55010
 
 config MMWAVE_STREAM_INTERVAL_MS
     int "Minimum interval between radar UDP packets (ms)"
@@ -33,6 +33,22 @@ config MMWAVE_WIFI_PS_NONE
         Disable modem sleep so received UDP frames are not held until a DTIM
         wake-up. This increases power use, but is the preferred setting for a
         mains-powered sensor where measurement latency matters.
+
+config MMWAVE_WIFI_LIMIT_TX_POWER
+    bool "Limit WiFi TX power for a verified board-specific RF problem"
+    default n
+    help
+        Enable only for a board with a reproducible TX-power-dependent failure.
+        The default preserves the WiFi driver's power setting on other nodes.
+
+config MMWAVE_WIFI_MAX_TX_POWER
+    int "Maximum WiFi TX power (quarter dBm)"
+    depends on MMWAVE_WIFI_LIMIT_TX_POWER
+    range 8 78
+    default 40
+    help
+        40 requests a 10 dBm limit. Applied after WiFi starts and before the
+        first association attempt; the effective value is logged at boot.
 
 config MMWAVE_UDP_ACK_ATTEMPTS
     int "Maximum UDP delivery attempts per radar frame"

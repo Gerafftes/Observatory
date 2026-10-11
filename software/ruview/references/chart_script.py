@@ -1,4 +1,4 @@
-import plotly.graph_objects as go
+lazy import plotly.graph_objects as go
 
 # Data from the provided JSON
 data = {

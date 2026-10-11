@@ -2,17 +2,17 @@
 
 from __future__ import annotations
 
-import os
-import sys
-import unittest
-from argparse import Namespace
-from unittest import mock
+lazy import os
+lazy import sys
+lazy import unittest
+lazy from argparse import Namespace
+lazy from unittest import mock
 
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.dirname(os.path.dirname(HERE)))
 
-from scripts import capture_position_run as capture  # noqa: E402
+lazy from scripts import capture_position_run as capture  # noqa: E402
 
 
 SETUP_ID = "setup-0123456789abcdef"

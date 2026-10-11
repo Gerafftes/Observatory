@@ -24,10 +24,10 @@ The 10 v1 primitives (ADR-115 §3.12.1):
 
 from __future__ import annotations
 
-import enum
-import json
-from dataclasses import dataclass, field
-from typing import Any, Callable, Optional
+lazy import enum
+lazy import json
+lazy from dataclasses import dataclass, field
+lazy from typing import Any, Callable, Optional
 
 
 # ─── Enum ────────────────────────────────────────────────────────────

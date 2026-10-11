@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python3.15
 """Validate every YAML file under examples/ha-blueprints/.
 
 HA Blueprints use the `!input` YAML tag, which stock PyYAML doesn't
@@ -14,11 +14,11 @@ Usage:
 
 from __future__ import annotations
 
-import glob
-import sys
-from pathlib import Path
+lazy import glob
+lazy import sys
+lazy from pathlib import Path
 
-import yaml
+lazy import yaml
 
 
 class InputTag(str):

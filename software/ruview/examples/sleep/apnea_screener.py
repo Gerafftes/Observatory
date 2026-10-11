@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python3.15
 """
 Sleep Apnea Screener — Contactless via 60 GHz mmWave
 
@@ -11,12 +11,12 @@ Usage:
     python examples/sleep/apnea_screener.py --port COM4 --duration 3600  # 1 hour
 """
 
-import argparse
-import collections
-import re
-import serial
-import sys
-import time
+lazy import argparse
+lazy import collections
+lazy import re
+lazy import serial
+lazy import sys
+lazy import time
 
 RE_BR = re.compile(r"'Real-time respiratory rate'.*?(\d+\.?\d*)", re.IGNORECASE)
 RE_HR = re.compile(r"'Real-time heart rate'.*?(\d+\.?\d*)", re.IGNORECASE)

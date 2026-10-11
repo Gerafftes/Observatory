@@ -401,7 +401,7 @@ async fn setup_profile_v2_draft(
             return experiment_api_error(StatusCode::SERVICE_UNAVAILABLE, "DB_READ_FAILED", error)
         }
     };
-    let mut draft = match position_setup::observatory_profile_setup_draft(&profile.document) {
+    let mut draft = match position_setup::observatory_profile_setup_draft(&profile) {
         Ok(draft) => draft,
         Err(error) => {
             return experiment_api_error(StatusCode::CONFLICT, "PROFILE_NOT_SEALABLE", error)
@@ -991,6 +991,7 @@ async fn control_center_status(State(state): State<SharedState>) -> Json<serde_j
                     "setup_id": setup.setup_id(),
                     "setup_sha256": setup.setup_sha256(),
                     "room_dimensions_m": setup.room_dimensions_m(),
+                    "cable_revision": setup.cable_revision_status(),
                 })
             }),
             s.csi_grid_pin,

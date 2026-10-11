@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python3.15
 """Export pose_v1.safetensors -> pose_v1.onnx.
 
 Builds the same architecture as v2/crates/cog-pose-estimation/src/inference.rs
@@ -7,14 +7,14 @@ export with a fixed [1, 56, 20] input. Then verifies the ONNX loads and
 matches the torch output to within 1e-5.
 """
 
-import json
-import struct
-import sys
-from pathlib import Path
+lazy import json
+lazy import struct
+lazy import sys
+lazy from pathlib import Path
 
-import numpy as np
-import torch
-import torch.nn as nn
+lazy import numpy as np
+lazy import torch
+lazy import torch.nn as nn
 
 
 N_SUB = 56

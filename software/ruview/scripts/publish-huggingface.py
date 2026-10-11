@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python3.15
 """
 Publish WiFi-DensePose pre-trained models to HuggingFace Hub.
 
@@ -18,11 +18,11 @@ Usage:
 
 from __future__ import annotations
 
-import argparse
-import os
-import subprocess
-import sys
-from pathlib import Path
+lazy import argparse
+lazy import os
+lazy import subprocess
+lazy import sys
+lazy from pathlib import Path
 
 EXPECTED_FILES = [
     "pretrained-encoder.onnx",

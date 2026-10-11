@@ -38,7 +38,7 @@ use super::raw_csi_recording::RawCsiFrame;
 use super::server_clock::HostTimestamp;
 
 pub(crate) const MMWAVE_SCHEMA: &str = "ruview.mmwave.ld2450.v1";
-pub(crate) const DEFAULT_UDP_PORT: u16 = 5010;
+pub(crate) const DEFAULT_UDP_PORT: u16 = 55010;
 const STALE_AFTER_NS: u64 = 1_000_000_000;
 const COVERAGE_CELL_MM: i32 = 250;
 const MIN_ZONE_SEPARATION_MM: i32 = 750;
@@ -473,6 +473,7 @@ pub(crate) struct MmwaveStatus {
     pub(crate) reason: String,
     pub(crate) configured: bool,
     pub(crate) setup_sealed: bool,
+    pub(crate) sealed_cad: Option<super::position_setup::CadExteriorRule>,
     pub(crate) room_dimensions_m: Option<[f64; 3]>,
     pub(crate) mounting_position_m: Option<[f64; 3]>,
     pub(crate) receiver_positions_m: Option<Vec<[f64; 3]>>,
@@ -723,6 +724,7 @@ pub(crate) struct CadProfileGeometry {
     pub(crate) revision_id: String,
     pub(crate) profile_sha256: String,
     pub(crate) room_dimensions_m: [f64; 3],
+    pub(crate) sensor_mount_radius_m: f64,
     pub(crate) mounting_position_m: [f64; 3],
     pub(crate) tx_position_m: Option<[f64; 3]>,
     pub(crate) receiver_positions_m: Vec<[f64; 3]>,
@@ -1200,10 +1202,42 @@ pub(crate) struct NodeControl {
 pub(crate) struct ExperimentContext {
     pub(crate) setup_id: String,
     pub(crate) setup_sha256: String,
+    pub(crate) cad: Option<super::position_setup::CadExteriorRule>,
     pub(crate) server_version: String,
     pub(crate) geometry: PositionCaptureGeometry,
     pub(crate) calibration_tx_position_m: Option<[f64; 3]>,
     pub(crate) calibration_rx_positions_m: Option<Vec<[f64; 3]>>,
+}
+
+impl ExperimentContext {
+    pub(crate) fn from_setup(setup: &super::position_setup::SealedPositionSetup) -> Option<Self> {
+        setup.mmwave()?;
+        let receiver_positions_m = setup.receiver_positions_m();
+        let calibration_receiver_positions_m = setup.receiver_calibration_positions_m();
+        let calibration_rx_positions_m = calibration_receiver_positions_m
+            .iter()
+            .any(|position| position.is_some())
+            .then(|| {
+                calibration_receiver_positions_m
+                    .into_iter()
+                    .zip(receiver_positions_m)
+                    .map(|(calibration, device)| calibration.unwrap_or(device))
+                    .collect()
+            });
+        Some(Self {
+            cad: setup.cad_exterior_rule(),
+            setup_id: setup.setup_id().to_string(),
+            setup_sha256: setup.setup_sha256().to_string(),
+            server_version: env!("CARGO_PKG_VERSION").to_string(),
+            geometry: PositionCaptureGeometry {
+                room_dimensions_m: setup.room_dimensions_m(),
+                tx_position_m: setup.transmitter_position_m(),
+                rx_positions_m: receiver_positions_m.to_vec(),
+            },
+            calibration_tx_position_m: setup.transmitter_calibration_position_m(),
+            calibration_rx_positions_m,
+        })
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -1559,6 +1593,13 @@ impl MmwaveManager {
             );
             return;
         };
+        let sensor_mount_radius_m = match super::experiment::sensor_mount_radius_m(&profile.document) {
+            Ok(radius) => radius,
+            Err(error) => {
+                self.cad_profile_error = Some(error);
+                return;
+            }
+        };
         let tx_position_m = serde_json::from_value::<[f64; 3]>(
             profile.document["transmitter"]["position_m"].clone(),
         )
@@ -1668,6 +1709,7 @@ impl MmwaveManager {
             revision_id: profile.revision_id.clone(),
             profile_sha256: profile.profile_sha256.clone(),
             room_dimensions_m: room,
+            sensor_mount_radius_m,
             mounting_position_m: mounting,
             tx_position_m,
             receiver_positions_m,
@@ -2948,14 +2990,28 @@ impl MmwaveManager {
         let dimensions = self
             .room_dimensions_mm
             .ok_or_else(|| "room dimensions are not configured".to_string())?;
-        if target.room_x_mm < 0
-            || target.room_z_mm < 0
-            || target.room_x_mm > dimensions[0]
-            || target.room_z_mm > dimensions[1]
-        {
+        // A sealed legacy setup without a CAD binding retains its own contract.
+        // Do not invent a radius or reinterpret old acquisition geometry.
+        let radius_m = self
+            .experiment
+            .as_ref()
+            .and_then(|experiment| experiment.cad.as_ref())
+            .map(|cad| cad.sensor_mount_radius_m)
+            .or_else(|| {
+                self.cad_profile
+                    .as_ref()
+                    .map(|cad| cad.sensor_mount_radius_m)
+            })
+            .unwrap_or(0.0);
+        let radius_mm = radius_m * 1000.0;
+        let x = f64::from(target.room_x_mm);
+        let z = f64::from(target.room_z_mm);
+        let dx = (-x).max(x - f64::from(dimensions[0])).max(0.0);
+        let dz = (-z).max(z - f64::from(dimensions[1])).max(0.0);
+        if dx.hypot(dz) > radius_mm {
             return Err(format!(
-                "target [{}, {}] mm is outside room [0..{}, 0..{}] mm",
-                target.room_x_mm, target.room_z_mm, dimensions[0], dimensions[1]
+                "target [{}, {}] mm is outside room [0..{}, 0..{}] mm and CAD exterior radius {} mm",
+                target.room_x_mm, target.room_z_mm, dimensions[0], dimensions[1], radius_mm
             ));
         }
         Ok(())
@@ -4263,6 +4319,7 @@ impl MmwaveManager {
             },
             configured: self.control.is_some(),
             setup_sealed: self.expected_node.is_some() && self.experiment.is_some(),
+            sealed_cad: self.experiment.as_ref().and_then(|experiment| experiment.cad.clone()),
             room_dimensions_m: self
                 .experiment
                 .as_ref()
@@ -5805,7 +5862,7 @@ mod tests {
         experiment.geometry.rx_positions_m = vec![[1.001, 1.0, 1.5]; 4];
         experiment.geometry.tx_position_m = [1.001, 1.0, 1.5];
         manager
-            .ingest_json(&packet(0, 1, MeasurementMode::Calibration), 1_000_000_000)
+            .ingest_json(&packet_with_raw(0, [1_500, 1_001]), 1_000_000_000)
             .expect("fresh radar packet");
 
         assert!(manager.validate_calibration_phase_two_start().is_err());
@@ -6052,7 +6109,7 @@ mod tests {
     }
 
     #[test]
-    fn cad_preview_still_rejects_outside_room_targets() {
+    fn cad_preview_rejects_targets_beyond_its_exterior_radius() {
         let mut manager = manager();
         manager.apply_cad_profile(&cad_profile([3.9, 0.0, 3.3], "v5"));
         assert!(manager
@@ -6068,6 +6125,249 @@ mod tests {
         );
     }
 
+    #[test]
+    fn sealed_v4_and_cad_preview_use_the_same_bounds_and_no_target_path() {
+        for mount in [[0.0, 1.2, 0.0], [0.123177, 1.2, 0.456846]] {
+            check_sealed_cad_bounds_and_no_target(mount);
+        }
+    }
+
+    fn check_sealed_cad_bounds_and_no_target(mount: [f64; 3]) {
+        let (profile, setup) =
+            super::super::position_setup::tests::cad_setup_fixture_with_mount(mount);
+        let definition = setup.mmwave().unwrap();
+        let (origin_x_mm, origin_z_mm, yaw_mdeg, raw_x_inverted) = definition.transform();
+        let mut sealed = MmwaveManager::new_for_node(
+            "MMWAVE1".into(),
+            55010,
+            Some(setup.room_dimensions_m()),
+            None,
+            Some(ExpectedNode {
+                node_id: "MMWAVE1".into(),
+                mounting_position_m: setup.mmwave_mounting_position_m("MMWAVE1"),
+                transform: CoordinateFrame {
+                    local: "x_right_y_forward_mm".into(),
+                    room: "x_length_z_width_mm".into(),
+                    origin_x_mm,
+                    origin_z_mm,
+                    yaw_mdeg,
+                    raw_x_inverted,
+                },
+            }),
+            ExperimentContext::from_setup(&setup),
+        );
+        let mut preview = manager();
+        preview.apply_cad_profile(&profile);
+        for (index, (point, accepted)) in [
+            ([1000, 1000], true),
+            ([0, 0], true),
+            ([4020, 3440], true),
+            ([-499, 1000], true),
+            ([-500, 1000], true),
+            ([-501, 1000], false),
+            ([4519, 1000], true),
+            ([4520, 1000], true),
+            ([4521, 1000], false),
+            ([1000, -499], true),
+            ([1000, -500], true),
+            ([1000, -501], false),
+            ([1000, 3939], true),
+            ([1000, 3940], true),
+            ([1000, 3941], false),
+            ([-299, -400], true),
+            ([-300, -400], true),
+            ([-301, -400], false),
+            ([4320, 3840], true),
+            ([4321, 3840], false),
+            ([-300, 3840], true),
+            ([4320, -400], true),
+            ([-500, -500], false),
+            ([-666, 1000], false),
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            let now = 1_000_000_000 + index as u64 * 100_000_000;
+            let mut wire: serde_json::Value = serde_json::from_slice(&packet_with_raw(
+                index as u32,
+                [point[1] - origin_z_mm, point[0] - origin_x_mm],
+            ))
+            .unwrap();
+            wire["node_id"] = serde_json::json!("MMWAVE1");
+            let wire = serde_json::to_vec(&wire).unwrap();
+            for manager in [&mut preview, &mut sealed] {
+                assert_eq!(
+                    manager.ingest_json(&wire, now).is_ok(),
+                    accepted,
+                    "{point:?}"
+                );
+                assert_eq!(
+                    manager.status(now).state,
+                    if accepted {
+                        LinkState::Valid
+                    } else {
+                        LinkState::Invalid
+                    }
+                );
+            }
+        }
+        let now = 5_000_000_000;
+        let mut empty: serde_json::Value =
+            serde_json::from_slice(&packet(24, 0, MeasurementMode::Calibration)).unwrap();
+        empty["node_id"] = serde_json::json!("MMWAVE1");
+        for manager in [&mut preview, &mut sealed] {
+            manager
+                .ingest_json(&serde_json::to_vec(&empty).unwrap(), now)
+                .unwrap();
+            let status = manager.status(now);
+            assert_eq!(status.state, LinkState::NoTarget);
+            assert!(status.target_position_mm.is_none());
+            assert!(status.target_raw_position_mm.is_none());
+            assert!(status.targets.is_empty());
+            assert_eq!(status.last_rejection.unwrap().category, "room_bounds");
+        }
+        let status = sealed.status(now);
+        assert!(status.setup_sealed);
+        assert!(status.cad_profile.is_none());
+        assert_eq!(
+            status.sealed_cad.unwrap().profile_sha256,
+            profile.profile_sha256
+        );
+        // Saving a different CAD profile cannot replace a sealed rule.
+        sealed.apply_cad_profile(&profile);
+        assert!(sealed.cad_profile_error.is_some());
+        assert_eq!(
+            sealed
+                .experiment
+                .unwrap()
+                .cad
+                .unwrap()
+                .sensor_mount_radius_m,
+            0.5
+        );
+    }
+
+    #[test]
+    fn cad_target_bounds_use_euclidean_distance_in_millimetres() {
+        let mut manager = manager();
+        let mut profile = cad_profile([0.0, 1.2, 0.0], "radius-v1");
+        profile.document["sensor_mount_radius_m"] = serde_json::json!(0.5);
+        manager.apply_cad_profile(&profile);
+        let packet: RadarPacket =
+            serde_json::from_slice(&packet(0, 1, MeasurementMode::Calibration)).unwrap();
+        let mut target = packet.targets[0].clone();
+        for (point, accepted) in [
+            ([1000, 1000], true),
+            ([0, 0], true),
+            ([4020, 3440], true),
+            ([-499, 1000], true),
+            ([-500, 1000], true),
+            ([-501, 1000], false),
+            ([4520, 1000], true),
+            ([4521, 1000], false),
+            ([1000, -500], true),
+            ([1000, -501], false),
+            ([1000, 3940], true),
+            ([1000, 3941], false),
+            ([-299, -400], true),
+            ([-300, -400], true),
+            ([-301, -400], false),
+            ([4320, 3840], true),
+            ([4321, 3840], false),
+            ([-300, 3840], true),
+            ([4320, -400], true),
+            ([-500, -500], false),
+            ([i32::MIN, i32::MAX], false),
+        ] {
+            [target.room_x_mm, target.room_z_mm] = point;
+            assert_eq!(
+                manager.validate_room_bounds(&target).is_ok(),
+                accepted,
+                "{point:?}"
+            );
+        }
+        let cad = manager.cad_profile.as_ref().unwrap();
+        assert_eq!(cad.sensor_mount_radius_m, 0.5);
+        assert_eq!(manager.room_dimensions_mm, Some([4020, 3440]));
+
+        profile.profile_sha256 = "radius-zero".to_string();
+        profile.document["sensor_mount_radius_m"] = serde_json::json!(0.0);
+        manager.apply_cad_profile(&profile);
+        [target.room_x_mm, target.room_z_mm] = [-1, 1000];
+        assert!(manager.validate_room_bounds(&target).is_err());
+        profile.document["sensor_mount_radius_m"] = serde_json::json!(-0.5);
+        manager.apply_cad_profile(&profile);
+        assert!(manager.cad_profile_error.is_some());
+        assert_eq!(
+            manager.cad_profile.as_ref().unwrap().sensor_mount_radius_m,
+            0.0
+        );
+    }
+
+    #[test]
+    fn cad_exterior_target_then_no_target_never_reuses_old_position() {
+        let mut manager = manager();
+        let mut profile = cad_profile([0.0, 1.2, 0.0], "radius-ingest");
+        profile.document["sensor_mount_radius_m"] = serde_json::json!(0.5);
+        profile.document["mmwave"]["yaw_mdeg"] = serde_json::json!(0);
+        profile.document["mmwave"]["raw_x_inverted"] = serde_json::json!(false);
+        manager.apply_cad_profile(&profile);
+        manager
+            .ingest_json(&packet_with_raw(0, [1000, -500]), 1_000_000_000)
+            .unwrap();
+        let status = manager.status(1_000_000_000);
+        assert_eq!(status.state, LinkState::Valid);
+        assert_eq!(status.target_raw_position_mm, Some([1000, -500]));
+        assert_eq!(status.target_position_mm, Some([-500, 1000]));
+        manager
+            .ingest_json(&packet(1, 0, MeasurementMode::Calibration), 1_100_000_000)
+            .unwrap();
+        let empty = manager.status(1_100_000_000);
+        assert_eq!(empty.state, LinkState::NoTarget);
+        assert!(empty.target_position_mm.is_none());
+        assert!(empty.target_raw_position_mm.is_none());
+        assert!(empty.targets.is_empty());
+        assert!(manager
+            .ingest_json(&packet_with_raw(2, [1000, -501]), 1_200_000_000)
+            .is_err());
+        assert_eq!(
+            manager
+                .status(1_200_000_000)
+                .last_rejection
+                .unwrap()
+                .category,
+            "room_bounds"
+        );
+    }
+
+    #[test]
+    #[ignore = "requires the private saved CAD/rejection fixture, supplied explicitly offline"]
+    fn cad_saved_rejection_views_use_the_bound_profile() {
+        let path =
+            std::env::var("BLL_CAD_REJECTION_FIXTURE").expect("private fixture path required");
+        let fixture: serde_json::Value =
+            serde_json::from_slice(&std::fs::read(path).unwrap()).unwrap();
+        let mut manager = manager();
+        let mut profile = cad_profile([0.0, 0.0, 0.0], "saved-regression");
+        profile.document = fixture["profile"].clone();
+        manager.apply_cad_profile(&profile);
+        assert!(manager.cad_profile_error.is_none());
+        let packet: RadarPacket =
+            serde_json::from_slice(&packet(0, 1, MeasurementMode::Calibration)).unwrap();
+        let mut target = packet.targets[0].clone();
+        let mut accepted = 0;
+        let views = fixture["views"].as_array().unwrap();
+        assert_eq!(views.len(), 156);
+        for view in views {
+            target.room_x_mm = view["position_mm"][0].as_i64().unwrap().try_into().unwrap();
+            target.room_z_mm = view["position_mm"][1].as_i64().unwrap().try_into().unwrap();
+            let pass = manager.validate_room_bounds(&target).is_ok();
+            assert_eq!(pass, view["within_existing_radius"].as_bool().unwrap());
+            accepted += usize::from(pass);
+        }
+        assert_eq!(accepted, 101);
+        assert_eq!(views.len() - accepted, 55);
+    }
     #[test]
     fn node_status_errors_are_classified_without_exposing_credentials() {
         assert_eq!(classify_node_status_error("request timed out"), "timeout");
@@ -6324,6 +6624,7 @@ mod tests {
                 },
             }),
             Some(ExperimentContext {
+                cad: None,
                 setup_id: "setup-01".to_string(),
                 setup_sha256: "a".repeat(64),
                 server_version: "test".to_string(),
@@ -6407,6 +6708,7 @@ mod tests {
             serde_json::from_slice(&packet(0, 1, MeasurementMode::Calibration))
                 .expect("synthetic radar packet");
         outside["targets"][0]["room_x_mm"] = serde_json::json!(5_000);
+        outside["targets"][0]["y_mm"] = serde_json::json!(5_000);
         let outside = serde_json::to_vec(&outside).expect("serialize outside target");
 
         manager
@@ -6634,6 +6936,7 @@ mod tests {
             flags: 0,
             mesh_timestamp_us: None,
             source_binding: Some(position_test_source_binding()),
+            protocol_identity: None,
             iq_pairs: (0..8)
                 .map(|_| IqPair {
                     i: rx_id as i8 + signal_offset,
@@ -6829,6 +7132,9 @@ mod tests {
                 .expect("synthetic radar packet");
         value["targets"][0]["room_x_mm"] = serde_json::json!(room_position_mm[0]);
         value["targets"][0]["room_z_mm"] = serde_json::json!(room_position_mm[1]);
+        // The sealed fixture uses zero yaw/origin and no raw-x inversion.
+        value["targets"][0]["x_mm"] = serde_json::json!(room_position_mm[1]);
+        value["targets"][0]["y_mm"] = serde_json::json!(room_position_mm[0]);
         serde_json::to_vec(&value).expect("serialize synthetic radar packet")
     }
 

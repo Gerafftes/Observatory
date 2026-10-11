@@ -15,6 +15,9 @@
 #include <stdbool.h>
 #include <stdio.h>
 #include <string.h>
+#ifdef CSI_DIAGNOSTICS_THREAD_SAFE_STUBS
+#include <pthread.h>
+#endif
 
 /* ---- esp_err.h ---- */
 typedef int esp_err_t;
@@ -53,6 +56,9 @@ typedef struct {
  * Declared here, defined in esp_stubs.c.
  */
 int64_t esp_timer_get_time(void);
+void esp_test_set_time_us(int64_t time_us);
+void esp_test_set_time_step_us(int64_t step_us);
+void esp_test_advance_time_us(int64_t delta_us);
 
 /** Stub: timer lifecycle (no-ops for fuzz testing). */
 static inline esp_err_t esp_timer_create(const esp_timer_create_args_t *args, esp_timer_handle_t *h) {
@@ -78,7 +84,8 @@ typedef struct {
     signed   rssi          : 8;
     unsigned channel       : 4;
     unsigned noise_floor   : 8;
-    unsigned rx_ant        : 2;
+    unsigned ant           : 2;
+    unsigned rx_state      : 8;
     /* ADR-110 HE-branch fields (CONFIG_SOC_WIFI_HE_SUPPORT path) */
     unsigned cur_bb_format : 4;   /**< 0=11b 1=11g/a 2=HT 3=VHT 4=HE-SU 5=HE-MU 6=HE-ER-SU 7=HE-TB */
     unsigned second        : 4;   /**< secondary 40 MHz channel offset */
@@ -87,13 +94,15 @@ typedef struct {
     unsigned cwb           : 1;   /**< 0=20 MHz 1=40 MHz */
     unsigned stbc          : 1;   /**< STBC flag */
     /* Padding to keep alignment predictable. */
-    unsigned _pad          : 18;
+    unsigned _pad          : 8;
+    uint32_t timestamp;
 } wifi_pkt_rx_ctrl_t;
 
 /** Minimal wifi_csi_info_t needed by csi_serialize_frame. */
 typedef struct {
     wifi_pkt_rx_ctrl_t rx_ctrl;
     uint8_t            mac[6];
+    bool               first_word_invalid;
     int16_t            len;     /**< Length of the I/Q buffer in bytes. */
     int8_t            *buf;     /**< Pointer to I/Q data. */
 } wifi_csi_info_t;
@@ -130,10 +139,71 @@ typedef struct {
 /* ---- FreeRTOS stubs ---- */
 #define pdMS_TO_TICKS(x) ((x))
 #define pdPASS  1
+#define pdTRUE  1
+#define pdFALSE 0
+#define portMAX_DELAY UINT32_MAX
 typedef int BaseType_t;
+typedef uint32_t UBaseType_t;
+typedef uint8_t StackType_t;
+typedef void *TaskHandle_t;
+#ifdef CSI_DIAGNOSTICS_THREAD_SAFE_STUBS
+typedef pthread_mutex_t portMUX_TYPE;
+#define portMUX_INITIALIZER_UNLOCKED PTHREAD_MUTEX_INITIALIZER
+#define portENTER_CRITICAL(lock) ((void)pthread_mutex_lock(lock))
+#define portEXIT_CRITICAL(lock) ((void)pthread_mutex_unlock(lock))
+#else
+typedef int portMUX_TYPE;
+#define portMUX_INITIALIZER_UNLOCKED 0
+#define portENTER_CRITICAL(lock) ((void)(lock))
+#define portEXIT_CRITICAL(lock) ((void)(lock))
+#endif
+
+#ifdef CSI_DIAGNOSTICS_THREAD_SAFE_STUBS
+typedef pthread_mutex_t StaticSemaphore_t;
+#else
+typedef int StaticSemaphore_t;
+#endif
+typedef StaticSemaphore_t *SemaphoreHandle_t;
+
+SemaphoreHandle_t xSemaphoreCreateMutexStatic(StaticSemaphore_t *storage);
+BaseType_t xSemaphoreTake(SemaphoreHandle_t semaphore, uint32_t wait_ticks);
+BaseType_t xSemaphoreGive(SemaphoreHandle_t semaphore);
+
+typedef struct {
+    uint8_t *storage;
+    size_t item_size;
+    size_t capacity;
+    size_t head;
+    size_t tail;
+    size_t count;
+#ifdef CSI_DIAGNOSTICS_THREAD_SAFE_STUBS
+    pthread_mutex_t lock;
+    bool lock_initialized;
+#endif
+} StaticQueue_t;
+typedef StaticQueue_t *QueueHandle_t;
+
+QueueHandle_t xQueueCreateStatic(size_t capacity, size_t item_size,
+                               uint8_t *storage, StaticQueue_t *control);
+BaseType_t xQueueSend(QueueHandle_t queue, const void *item, uint32_t wait_ticks);
+BaseType_t xQueueReceive(QueueHandle_t queue, void *item, uint32_t wait_ticks);
+size_t uxQueueMessagesWaiting(QueueHandle_t queue);
 
 static inline int xPortGetCoreID(void) { return 0; }
-static inline void vTaskDelay(uint32_t ticks) { (void)ticks; }
+static inline void vTaskDelay(uint32_t ticks) { esp_test_advance_time_us((int64_t)ticks * 1000); }
+static inline TaskHandle_t xTaskGetCurrentTaskHandle(void) { return (void *)2; }
+static inline UBaseType_t uxTaskGetStackHighWaterMark(TaskHandle_t task) {
+    return task == NULL ? 0 : 4096;
+}
+static inline void vTaskDelete(TaskHandle_t task) { (void)task; }
+static inline BaseType_t xTaskCreate(
+    void (*fn)(void *), const char *name, uint32_t stack,
+    void *arg, int prio, TaskHandle_t *handle)
+{
+    (void)fn; (void)name; (void)stack; (void)arg; (void)prio;
+    if (handle) *handle = (void *)1;
+    return pdPASS;
+}
 static inline BaseType_t xTaskCreatePinnedToCore(
     void (*fn)(void *), const char *name, uint32_t stack,
     void *arg, int prio, void *handle, int core)
@@ -201,10 +271,21 @@ static inline esp_err_t nvs_get_u32(nvs_handle_t h, const char *k, uint32_t *v) 
 static inline esp_err_t nvs_get_blob(nvs_handle_t h, const char *k, void *v, size_t *l) { (void)h; (void)k; (void)v; (void)l; return ESP_FAIL; }
 
 /* ---- stream_sender stubs (defined in esp_stubs.c) ---- */
+#ifndef CSI_DIAGNOSTICS_REAL_TRANSPORT
 int stream_sender_send(const uint8_t *data, size_t len);
 int stream_sender_init(void);
 int stream_sender_init_with(const char *ip, uint16_t port);
 void stream_sender_deinit(void);
+esp_err_t csi_transport_start(void);
+void csi_transport_stop(void);
+bool csi_transport_enqueue_capture(const wifi_csi_info_t *info,
+                                   int64_t callback_started_at_us);
+#endif
+
+void esp_test_reset_edge_enqueue(void);
+void esp_test_set_edge_enqueue_result(bool accepted);
+uint32_t esp_test_edge_enqueue_count(void);
+uint32_t esp_test_edge_timestamp_us(void);
 
 /*
  * wasm_runtime stubs: defined in esp_stubs.c.

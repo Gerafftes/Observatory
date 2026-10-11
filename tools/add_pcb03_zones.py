@@ -1,11 +1,11 @@
-import sys
+lazy import sys
 
 sys.path.insert(
     0,
     "/Applications/KiCad/KiCad.app/Contents/Frameworks/Python.framework/Versions/3.9/lib/python3.9/site-packages",
 )
 
-import pcbnew
+lazy import pcbnew
 
 
 PCB_PATH = "/Users/Johann/Development/BLL KiCad/mmwave-PCB/PCB-02/PCB-03/PCB-03.kicad_pcb"

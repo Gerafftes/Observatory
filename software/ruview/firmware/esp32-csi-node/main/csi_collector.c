@@ -12,17 +12,19 @@
  */
 
 #include "csi_collector.h"
+#include "csi_transport.h"
 #include "nvs_config.h"
-#include "stream_sender.h"
-#include "edge_processing.h"
-#include "c6_timesync.h"  /* ADR-110: 802.15.4 epoch for cross-node alignment */
-#include "c6_sync_espnow.h" /* ADR-110 §A0.11: mesh-aligned epoch for sync packet */
+#include "c6_timesync.h"  /* Serializer sync-valid flag on ESP32-C6. */
+#include "c6_sync_espnow.h" /* Serializer sync-valid flag on every RX target. */
 
+#include <limits.h>
 #include <string.h>
 #include "esp_log.h"
 #include "esp_wifi.h"
 #include "esp_timer.h"
 #include "sdkconfig.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
 #include "esp_netif.h"          /* #954: STA gateway lookup for self-ping CSI source */
 #include "ping/ping_sock.h"     /* #954: esp_ping gateway traffic generator */
 #include "lwip/ip_addr.h"       /* #954: ip_addr_t target for esp_ping */
@@ -47,6 +49,8 @@ static uint8_t s_filter_mac[6] = {0};
 static bool    s_filter_mac_set = false;
 static uint8_t s_filter_identity_sha256[32] = {0};
 static bool    s_filter_identity_valid = false;
+static uint64_t s_boot_id = 1;
+static int8_t s_latest_rssi = INT8_MIN;
 
 /* ADR-057: Build-time guard — fail early if CSI is not enabled in sdkconfig.
  * Without this, the firmware compiles but crashes at runtime with:
@@ -62,36 +66,113 @@ static const char *TAG = "csi_collector";
 
 static uint32_t s_sequence = 0;
 static uint32_t s_cb_count = 0;
-static uint32_t s_send_ok = 0;
-static uint32_t s_send_fail = 0;
-static uint32_t s_rate_skip = 0;
+static TaskHandle_t s_callback_task;
+static csi_collector_stats_t s_diagnostics;
+static portMUX_TYPE s_diagnostics_lock = portMUX_INITIALIZER_UNLOCKED;
+
+typedef enum {
+    CSI_CALLBACK_INVALID,
+    CSI_CALLBACK_FOREIGN_TX,
+    CSI_CALLBACK_RATE_LIMITED,
+    CSI_CALLBACK_ADMITTED,
+} csi_callback_outcome_t;
+
+static void csi_record_callback_diagnostics(
+    csi_callback_outcome_t outcome,
+    bool handoff_attempted,
+    bool handoff_accepted,
+    int64_t started_us
+)
+{
+    int64_t elapsed_us = esp_timer_get_time() - started_us;
+    uint32_t duration_us = elapsed_us > 0
+        ? (elapsed_us > UINT32_MAX ? UINT32_MAX : (uint32_t)elapsed_us)
+        : 0;
+
+    portENTER_CRITICAL(&s_diagnostics_lock);
+    s_diagnostics.callbacks_received++;
+    switch (outcome) {
+    case CSI_CALLBACK_INVALID:
+        s_diagnostics.invalid_inputs++;
+        break;
+    case CSI_CALLBACK_FOREIGN_TX:
+        s_diagnostics.foreign_tx++;
+        break;
+    case CSI_CALLBACK_RATE_LIMITED:
+        s_diagnostics.rate_limited++;
+        break;
+    case CSI_CALLBACK_ADMITTED:
+        s_diagnostics.admitted++;
+        break;
+    }
+    if (handoff_attempted) {
+        s_diagnostics.capture_handoff_attempts++;
+        if (handoff_accepted) {
+            s_diagnostics.capture_handoff_accepted++;
+        } else {
+            s_diagnostics.capture_handoff_drops++;
+        }
+    }
+    s_diagnostics.last_callback_started_us = started_us > 0 ? (uint64_t)started_us : 0;
+    s_diagnostics.callback_duration_total_us += duration_us;
+    if (duration_us > s_diagnostics.callback_duration_max_us) {
+        s_diagnostics.callback_duration_max_us = duration_us;
+    }
+    s_diagnostics.callback_duration_samples++;
+    portEXIT_CRITICAL(&s_diagnostics_lock);
+}
 
 /**
- * Minimum interval between UDP sends in microseconds.
+ * Single callback-admission schedule for valid frames from the configured TX.
+ *
  * CSI callbacks can fire hundreds of times per second in promiscuous mode.
- * We cap the send rate to avoid exhausting lwIP packet buffers (ENOMEM).
- * Default: 20 ms = 50 Hz max send rate.
+ * A valid frame may arrive up to 500 us before its nominal deadline;
+ * accepting it advances the deadline by one configured interval rather than
+ * anchoring the next interval to the jittered arrival. A later arrival outside
+ * that tolerance rebases the deadline, so missed slots never accumulate into
+ * a catch-up burst.
  */
-#define CSI_MIN_SEND_INTERVAL_US  (20 * 1000)
-static int64_t s_last_send_us = 0;
+#ifndef CONFIG_CSI_CAPTURE_RATE_LIMIT_HZ
+#define CONFIG_CSI_CAPTURE_RATE_LIMIT_HZ 50
+#endif
+#define CSI_FRAME_INTERVAL_US \
+    (1000000LL / CONFIG_CSI_CAPTURE_RATE_LIMIT_HZ)
+#define CSI_FRAME_EARLY_TOLERANCE_US 500
+static int64_t s_next_frame_deadline_us = 0;
 
-/**
- * Minimum interval between processing ANY CSI callback in microseconds.
- * Promiscuous MGMT+DATA can fire 100-500+ times/sec. At rates above ~50 Hz,
- * the WiFi FIQ handler (wDev_ProcessFiq) races with SPI flash cache operations,
- * causing Core 0 LoadProhibited panics in cache_ll_l1_resume_icache.
- *
- * This early gate drops excess callbacks BEFORE any processing (serialization,
- * UDP, edge enqueue), keeping the effective callback rate at ~50 Hz while
- * preserving the full MGMT+DATA promiscuous filter and HT-LTF/STBC CSI quality.
- *
- * The WiFi hardware still captures all frames and the CSI data is generated,
- * but we simply discard the excess in software. This reduces the time spent
- * in callback context per second, giving the WiFi ISR more headroom.
- */
-#define CSI_MIN_PROCESS_INTERVAL_US  (20 * 1000)  /* 50 Hz */
-static int64_t s_last_process_us = 0;
-static uint32_t s_early_drop = 0;
+static bool csi_rate_limit_admit(int64_t now_us)
+{
+    if (s_next_frame_deadline_us == 0) {
+        s_next_frame_deadline_us = now_us + CSI_FRAME_INTERVAL_US;
+        return true;
+    }
+
+    if (now_us < s_next_frame_deadline_us - CSI_FRAME_EARLY_TOLERANCE_US) {
+        return false;
+    }
+
+    if (now_us > s_next_frame_deadline_us + CSI_FRAME_EARLY_TOLERANCE_US) {
+        s_next_frame_deadline_us = now_us + CSI_FRAME_INTERVAL_US;
+    } else {
+        s_next_frame_deadline_us += CSI_FRAME_INTERVAL_US;
+    }
+    return true;
+}
+
+uint32_t csi_collector_get_csi_config_flags(void)
+{
+    uint32_t flags = 0;
+#if CONFIG_SOC_WIFI_HE_SUPPORT
+    flags |= CSI_CONFIG_LEGACY_OR_LLT;
+    flags |= CSI_CONFIG_HT_LTF;
+    flags |= CSI_CONFIG_HE_OR_VHT;
+#else
+    flags |= CSI_CONFIG_LEGACY_OR_LLT;
+    flags |= CSI_CONFIG_HT_LTF;
+    flags |= CSI_CONFIG_STBC_HTLTF2;
+#endif
+    return flags;
+}
 
 /* ---- ADR-029: Channel-hop state ---- */
 
@@ -123,10 +204,16 @@ static esp_timer_handle_t s_hop_timer = NULL;
  *   [16]     RSSI (i8)
  *   [17]     Noise floor (i8)
  *   [18..19] Reserved
- *   [20..]   I/Q data (raw bytes from ESP-IDF callback)
+ *   [20..]   CSI complex samples (ESP-IDF order: imaginary, then real)
  *   [I/Q end..+39] Runtime TX source-binding trailer (see csi_collector.h)
+ *   [binding end..] Versioned RX boot/timing/quality trailer
  */
-size_t csi_serialize_frame(const wifi_csi_info_t *info, uint8_t *buf, size_t buf_len)
+size_t csi_serialize_frame_at(
+    const wifi_csi_info_t *info,
+    uint64_t callback_started_at_us,
+    uint8_t *buf,
+    size_t buf_len
+)
 {
     if (info == NULL || buf == NULL || info->buf == NULL) {
         return 0;
@@ -137,7 +224,8 @@ size_t csi_serialize_frame(const wifi_csi_info_t *info, uint8_t *buf, size_t buf
     uint16_t n_subcarriers = iq_len / (2 * n_antennas);
 
     size_t iq_end = CSI_HEADER_SIZE + iq_len;
-    size_t frame_size = iq_end + CSI_SOURCE_BINDING_SIZE;
+    size_t binding_end = iq_end + CSI_SOURCE_BINDING_SIZE;
+    size_t frame_size = binding_end + CSI_IDENTITY_TRAILER_SIZE;
     if (frame_size > buf_len) {
         ESP_LOGW(TAG, "Buffer too small: need %u, have %u", (unsigned)frame_size, (unsigned)buf_len);
         return 0;
@@ -242,8 +330,15 @@ size_t csi_serialize_frame(const wifi_csi_info_t *info, uint8_t *buf, size_t buf
     buf[19] = 0;
 #endif
 
-    /* I/Q data */
+    /* I/Q data. Espressif marks the first four bytes invalid on some frames.
+     * Preserve the fixed grid and sanitize those bytes instead of deleting
+     * them. Selectively retained from upstream commit dd02efe2. */
     memcpy(&buf[CSI_HEADER_SIZE], info->buf, iq_len);
+    if (info->first_word_invalid && iq_len > 0) {
+        size_t invalid_len = iq_len < 4 ? iq_len : 4;
+        memset(&buf[CSI_HEADER_SIZE], 0, invalid_len);
+        buf[19] |= (1u << 5);
+    }
 
     /* Runtime TX source binding. Version 1 hashes exactly the six binary
      * filter-MAC bytes captured before WiFi initialization. The callback
@@ -275,7 +370,51 @@ size_t csi_serialize_frame(const wifi_csi_info_t *info, uint8_t *buf, size_t buf
         memset(&binding[8], 0, sizeof(s_filter_identity_sha256));
     }
 
+    uint8_t *identity = &buf[binding_end];
+    uint32_t identity_magic = CSI_IDENTITY_MAGIC;
+    uint16_t identity_size = CSI_IDENTITY_TRAILER_SIZE;
+    uint32_t driver_rx_timestamp_us = info->rx_ctrl.timestamp;
+    uint32_t sync_age_ms = c6_sync_espnow_get_age_ms();
+    uint32_t csi_config_flags = csi_collector_get_csi_config_flags();
+    uint8_t quality_flags = 0;
+    if (info->first_word_invalid) quality_flags |= CSI_QUALITY_FIRST_WORD_INVALID;
+    if ((int8_t)info->rx_ctrl.noise_floor < 0) quality_flags |= CSI_QUALITY_NOISE_FLOOR_VALID;
+    if (info->rx_ctrl.rx_state == 0) quality_flags |= CSI_QUALITY_RX_STATE_VALID;
+#if CONFIG_CSI_RAW_PROFILE
+    quality_flags |= CSI_QUALITY_RAW_PROFILE;
+#endif
+    if (c6_sync_espnow_is_valid()) quality_flags |= CSI_QUALITY_SYNC_VALID;
+#if CONFIG_SOC_WIFI_HE_SUPPORT
+    uint8_t rx_antenna = 0xFF;
+#else
+    uint8_t rx_antenna = info->rx_ctrl.ant;
+#endif
+    memcpy(&identity[0], &identity_magic, sizeof(identity_magic));
+    identity[4] = CSI_PROTOCOL_VERSION;
+    identity[5] = CSI_IDENTITY_ROLE_RX;
+    memcpy(&identity[6], &identity_size, sizeof(identity_size));
+    memcpy(&identity[8], &s_boot_id, sizeof(s_boot_id));
+    memcpy(&identity[16], &callback_started_at_us, sizeof(callback_started_at_us));
+    memcpy(&identity[24], &driver_rx_timestamp_us, sizeof(driver_rx_timestamp_us));
+    identity[28] = quality_flags;
+    identity[29] = info->rx_ctrl.rx_state;
+    identity[30] = rx_antenna;
+    identity[31] = (uint8_t)INT8_MIN; /* ESP-IDF 5.4 exposes no public RX gain API. */
+    memcpy(&identity[32], &csi_config_flags, sizeof(csi_config_flags));
+    memcpy(&identity[36], &sync_age_ms, sizeof(sync_age_ms));
+    memset(&identity[40], 0, 8);
+
     return frame_size;
+}
+
+size_t csi_serialize_frame(const wifi_csi_info_t *info, uint8_t *buf, size_t buf_len)
+{
+    return csi_serialize_frame_at(
+        info,
+        (uint64_t)esp_timer_get_time(),
+        buf,
+        buf_len
+    );
 }
 
 /**
@@ -285,111 +424,57 @@ static void wifi_csi_callback(void *ctx, wifi_csi_info_t *info)
 {
     (void)ctx;
 
-    /* Early rate gate: drop excess callbacks to ~50 Hz to prevent
-     * SPI flash cache crash in WiFi ISR (wDev_ProcessFiq). */
-    int64_t now_us = esp_timer_get_time();
-    if ((now_us - s_last_process_us) < CSI_MIN_PROCESS_INTERVAL_US) {
-        s_early_drop++;
-        return;
+    int64_t callback_started_us = esp_timer_get_time();
+    csi_callback_outcome_t outcome = CSI_CALLBACK_INVALID;
+    bool handoff_attempted = false;
+    bool handoff_accepted = false;
+
+    if (s_callback_task == NULL) {
+        TaskHandle_t current_task = xTaskGetCurrentTaskHandle();
+        portENTER_CRITICAL(&s_diagnostics_lock);
+        if (s_callback_task == NULL) {
+            s_callback_task = current_task;
+        }
+        portEXIT_CRITICAL(&s_diagnostics_lock);
     }
-    s_last_process_us = now_us;
+
+    if (info == NULL || info->buf == NULL || info->len <= 0
+        || (size_t)info->len > CSI_MAX_IQ_SIZE
+        || info->rx_ctrl.rx_state != 0) {
+        goto callback_done;
+    }
 
     /* ADR-060: MAC address filtering — drop frames from non-matching sources.
      * Uses defensively-copied s_filter_mac instead of g_nvs_config (which can
      * be corrupted by wifi_init_sta — same root cause as the node_id clobber). */
     if (s_filter_mac_set) {
         if (memcmp(info->mac, s_filter_mac, 6) != 0) {
-            return;  /* Source MAC doesn't match filter — skip frame. */
+            outcome = CSI_CALLBACK_FOREIGN_TX;
+            goto callback_done;
         }
     }
 
+    /* Rate-limit only fully valid frames from the configured TX. This single
+     * admission decision bounds serialization, edge processing and transport
+     * work together; rejected inputs and foreign sources consume no slot. */
+    if (!csi_rate_limit_admit(callback_started_us)) {
+        outcome = CSI_CALLBACK_RATE_LIMITED;
+        goto callback_done;
+    }
+
+    outcome = CSI_CALLBACK_ADMITTED;
     s_cb_count++;
+    s_latest_rssi = (int8_t)info->rx_ctrl.rssi;
+    handoff_attempted = true;
+    handoff_accepted = csi_transport_enqueue_capture(info, callback_started_us);
 
-    if (s_cb_count <= 3 || (s_cb_count % 100) == 0) {
-        ESP_LOGI(TAG, "CSI cb #%lu: len=%d rssi=%d ch=%d",
-                 (unsigned long)s_cb_count, info->len,
-                 info->rx_ctrl.rssi, info->rx_ctrl.channel);
-    }
-
-    uint8_t frame_buf[CSI_MAX_FRAME_SIZE];
-    size_t frame_len = csi_serialize_frame(info, frame_buf, sizeof(frame_buf));
-
-    if (frame_len > 0) {
-        /* Rate-limit UDP sends to avoid ENOMEM from lwIP pbuf exhaustion.
-         * In promiscuous mode, CSI callbacks can fire 100-500+ times/sec.
-         * We only need 20-50 Hz for the sensing pipeline. */
-        int64_t now = esp_timer_get_time();
-        if ((now - s_last_send_us) >= CSI_MIN_SEND_INTERVAL_US) {
-            int ret = stream_sender_send(frame_buf, frame_len);
-            if (ret > 0) {
-                s_send_ok++;
-                s_last_send_us = now;
-            } else {
-                s_send_fail++;
-                if (s_send_fail <= 5) {
-                    ESP_LOGW(TAG, "sendto failed (fail #%lu)", (unsigned long)s_send_fail);
-                }
-            }
-        } else {
-            s_rate_skip++;
-        }
-    }
-
-    /* ADR-039: Enqueue raw I/Q into edge processing ring buffer. */
-    if (info->buf && info->len > 0) {
-        edge_enqueue_csi((const uint8_t *)info->buf, (uint16_t)info->len,
-                         (int8_t)info->rx_ctrl.rssi, info->rx_ctrl.channel);
-    }
-
-    /* ADR-110 §A0.11/§A0.12 — Emit a sync-packet every N CSI frames so the
-     * host aggregator can pair node-local sequence numbers with the mesh-aligned
-     * epoch coming out of c6_sync_espnow_get_epoch_us(). Backwards-compatible
-     * with the ADR-018 frame format: new packet uses a distinct magic so the
-     * existing CSI parser can dispatch by first 4 bytes.
-     *
-     * Cadence is operator-tunable via CONFIG_C6_SYNC_EVERY_N_FRAMES (default 20).
-     * At 10 Hz observed CSI rate that's ~2 s between sync packets; raise to 50
-     * for ~5 s (less overhead, slower convergence), lower to 5 for ~0.5 s
-     * (heavier wire, tighter ADR-029/030 multistatic alignment window). */
-    {
-#ifndef CONFIG_C6_SYNC_EVERY_N_FRAMES
-#define CONFIG_C6_SYNC_EVERY_N_FRAMES 20
-#endif
-        if ((s_cb_count % CONFIG_C6_SYNC_EVERY_N_FRAMES) == 0) {
-            uint8_t sync[32];
-            uint32_t sync_magic = 0xC511A110u;    /* CSI-ADR-110 sync packet */
-            uint64_t local_us = (uint64_t)esp_timer_get_time();
-            uint64_t epoch_us = c6_sync_espnow_get_epoch_us();
-            int64_t  off_smooth = c6_sync_espnow_get_offset_us_smoothed();
-            uint8_t  flags = 0;
-            if (c6_sync_espnow_is_leader()) flags |= 0x01;
-            if (c6_sync_espnow_is_valid())  flags |= 0x02;
-            if (off_smooth != 0)            flags |= 0x04;
-
-            memcpy(&sync[0],  &sync_magic, 4);
-            sync[4] = s_node_id;
-            sync[5] = 0x01;                       /* protocol version */
-            sync[6] = flags;
-            sync[7] = 0;                          /* reserved */
-            memcpy(&sync[8],  &local_us, 8);
-            memcpy(&sync[16], &epoch_us, 8);
-            memcpy(&sync[24], &s_sequence, 4);    /* high-water seq for pairing */
-            uint32_t zero32 = 0;
-            memcpy(&sync[28], &zero32, 4);        /* reserved (room for leader_id low32) */
-            int sr = stream_sender_send(sync, sizeof(sync));
-            static uint32_t s_sync_count = 0;
-            s_sync_count++;
-            if (s_sync_count <= 3 || (s_sync_count % 60) == 0) {
-                ESP_LOGI(TAG, "sync-pkt #%lu (sr=%d) node=%u flags=0x%02x "
-                              "local_us=%llu epoch_us=%llu seq=%lu",
-                         (unsigned long)s_sync_count, sr,
-                         (unsigned)s_node_id, (unsigned)flags,
-                         (unsigned long long)local_us,
-                         (unsigned long long)epoch_us,
-                         (unsigned long)s_sequence);
-            }
-        }
-    }
+callback_done:
+    csi_record_callback_diagnostics(
+        outcome,
+        handoff_attempted,
+        handoff_accepted,
+        callback_started_us
+    );
 }
 
 /**
@@ -419,17 +504,100 @@ static void wifi_promiscuous_cb(void *buf, wifi_promiscuous_pkt_type_t type)
  * Espressif's esp-csi csi_recv_router reference.
  */
 static esp_ping_handle_t s_self_ping = NULL;
-static void csi_ping_cb_noop(esp_ping_handle_t hdl, void *args) { (void)hdl; (void)args; }
+static csi_ping_stats_t s_ping_stats;
+static int64_t s_last_ping_reply_us;
+
+#ifndef CONFIG_CSI_SELF_PING_INTERVAL_MS
+#define CONFIG_CSI_SELF_PING_INTERVAL_MS 20
+#endif
+#ifndef CONFIG_CSI_SELF_PING_TIMEOUT_MS
+#define CONFIG_CSI_SELF_PING_TIMEOUT_MS 1000
+#endif
+
+#if defined(CONFIG_CSI_SELF_PING_ENABLE) && CONFIG_CSI_SELF_PING_ENABLE
+static void csi_ping_success(esp_ping_handle_t hdl, void *args)
+{
+    (void)hdl;
+    (void)args;
+    int64_t now_us = esp_timer_get_time();
+    uint32_t interval_us = 0;
+    if (s_last_ping_reply_us > 0 && now_us > s_last_ping_reply_us) {
+        int64_t elapsed = now_us - s_last_ping_reply_us;
+        interval_us = elapsed > UINT32_MAX ? UINT32_MAX : (uint32_t)elapsed;
+    }
+    portENTER_CRITICAL(&s_diagnostics_lock);
+    s_ping_stats.replies++;
+    if (interval_us > 0) {
+        s_ping_stats.last_reply_interval_us = interval_us;
+        s_ping_stats.reply_interval_total_us += interval_us;
+        s_ping_stats.reply_interval_samples++;
+        if (interval_us > s_ping_stats.reply_interval_max_us) {
+            s_ping_stats.reply_interval_max_us = interval_us;
+        }
+    }
+    portEXIT_CRITICAL(&s_diagnostics_lock);
+    s_last_ping_reply_us = now_us;
+}
+
+static void csi_ping_timeout(esp_ping_handle_t hdl, void *args)
+{
+    (void)hdl;
+    (void)args;
+    portENTER_CRITICAL(&s_diagnostics_lock);
+    s_ping_stats.timeouts++;
+    portEXIT_CRITICAL(&s_diagnostics_lock);
+}
+
+static void csi_ping_end(esp_ping_handle_t hdl, void *args)
+{
+    (void)hdl;
+    (void)args;
+    portENTER_CRITICAL(&s_diagnostics_lock);
+    s_ping_stats.running = false;
+    portEXIT_CRITICAL(&s_diagnostics_lock);
+}
+#endif
+
+static void csi_stop_self_ping(void)
+{
+    esp_ping_handle_t ping = s_self_ping;
+    s_self_ping = NULL;
+    if (ping != NULL) {
+        (void)esp_ping_stop(ping);
+        (void)esp_ping_delete_session(ping);
+    }
+    portENTER_CRITICAL(&s_diagnostics_lock);
+    s_ping_stats.running = false;
+    portEXIT_CRITICAL(&s_diagnostics_lock);
+    s_last_ping_reply_us = 0;
+}
 
 static void csi_start_self_ping(void)
 {
+#if !CONFIG_CSI_SELF_PING_ENABLE
+    portENTER_CRITICAL(&s_diagnostics_lock);
+    s_ping_stats.enabled = false;
+    s_ping_stats.running = false;
+    portEXIT_CRITICAL(&s_diagnostics_lock);
+    return;
+#else
     if (s_self_ping != NULL) {
         return;  /* already running */
     }
 
+    portENTER_CRITICAL(&s_diagnostics_lock);
+    s_ping_stats.enabled = true;
+    s_ping_stats.configured_interval_ms = CONFIG_CSI_SELF_PING_INTERVAL_MS;
+    s_ping_stats.configured_timeout_ms = CONFIG_CSI_SELF_PING_TIMEOUT_MS;
+    s_ping_stats.start_attempts++;
+    portEXIT_CRITICAL(&s_diagnostics_lock);
+
     esp_netif_t *sta = esp_netif_get_handle_from_ifkey("WIFI_STA_DEF");
     esp_netif_ip_info_t ip;
     if (sta == NULL || esp_netif_get_ip_info(sta, &ip) != ESP_OK || ip.gw.addr == 0) {
+        portENTER_CRITICAL(&s_diagnostics_lock);
+        s_ping_stats.gateway_unavailable++;
+        portEXIT_CRITICAL(&s_diagnostics_lock);
         ESP_LOGW(TAG, "self-ping: no gateway IP yet; CSI relies on ambient frames (#954)");
         return;
     }
@@ -444,24 +612,40 @@ static void csi_start_self_ping(void)
     esp_ping_config_t cfg = ESP_PING_DEFAULT_CONFIG();
     cfg.target_addr     = target;
     cfg.count           = ESP_PING_COUNT_INFINITE;
-    cfg.interval_ms     = 20;     /* 50 Hz -> ~50 received OFDM replies/sec */
+    cfg.interval_ms     = CONFIG_CSI_SELF_PING_INTERVAL_MS;
+    cfg.timeout_ms      = CONFIG_CSI_SELF_PING_TIMEOUT_MS;
     cfg.data_size       = 1;
     cfg.task_stack_size = 4096;
 
     esp_ping_callbacks_t cbs = {
         .cb_args         = NULL,
-        .on_ping_success = csi_ping_cb_noop,
-        .on_ping_timeout = csi_ping_cb_noop,
-        .on_ping_end     = csi_ping_cb_noop,
+        .on_ping_success = csi_ping_success,
+        .on_ping_timeout = csi_ping_timeout,
+        .on_ping_end     = csi_ping_end,
     };
 
     if (esp_ping_new_session(&cfg, &cbs, &s_self_ping) == ESP_OK && s_self_ping != NULL) {
-        esp_ping_start(s_self_ping);
-        ESP_LOGI(TAG, "self-ping started -> %s @50Hz (CSI OFDM source, fix #521/#954)", gw_str);
+        if (esp_ping_start(s_self_ping) == ESP_OK) {
+            portENTER_CRITICAL(&s_diagnostics_lock);
+            s_ping_stats.running = true;
+            portEXIT_CRITICAL(&s_diagnostics_lock);
+            ESP_LOGI(TAG, "self-ping started -> %s interval=%d ms timeout=%d ms",
+                     gw_str, CONFIG_CSI_SELF_PING_INTERVAL_MS,
+                     CONFIG_CSI_SELF_PING_TIMEOUT_MS);
+        } else {
+            csi_stop_self_ping();
+            portENTER_CRITICAL(&s_diagnostics_lock);
+            s_ping_stats.start_failures++;
+            portEXIT_CRITICAL(&s_diagnostics_lock);
+        }
     } else {
         ESP_LOGW(TAG, "self-ping: esp_ping_new_session failed");
         s_self_ping = NULL;
+        portENTER_CRITICAL(&s_diagnostics_lock);
+        s_ping_stats.start_failures++;
+        portEXIT_CRITICAL(&s_diagnostics_lock);
     }
+#endif
 }
 
 void csi_collector_set_node_id(uint8_t node_id)
@@ -498,6 +682,11 @@ void csi_collector_set_node_id(uint8_t node_id)
                      hash_result);
         }
     }
+}
+
+void csi_collector_set_boot_id(uint64_t boot_id)
+{
+    s_boot_id = boot_id == 0 ? 1 : boot_id;
 }
 
 void csi_collector_init(void)
@@ -652,6 +841,88 @@ uint8_t csi_collector_get_node_id(void)
     return s_node_id;
 }
 
+uint64_t csi_collector_get_boot_id(void)
+{
+    return s_boot_id;
+}
+
+uint32_t csi_collector_get_sequence(void)
+{
+    return s_sequence;
+}
+
+int8_t csi_collector_get_rssi(void)
+{
+    return s_latest_rssi;
+}
+
+void csi_collector_get_stats(csi_collector_stats_t *stats)
+{
+    if (stats == NULL) {
+        return;
+    }
+    portENTER_CRITICAL(&s_diagnostics_lock);
+    *stats = s_diagnostics;
+    TaskHandle_t callback_task = s_callback_task;
+    portEXIT_CRITICAL(&s_diagnostics_lock);
+    if (callback_task != NULL) {
+        stats->callback_stack_free_min_bytes =
+            (uint32_t)uxTaskGetStackHighWaterMark(callback_task)
+                * (uint32_t)sizeof(StackType_t);
+        stats->callback_stack_runtime_measured = true;
+    }
+}
+
+void csi_collector_get_ping_stats(csi_ping_stats_t *stats)
+{
+    if (stats == NULL) {
+        return;
+    }
+    portENTER_CRITICAL(&s_diagnostics_lock);
+    *stats = s_ping_stats;
+    portEXIT_CRITICAL(&s_diagnostics_lock);
+}
+
+void csi_collector_notify_network_change(bool connected)
+{
+    bool was_running;
+    portENTER_CRITICAL(&s_diagnostics_lock);
+    was_running = s_ping_stats.running;
+    portEXIT_CRITICAL(&s_diagnostics_lock);
+
+    if (!connected) {
+        csi_stop_self_ping();
+        return;
+    }
+    if (!was_running) {
+        portENTER_CRITICAL(&s_diagnostics_lock);
+        s_ping_stats.restarts++;
+        portEXIT_CRITICAL(&s_diagnostics_lock);
+        csi_start_self_ping();
+    }
+}
+
+#ifdef CSI_DIAGNOSTICS_TEST
+void csi_collector_test_reset(void)
+{
+    portENTER_CRITICAL(&s_diagnostics_lock);
+    memset(&s_diagnostics, 0, sizeof(s_diagnostics));
+    portEXIT_CRITICAL(&s_diagnostics_lock);
+    s_sequence = 0;
+    s_cb_count = 0;
+    s_callback_task = NULL;
+    s_next_frame_deadline_us = 0;
+    s_latest_rssi = INT8_MIN;
+    memset(&s_ping_stats, 0, sizeof(s_ping_stats));
+    s_last_ping_reply_us = 0;
+}
+
+void csi_collector_test_invoke_callback(wifi_csi_info_t *info)
+{
+    wifi_csi_callback(NULL, info);
+}
+#endif
+
 /* ---- ADR-081: packet yield accessor for the radio abstraction layer ---- */
 
 uint16_t csi_collector_get_pkt_yield_per_sec(void)
@@ -685,7 +956,10 @@ uint16_t csi_collector_get_pkt_yield_per_sec(void)
 
 uint16_t csi_collector_get_send_fail_count(void)
 {
-    uint32_t f = s_send_fail;
+    csi_transport_stats_t stats;
+    csi_transport_get_stats(&stats);
+    uint32_t f = stats.pool_exhausted_drops + stats.queue_publish_failures
+        + stats.transport_errors + stats.frames_abandoned;
     return (f > 0xFFFFu) ? 0xFFFFu : (uint16_t)f;
 }
 

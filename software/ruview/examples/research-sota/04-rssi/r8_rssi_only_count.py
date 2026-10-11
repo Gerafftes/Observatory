@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python3.15
 """R8 — RSSI-only person count: how much accuracy do we lose vs full CSI?
 
 See docs/research/sota-2026-05-22/R8-rssi-only-count.md.
@@ -24,13 +24,13 @@ Usage:
 
 from __future__ import annotations
 
-import argparse
-import json
-import time
-from collections import Counter
-from pathlib import Path
+lazy import argparse
+lazy import json
+lazy import time
+lazy from collections import Counter
+lazy from pathlib import Path
 
-import numpy as np
+lazy import numpy as np
 
 N_SUB, N_FRAMES, COUNT_CLASSES = 56, 20, 8
 

@@ -1,0 +1,3 @@
+# Opt-in comparison overlay. Pair with sdkconfig.defaults.rx-raw.
+# It changes only the self-ping traffic source; it does not disable CSI capture.
+CONFIG_CSI_SELF_PING_ENABLE=n

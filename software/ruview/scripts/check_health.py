@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python3.15
 """
 QEMU Post-Fault Health Checker — ADR-061 Layer 9
 
@@ -21,12 +21,12 @@ Usage:
     python3 check_health.py --log /path/to/fault_segment.log --after-fault wifi_kill
 """
 
-import argparse
-import re
-import sys
-from dataclasses import dataclass
-from pathlib import Path
-from typing import List
+lazy import argparse
+lazy import re
+lazy import sys
+lazy from dataclasses import dataclass
+lazy from pathlib import Path
+lazy from typing import List
 
 
 # ANSI colors

@@ -1,14 +1,14 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python3.15
 """Build a private, no-clobber truth template from classification predictions."""
 
 from __future__ import annotations
 
-import argparse
-import hashlib
-import json
-import os
-from pathlib import Path
-from typing import Any
+lazy import argparse
+lazy import hashlib
+lazy import json
+lazy import os
+lazy from pathlib import Path
+lazy from typing import Any
 
 PREDICTION_SCHEMA_VERSION = 2
 PREDICTION_KIND = "ruview.classification-predictions"

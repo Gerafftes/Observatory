@@ -1,9 +1,9 @@
-import csv
-import importlib.util
-import io
-import types
-import unittest
-from pathlib import Path
+lazy import csv
+lazy import importlib.util
+lazy import io
+lazy import types
+lazy import unittest
+lazy from pathlib import Path
 
 
 PROVISION_PATH = Path(__file__).resolve().parents[1] / "provision.py"

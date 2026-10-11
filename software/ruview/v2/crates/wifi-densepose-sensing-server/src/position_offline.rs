@@ -1821,6 +1821,7 @@ mod tests {
             flags: 0,
             mesh_timestamp_us: None,
             source_binding: Some(synthetic_source_binding('f')),
+            protocol_identity: None,
             iq_pairs: vec![IqPair { i: 1, q: 1 }],
         }
     }
@@ -2062,6 +2063,7 @@ mod tests {
                     flags: 0,
                     mesh_timestamp_us: None,
                     source_binding: Some(synthetic_source_binding(digest_character)),
+                    protocol_identity: None,
                     iq_pairs: synthetic_iq_pairs(kind, rx_id, tick_index),
                 };
                 writer

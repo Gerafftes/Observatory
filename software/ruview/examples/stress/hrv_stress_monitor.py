@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python3.15
 """
 Real-Time Stress Monitor via Heart Rate Variability (HRV)
 
@@ -15,13 +15,13 @@ Usage:
     python examples/stress/hrv_stress_monitor.py --port COM4
 """
 
-import argparse
-import collections
-import math
-import re
-import serial
-import sys
-import time
+lazy import argparse
+lazy import collections
+lazy import math
+lazy import re
+lazy import serial
+lazy import sys
+lazy import time
 
 RE_HR = re.compile(r"'Real-time heart rate'.*?(\d+\.?\d*)\s*bpm", re.IGNORECASE)
 RE_ANSI = re.compile(r"\x1b\[[0-9;]*m")

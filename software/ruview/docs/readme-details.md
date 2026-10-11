@@ -347,8 +347,8 @@ The installer walks through 7 steps: system detection, toolchain check, WiFi har
 
 | Profile | What it installs | Size | Requirements |
 |---------|-----------------|------|-------------|
-| `verify` | Pipeline verification only | ~5 MB | Python 3.8+ |
-| `python` | Full Python API server + sensing | ~500 MB | Python 3.8+ |
+| `verify` | Pipeline verification only | ~5 MB | Python 3.15+ |
+| `python` | Full Python API server + sensing | ~500 MB | Python 3.15+ |
 | `rust` | Rust pipeline (~810x faster) | ~200 MB | Rust 1.70+ |
 | `browser` | WASM for in-browser execution | ~10 MB | Rust + wasm-pack |
 | `iot` | ESP32 sensor mesh + aggregator | varies | Rust + ESP-IDF |
@@ -384,7 +384,7 @@ pip install -e .
 
 # Or via pip
 pip install wifi-densepose
-pip install wifi-densepose[gpu]   # GPU acceleration
+pip install wifi-densepose[gpu]   # GPU acceleration once PyTorch publishes cp315 wheels
 pip install wifi-densepose[all]   # All optional deps
 ```
 

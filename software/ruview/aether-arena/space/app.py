@@ -8,11 +8,11 @@ hash-chained **witness ledger** shown here.
 Benchmark-first: the board starts EMPTY. No seeded or hand-entered numbers — every
 row is a real scoring-pipeline witness (inputs_sha256 + proof_sha256 + harness_version).
 """
-import hashlib
-import json
-from pathlib import Path
+lazy import hashlib
+lazy import json
+lazy from pathlib import Path
 
-import gradio as gr
+lazy import gradio as gr
 
 LEDGER = Path(__file__).parent / "ledger.jsonl"
 GENESIS_PREV = "0" * 64

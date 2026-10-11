@@ -219,6 +219,45 @@ Offset  Size  Field
 20      N*2   I/Q pairs (n_antennas * n_subcarriers * 2 bytes)
 ```
 
+Every current raw frame then carries the existing 40-byte TX-source-binding
+trailer followed by a strict 24-byte protocol-v2 identity trailer:
+
+```
+Offset after I/Q  Size  Field
+0                 4     TX binding magic: 0xC511A060
+4                 1     Binding version: 1
+5                 1     Complete flags: 0x07
+6                 2     Binding length: 40
+8                 32    SHA-256 of the configured six-byte TX filter MAC
+40                4     Identity magic: 0xC511A061
+44                1     CSI protocol version: 2
+45                1     Role: 1 (RX)
+46                2     Identity length: 24
+48                8     Non-zero random boot_id (LE u64)
+56                8     Reserved, zero
+```
+
+`node_id` remains the durable NVS identity RX1-RX4. `boot_id` changes on every
+boot and the sequence is boot-local, so the server keys stream state by
+`(node_id, boot_id)` rather than treating a sequence regression as a global
+reset. Missing/unknown IDs, conflicting live boots, duplicate sequences, and
+unknown TX bindings are rejected before they reach sensing or recording.
+
+The WiFi CSI callback only validates/serializes and performs a non-blocking copy
+into an eight-frame static queue. A sender task owns socket I/O, bounded retries
+(three attempts within 100 ms), and socket reconstruction after disconnect,
+reconnect, IP change, or send failure. Queue depth, full-queue drops, retries,
+abandoned frames, socket rebuilds, and ENOMEM backoffs are exposed by
+`GET /ota/status` on port 8032 together with RX identity, boot, sequence, RSSI,
+IP, firmware/image hash, OTA state, and partition sizes.
+
+OTA rollback is enabled for every maintained RX sdkconfig. A newly booted image
+remains `PENDING_VERIFY` until NVS identity, runtime initialization, and minimum
+heap checks pass; a failed self-test marks it invalid and requests rollback.
+The callback sanitation for ESP-IDF's `first_word_invalid` flag and OTA size
+guard were selectively reconciled with official RuView commit `dd02efe2`; the
+local source-binding, privacy, multistatic, and server contracts remain local.
+
 ### Vitals Packet (32 bytes)
 
 ```
@@ -247,7 +286,7 @@ Offset  Size  Field
 |-----------|---------|---------|
 | Docker Desktop | 28.x+ | Cross-compile firmware in ESP-IDF container |
 | esptool | 5.x+ | Flash firmware to ESP32 (`pip install esptool`) |
-| Python 3.10+ | 3.10+ | Provisioning script, serial monitor |
+| Python 3.15+ | 3.15+ | Provisioning script, serial monitor |
 | ESP32-S3 board | -- | Target hardware |
 | CP210x driver | -- | USB-UART bridge driver ([download](https://www.silabs.com/developers/usb-to-uart-bridge-vcp-drivers)) |
 

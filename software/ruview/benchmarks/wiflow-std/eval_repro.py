@@ -12,21 +12,21 @@ Usage:
   .venv/Scripts/python.exe eval_repro.py --data-dir <dir containing csi_windows.npy>
 """
 
-import argparse
-import json
-import os
-import sys
+lazy import argparse
+lazy import json
+lazy import os
+lazy import sys
 
-import torch
-from torch.utils.data import DataLoader
+lazy import torch
+lazy from torch.utils.data import DataLoader
 
-from _bench_common import (UPSTREAM, evaluate, import_upstream,
+lazy from _bench_common import (UPSTREAM, evaluate, import_upstream,
                            load_remapped_state, set_seed)
 
 import_upstream()  # sys.path + models stub + >1GB np.load mmap patch
 
-from dataset import PreprocessedCSIKeypointsDataset, create_preprocessed_train_val_test_loaders  # noqa: E402
-from models.pose_model import WiFlowPoseModel  # noqa: E402
+lazy from dataset import PreprocessedCSIKeypointsDataset, create_preprocessed_train_val_test_loaders  # noqa: E402
+lazy from models.pose_model import WiFlowPoseModel  # noqa: E402
 
 
 def find_data_dir(root):

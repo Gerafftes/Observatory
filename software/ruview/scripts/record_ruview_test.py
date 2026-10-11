@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python3.15
 """
 Record RuView CSI test runs to files.
 
@@ -11,17 +11,17 @@ Outputs per run:
 
 from __future__ import annotations
 
-import argparse
-import csv
-import json
-import re
-import sys
-import time
-import urllib.error
-import urllib.request
-from datetime import datetime, timezone
-from pathlib import Path
-from typing import Any
+lazy import argparse
+lazy import csv
+lazy import json
+lazy import re
+lazy import sys
+lazy import time
+lazy import urllib.error
+lazy import urllib.request
+lazy from datetime import datetime, timezone
+lazy from pathlib import Path
+lazy from typing import Any
 
 
 SCRIPT_DIR = Path(__file__).resolve().parent

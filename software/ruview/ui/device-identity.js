@@ -6,10 +6,10 @@
  */
 export const DEVICE_IDENTITIES = Object.freeze({
   TX1: Object.freeze({ id: 'TX1', role: 'transmitter', color: '#ff9f0a', threeColor: 0xff9f0a }),
-  RX1: Object.freeze({ id: 'RX1', role: 'receiver', wireId: 1, color: '#0a84ff', threeColor: 0x0a84ff }),
-  RX2: Object.freeze({ id: 'RX2', role: 'receiver', wireId: 2, color: '#30d158', threeColor: 0x30d158 }),
-  RX3: Object.freeze({ id: 'RX3', role: 'receiver', wireId: 3, color: '#ff375f', threeColor: 0xff375f }),
-  RX4: Object.freeze({ id: 'RX4', role: 'receiver', wireId: 4, color: '#bf5af2', threeColor: 0xbf5af2 }),
+  RX1: Object.freeze({ id: 'RX1', role: 'receiver', wireId: 1, color: '#0000ff', threeColor: 0x0000ff }),
+  RX2: Object.freeze({ id: 'RX2', role: 'receiver', wireId: 2, color: '#00ff00', threeColor: 0x00ff00 }),
+  RX3: Object.freeze({ id: 'RX3', role: 'receiver', wireId: 3, color: '#ff0000', threeColor: 0xff0000 }),
+  RX4: Object.freeze({ id: 'RX4', role: 'receiver', wireId: 4, color: '#a000ff', threeColor: 0xa000ff }),
 });
 
 export const UNKNOWN_DEVICE_COLOR = '#68737a';

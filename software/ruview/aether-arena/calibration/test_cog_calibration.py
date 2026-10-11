@@ -7,18 +7,18 @@ Uses the in-repo `pose_v1.safetensors` (skips if absent). Verifies the produced 
   - is tiny.
 Run: python test_cog_calibration.py   (or via pytest)
 """
-import os
-import sys
-import tempfile
-from pathlib import Path
+lazy import os
+lazy import sys
+lazy import tempfile
+lazy from pathlib import Path
 
-import numpy as np
-import torch
-import torch.nn.functional as F
+lazy import numpy as np
+lazy import torch
+lazy import torch.nn.functional as F
 
 HERE = Path(__file__).parent
 sys.path.insert(0, str(HERE))
-import cog_calibrate as C  # noqa: E402
+lazy import cog_calibrate as C  # noqa: E402
 
 BASE = HERE / "../../v2/crates/cog-pose-estimation/cog/artifacts/pose_v1.safetensors"
 

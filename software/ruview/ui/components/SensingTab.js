@@ -338,7 +338,9 @@ export class SensingTab {
       if (radar.active) {
         cfg = { text: 'WIFI/CSI OFFLINE · MMWAVE AKTIV', cls: 'sensing-source-mixed' };
       } else if (radar.reachable) {
-        cfg = { text: 'WIFI/CSI OFFLINE · MMWAVE VERBUNDEN', cls: 'sensing-source-mixed' };
+        cfg = { text: 'WIFI/CSI OFFLINE · MMWAVE-ESP ERREICHBAR', cls: 'sensing-source-mixed' };
+      } else {
+        cfg = { text: 'WIFI/CSI OFFLINE · MMWAVE OFFLINE', cls: 'sensing-source-offline' };
       }
     }
     banner.textContent = cfg.text;

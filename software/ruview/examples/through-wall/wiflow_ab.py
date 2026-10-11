@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python3.15
 """Rigorous A/B for WiFlow CSI->pose: is the held-out PCK real signal or split leakage?
 
 For a dataset of {csi:[D], kps:17x[x,y,vis]} pairs, train the SAME small MLP under
@@ -16,8 +16,8 @@ blocked_gap, the apparent signal was temporal leakage, not generalizable CSI->po
 
 Usage (ruvultra venv): python wiflow_ab.py --data ~/wiflow-room/dataset.jsonl
 """
-import argparse, json, sys
-import numpy as np, torch, torch.nn as nn
+lazy import argparse, json, sys
+lazy import numpy as np, torch, torch.nn as nn
 
 def _rec(r, X, Y, V, B):
     X.append(r["csi"]); kp=r["kps"]

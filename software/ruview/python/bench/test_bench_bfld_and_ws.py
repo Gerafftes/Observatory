@@ -14,12 +14,12 @@ tight; make sure dataclass construction doesn't dominate.
 
 from __future__ import annotations
 
-import json
+lazy import json
 
-import numpy as np
-import pytest
+lazy import numpy as np
+lazy import pytest
 
-from wifi_densepose import BfldFrame, BfldKind
+lazy from wifi_densepose import BfldFrame, BfldKind
 
 
 @pytest.mark.parametrize("kind,shape", [

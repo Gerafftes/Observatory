@@ -44,15 +44,15 @@ Usage:
 Writes/merges into results/edge_optimization.json under key "tiny_variant".
 """
 
-import argparse
-import json
-import os
-import platform
-import sys
-import time
+lazy import argparse
+lazy import json
+lazy import os
+lazy import platform
+lazy import sys
+lazy import time
 
-import numpy as np
-import torch
+lazy import numpy as np
+lazy import torch
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 RESULTS = os.path.join(HERE, "results")
@@ -60,15 +60,15 @@ sys.path.insert(0, HERE)
 sys.path.insert(0, os.path.join(HERE, "remote", "sweep"))
 
 # quantize_bench sets up upstream imports + the np.load mmap patch
-from quantize_bench import build_test_subset  # noqa: E402
-from eval_ort_accuracy import evaluate_ort  # noqa: E402
-from static_ptq_bench import (  # noqa: E402
+lazy from quantize_bench import build_test_subset  # noqa: E402
+lazy from eval_ort_accuracy import evaluate_ort  # noqa: E402
+lazy from static_ptq_bench import (  # noqa: E402
     build_calibration_windows,
     interleaved_latency,
     make_reader,
     ort_session,
 )
-from model_compact import CompactWiFlowPoseModel, describe  # noqa: E402
+lazy from model_compact import CompactWiFlowPoseModel, describe  # noqa: E402
 
 TINY_CKPT = os.path.join(RESULTS, "tiny_best.pth")
 TINY_FP32_ONNX = os.path.join(RESULTS, "tiny_fp32_dynamic.onnx")

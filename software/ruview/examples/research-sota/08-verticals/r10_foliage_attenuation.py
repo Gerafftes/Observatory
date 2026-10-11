@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python3.15
 """R10 — through-foliage WiFi attenuation curves (ITU-R P.833 + per-species gait).
 
 See docs/research/sota-2026-05-22/R10-through-foliage-wildlife.md.
@@ -12,10 +12,10 @@ downstream consumer can render them.
 
 from __future__ import annotations
 
-import argparse
-import json
-from pathlib import Path
-import numpy as np
+lazy import argparse
+lazy import json
+lazy from pathlib import Path
+lazy import numpy as np
 
 
 def itu_p833_attenuation(freq_ghz: float, distance_m: float, foliage_density: str) -> float:

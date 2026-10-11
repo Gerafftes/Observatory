@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python3.15
 """Transcode an ESP32 .csi.jsonl recording into a .rvcsi capture (JSONL).
 
 This is the moral equivalent of `rvcsi record --source esp32-jsonl` (which the
@@ -9,9 +9,9 @@ CsiFrame.  Rejected frames are dropped (quarantine), like the real pipeline.
 
 Usage: esp32_jsonl_to_rvcsi.py <in.csi.jsonl> <out.rvcsi> [--limit N]
 """
-import json
-import math
-import sys
+lazy import json
+lazy import math
+lazy import sys
 
 # --- rvcsi_core::ValidationPolicy::default() -------------------------------
 MIN_SUBCARRIERS = 1

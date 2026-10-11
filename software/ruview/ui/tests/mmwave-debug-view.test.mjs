@@ -60,7 +60,7 @@ test('room coordinates use the current UI orientation and stay centered', () => 
   ]);
 });
 
-test('fresh single mmWave target becomes the signal-red reference marker', () => {
+test('fresh single mmWave target becomes the valid reference marker', () => {
   const state = normalizeMmwaveDebugStatus({
     state: 'valid',
     room_dimensions_m: room,
@@ -232,7 +232,7 @@ test('debug component keeps the source legend explicit', () => {
   assert.match(source, /keine Fusion/);
   assert.match(source, /createMarkerLabel\(this\.nodeId, HARDWARE_GREY/);
   assert.doesNotMatch(source, /createMarkerLabel\('MMWAVE1', HARDWARE_GREY/);
-  assert.match(source, /createMarkerLabel\('RADAR TARGET'/);
+  assert.match(source, /createRadarTargetFrame\(THREE, MMWAVE_FRAME_COLORS\.yellow\)/);
   assert.match(source, /receiverIdentity\(node\.id\)/);
   assert.match(source, /createMarkerLabel\(identity\?\.id \|\| 'RX\?'/);
   assert.match(source, /createMarkerLabel\('TX1'/);

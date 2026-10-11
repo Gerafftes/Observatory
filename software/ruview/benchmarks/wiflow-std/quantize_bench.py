@@ -23,23 +23,23 @@ Usage:
 Writes/merges into results/edge_optimization.json under key "torch".
 """
 
-import argparse
-import json
-import os
-import platform
-import statistics
-import time
+lazy import argparse
+lazy import json
+lazy import os
+lazy import platform
+lazy import statistics
+lazy import time
 
-import numpy as np
-import torch
-import torch.nn as nn
-from torch.utils.data import DataLoader
+lazy import numpy as np
+lazy import torch
+lazy import torch.nn as nn
+lazy from torch.utils.data import DataLoader
 
-from _bench_common import HERE, RESULTS, evaluate, import_upstream, load_wiflow_model
+lazy from _bench_common import HERE, RESULTS, evaluate, import_upstream, load_wiflow_model
 
 import_upstream()  # sys.path + models stub + >1GB np.load mmap patch
 
-from dataset import (  # noqa: E402
+lazy from dataset import (  # noqa: E402
     PreprocessedCSIKeypointsDataset,
     create_preprocessed_train_val_test_loaders,
 )

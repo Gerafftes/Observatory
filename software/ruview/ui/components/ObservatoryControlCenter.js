@@ -155,9 +155,8 @@ function phaseLabel(phase) {
  * Summarise the independent mmWave transport for compact status surfaces.
  *
  * `packets_received` counts only packets that passed room/geometry validation;
- * `raw_udp_packets` proves that the radar is sending and the server is
- * receiving. Keeping both counters here avoids presenting a healthy transport
- * as disconnected when only the current geometry needs attention.
+ * `raw_udp_packets` is a lifetime counter, so only a recent transport packet
+ * proves activity. Rejected room coordinates can still have fresh transport.
  */
 export function mmwaveStatusSummary(status) {
   const mmwave = status?.mmwave || {};
@@ -166,7 +165,10 @@ export function mmwaveStatusSummary(status) {
   const packetsRejected = numberValue(mmwave.packets_rejected);
   const reachable = mmwave.connection?.reachable === true
     || mmwave.node_control?.reachable === true;
-  const active = rawPackets > 0;
+  const active = rawPackets > 0
+    && Number.isFinite(mmwave.packet_age_ms)
+    && mmwave.packet_age_ms >= 0 && mmwave.packet_age_ms <= 1000
+    && !['stale', 'disconnected'].includes(mmwave.state);
   const geometryNeedsAttention = active && packetsReceived === 0 && (
     packetsRejected > 0 || mmwave.state === 'invalid' || mmwave.last_rejection
   );
@@ -216,11 +218,11 @@ export function mmwaveStatusSummary(status) {
       reachable: true,
       accepted: packetsReceived,
       rejected: packetsRejected,
-      value: 'verbunden',
+      value: 'ESP erreichbar',
       state: 'WARTET',
       tone: 'is-warn',
       routeTone: 'is-waiting',
-      routeLabel: 'mmWave verbunden · wartet auf Daten',
+      routeLabel: 'mmWave-ESP erreichbar · wartet auf Daten',
     };
   }
   return {
@@ -394,6 +396,7 @@ export class ObservatoryControlCenter {
       this._nextRetryAt = 0;
     } catch (error) {
       this.connectionState = serverReached ? 'degraded' : 'offline';
+      if (!serverReached) this.status = null;
       this._nextRetryAt = Date.now() + 30000;
       this.message = '';
       this.error = serverReached
@@ -510,6 +513,7 @@ export class ObservatoryControlCenter {
   _render() {
     if (!this._mounted) return;
     const previousGeometrySelection = this.geometryEditor?.selectedIds;
+    const previousGeometrySnap = this.geometryEditor?.snap ?? true;
     this.geometryEditor?.dispose();
     this.geometryEditor = null;
     const connection = {
@@ -596,7 +600,6 @@ export class ObservatoryControlCenter {
             <div class="occ-inline-actions">
               <button type="button" class="occ-button occ-button-primary occ-mmwave-placement-button" data-occ-action="calculate-mmwave-placement">mmWave-Position berechnen</button>
               <button type="submit" class="occ-button occ-button-primary" ${experimentActionsDisabled ? 'disabled' : ''}>${this.selectedProfile ? 'Neue Profilversion speichern' : 'Setup-Profil speichern'}</button>
-              ${this._setupV2DraftActionMarkup()}
             </div>
             <p class="occ-helper" data-occ-mmwave-placement-status>Berechnet die mmWave-Montage aus Raum-, TX- und RX-Geometrie und übernimmt sie direkt in die Felder und den CAD-Plan. Danach Profilversion speichern.</p>
             </form>
@@ -644,10 +647,15 @@ export class ObservatoryControlCenter {
             this._syncProfileFormFromDraft();
           },
         onSave: (document) => this._saveGeometryDocument(document),
+        setupDraftActionMarkup: this._setupV2DraftActionMarkup(),
         saveDisabled: experimentActionsDisabled,
         setupSource: this.profileSource,
-        yawCalibration: this.status?.mmwave?.yaw_calibration || null,
+        yawCalibration: !this.profileDraftDirty && this.selectedProfile?.profile_sha256
+          && this.selectedProfile.profile_sha256 === this.status?.mmwave?.sealed_cad?.profile_sha256
+          ? this.status.mmwave.yaw_calibration || null
+          : null,
       });
+      this.geometryEditor.snap = previousGeometrySnap;
       this.geometryEditor.mount();
     }
   }
@@ -705,7 +713,7 @@ export class ObservatoryControlCenter {
         state: radar.state,
         tone: radar.tone,
         infoLabel: 'Radar',
-        infoText: 'UDP-Rohdaten zeigen die mmWave-Verbindung. Gültige Raumdaten können zusätzlich von Montage/Yaw abhängen; Ground Truth bleibt getrennt, kein WiFi-Feature.',
+        infoText: 'Nur frische UDP-Pakete zeigen mmWave-Aktivität. Gültige Raumdaten können zusätzlich von Montage/Yaw abhängen; Ground Truth bleibt getrennt, kein WiFi-Feature.',
       },
       {
         label: 'Runs',
@@ -729,7 +737,7 @@ export class ObservatoryControlCenter {
   }
 
   _tripleInputs(prefix, values = []) {
-    return [0, 1, 2].map((index) => `<input aria-label="${attribute(prefix)} ${index + 1}" data-occ-field="${attribute(prefix)}.${index}" type="number" step="0.01" value="${attribute(values?.[index] ?? 0)}" required>`).join('');
+    return [0, 1, 2].map((index) => `<input aria-label="${attribute(prefix)} ${index + 1}" data-occ-field="${attribute(prefix)}.${index}" type="number" step="0.001" value="${attribute(numberValue(values?.[index]).toFixed(3))}" required>`).join('');
   }
 
   _syncProfileFormFromDraft() {
@@ -738,7 +746,7 @@ export class ObservatoryControlCenter {
     const set = (prefix, values) => {
       [0, 1, 2].forEach((index) => {
         const input = form.querySelector(`[data-occ-field="${prefix}.${index}"]`);
-        if (input) input.value = values?.[index] ?? 0;
+        if (input) input.value = numberValue(values?.[index]).toFixed(3);
       });
     };
     set('room_dimensions_m', this.profileDraft.room_dimensions_m);
@@ -1253,8 +1261,16 @@ export class ObservatoryControlCenter {
     return `<div class="occ-table-wrap"><table class="occ-table"><thead><tr><th>Node</th><th>Status</th><th>RSSI ${infoTip('RSSI', 'Empfangsstärke des letzten Pakets.')}</th><th>CSI-Rate ${infoTip('CSI-Rate', 'Frames pro Sekunde.')}</th><th>Verlust ${infoTip('Verlust', 'Aus Sequenzlücken geschätzt.')}</th><th>Seq.</th><th>Zeit / Sync ${infoTip('Zeit / Sync', 'Zeitbezug zum Mesh.')}</th></tr></thead><tbody>${nodes.map((node) => {
       const identity = receiverIdentity(node.node_id);
       const label = identity?.id || node.display_name || `RX?`;
+      const active = node.status === 'active';
+      const ageMs = node.last_seen_ms;
+      const lastSeen = Number.isFinite(ageMs) && ageMs >= 0
+        ? `zuletzt vor ${ageMs < 60000 ? `${Math.floor(ageMs / 1000)} s` : ageMs < 3600000 ? `${Math.floor(ageMs / 60000)} min` : `${Math.floor(ageMs / 3600000)} h`}`
+        : 'kein Empfang';
+      if (!active) {
+        return `<tr><td><strong class="device-identity-label" style="--device-color:${deviceColor(label)}"><i aria-hidden="true"></i>${escapeHTML(label)}</strong><small>${escapeHTML(node.role || 'unbekannt')}</small></td><td><span class="occ-node-state is-stale">offline</span><small>${escapeHTML(lastSeen)}</small></td><td>--</td><td>0.0 Hz<small>kein aktueller Empfang</small></td><td>--<small>keine aktuellen Daten</small></td><td>${escapeHTML(node.latest_sequence ?? '--')}<small>zuletzt empfangen</small></td><td>veraltet</td></tr>`;
+      }
       return `
-      <tr><td><strong class="device-identity-label" style="--device-color:${deviceColor(label)}"><i aria-hidden="true"></i>${escapeHTML(label)}</strong><small>${escapeHTML(node.role || 'unbekannt')}</small></td><td><span class="occ-node-state ${node.status === 'active' ? 'is-active' : 'is-stale'}">${escapeHTML(node.status)}</span><small>${escapeHTML(node.last_seen_ms ?? '--')} ms ago</small></td><td>${node.rssi_dbm == null ? '--' : `${Number(node.rssi_dbm).toFixed(1)} dBm`}</td><td>${node.frame_rate_hz == null ? `wird ermittelt (${escapeHTML(node.frame_rate_samples ?? 0)})` : `${Number(node.frame_rate_hz).toFixed(1)} Hz`}</td><td>${node.packet_loss_percent == null ? '--' : `${Number(node.packet_loss_percent).toFixed(1)}%`}<small>${escapeHTML(node.inferred_lost_frames ?? 0)} geschätzt</small></td><td>${escapeHTML(node.latest_sequence ?? '--')}</td><td>${node.sync ? `${escapeHTML(node.sync.is_valid ? 'gültig' : 'veraltet')} · ${escapeHTML(node.sync.offset_us)} µs` : 'kein Mesh-Sync'}</td></tr>`;
+      <tr><td><strong class="device-identity-label" style="--device-color:${deviceColor(label)}"><i aria-hidden="true"></i>${escapeHTML(label)}</strong><small>${escapeHTML(node.role || 'unbekannt')}</small></td><td><span class="occ-node-state is-active">${escapeHTML(node.status)}</span><small>${escapeHTML(lastSeen)}</small></td><td>${node.rssi_dbm == null ? '--' : `${Number(node.rssi_dbm).toFixed(1)} dBm`}</td><td>${node.frame_rate_hz == null ? `wird ermittelt (${escapeHTML(node.frame_rate_samples ?? 0)})` : `${Number(node.frame_rate_hz).toFixed(1)} Hz`}</td><td>${node.packet_loss_percent == null ? '--' : `${Number(node.packet_loss_percent).toFixed(1)}%`}<small>${escapeHTML(node.inferred_lost_frames ?? 0)} geschätzt</small></td><td>${escapeHTML(node.latest_sequence ?? '--')}</td><td>${node.sync ? `${escapeHTML(node.sync.is_valid && Number.isFinite(node.sync.staleness_ms) && node.sync.staleness_ms <= 9000 ? 'gültig' : 'veraltet')} · ${escapeHTML(node.sync.offset_us)} µs` : 'kein Mesh-Sync'}</td></tr>`;
     }).join('')}</tbody></table></div>`;
   }
 

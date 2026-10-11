@@ -496,6 +496,7 @@ try {
   sensingService._dataSource = 'server-offline';
   sourceTab._latestMmwaveStatus = {
     raw_udp_packets: 12,
+    packet_age_ms: 10,
     packets_received: 0,
     packets_rejected: 12,
     state: 'invalid',
@@ -503,6 +504,14 @@ try {
   sourceTab._updateSourceBanner();
   assert.equal(sourceBanner.textContent, 'WIFI/CSI OFFLINE · MMWAVE AKTIV');
   assert.equal(sourceBanner.className, 'sensing-source-banner sensing-source-mixed');
+  sourceTab._latestMmwaveStatus.packet_age_ms = 48_000_000;
+  sourceTab._latestMmwaveStatus.state = 'stale';
+  sourceTab._updateSourceBanner();
+  assert.equal(sourceBanner.textContent, 'WIFI/CSI OFFLINE · MMWAVE OFFLINE');
+  assert.equal(sourceBanner.className, 'sensing-source-banner sensing-source-offline');
+  sourceTab._latestMmwaveStatus = null;
+  sourceTab._updateSourceBanner();
+  assert.equal(sourceBanner.textContent, 'WIFI/CSI OFFLINE · MMWAVE OFFLINE');
 } finally {
   sensingService._dataSource = previousDataSource;
 }

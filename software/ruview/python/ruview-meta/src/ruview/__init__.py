@@ -21,7 +21,7 @@ two names are interchangeable in application code.
 
 from __future__ import annotations
 
-import wifi_densepose as _wdp
+lazy import wifi_densepose as _wdp
 
 # Re-export everything `wifi_densepose.__all__` declares.
 for _name in _wdp.__all__:

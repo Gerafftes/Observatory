@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python3.15
 """
 Contactless Blood Pressure Estimation via mmWave Heart Rate Variability
 
@@ -37,14 +37,14 @@ Requirements:
     pip install pyserial numpy
 """
 
-import argparse
-import collections
-import math
-import re
-import sys
-import time
+lazy import argparse
+lazy import collections
+lazy import math
+lazy import re
+lazy import sys
+lazy import time
 
-import serial
+lazy import serial
 
 try:
     import numpy as np

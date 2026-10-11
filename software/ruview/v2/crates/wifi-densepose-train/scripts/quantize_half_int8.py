@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python3.15
 """ADR-175: int8 quantization of the WiFlow-STD "half" pose model + MEASURED accuracy/size trade-off.
 
 Sub-deliverable 8.2 of the benchmark/optimization milestone. Quantizes the 843,834-param
@@ -29,18 +29,18 @@ REPRODUCE (exact command run for ADR-175, run date 2026-06-15, on host ruvultra 
 
 Everything this script prints to stdout is MEASURED. Nothing is estimated.
 """
-import argparse
-import copy
-import json
-import os
-import random
-import sys
-import time
+lazy import argparse
+lazy import copy
+lazy import json
+lazy import os
+lazy import random
+lazy import sys
+lazy import time
 
-import numpy as np
-import torch
-import torch.nn as nn
-from torch.utils.data import DataLoader, Subset
+lazy import numpy as np
+lazy import torch
+lazy import torch.nn as nn
+lazy from torch.utils.data import DataLoader, Subset
 
 BENCH = os.path.expanduser('~/wiflow-std-bench')
 SWEEP = os.path.join(BENCH, 'sweep')
@@ -48,11 +48,11 @@ OUTDIR = os.path.join(SWEEP, 'int8')
 sys.path.insert(0, os.path.join(BENCH, 'upstream'))
 sys.path.insert(0, SWEEP)
 
-from dataset import (PreprocessedCSIKeypointsDataset,  # noqa: E402
+lazy from dataset import (PreprocessedCSIKeypointsDataset,  # noqa: E402
                      create_preprocessed_train_val_test_loaders)
-from losses.pose_loss import PoseLoss                  # noqa: E402
-from utils.metrics import calculate_pck, calculate_mpjpe  # noqa: E402  LOCKED metric (torso norm)
-from model_compact import CompactWiFlowPoseModel, describe  # noqa: E402
+lazy from losses.pose_loss import PoseLoss                  # noqa: E402
+lazy from utils.metrics import calculate_pck, calculate_mpjpe  # noqa: E402  LOCKED metric (torso norm)
+lazy from model_compact import CompactWiFlowPoseModel, describe  # noqa: E402
 
 # half variant config — IDENTICAL to sweep/run_sweep.py VARIANTS[0] that produced half_best.pth
 HALF = dict(tcn=[270, 220, 170, 120], conv=[4, 8, 16, 32], attn_groups=4,

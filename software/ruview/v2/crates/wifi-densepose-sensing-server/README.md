@@ -75,6 +75,29 @@ per ADR-022 Phase 3.
 | `position_setup` | Canonical sealed setup identity for room, devices, radio grid, and software revision |
 | `position_live` | Fail-closed live fingerprint runtime with D6 presence gating and temporal consensus |
 
+## Setup schema v5: deliberately unrecorded cabling
+
+The CAD importer emits schema v5. Its recording host can retain a real
+`"cable_revision": "revision-id"` or explicitly state
+`"cable_revision": {"status": "not_recorded"}`. The latter records the decision
+not to capture a cable revision; it provides no evidence of cable placement or
+comparability between measurements. A missing field, `null`, an empty string,
+an unknown status, or additional marker fields remains invalid.
+
+The marker participates in the v5 setup hash (`ruview.position-setup.v5\0`).
+Loading verifies that hash, and setup readiness and Observatory status expose
+whether the revision was recorded. Schemas v1–v4 continue to require the original
+nonempty string and retain their original serialization and hash domains.
+Other mandatory fields, exact CAD mounts, and transform projection remain
+unchanged. The exterior rule retains the inclusive 500 mm horizontal Euclidean
+distance to the CAD room contour, as bound by the existing rule identifier.
+
+A spec can be checked without sealing through the ignored native test
+`position_setup::tests::validate_saved_spec_without_sealing`, supplying
+`RUVIEW_SETUP_SPEC_INPUT` and its independently recorded
+`RUVIEW_SETUP_SPEC_SHA256`. It deserializes and validates the complete spec;
+it does not call the create/seal path or bind a future server executable.
+
 ## Quick Start
 
 ```bash
@@ -379,7 +402,7 @@ fingerprint model's measured person position.
 
 The optional HLK-LD2450 node is a temporary teacher and held-back reference.
 It never becomes an input to live position prediction. The server listens for
-strict `ruview.mmwave.ld2450.v1` packets on UDP 5010 by default, aligns each
+strict `ruview.mmwave.ld2450.v1` packets on UDP 55010 by default, aligns each
 accepted radar sample with fresh CSI from RX1-RX4, and guides this sequence in
 the Sensing tab:
 

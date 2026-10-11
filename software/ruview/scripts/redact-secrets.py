@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python3.15
 """Pipe stdin through a secret-redaction filter to stdout.
 
 Used by generate-witness-bundle.sh to strip credentials from log files
@@ -7,8 +7,8 @@ before they enter the witness bundle. Pure stdlib so it runs anywhere.
 Usage:
     some-command 2>&1 | python3 scripts/redact-secrets.py > clean.log
 """
-import re
-import sys
+lazy import re
+lazy import sys
 
 
 # Token prefix patterns — common SaaS / VCS API token shapes.

@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python3.15
 """Train the person-count head — ADR-103 v0.0.1.
 
 Mirrors the Conv1d encoder architecture from cog-person-count's
@@ -12,17 +12,17 @@ Output: count_v1.safetensors + count_v1.onnx + train_results.json.
 
 from __future__ import annotations
 
-import argparse
-import json
-import struct
-import time
-from collections import Counter
-from pathlib import Path
+lazy import argparse
+lazy import json
+lazy import struct
+lazy import time
+lazy from collections import Counter
+lazy from pathlib import Path
 
-import numpy as np
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
+lazy import numpy as np
+lazy import torch
+lazy import torch.nn as nn
+lazy import torch.nn.functional as F
 
 # Architecture constants — MUST match cog-person-count's src/inference.rs.
 N_SUB = 56

@@ -6,6 +6,7 @@ use std::collections::{HashMap, VecDeque};
 use wifi_densepose_hardware::PpduType;
 
 use crate::adaptive_classifier;
+use crate::raw_csi_recording;
 use crate::types::*;
 use crate::vital_signs::VitalSigns;
 
@@ -128,13 +129,41 @@ pub fn parse_esp32_frame(buf: &[u8]) -> Option<Esp32Frame> {
         return None;
     }
 
+    let identity = raw_csi_recording::csi_protocol_identity(buf).ok().flatten();
+    let q_first = identity.is_some_and(|identity| {
+        identity.protocol_version >= raw_csi_recording::CSI_PROTOCOL_VERSION
+    });
+    let invalid_prefix_pairs = if identity
+        .and_then(|identity| identity.quality_flags)
+        .is_some_and(|flags| flags & raw_csi_recording::CSI_QUALITY_FIRST_WORD_INVALID != 0)
+        || buf[19] & (1 << 5) != 0
+    {
+        2usize.min(n_pairs)
+    } else {
+        0
+    };
+    if invalid_prefix_pairs > 0 && n_pairs < 3 {
+        return None;
+    }
+
     let mut amplitudes = Vec::with_capacity(n_pairs);
     let mut phases = Vec::with_capacity(n_pairs);
     for k in 0..n_pairs {
-        let i_val = buf[iq_start + k * 2] as i8 as f64;
-        let q_val = buf[iq_start + k * 2 + 1] as i8 as f64;
+        let first = buf[iq_start + k * 2] as i8 as f64;
+        let second = buf[iq_start + k * 2 + 1] as i8 as f64;
+        let (i_val, q_val) = if q_first {
+            (second, first)
+        } else {
+            (first, second)
+        };
         amplitudes.push((i_val * i_val + q_val * q_val).sqrt());
         phases.push(q_val.atan2(i_val));
+    }
+    if invalid_prefix_pairs > 0 {
+        let first_valid_amplitude = amplitudes[2];
+        let first_valid_phase = phases[2];
+        amplitudes[..invalid_prefix_pairs].fill(first_valid_amplitude);
+        phases[..invalid_prefix_pairs].fill(first_valid_phase);
     }
 
     Some(Esp32Frame {
@@ -147,6 +176,17 @@ pub fn parse_esp32_frame(buf: &[u8]) -> Option<Esp32Frame> {
         rssi,
         noise_floor,
         ppdu_type,
+        protocol_version: identity.map(|identity| identity.protocol_version),
+        device_callback_started_us: identity.and_then(|identity| identity.callback_started_us),
+        driver_rx_timestamp_us: identity.and_then(|identity| identity.driver_rx_timestamp_us),
+        quality_flags: identity.and_then(|identity| identity.quality_flags),
+        rx_state: identity.and_then(|identity| identity.rx_state),
+        antenna_index: identity.and_then(|identity| identity.antenna_index),
+        gain_db: identity.and_then(|identity| identity.gain_db),
+        csi_config_flags: identity.and_then(|identity| identity.csi_config_flags),
+        sync_age_ms: identity.and_then(|identity| identity.sync_age_ms),
+        invalid_prefix_pairs: invalid_prefix_pairs as u8,
+        interpolated_prefix_pairs: invalid_prefix_pairs as u8,
         amplitudes,
         phases,
     })
@@ -986,6 +1026,17 @@ pub fn generate_simulated_frame(tick: u64) -> Esp32Frame {
         rssi: (-40.0 + 5.0 * (t * 0.2).sin()) as i8,
         noise_floor: -90,
         ppdu_type: PpduType::HtLegacy,
+        protocol_version: None,
+        device_callback_started_us: None,
+        driver_rx_timestamp_us: None,
+        quality_flags: None,
+        rx_state: None,
+        antenna_index: None,
+        gain_db: None,
+        csi_config_flags: None,
+        sync_age_ms: None,
+        invalid_prefix_pairs: 0,
+        interpolated_prefix_pairs: 0,
         amplitudes,
         phases,
     }

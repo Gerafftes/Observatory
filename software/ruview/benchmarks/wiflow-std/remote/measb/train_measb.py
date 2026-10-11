@@ -61,15 +61,15 @@ np.load mmap patch, key-remap loader, canonical evaluate loop) live in
 benchmarks/wiflow-std/_bench_common.py — keep copies in sync.
 """
 
-import json
-import os
-import random
-import sys
-import time
+lazy import json
+lazy import os
+lazy import random
+lazy import sys
+lazy import time
 
-import numpy as np
-import torch
-import torch.nn as nn
+lazy import numpy as np
+lazy import torch
+lazy import torch.nn as nn
 
 BENCH = os.path.expanduser("~/wiflow-std-bench")
 UPSTREAM = os.path.join(BENCH, "upstream")
@@ -81,13 +81,13 @@ sys.path.insert(0, UPSTREAM)
 
 # Upstream defect (1): models/__init__.py imports a name tcn.py does not define.
 # Register a stub package so the broken __init__ never executes (as eval_repro.py).
-import types  # noqa: E402
+lazy import types  # noqa: E402
 
 _models_pkg = types.ModuleType("models")
 _models_pkg.__path__ = [os.path.join(UPSTREAM, "models")]
 sys.modules["models"] = _models_pkg
 
-from models.pose_model import WiFlowPoseModel  # noqa: E402
+lazy from models.pose_model import WiFlowPoseModel  # noqa: E402
 
 SEED = 42
 K = 17

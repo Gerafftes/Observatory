@@ -254,6 +254,15 @@ bool c6_sync_espnow_is_valid(void)
     return (now - s_last_seen_us) < (VALID_WINDOW_MS * 1000ULL);
 }
 
+uint32_t c6_sync_espnow_get_age_ms(void)
+{
+    if (s_is_leader) return 0;
+    if (s_last_seen_us == 0) return UINT32_MAX;
+    uint64_t now = (uint64_t)esp_timer_get_time();
+    uint64_t age_ms = (now - s_last_seen_us) / 1000ULL;
+    return age_ms > UINT32_MAX ? UINT32_MAX : (uint32_t)age_ms;
+}
+
 uint32_t c6_sync_espnow_tx_count(void)       { return s_tx_count; }
 uint32_t c6_sync_espnow_tx_fail(void)        { return s_tx_fail; }
 uint32_t c6_sync_espnow_rx_count(void)       { return s_rx_count; }

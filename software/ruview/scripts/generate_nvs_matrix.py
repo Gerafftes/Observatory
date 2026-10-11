@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python3.15
 """
 NVS Test Matrix Generator (ADR-061)
 
@@ -15,17 +15,17 @@ Usage:
 
 Requirements:
     - esp_idf_nvs_partition_gen (pip install) or ESP-IDF nvs_partition_gen.py
-    - Python 3.8+
+    - Python 3.15+
 """
 
-import argparse
-import csv
-import io
-import os
-import sys
-from dataclasses import dataclass, field
-from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+lazy import argparse
+lazy import csv
+lazy import io
+lazy import os
+lazy import sys
+lazy from dataclasses import dataclass, field
+lazy from pathlib import Path
+lazy from typing import Dict, List, Optional, Tuple
 
 
 # NVS partition size must match partitions_display.csv: 0x6000 = 24576 bytes

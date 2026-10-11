@@ -11,11 +11,11 @@ into `b`) — exactly what `cog-pose-estimation run --adapter <file>` consumes.
 
 `calib.npz`: `X` [N,56,20] CSI window + `Y` [N,17,2] (or [N,34]) keypoints in [0,1].
 """
-import argparse
-import numpy as np
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
+lazy import argparse
+lazy import numpy as np
+lazy import torch
+lazy import torch.nn as nn
+lazy import torch.nn.functional as F
 
 
 class CogPose(nn.Module):

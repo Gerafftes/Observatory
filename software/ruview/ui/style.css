@@ -639,17 +639,22 @@
 .occ-cad-sensor-zone { fill: rgba(40, 122, 87, .045); stroke: rgba(40, 122, 87, .55); stroke-width: 1.5; stroke-dasharray: 7 6; vector-effect: non-scaling-stroke; pointer-events: none; }
 .occ-cad-sensor-zone-label { fill: #287a57; font: 650 9px var(--font-family-mono); letter-spacing: .05em; pointer-events: none; }
 .occ-cad-minor-grid { opacity: .8; }
-.occ-cad-grid-lines line { stroke: rgba(17, 17, 17, .14); stroke-width: 1; vector-effect: non-scaling-stroke; }
 .occ-cad-room { fill: rgba(255, 255, 255, .3); stroke: var(--occ-ink); stroke-width: 2; vector-effect: non-scaling-stroke; }
 .occ-cad-mmwave-view { pointer-events: none; }
-.occ-cad-mmwave-fov { fill: rgba(111, 76, 30, .08); stroke: rgba(111, 76, 30, .5); stroke-width: 1; stroke-dasharray: 7 6; vector-effect: non-scaling-stroke; }
-.occ-cad-mmwave-centerline { stroke: rgba(111, 76, 30, .72); stroke-width: 2; vector-effect: non-scaling-stroke; }
-.occ-cad-mmwave-view.is-selected .occ-cad-mmwave-fov { fill: rgba(111, 76, 30, .14); stroke: #6f4c1e; }
-.occ-cad-mmwave-view.is-selected .occ-cad-mmwave-centerline { stroke: #6f4c1e; stroke-width: 3; }
+.occ-cad-mmwave-fov { fill: var(--device-color); fill-opacity: .08; stroke: var(--device-color); stroke-opacity: .55; stroke-width: 1; stroke-dasharray: 7 6; vector-effect: non-scaling-stroke; }
+.occ-cad-mmwave-centerline { stroke: var(--device-color); stroke-width: 2; vector-effect: non-scaling-stroke; }
+.occ-cad-mmwave-view[data-cad-mmwave-view="MMWAVE2"] .occ-cad-mmwave-centerline { stroke-dasharray: 10 7; }
+.occ-cad-mmwave-direction { fill: none; stroke: var(--device-color); stroke-width: 2.5; stroke-linecap: round; vector-effect: non-scaling-stroke; }
+.occ-cad-wall-angle { pointer-events: none; }
+.occ-cad-wall-angle-extension, .occ-cad-wall-angle-arc { fill: none; stroke: var(--device-color); stroke-width: 1.5; vector-effect: non-scaling-stroke; }
+.occ-cad-wall-angle-extension { stroke-width: 1; stroke-dasharray: 4 4; }
+.occ-cad-wall-angle text { fill: var(--device-color); font: 700 11px var(--font-family-mono); text-anchor: middle; dominant-baseline: middle; paint-order: stroke; stroke: var(--occ-paper); stroke-width: 4px; stroke-linejoin: round; }
+.occ-cad-mmwave-view.is-selected .occ-cad-mmwave-fov { fill-opacity: .14; stroke-opacity: 1; }
+.occ-cad-mmwave-view.is-selected .occ-cad-mmwave-centerline { stroke-width: 3; }
 .occ-cad-yaw-handle { cursor: crosshair; outline: none; pointer-events: all; }
 .occ-cad-yaw-handle-hit { fill: transparent; stroke: transparent; }
-.occ-cad-yaw-handle-core { fill: var(--occ-paper); stroke: #6f4c1e; stroke-width: 3; vector-effect: non-scaling-stroke; }
-.occ-cad-yaw-handle:focus-visible .occ-cad-yaw-handle-hit { fill: rgba(111, 76, 30, .12); stroke: #6f4c1e; stroke-width: 2; vector-effect: non-scaling-stroke; }
+.occ-cad-yaw-handle-core { fill: var(--occ-paper); stroke: var(--device-color); stroke-width: 3; vector-effect: non-scaling-stroke; }
+.occ-cad-yaw-handle:focus-visible .occ-cad-yaw-handle-hit { fill: var(--device-color); fill-opacity: .12; stroke: var(--device-color); stroke-width: 2; vector-effect: non-scaling-stroke; }
 .occ-cad-wall-edge { stroke: var(--occ-ink); stroke-width: 3; vector-effect: non-scaling-stroke; pointer-events: none; }
 .occ-cad-wall-hit { fill: none; stroke: rgba(17, 17, 17, .001); stroke-width: 18; cursor: pointer; outline: none; pointer-events: stroke; vector-effect: non-scaling-stroke; }
 .occ-cad-wall-hit.is-selected { stroke: var(--occ-signal); stroke-width: 7; stroke-dasharray: 8 6; stroke-opacity: .78; }
@@ -673,10 +678,11 @@
 .occ-cad-marker-core { stroke: var(--occ-paper); stroke-width: 2; vector-effect: non-scaling-stroke; }
 .occ-cad-marker-tx .occ-cad-marker-core,
 .occ-cad-marker-rx .occ-cad-marker-core { fill: var(--device-color, #68737a); }
-.occ-cad-marker-mmwave .occ-cad-marker-core { fill: #6f4c1e; }
-.occ-cad-marker-calibration .occ-cad-marker-core { fill: var(--occ-paper); stroke: var(--occ-ink); stroke-width: 1.5; }
-.occ-cad-marker-calibration.is-fallback { opacity: .52; }
+.occ-cad-marker-mmwave .occ-cad-marker-core { fill: var(--device-color); }
+.occ-cad-marker-calibration .occ-cad-marker-core { fill: #fff; stroke: var(--occ-ink); stroke-width: 1.5; }
+.occ-cad-marker-calibration.is-fallback text { opacity: .65; }
 .occ-cad-marker text { fill: var(--occ-ink); font: 650 10px var(--font-family-mono); paint-order: stroke; stroke: #f4f4f0; stroke-width: 4px; stroke-linejoin: round; }
+.occ-cad-marker:not(.occ-cad-marker-calibration) text { fill: var(--device-color, var(--occ-ink)); }
 .occ-cad-marker.is-selected .occ-cad-marker-core { stroke: var(--occ-ink); stroke-width: 3; }
 .occ-cad-marker:focus-visible .occ-cad-marker-hit { fill: rgba(229, 28, 35, .12); stroke: var(--occ-signal); stroke-width: 2; vector-effect: non-scaling-stroke; }
 .occ-cad-inspector { display: grid; align-content: start; gap: 11px; min-width: 0; padding-left: 14px; border-left: 1px solid var(--occ-rule); }
@@ -838,6 +844,7 @@
 .occ-table th { padding: 8px 7px; border-top: 1px solid var(--occ-ink); border-bottom: 1px solid var(--occ-ink); color: var(--occ-muted); font: 650 9px/1.2 var(--font-family-mono); text-align: left; text-transform: uppercase; }
 .occ-table td { padding: 9px 7px; border-bottom: 1px solid var(--occ-rule); vertical-align: top; }
 .occ-table td:first-child { display: grid; gap: 3px; }
+.occ-table td > small { display: block; }
 .occ-node-state { display: inline-block; padding: 4px 6px; border-color: var(--occ-rule); color: var(--occ-muted); }
 .occ-node-state.is-active { border-color: #1d5d4f; color: #1d5d4f; }
 .occ-node-state.is-stale { border-color: var(--occ-signal); color: var(--occ-signal); }
@@ -3212,7 +3219,7 @@ canvas {
   --debug-muted: var(--mmwave-muted, #666);
   --debug-ink: var(--mmwave-ink, #111);
   --debug-signal: var(--mmwave-signal, #e51c23);
-  --debug-radar: var(--mmwave-signal, #e51c23);
+  --debug-radar: #b88900;
   --debug-rx: var(--mmwave-ink, #111111);
   --debug-rejected: var(--mmwave-signal, #e51c23);
   --debug-room: #68737a;
@@ -3388,8 +3395,10 @@ canvas {
 }
 
 .sensing-mmwave-debug-fact-radar { border-left: 3px solid var(--debug-radar); }
+.sensing-mmwave-debug-fact-radar.is-outside { border-left-color: var(--debug-rejected); }
 .sensing-mmwave-debug-fact-rx { border-left: 3px solid var(--debug-rx); }
 .sensing-mmwave-debug-fact-radar strong { color: var(--debug-radar); }
+.sensing-mmwave-debug-fact-radar.is-outside strong { color: var(--debug-rejected); }
 .sensing-mmwave-debug-fact-rx strong { color: var(--debug-rx); }
 .sensing-mmwave-debug-fact strong[data-state='rejected'],
 .sensing-mmwave-debug-fact strong[data-state='offline'] { color: var(--debug-rejected); }
@@ -3427,9 +3436,19 @@ canvas {
   background: var(--debug-room);
 }
 
-.sensing-mmwave-debug-swatch.is-radar { background: var(--debug-radar); }
+.sensing-mmwave-debug-swatch.is-radar {
+  width: 10px;
+  height: 10px;
+  border: 1px dashed var(--debug-radar);
+  background: transparent;
+}
 .sensing-mmwave-debug-swatch.is-rx { background: var(--debug-rx); }
-.sensing-mmwave-debug-swatch.is-rejected { background: var(--debug-rejected); }
+.sensing-mmwave-debug-swatch.is-rejected {
+  width: 10px;
+  height: 10px;
+  border: 1px dashed var(--debug-rejected);
+  background: transparent;
+}
 
 .sensing-mmwave-debug-controls {
   display: flex;

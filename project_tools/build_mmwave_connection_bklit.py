@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python3.15
 """Render source-backed mmWave connection diagrams in the Bklit visual style.
 
 These diagrams describe the implemented transport and coordinate contracts.
@@ -7,12 +7,12 @@ They intentionally contain no newly measured latency, loss, or accuracy data.
 
 from __future__ import annotations
 
-import textwrap
-from pathlib import Path
+lazy import textwrap
+lazy from pathlib import Path
 
-from PIL import Image, ImageDraw
+lazy from PIL import Image, ImageDraw
 
-from build_mmwave_transport_bklit import (
+lazy from build_mmwave_transport_bklit import (
     ACCENT,
     BACKGROUND,
     BORDER,

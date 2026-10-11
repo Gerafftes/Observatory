@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python3.15
 """
 ruview-hap-bridge.py — ADR-125 §2.1.c production bridge (Tier 1+2 iter 3).
 
@@ -31,18 +31,18 @@ Usage:
     python3 ruview-hap-bridge.py --rooms "Living Room,Bedroom,Office"
 """
 from __future__ import annotations
-import argparse
-import json
-import os
-import re
-import sys
-import time
-from pathlib import Path
+lazy import argparse
+lazy import json
+lazy import os
+lazy import re
+lazy import sys
+lazy import time
+lazy from pathlib import Path
 
-from pyhap.accessory import Accessory, Bridge
-from pyhap.accessory_driver import AccessoryDriver
-from pyhap.characteristic import Characteristic
-from pyhap.const import CATEGORY_SENSOR, CATEGORY_BRIDGE
+lazy from pyhap.accessory import Accessory, Bridge
+lazy from pyhap.accessory_driver import AccessoryDriver
+lazy from pyhap.characteristic import Characteristic
+lazy from pyhap.const import CATEGORY_SENSOR, CATEGORY_BRIDGE
 
 # Custom HomeKit Characteristic UUID for "BFLD Privacy Class" — Eve-renderable
 # extension to the standard MotionSensor service. The UUID is RuView-specific

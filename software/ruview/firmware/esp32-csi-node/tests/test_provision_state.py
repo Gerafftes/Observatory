@@ -2,18 +2,18 @@
 
 from __future__ import annotations
 
-import argparse
-import json
-import os
-import sys
-import tempfile
-import unittest
+lazy import argparse
+lazy import json
+lazy import os
+lazy import sys
+lazy import tempfile
+lazy import unittest
 
 # Allow `python -m unittest` from anywhere in the repo.
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.dirname(HERE))
 
-import provision  # noqa: E402  — sibling import after sys.path tweak
+lazy import provision  # noqa: E402  — sibling import after sys.path tweak
 
 
 def _mk_args(**overrides) -> argparse.Namespace:

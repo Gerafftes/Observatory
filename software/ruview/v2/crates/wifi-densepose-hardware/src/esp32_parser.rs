@@ -21,7 +21,9 @@
 //! 20      N*2   I/Q pairs (n_antennas * n_subcarriers * 2 bytes)
 //! ```
 //!
-//! Each I/Q pair is 2 signed bytes: I then Q.
+//! Protocol v2 and legacy packets retain the historical I/Q interpretation.
+//! Protocol v3 follows ESP-IDF 5.4's documented wire order: Q (imaginary),
+//! then I (real).
 //!
 //! # No-Mock Guarantee
 //!
@@ -42,8 +44,10 @@ pub const ESP32_CSI_MAGIC: u32 = 0xC5110001;
 
 /// Maximum UDP datagram size accepted by the ADR-018 parser, including the
 /// optional TX-binding trailer.
-pub const ESP32_CSI_MAX_DATAGRAM_SIZE: usize =
-    HEADER_SIZE + MAX_ANTENNAS as usize * MAX_SUBCARRIERS * 2 + TX_BINDING_TRAILER_SIZE;
+pub const ESP32_CSI_MAX_DATAGRAM_SIZE: usize = HEADER_SIZE
+    + MAX_ANTENNAS as usize * MAX_SUBCARRIERS * 2
+    + TX_BINDING_TRAILER_SIZE
+    + CSI_IDENTITY_TRAILER_SIZE;
 
 /// Magic at the start of the optional TX-binding trailer.
 const TX_BINDING_TRAILER_MAGIC: u32 = 0xC511A060;
@@ -53,6 +57,13 @@ const TX_BINDING_TRAILER_VERSION: u8 = 1;
 const TX_BINDING_TRAILER_SIZE: usize = 40;
 /// Complete proof: filter enforced, source matched filter, identity valid.
 const TX_BINDING_TRAILER_REQUIRED_FLAGS: u8 = 0x07;
+const CSI_IDENTITY_TRAILER_MAGIC: u32 = 0xC511A061;
+const CSI_IDENTITY_PROTOCOL_V2: u8 = 2;
+const CSI_IDENTITY_PROTOCOL_VERSION: u8 = 3;
+const CSI_IDENTITY_ROLE_RX: u8 = 1;
+const CSI_IDENTITY_V2_TRAILER_SIZE: usize = 24;
+const CSI_IDENTITY_TRAILER_SIZE: usize = 48;
+const CSI_QUALITY_FIRST_WORD_INVALID: u8 = 1 << 0;
 
 // ── Sibling RuView wire packets ──────────────────────────────────────────────
 // The ESP32 firmware multiplexes several packet types onto the same UDP port
@@ -103,6 +114,36 @@ const MAX_ANTENNAS: u8 = 4;
 ///
 /// An incomplete or malformed trailer is deliberately left unconsumed so
 /// legacy concatenated streams and arbitrary trailing bytes remain compatible.
+fn csi_identity(data: &[u8]) -> Option<(usize, u8, u8)> {
+    if data.len() < CSI_IDENTITY_V2_TRAILER_SIZE {
+        return None;
+    }
+    let magic = u32::from_le_bytes(data[0..4].try_into().ok()?);
+    let version = data[4];
+    let expected_len = match version {
+        CSI_IDENTITY_PROTOCOL_V2 => CSI_IDENTITY_V2_TRAILER_SIZE,
+        CSI_IDENTITY_PROTOCOL_VERSION => CSI_IDENTITY_TRAILER_SIZE,
+        _ => return None,
+    };
+    if data.len() < expected_len
+        || magic != CSI_IDENTITY_TRAILER_MAGIC
+        || data[5] != CSI_IDENTITY_ROLE_RX
+        || u16::from_le_bytes(data[6..8].try_into().ok()?) as usize != expected_len
+        || u64::from_le_bytes(data[8..16].try_into().ok()?) == 0
+    {
+        return None;
+    }
+    if version == CSI_IDENTITY_PROTOCOL_V2 && data[16..24].iter().any(|byte| *byte != 0) {
+        return None;
+    }
+    let quality_flags = if version == CSI_IDENTITY_PROTOCOL_VERSION {
+        data[28]
+    } else {
+        0
+    };
+    Some((expected_len, version, quality_flags))
+}
+
 fn tx_binding_trailer_size(data: &[u8]) -> usize {
     if data.len() < TX_BINDING_TRAILER_SIZE {
         return 0;
@@ -121,7 +162,11 @@ fn tx_binding_trailer_size(data: &[u8]) -> usize {
         && trailer_len == TX_BINDING_TRAILER_SIZE
         && binding_semantics_are_valid
     {
-        TX_BINDING_TRAILER_SIZE
+        if let Some((identity_len, _, _)) = csi_identity(&data[TX_BINDING_TRAILER_SIZE..]) {
+            TX_BINDING_TRAILER_SIZE + identity_len
+        } else {
+            TX_BINDING_TRAILER_SIZE
+        }
     } else {
         0
     }
@@ -257,7 +302,26 @@ impl Esp32CsiParser {
             });
         }
 
-        // Parse I/Q pairs — stored as [ant0_sc0_I, ant0_sc0_Q, ant0_sc1_I, ant0_sc1_Q, ..., ant1_sc0_I, ...]
+        let trailing = &data[total_frame_size..];
+        let identity = (tx_binding_trailer_size(trailing) > TX_BINDING_TRAILER_SIZE)
+            .then(|| csi_identity(&trailing[TX_BINDING_TRAILER_SIZE..]))
+            .flatten();
+        let q_first = identity.is_some_and(|(_, version, _)| {
+            version >= CSI_IDENTITY_PROTOCOL_VERSION
+        });
+        let invalid_prefix = adr018_flags.first_word_invalid
+            || identity.is_some_and(|(_, _, quality)| {
+                quality & CSI_QUALITY_FIRST_WORD_INVALID != 0
+            });
+        if invalid_prefix && iq_pair_count < 3 {
+            return Err(ParseError::ByteError {
+                offset: HEADER_SIZE,
+                message: "first four CSI bytes are invalid but no replacement sample exists".into(),
+            });
+        }
+
+        // Protocol v3 follows ESP-IDF's Q/I byte order. Older packets retain
+        // the historical I/Q interpretation for migration compatibility.
         let iq_start = HEADER_SIZE;
         let mut subcarriers = Vec::with_capacity(iq_pair_count);
 
@@ -266,8 +330,13 @@ impl Esp32CsiParser {
         for ant in 0..n_antennas as usize {
             for sc_idx in 0..n_subcarriers {
                 let byte_offset = iq_start + (ant * n_subcarriers + sc_idx) * 2;
-                let i_val = data[byte_offset] as i8 as i16;
-                let q_val = data[byte_offset + 1] as i8 as i16;
+                let first = data[byte_offset] as i8 as i16;
+                let second = data[byte_offset + 1] as i8 as i16;
+                let (i_val, q_val) = if q_first {
+                    (second, first)
+                } else {
+                    (first, second)
+                };
 
                 let index = if (sc_idx as i16) < half {
                     -(half - sc_idx as i16)
@@ -281,6 +350,13 @@ impl Esp32CsiParser {
                     index,
                 });
             }
+        }
+        if invalid_prefix {
+            let first_valid = subcarriers[2];
+            subcarriers[0].i = first_valid.i;
+            subcarriers[0].q = first_valid.q;
+            subcarriers[1].i = first_valid.i;
+            subcarriers[1].q = first_valid.q;
         }
 
         // Determine bandwidth from PPDU type + subcarrier count (ADR-110).
@@ -426,6 +502,16 @@ mod tests {
         } else {
             trailer.extend(1u8..=32);
         }
+        trailer
+    }
+
+    fn build_csi_identity_trailer(boot_id: u64) -> Vec<u8> {
+        let mut trailer = vec![0u8; CSI_IDENTITY_TRAILER_SIZE];
+        trailer[0..4].copy_from_slice(&CSI_IDENTITY_TRAILER_MAGIC.to_le_bytes());
+        trailer[4] = CSI_IDENTITY_PROTOCOL_VERSION;
+        trailer[5] = CSI_IDENTITY_ROLE_RX;
+        trailer[6..8].copy_from_slice(&(CSI_IDENTITY_TRAILER_SIZE as u16).to_le_bytes());
+        trailer[8..16].copy_from_slice(&boot_id.to_le_bytes());
         trailer
     }
 
@@ -588,11 +674,24 @@ mod tests {
             &[(0, 0); MAX_ANTENNAS as usize * MAX_SUBCARRIERS],
         );
         data.extend_from_slice(&build_tx_binding_trailer(TX_BINDING_TRAILER_REQUIRED_FLAGS));
+        data.extend_from_slice(&build_csi_identity_trailer(0x0102_0304_0506_0708));
 
         let (_, consumed) = Esp32CsiParser::parse_frame(&data).unwrap();
 
         assert_eq!(data.len(), ESP32_CSI_MAX_DATAGRAM_SIZE);
         assert_eq!(consumed, ESP32_CSI_MAX_DATAGRAM_SIZE);
+    }
+
+    #[test]
+    fn malformed_or_zero_boot_identity_is_not_consumed() {
+        let mut data = build_test_frame(1, 1, &[(10, 20); 4]);
+        let frame_and_binding_len = data.len() + TX_BINDING_TRAILER_SIZE;
+        data.extend_from_slice(&build_tx_binding_trailer(TX_BINDING_TRAILER_REQUIRED_FLAGS));
+        data.extend_from_slice(&build_csi_identity_trailer(0));
+
+        let (_, consumed) = Esp32CsiParser::parse_frame(&data).unwrap();
+
+        assert_eq!(consumed, frame_and_binding_len);
     }
 
     #[test]

@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python3.15
 """R11 — Maritime / through-bulkhead RF propagation.
 
 See docs/research/sota-2026-05-22/R11-maritime-sensing.md.
@@ -14,10 +14,10 @@ Pure NumPy.
 
 from __future__ import annotations
 
-import argparse
-import json
-from pathlib import Path
-import numpy as np
+lazy import argparse
+lazy import json
+lazy from pathlib import Path
+lazy import numpy as np
 
 C = 2.998e8
 MU_0 = 4 * np.pi * 1e-7      # H/m

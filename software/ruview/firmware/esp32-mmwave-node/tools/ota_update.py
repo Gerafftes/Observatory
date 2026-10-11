@@ -1,9 +1,9 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python3.15
 """Inspect or update an ESP32 mmWave node over WiFi."""
 
-import argparse
-import json
-import urllib.request
+lazy import argparse
+lazy import json
+lazy import urllib.request
 
 
 def request(url: str, method: str = "GET", data: bytes | None = None,

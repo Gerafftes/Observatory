@@ -19,7 +19,7 @@ name = "ruview"
 version = "2.0.0a1"
 description = "RuView — ambient intelligence from WiFi CSI. Meta-package; installs `wifi-densepose` and re-exports it under the `ruview` namespace. See https://github.com/ruvnet/RuView."
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.15.0rc2"
 license = { text = "MIT" }
 authors = [{ name = "rUv", email = "ruv@ruv.net" }]
 keywords = [
@@ -34,10 +34,7 @@ classifiers = [
     "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.10",
-    "Programming Language :: Python :: 3.11",
-    "Programming Language :: Python :: 3.12",
-    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.15",
     "Topic :: Scientific/Engineering",
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
     "Typing :: Typed",

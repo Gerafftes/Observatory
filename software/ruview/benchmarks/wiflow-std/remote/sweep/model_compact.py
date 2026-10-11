@@ -20,11 +20,11 @@ upstream, all forced by shrinking channels and documented per variant in run_swe
    tiny <100k budget). tiny groups these two convs (groups=4; 4 | gcd(540, 68)).
 4. Decoder mid-channels: upstream 64->32; here c_last -> max(c_last // 2, 4).
 """
-import math
+lazy import math
 
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
+lazy import torch
+lazy import torch.nn as nn
+lazy import torch.nn.functional as F
 
 
 def tcn_groups(channels: int, mode: str) -> int:

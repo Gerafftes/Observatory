@@ -3,6 +3,12 @@
 use super::*;
 
 pub(super) struct NodeState {
+    /// Stable logical identity is the HashMap key; these fields identify its
+    /// current boot and transport without treating the IP address as identity.
+    pub(super) boot_id: Option<u64>,
+    pub(super) protocol_version: Option<u8>,
+    pub(super) source_address: Option<String>,
+    pub(super) ip_change_count: u64,
     pub(crate) frame_history: VecDeque<Vec<f64>>,
     pub(super) smoothed_person_score: f64,
     pub(crate) prev_person_count: usize,
@@ -67,6 +73,8 @@ pub(super) struct NodeState {
     pub(super) csi_fps_ema: f64,
     /// Number of valid sync-to-sync rate samples observed.
     pub(super) csi_fps_samples: u32,
+    /// Actual CSI cadence measured from v3 callback time or host receive time.
+    pub(super) csi_sample_timing: csi_sample_timing::CsiSampleRateEstimator,
     /// Latest accepted CSI sequence and diagnostic gap counters.
     pub(super) latest_sequence: Option<u32>,
     pub(super) accepted_csi_frames: u64,
@@ -136,13 +144,13 @@ pub(super) const GRID_SWITCH_CONFIRMATIONS: u8 = 8;
 pub(super) const MESH_SYNC_MAX_AGE: std::time::Duration = std::time::Duration::from_secs(9);
 pub(super) const MIN_SYNC_RATE_INTERVAL_SECONDS: f64 = 0.5;
 pub(super) const MIN_PLAUSIBLE_CSI_FPS: f64 = 1.0;
-pub(super) const MAX_PLAUSIBLE_CSI_FPS: f64 = 25.0;
+pub(super) const MAX_PLAUSIBLE_CSI_FPS: f64 = 100.0;
 pub(super) const MESH_SEQUENCE_SLACK_FRAMES: u32 = 32;
 
 /// Convert one valid sync-to-sync interval into the node-local sequence rate.
 /// Sequence distance, rather than received CSI packet count, makes the sample
-/// robust to lost CSI datagrams. Very short intervals and rates outside the
-/// firmware's 20 Hz ceiling plus tolerance fail closed.
+/// robust to lost CSI datagrams. Very short intervals and rates above the
+/// requested 100 Hz experiment envelope fail closed.
 pub(crate) fn sequence_rate_from_sync_interval(sequence_delta: u32, dt_sec: f64) -> Option<f64> {
     if sequence_delta == 0 || !dt_sec.is_finite() || dt_sec < MIN_SYNC_RATE_INTERVAL_SECONDS {
         return None;
@@ -161,6 +169,15 @@ mod fps_ema_tests {
     fn packet_loss_uses_sender_sequence_delta() {
         let fps = sequence_rate_from_sync_interval(40, 2.0).unwrap();
         assert!((fps - 20.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn sync_rate_estimator_accepts_the_requested_rate_envelope() {
+        for rate in [20.0, 25.0, 50.0, 100.0] {
+            let fps = sequence_rate_from_sync_interval((rate * 2.0) as u32, 2.0).unwrap();
+            assert!((fps - rate).abs() < f64::EPSILON);
+        }
+        assert!(sequence_rate_from_sync_interval(202, 2.0).is_none());
     }
 
     #[test]
@@ -329,15 +346,16 @@ impl NodeState {
     /// the axum router.
     pub(crate) fn sync_snapshot(&self) -> Option<NodeSyncSnapshot> {
         let sync = self.latest_sync.as_ref()?;
+        let sync_age = self.latest_sync_at.map(|t| t.elapsed());
         Some(NodeSyncSnapshot {
             offset_us: sync.local_minus_epoch_us(),
             is_leader: sync.flags.is_leader,
-            is_valid: sync.flags.is_valid,
+            is_valid: sync.flags.is_valid && sync_age.is_some_and(|age| age <= MESH_SYNC_MAX_AGE),
             smoothed: sync.flags.smoothed_used,
             sequence: sync.sequence,
             csi_fps_ema: self.csi_fps_ema,
             csi_fps_samples: self.csi_fps_samples,
-            staleness_ms: self.latest_sync_at.map(|t| t.elapsed().as_millis() as u64),
+            staleness_ms: sync_age.map(|age| age.as_millis() as u64),
         })
     }
 
@@ -406,8 +424,27 @@ impl NodeState {
         self.source_binding_observation = None;
     }
 
+    pub(super) fn observe_transport_identity(
+        &mut self,
+        protocol_version: u8,
+        boot_id: u64,
+        source: std::net::SocketAddr,
+        ip_changed: bool,
+    ) {
+        self.protocol_version = Some(protocol_version);
+        self.boot_id = Some(boot_id);
+        self.source_address = Some(source.ip().to_string());
+        if ip_changed {
+            self.ip_change_count = self.ip_change_count.saturating_add(1);
+        }
+    }
+
     pub(crate) fn new() -> Self {
         Self {
+            boot_id: None,
+            protocol_version: None,
+            source_address: None,
+            ip_change_count: 0,
             frame_history: VecDeque::new(),
             smoothed_person_score: 0.0,
             prev_person_count: 0,
@@ -441,6 +478,7 @@ impl NodeState {
             csi_fps_sync_anchor: None,
             csi_fps_ema: 0.0,
             csi_fps_samples: 0,
+            csi_sample_timing: csi_sample_timing::CsiSampleRateEstimator::default(),
             latest_sequence: None,
             accepted_csi_frames: 0,
             inferred_lost_frames: 0,
@@ -671,6 +709,7 @@ mod grid_gate_tests {
             flags,
             mesh_timestamp_us: None,
             source_binding: None,
+            protocol_identity: None,
             iq_pairs: Vec::new(),
         }
     }
@@ -743,7 +782,7 @@ mod grid_gate_tests {
     }
 
     #[test]
-    fn missing_incomplete_and_malformed_bindings_remain_fatal() {
+    fn missing_incomplete_malformed_and_unknown_bindings_remain_fatal() {
         let now = std::time::Instant::now();
         assert!(validated_complete_source_binding(None, now, false).is_err());
 
@@ -757,7 +796,8 @@ mod grid_gate_tests {
         assert!(validated_complete_source_binding(Some(&malformed), now, false).is_err());
 
         let complete = source_binding(raw_csi_recording::SOURCE_BINDING_REQUIRED_FLAGS, 'a');
-        assert!(validated_complete_source_binding(Some(&complete), now, false).is_ok());
+        assert!(validated_complete_source_binding(Some(&complete), now, false).is_err());
+        assert!(validated_complete_source_binding(Some(&complete), now, true).is_ok());
     }
 
     #[test]
@@ -1014,6 +1054,9 @@ pub(super) struct AppStateInner {
     /// Explicit pre-setup grid filter. A sealed setup supersedes this mechanism
     /// and the CLI rejects configuring both at once.
     pub(super) csi_grid_pin: Option<CsiGridPin>,
+    /// Explicit authority for pre-setup ESP32 streams. A sealed setup remains
+    /// authoritative when present.
+    pub(super) expected_tx_source_binding_sha256: Option<String>,
     /// Independent mmWave teacher/reference state. It is never read by the
     /// WiFi position predictor.
     pub(super) mmwave: mmwave_calibration::MmwaveFleet,
@@ -1121,6 +1164,8 @@ pub(super) struct AppStateInner {
     /// Per-node sensing state for multi-node deployments.
     /// Keyed by `node_id` from the ESP32 frame header.
     pub(super) node_states: HashMap<u8, NodeState>,
+    pub(super) csi_ingress_diagnostics: Arc<csi_diagnostics::CsiIngressDiagnostics>,
+    pub(super) csi_identity_registry: csi_identity::Registry,
     /// Experimental D5 calibration/fusion state. It remains uncalibrated until
     /// explicitly activated through the classification-calibration API.
     pub(super) d5_presence: d5_presence::PresenceFusionState,

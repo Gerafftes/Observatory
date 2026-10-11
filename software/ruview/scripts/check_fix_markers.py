@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python3.15
 """Fix-marker regression guard for RuView.
 
 Reads ``scripts/fix-markers.json`` and asserts that every previously-shipped
@@ -13,7 +13,7 @@ fix is still present in the codebase:
 A pattern is a literal substring by default. Wrap it in ``/.../`` to treat it
 as a (multiline, case-sensitive) regular expression, e.g. ``"/fall_thresh\\s*=\\s*2\\.0/"``.
 
-This is a stdlib-only script — no dependencies, runs anywhere Python 3.8+ does.
+This is a stdlib-only script — no dependencies, requires Python 3.15+.
 
 Usage::
 
@@ -27,11 +27,11 @@ Exit codes: 0 = all markers OK, 1 = one or more regressions, 2 = bad manifest.
 
 from __future__ import annotations
 
-import argparse
-import json
-import re
-import sys
-from pathlib import Path
+lazy import argparse
+lazy import json
+lazy import re
+lazy import sys
+lazy from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 MANIFEST_PATH = REPO_ROOT / "scripts" / "fix-markers.json"

@@ -16,12 +16,12 @@ so the main test run stays fast.
 
 from __future__ import annotations
 
-import math
-from random import Random
+lazy import math
+lazy from random import Random
 
-import pytest
+lazy import pytest
 
-from wifi_densepose import BreathingExtractor, HeartRateExtractor
+lazy from wifi_densepose import BreathingExtractor, HeartRateExtractor
 
 
 def _synth_frame(n_subcarriers: int, sample_rate: float, t: float, freq_hz: float, rng: Random) -> tuple[list[float], list[float]]:
