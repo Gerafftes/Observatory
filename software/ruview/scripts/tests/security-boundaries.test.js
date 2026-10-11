@@ -12,6 +12,12 @@ const read = name => fs.readFileSync(path.join(root, name), 'utf8');
 const viewer = read('v2/crates/wifi-densepose-pointcloud/src/viewer.html');
 const wall = read('examples/through-wall/index.html');
 
+// Repository fixture extraction only; this is not an HTML sanitizer.
+const inlineScripts = html => Array.from(
+  html.matchAll(/<script(?=[\s/>])[^>]*>([\s\S]*?)<\/script(?=[\s/>])[^>]*>/gi),
+  match => match[1],
+);
+
 // A sink-sensitive DOM fixture: any attempted HTML parsing fails the test.
 class Element {
   constructor(tag = 'div') { this.tagName = tag; this.children = []; this.style = {}; }
@@ -42,8 +48,16 @@ function viewerContext(options = {}) {
 
 test('both HTML pages retain syntactically valid inline JavaScript', () => {
   for (const html of [viewer, wall]) {
-    for (const [, script] of html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/g)) new vm.Script(script);
+    const scripts = inlineScripts(html);
+    assert.ok(scripts.length > 0);
+    for (const script of scripts) new vm.Script(script);
   }
+});
+
+test('fixture script extraction handles case and closing attributes without matching custom tags', () => {
+  assert.deepEqual(inlineScripts('<SCRIPT>const x = 1;</ScRiPt ignored>'), ['const x = 1;']);
+  assert.deepEqual(inlineScripts('<script-data>not JavaScript</script-data>'), []);
+  assert.throws(() => new vm.Script(inlineScripts('<SCRIPT>const = ;</SCRIPT>')[0]), SyntaxError);
 });
 
 test('pointcloud stats render query, remote fields and error values only as text', async () => {
