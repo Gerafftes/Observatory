@@ -43,7 +43,11 @@ async function doctor() {
     !claimCheck('We hit 100% accuracy on poses.').ok]);
   checks.push(['claim_check passes a tagged MEASURED claim',
     claimCheck('Held-out PCK@20 59.5% (MEASURED vs mean-pose baseline, verify.py).').ok]);
-  checks.push(['skills present', listSkills().length > 0]);
+  if (existsSync(SKILLS_DIR)) {
+    checks.push(['skills present', listSkills().length > 0]);
+  } else {
+    console.log('SKIP skills present: skills are not bundled in this publication');
+  }
   // Kernel + host adapter (optional — only needed to install into a repo).
   let kernelLine = 'kernel/host: not installed (ok — operator tools run without them)';
   try {

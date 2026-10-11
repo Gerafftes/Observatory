@@ -34,6 +34,8 @@ if has '"keywords"' "$PJ"; then ok "plugin.json has keywords"; else bad "plugin.
 # 4. plugin.json does NOT enumerate skills/commands/agents (auto-discovered)
 if has '"skills"' "$PJ" || has '"commands"' "$PJ" || has '"agents"' "$PJ"; then bad "plugin.json must NOT contain skills/commands/agents arrays"; else ok "plugin.json does not enumerate skills/commands/agents"; fi
 
+# Skills are retained locally but omitted from the Observatory publication.
+if [ -d "$ROOT/skills" ]; then
 # 5. every skill has SKILL.md with name + description + allowed-tools, and no wildcard tools
 SKILL_OK=1
 for d in "$ROOT"/skills/*/; do
@@ -54,6 +56,9 @@ for s in $EXPECTED_SKILLS; do
   [ -f "$ROOT/skills/$s/SKILL.md" ] || { bad "expected skill missing: $s"; SKILLS_PRESENT=0; }
 done
 [ "$SKILLS_PRESENT" = 1 ] && ok "expected skill set present ($(echo $EXPECTED_SKILLS | wc -w) skills)"
+else
+  echo "  SKIP  skill checks: skills are not bundled in this publication"
+fi
 
 # 7. every command has a description in frontmatter
 CMD_OK=1

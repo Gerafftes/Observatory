@@ -61,3 +61,11 @@ software/ruview/vendor/ruvector/ui/ruvocal/.env.ci
 /test-reports/
 /test-results/
 /evidence/
+
+# Bundled agent skills stay local; do not republish their prompt files.
+/software/ruview/harness/ruview/skills/
+/software/ruview/plugins/ruview/skills/
+/software/ruview/vendor/midstream/.claude/skills/
+/software/ruview/vendor/ruvector/.claude/skills/
+/software/ruview/vendor/ruvector/ui/ruvocal/.claude/skills/
+**/SKILL.md

@@ -7,12 +7,6 @@ gemessenen BLL-Ergebnisse. Jeder Eintrag ist ein eigenständiges Paket: Der
 Bericht liegt als `README.md` direkt neben seinen Diagrammen, Tabellen und
 Renderhinweisen.
 
-## Quelle der Wahrheit
-
-`experiment-reports/` ist die einzige aktuelle Quelle für Ergebnisnachweise.
-`software/ruview/results/` bleibt ein historischer Software-Snapshot und wird
-weder automatisch synchronisiert noch als neuere Messung interpretiert.
-
 Die Pakete heißen `YYYY-MM-DD_<Serie>_<Ergebnistyp>`. Versuchskennungen wie
 `D4`, `E0` oder `RX` bleiben großgeschrieben; beschreibende Bestandteile sind
 kleingeschriebene ASCII-Slugs. Innerhalb eines Pakets gilt:
