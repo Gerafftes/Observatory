@@ -43,14 +43,16 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r archive/v1/requirements-lock.txt
 
+      - name: Test reference generation and cache integrity
+        run: python -m unittest discover -s archive/v1/data/proof -p test_reference_signal.py
+
       - name: Verify reference signal is reproducible
         run: |
           echo "=== Regenerating reference signal ==="
-          python archive/v1/data/proof/generate_reference_signal.py
+          python archive/v1/data/proof/generate_reference_signal.py --ensure
           echo ""
-          echo "=== Checking data file matches committed version ==="
-          # The regenerated file should be identical to the committed one
-          # (We compare the metadata file since data file is large)
+          echo "=== Generated input matches the committed normalized SHA-256 ==="
+          # --ensure validates all input fields, not just the small metadata file.
           python -c "
           import json, hashlib
           with open('archive/v1/data/proof/sample_csi_meta.json') as f:

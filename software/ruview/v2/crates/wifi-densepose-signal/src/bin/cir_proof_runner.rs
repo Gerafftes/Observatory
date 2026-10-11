@@ -21,11 +21,10 @@
 //!     --no-default-features
 //!   (compares against archive/v1/data/proof/expected_cir_features.sha256)
 //!
-//! Note (2026-05-28): This binary requires wifi_densepose_signal::ruvsense::cir,
-//! which is NOT YET IMPLEMENTED by the implementation agent. The binary will
-//! not compile until CirEstimator is available. The hash file and scripts are
-//! committed as placeholders. To generate the real hash after the cir module
-//! lands, run:
+//! Synthetic input is generated and validated through the shared Python
+//! generator (Python 3 + NumPy, PYTHON may select the interpreter). Generation
+//! never updates the expected CIR hash. To intentionally update that baseline
+//! after an algorithm change, run:
 //!
 //!   cd v2 && cargo run -p wifi-densepose-signal --bin cir_proof_runner \
 //!     --release --no-default-features -- --generate-hash \
@@ -35,6 +34,7 @@ use std::env;
 use std::fs;
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
+use std::process::{Command, Stdio};
 
 use num_complex::Complex32;
 use serde_json::Value;
@@ -55,18 +55,21 @@ const N_SUBCARRIERS_RAW: usize = 56;
 const N_SUBCARRIERS_PADDED: usize = 64;
 
 fn repo_root() -> PathBuf {
-    // Binary lives at v2/target/release/cir_proof_runner; repo root is ../..
-    // But we can't rely on binary location at runtime. Use git rev-parse instead,
-    // or walk up from cwd until we find archive/.
+    // Locate the generator, not the optional generated data file.
     let cwd = env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
     // If run from v2/, walk up once; if run from repo root, use directly.
     let candidates = [
         cwd.clone(),
         cwd.join(".."),
         cwd.join("../.."),
+        cwd.join("software/ruview"),
+        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../.."),
     ];
     for candidate in &candidates {
-        if candidate.join("archive/v1/data/proof/sample_csi_data.json").exists() {
+        if candidate
+            .join("archive/v1/data/proof/generate_reference_signal.py")
+            .is_file()
+        {
             return candidate.canonicalize().unwrap_or(candidate.clone());
         }
     }
@@ -180,8 +183,17 @@ fn main() {
     let json_path = root.join("archive/v1/data/proof/sample_csi_data.json");
     let hash_path = root.join("archive/v1/data/proof/expected_cir_features.sha256");
 
-    if !json_path.exists() {
-        eprintln!("ERROR: reference signal not found at {}", json_path.display());
+    let generator = root.join("archive/v1/data/proof/generate_reference_signal.py");
+    let python = env::var_os("PYTHON").unwrap_or_else(|| "python3".into());
+    let ensured = Command::new(python)
+        .arg(&generator)
+        .arg("--ensure")
+        .stdout(Stdio::null())
+        .status();
+    if !matches!(ensured, Ok(status) if status.success()) {
+        eprintln!(
+            "ERROR: reference generation/validation failed; Python 3 and NumPy are required"
+        );
         std::process::exit(1);
     }
 

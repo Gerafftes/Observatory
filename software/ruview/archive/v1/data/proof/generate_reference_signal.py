@@ -41,11 +41,68 @@ Output:
 Author: WiFi-DensePose Project (synthetic test data)
 """
 
+import argparse
+import hashlib
 import json
 import os
 import sys
+import tempfile
+from pathlib import Path
 
 import numpy as np
+
+REFERENCE_HASH_PATH = Path(__file__).with_name("expected_reference.sha256")
+
+
+def reference_digest(data_path):
+    """Hash all input fields, rounding floats to 9 decimals for libm jitter.
+
+    The original and regenerated arrays can differ by ~2e-15 across platforms.
+    This input-only normalization does not change the pipeline/CIR hash rules.
+    """
+    def normalize(value):
+        if isinstance(value, float):
+            return round(value, 9)
+        if isinstance(value, list):
+            return [normalize(item) for item in value]
+        if isinstance(value, dict):
+            return {key: normalize(item) for key, item in value.items()}
+        return value
+
+    with open(data_path, encoding="utf-8") as source:
+        data = normalize(json.load(source))
+    canonical = json.dumps(data, sort_keys=True, separators=(",", ":"), allow_nan=False)
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
+def verify_reference_signal(data_path):
+    """Reject missing, damaged, or changed input without updating the baseline."""
+    expected = REFERENCE_HASH_PATH.read_text(encoding="utf-8").strip()
+    actual = reference_digest(data_path)
+    if actual != expected:
+        raise ValueError(f"Reference signal hash mismatch: expected {expected}, got {actual}")
+    return actual
+
+
+def ensure_reference_signal(output_dir=None):
+    """Reuse validated input or atomically generate it; never overwrite a cache."""
+    output_dir = Path(output_dir) if output_dir is not None else Path(__file__).parent
+    data_path = output_dir / "sample_csi_data.json"
+    if data_path.exists():
+        verify_reference_signal(data_path)
+        return str(data_path)
+
+    with tempfile.TemporaryDirectory(prefix=".reference-csi-", dir=output_dir) as staging:
+        params = generate_deterministic_parameters()
+        save_data(generate_csi_frames(params), params, staging)
+        generated = Path(staging) / data_path.name
+        verify_reference_signal(generated)
+        # Publish only checked data. The tracked metadata file stays untouched.
+        try:
+            os.link(generated, data_path)
+        except FileExistsError:
+            verify_reference_signal(data_path)
+    return str(data_path)
 
 
 def generate_deterministic_parameters():
@@ -286,6 +343,14 @@ def save_data(frames, params, output_dir):
 
 def main():
     """Main entry point."""
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--ensure", action="store_true",
+                        help="Generate missing data or verify the existing local cache")
+    args = parser.parse_args()
+    if args.ensure:
+        print(f"Reference signal verified: {ensure_reference_signal()}")
+        return
+
     # Determine output directory
     output_dir = os.path.dirname(os.path.abspath(__file__))
 
@@ -315,6 +380,7 @@ def main():
     # Step 3: Save output
     print("[3/3] Saving output files...")
     save_data(frames, params, output_dir)
+    verify_reference_signal(os.path.join(output_dir, "sample_csi_data.json"))
     print()
     print("Done. Reference signal generated successfully.")
     print("=" * 70)

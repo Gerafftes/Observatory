@@ -15,7 +15,7 @@
 
 set -euo pipefail
 
-cd "$(git rev-parse --show-toplevel)"
+cd "$(dirname "${BASH_SOURCE[0]}")/.."
 
 HASH_FILE="archive/v1/data/proof/expected_cir_features.sha256"
 
