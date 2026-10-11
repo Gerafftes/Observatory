@@ -1,0 +1,142 @@
+name: Security Scanning
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: '17 3 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: security-scan-${{ github.ref }}
+  cancel-in-progress: true
+
+# Only static analysis: no application builds, releases, deployments or hardware.
+# Checkouts contain public tracked files only; no local backups or private data.
+jobs:
+  codeql:
+    name: CodeQL (${{ matrix.language }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      actions: read
+      security-events: write
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [c-cpp, javascript-typescript, python, rust]
+    steps:
+      - name: Check out published sources
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+          submodules: false
+      - name: Initialize CodeQL without a full application build
+        uses: github/codeql-action/init@24c54180a607b1449ed407dd24f251e4e9147c8d # v4
+        with:
+          languages: ${{ matrix.language }}
+          build-mode: none
+          config: |
+            paths:
+              - software/ruview
+              - project_tools
+              - tools
+            paths-ignore:
+              - '**/vendor/**'
+              - '**/node_modules/**'
+              - '**/target/**'
+              - '**/managed_components/**'
+              - '**/build/**'
+              - '**/build-*/**'
+              - '**/private/**'
+              - '**/data/raw/**'
+              - '**/data/recordings/**'
+              - '**/.codex/**'
+              - '**/.agents/**'
+      - name: Analyze and upload CodeQL findings
+        uses: github/codeql-action/analyze@24c54180a607b1449ed407dd24f251e4e9147c8d # v4
+        with:
+          category: codeql/${{ matrix.language }}
+          upload-database: false
+
+  # Preserve the previous job/category identity when updating historical alerts.
+  sast:
+    name: Semgrep (maintained and archived first-party source)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      actions: read
+      security-events: write
+    env:
+      SEMGREP_SEND_METRICS: 'off'
+      SEMGREP_ENABLE_VERSION_CHECK: '0'
+    steps:
+      - name: Check out published sources
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+          submodules: false
+      - name: Set up scanner Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: '3.12'
+      - name: Install pinned Semgrep
+        run: python -m pip install --disable-pip-version-check semgrep==1.180.0
+      - name: Scan first-party sources
+        run: |
+          semgrep scan --strict --metrics=off --disable-version-check \
+            --config=p/security-audit --config=p/secrets \
+            --exclude='**/vendor/**' --exclude='**/node_modules/**' \
+            --exclude='**/target/**' --exclude='**/managed_components/**' \
+            --exclude='**/build/**' --exclude='**/build-*/**' \
+            --exclude='**/private/**' --exclude='**/data/raw/**' \
+            --exclude='**/data/recordings/**' \
+            --exclude='**/.codex/**' --exclude='**/.agents/**' \
+            --sarif --output="$RUNNER_TEMP/semgrep.sarif" \
+            software/ruview project_tools tools
+      - name: Upload Semgrep findings
+        if: always() && !cancelled()
+        uses: github/codeql-action/upload-sarif@24c54180a607b1449ed407dd24f251e4e9147c8d # v4
+        with:
+          sarif_file: ${{ runner.temp }}/semgrep.sarif
+          category: semgrep
+
+  iac-scan:
+    name: KICS (first-party and vendor infrastructure)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      actions: read
+      security-events: write
+    steps:
+      - name: Check out published sources
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+          submodules: false
+      - name: Scan public infrastructure without executing it
+        uses: Checkmarx/kics-github-action@05aa5eb70eede1355220f4ca5238d96b397e30a6 # v2.1.20
+        with:
+          path: '.github,software/ruview,project_tools,tools'
+          output_path: scan-results/kics
+          output_formats: sarif
+          ignore_on_exit: results
+          enable_annotations: false
+          enable_comments: false
+          enable_jobs_summary: false
+          disable_full_descriptions: true
+          exclude_paths: '.git,private,artifacts,devlogs,.toolchains,.codex,.agents,scan-results,**/target/**,**/node_modules/**,**/managed_components/**,**/build/**,**/build-*/**,**/private/**,**/data/raw/**,**/data/recordings/**'
+      - name: Upload KICS findings
+        if: always() && !cancelled()
+        uses: github/codeql-action/upload-sarif@24c54180a607b1449ed407dd24f251e4e9147c8d # v4
+        with:
+          sarif_file: scan-results/kics/results.sarif
+          category: kics
