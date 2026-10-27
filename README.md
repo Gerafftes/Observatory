@@ -225,6 +225,13 @@ Befestigungs- und mmWave-Bauteile, Bilder und Gehäusehinweise.
 - [PCB-03 KiCad-Quellen, Prüfberichte und Bestellarchiv](hardware/pcb-03/)
 - [Breadboard-CAD, Befestigungsteile und mmWave-BOM](hardware/breadboard/README.md)
 
+### RX-Status-LED
+
+Im Normalbetrieb leuchten RX1 blau, RX2 grün, RX3 rot und RX4 violett.
+Die Übersicht erklärt die weiteren Zustände anhand von Farbe und Blinkfolge.
+
+<a href="devlogs/RX_Farbmuster.png"><img src="devlogs/RX_Farbmuster.png" alt="RX-LED-Farben und Blinkmuster für Normalbetrieb, Start, WLAN/IP, fehlende TX1-CSI, Initialisierungsfehler, Transportfehler, OTA und interne Fehler" width="560"></a>
+
 ## Dokumentation
 
 | Datei | Inhalt |
