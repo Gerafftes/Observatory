@@ -54,14 +54,15 @@ is still in development. There is currently no public live demo.
 > This room has a secret system, a machine that watches the Wi-Fi every second
 > it is running. I know because I built it.
 >
-> I built it to study movement: the reflections, the interruptions, the
-> small changes ordinary people leave in a wireless signal. People like you.
+> I designed the machine to detect movement, but it sees every disturbance.
+> Reflections caused by ordinary people—people like you. Signals the old
+> algorithms considered “irrelevant.”
 >
-> But a changing signal is not yet a position. To learn what it means,
-> I needed a reference—another way to observe the room.
+> They couldn’t understand them, so I decided I would. But I needed a partner,
+> another sensor with the precision to reveal the truth.
 >
-> Bound by physics, we work without cameras. Moving or motionless,
-> you may change the signal. The question is what we can prove from it.
+> Bound by physics, we work without cameras. You’ll never see us. But moving or
+> motionless, if you change the signal… we’ll find *you*.
 
 *Inspired by the opening monologue of the TV series
 [*Person of Interest*](https://en.wikipedia.org/wiki/Person_of_Interest_(TV_series)).*
