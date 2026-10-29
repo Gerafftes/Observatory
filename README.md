@@ -29,8 +29,9 @@
       <sub>ESP32-S3-Boards: RX1 bis RX4 und TX</sub>
     </td>
     <td align="center" width="50%">
-      <a href="project-media/mmwave-breadboard-setup.jpeg"><img src="project-media/mmwave-breadboard-setup-hero.jpeg" alt="Vorläufiger Breadboard-Aufbau mit HLK-LD2450 und ESP32-C3" width="100%"></a><br>
-      <sub>Vorläufiger mmWave-Breadboard-Aufbau</sub>
+      <a href="project-media/mmwave-breadboard-setup.jpeg"><img src="project-media/mmwave-breadboard-setup-hero.jpeg" alt="Vorläufiger Breadboard-Aufbau mit HLK-LD2450 und ESP32-C3" width="48%"></a>
+      <a href="hardware/pcb-03/"><img src="hardware/pcb-03/preview/PCB-03-top.png" alt="PCB-03-Platinenvorschau für den ESP32-C3-/HLK-LD2450-Referenzknoten" width="48%"></a><br>
+      <sub>mmWave: Breadboard-Aufbau und PCB-03-Platinenvorschau</sub>
     </td>
   </tr>
 </table>
