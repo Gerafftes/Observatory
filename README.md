@@ -1,15 +1,15 @@
 <h1 align="center">Observatory</h1>
 
 <p align="center">
-  Kamerafreie Raumwahrnehmung mit WLAN: Ein Sender und vier ESP32-S3-Empfänger
-  erfassen Veränderungen im Funksignal. Ziel ist die fortlaufende Ortung einer
-  Person; zwei mmWave-Sensoren dienen als Kalibrierungs- und Vergleichsreferenz.
+  Erforsche, was WLAN über Bewegung im Raum verrät – ohne Kamera.
+  Observatory hilft dir, Funksignale mit ESP32-Boards aufzuzeichnen und
+  auszuwerten. Ziel ist die fortlaufende Ortung einer Person.
 </p>
 
 <p align="center">
   <a href="https://stardance.hackclub.com/projects/25673">Stardance</a> ·
   <a href="#schnelleinstieg">Schnellstart</a> ·
-  <a href="#was-observatory-kann">Features</a> ·
+  <a href="#was-observatory-kann">Möglichkeiten</a> ·
   <a href="experiment-reports/README.md">Ergebnisse</a> ·
   <a href="hardware/README.md">Hardware</a> ·
   <a href="docs/research/rf-sensing-sources.md">Quellen</a> ·
@@ -38,16 +38,17 @@
 
 ## Projekt ansehen
 
-**[Observatory auf Stardance ansehen](https://stardance.hackclub.com/projects/25673)**
+**[Projekt auf Stardance ansehen](https://stardance.hackclub.com/projects/25673)** · **[Oberfläche ohne Sensoren ausprobieren](#schnelleinstieg)**
 
-Observatory untersucht, wie sich Menschen anhand ihrer Wirkung auf WLAN-Signale
-im Raum erkennen und lokalisieren lassen. Die Erfassung mit vier Empfängern,
-ein RX1↔RX4-Paarvergleich und ein 60-Minuten-TX-only-Stabilitätsnachweis sind
-belegt. Zuverlässige fortlaufende WiFi-Ortung bleibt das nächste Forschungsziel.
+Du möchtest verstehen, wie sich Menschen über WLAN-Signale erkennen lassen?
+Observatory verbindet Rohdatenerfassung, eine Experiment-Oberfläche und
+dokumentierte Versuche. So kannst du nachvollziehen, was die Daten tatsächlich
+zeigen und wo die Methode an Grenzen stößt.
 
-Eine öffentliche Live-Demo gibt es derzeit nicht. Der lokale Messaufbau wird
-in den lokalen Entwicklungsunterlagen
-beschrieben; ohne Sensoren lässt sich die Oberfläche im Simulationsmodus ansehen.
+**Bereits belegt:** Erfassung mit vier Empfängern, ein Funkvergleich zwischen
+RX1 und RX4 sowie 60 Minuten stabiler TX-only-Erfassung. Zuverlässige
+fortlaufende WiFi-Ortung ist noch in Entwicklung. Eine öffentliche Live-Demo
+gibt es derzeit nicht.
 
 > **You are being sensed.**
 >
@@ -68,263 +69,141 @@ beschrieben; ohne Sensoren lässt sich die Oberfläche im Simulationsmodus anseh
 
 ## Inhaltsverzeichnis
 
-- [Projekt ansehen](#projekt-ansehen)
 - [Schnelleinstieg](#schnelleinstieg)
 - [Was Observatory kann](#was-observatory-kann)
-- [Lokale Checks](#lokale-checks)
-- [Forschungsfrage](#forschungsfrage)
 - [Aktueller Validierungsstand](#aktueller-validierungsstand)
-- [Benutzeroberfläche](software/experiment-cockpit.md)
-- [Wie es funktioniert](experiment-reports/architecture/architecture.md)
-- [Belastbare Ergebnisse](experiment-reports/README.md)
-- [Hardware](hardware/README.md)
+- [Benutzeroberfläche](#benutzeroberfläche)
+- [Wie es funktioniert](#wie-es-funktioniert)
+- [Hardware](#hardware)
 - [Dokumentation](#dokumentation)
-- [Lizenz](#lizenz)
-- [Credits](#credits)
+- [Lizenz und Credits](#lizenz-und-credits)
 
 ## Schnelleinstieg
 
-Dieses Repository bündelt Projektberichte, Hardwaredateien und den
-Observatory-Quellstand mit UI, Backend und Firmware:
+Starte mit der Simulation, um die Oberfläche ohne Sensoren kennenzulernen.
+Dafür brauchst du Git und eine Rust-/Cargo-Umgebung; Details zum Quellstand
+stehen im [Software-Einstieg](software/README.md).
 
 ```bash
 git clone https://github.com/Gerafftes/Observatory.git
-cd Observatory
-```
-
-Die Dokumentation kann direkt gelesen werden. UI und Backend liegen gemeinsam
-unter [`software/ruview/`](software/README.md). Ein Softwaretest ohne Hardware
-lässt sich so starten:
-
-```bash
-cd software/ruview/v2
+cd Observatory/software/ruview/v2
 cargo run -p wifi-densepose-sensing-server --no-default-features -- \
   --source simulate --http-port 3002 --ws-port 3001
 ```
 
-Danach ist die Sensing-UI unter
-`http://127.0.0.1:3002/ui/index.html#sensing` erreichbar.
+Öffne anschließend `http://127.0.0.1:3002/ui/index.html#sensing`.
+
+1. **Erkunden:** Setup und Messablauf in der [Cockpit-Anleitung](software/experiment-cockpit.md) kennenlernen.
+2. **Einordnen:** [Versuchsergebnisse und Grenzen](experiment-reports/README.md) lesen.
+3. **Vorbereiten:** Für eigene Messungen [Hardware und Revisionen](hardware/README.md) prüfen.
 
 > [!NOTE]
-> Der Lauf mit `--source simulate` prüft UI und Workflow ohne Hardware. Er bleibt ausdrücklich `SOFTWARE-ONLY / UNVALIDATED` und ersetzt kein Hardware-Gate.
-
-Die wichtigsten Einstiegspunkte sind:
-
-1. [Software, Voraussetzungen und Herkunft](software/README.md)
-2. [Historische Versuchsergebnisse](experiment-reports/README.md)
-3. [PCB-03-Fertigungsdaten und KiCad-Quellen](hardware/pcb-03/)
-4. [MMWAVE1/2-Firmware und Geräteanbindung](software/ruview/firmware/esp32-mmwave-node/README.md)
-
-Die dokumentierten Hardwareläufe sind an ihre jeweiligen Firmware-, Host- und
-Setup-Versionen gebunden. Der Quellstand eines Checkouts ist nicht automatisch
-der auf den Geräten installierte oder für einen bestimmten Lauf geprüfte Stand.
-
-Die Software basiert auf [ruvnet/RuView](https://github.com/ruvnet/RuView), ist
-aber mit den Observatory-Anpassungen und den benötigten Unterprojekten direkt
-im Repository enthalten. Herkunft und festgeschriebene Quellstände stehen in
-[`software/README.md`](software/README.md); die Projektanpassungen sind unter
-[`06-ruview-anpassungen.md`](docs/project/06-ruview-anpassungen.md) dokumentiert.
+> Die Simulation zeigt UI und Workflow mit künstlichen Daten (`SOFTWARE-ONLY / UNVALIDATED`). Reale Messungen benötigen den lokalen Hardwareaufbau und eine eigene Kalibrierung.
 
 ## Was Observatory kann
 
-- **WLAN-Signale erfassen:** Raw-CSI von vier ESP32-S3-Empfängern aufzeichnen
-  und Messungen an die verwendete Aufbau- und Softwareversion binden.
-- **Datenqualität sichtbar machen:** Quellen, Empfängeridentität, CSI-Layouts,
-  Raten, Zeitfenster und Datenlücken prüfen und bilanzieren.
-- **Experimente nachvollziehbar auswerten:** Setup-Profile, Kalibrierung,
-  Blindaufnahmen und Evaluation im Experiment-Cockpit verwalten; Training,
-  Vorhersage und Wahrheit durch getrennte Dateien und Hashbindungen trennen.
-- **Zusätzliche Funkstrecken untersuchen:** RX1↔RX4-CSI neben den vier
-  TX→RX-Strecken erfassen. Der technische Paarvergleich ist bestanden;
-  sein Nutzen für die Positionsgenauigkeit ist noch zu bewerten.
+- **Signale untersuchen:** Raw-CSI von vier ESP32-S3-Empfängern erfassen;
+  Quelle, Datenrate, Zeitfenster und Lücken prüfen.
+- **Versuche nachvollziehen:** Aufbau und Aufnahmen an Versionen binden;
+  Training, Blindvorhersage und Vergleichswahrheit getrennt halten.
+- **Funkstrecken vergleichen:** RX1↔RX4 zusätzlich zu den vier TX→RX-Strecken
+  erfassen. Der technische Paartest ist bestanden; sein Positionsnutzen ist offen.
 
-**In Entwicklung:** fortlaufende WiFi-Positionen nach einer Kalibrierung durch
-langsames Ablaufen des Raums. Zwei unabhängig geprüfte mmWave-Sensoren sollen
-dabei Positionslabels und eine getrennte Vergleichsreferenz liefern. Die
-spätere WiFi-Schätzung soll ausschließlich WiFi-Daten verwenden.
+**Das nächste Ziel:** Eine Person soll sich frei durch den kalibrierten Raum
+bewegen können, während das System ihre Position allein aus WiFi-Daten schätzt.
+Die Kalibrierung soll durch langsames Ablaufen erfolgen; zwei mmWave-Sensoren
+sollen Positionslabels und eine unabhängige Vergleichsreferenz liefern.
 
-Die vorhandene D6-Pipeline schätzt diskrete Punkte beziehungsweise Zonen mit
-`unknown` und `ambiguous` bei unzureichender oder mehrdeutiger Evidenz. Sie ist
-ein bisheriger Ansatz und erfüllt das Ziel freier Positionsverfolgung noch nicht.
-Atem- und Herzfrequenzindikatoren bleiben ein experimenteller Nebenbereich
-und sind nicht physiologisch validiert.
-
-## Lokale Checks
-
-Der enthaltene Softwarestand lässt sich aus dem Repository heraus prüfen:
-
-```bash
-sh project_tools/verify_observatory_source.sh
-node --test software/ruview/ui/tests/*.test.mjs
-cargo check --manifest-path software/ruview/v2/Cargo.toml \
-  -p wifi-densepose-sensing-server --no-default-features
-python3 -m unittest project_tools/tests/test_evaluate_d5_replay.py
-```
-
-> [!WARNING]
-> Die Checks verarbeiten keine neuen Sensorsignale. Ein bestandener Softwaretest, Flashvorgang oder Transportnachweis beweist keine Live-Hardware- oder Positionsgenauigkeit.
-
-## Forschungsfrage
-
-Wie zuverlässig lassen sich Anwesenheit, Bewegung und die fortlaufende
-Position einer Person aus WLAN-CSI bestimmen? Welche Grenzen setzen
-Raumgeometrie, Kalibrierung, Datenqualität und zeitliche Stabilität, und welchen
-zusätzlichen Nutzen bringen Funkstrecken zwischen den Empfängern?
-
-Zuerst soll die freie Bewegung einer Person im kalibrierten Raum unabhängig
-geprüft werden. Mehrpersonenbetrieb und die Übertragung auf einen zweiten
-Aufbau sind nachfolgende Entwicklungsziele.
+Der bisherige D6-Ansatz liefert diskrete Punkte oder Zonen mit `unknown` oder
+`ambiguous` bei unsicherer Evidenz. Freie Ortung, Mehrpersonenbetrieb und die
+Übertragung auf einen zweiten Aufbau bleiben zu prüfen.
 
 ## Aktueller Validierungsstand
 
-**Stand: 29. Oktober 2026** — Zusammenfassung gespeicherter Mess- und
-Auswertungsbefunde, keine laufende Geräteüberwachung.
+**Stand: 29. Oktober 2026.** Die Angaben fassen gespeicherte Befunde zusammen.
 
-| Bereich | Status | Aussage und Grenze |
+| Bereich | Ergebnis | Grenze |
 |---|---|---|
-| Vier-RX-Datenbasis | Messfolge bestanden | Frische Bootqualifikation, 30-s-Vorlauf und 180-s-Basis mit 173/173 gemeinsamen gültigen Fenstern; Geräte-/Host-/PCAP-Abgleich bestanden. |
-| RX1↔RX4 | Technischer Paarvergleich bestanden | Im 300-s-Lauf 2.581 beziehungsweise 2.578 qualifizierte Peerframes; beide Richtungen mit 293/293 gültigen Fenstern. Positionsnutzen und Vier-RX-Mesh sind damit nicht bewiesen. |
-| 60-Minuten-TX-only-Lauf | Nach Offline-Neubewertung bestanden | 3.600,024 s, 533.429 Frames und 3.589/3.593 gemeinsame gültige Fenster (99,89 %); ursprüngliche Mindestanforderung 90 %. Ressourcen- und PCAP/Raw-Prüfungen bestanden. |
-| Automatischer Messabschluss | Softwarekorrektur offen | Der ursprüngliche Onlineworker scheiterte an der langen Finalisierung. Die Datenneubewertung bestätigt die RX-Stabilität; sie macht den damaligen Ablauf nicht nachträglich fehlerfrei und erteilt keinen globalen Firmware-Freeze. |
-| Zwei mmWave-Referenzen | Gemeinsame Abnahme offen | Einzelprüfung, gemeinsame Raum-/Zeitzuordnung und Referenzgenauigkeit für die Laufkalibrierung stehen noch aus. |
-| Kontinuierliche WiFi-Ortung | Entwicklungsziel | Laufkalibrierung, Modellvergleich und unabhängige Blindprüfung sind noch nicht als Gesamtfunktion nachgewiesen. |
-| Präsenz und Vitalindikatoren | Experimentell | Frühere Still-Präsenz-Versuche scheiterten; Atem-/Herzfrequenzindikatoren sind nicht physiologisch validiert. |
-| Gesamtsystem | Nicht als Ortungssystem validiert | Erfassungs- und Stabilitätsnachweise ersetzen keine reale Positions- oder Mehrpersonenabnahme. |
+| Vier-RX-Erfassung | 180-s-Basis bestanden: 173/173 gemeinsame gültige Fenster | Kein Nachweis der Positionsgenauigkeit |
+| RX1↔RX4-Paartest | 300 s bestanden: 2.581/2.578 qualifizierte Peerframes, beide Richtungen 293/293 gültige Fenster | Positionsnutzen und Vier-RX-Mesh offen |
+| 60 Minuten TX-only | Nach Offline-Neubewertung bestanden: 533.429 Frames, 3.589/3.593 gültige gemeinsame Fenster (99,89 %; mindestens 90 % gefordert) | Ursprünglicher automatischer Abschluss fehlgeschlagen; kein globaler Firmware-Freeze daraus |
+| Zwei mmWave-Referenzen | Gemeinsame Abnahme offen | Raum-/Zeitzuordnung und Referenzgenauigkeit noch zu prüfen |
+| Kontinuierliche WiFi-Ortung | In Entwicklung | Laufkalibrierung und unabhängige Blindprüfung noch nicht als Gesamtfunktion nachgewiesen |
 
-Der Daten- und Paartest (Tag 14) wurde am 29. Oktober abgeschlossen. Der spätere
-60-Minuten-Lauf wurde mit der bereits vorab verlangten 90-%-Fensterregel
-zweimal identisch neu ausgewertet. Sein Zeitnachweis wurde aus gespeicherten
-Originalbelegen rekonstruiert; die damals fehlende Online-Enduhrprüfung bleibt
-als Fehler des ursprünglichen Ablaufs erhalten. Die ausführlichen
-Dauerlaufbelege liegen privat außerhalb dieses Repositorys.
+Der 60-Minuten-Lauf wurde zweimal identisch neu ausgewertet; sein Zeitnachweis
+wurde aus Originalbelegen rekonstruiert. Der Fehler des damaligen Online-Abschlusses
+bleibt dokumentiert. Ausführliche Dauerlaufbelege liegen privat außerhalb des
+Repositorys; neuere Entwicklungsberichte sind noch nicht veröffentlicht.
+
+Frühere D5-abs-Versuche beseitigten Leerraum-Fehlpräsenz, verloren aber den
+Still-Recall vollständig und scheiterten insgesamt. Atem-/Herzfrequenzindikatoren
+bleiben experimentell und sind nicht physiologisch validiert.
 
 > [!IMPORTANT]
-> Gültige Aufnahmefenster und vollständiger PCAP/Raw-Abgleich belegen keine verlustfreie Funkübertragung. Die dokumentierten Sequenzlücken bleiben erhalten. Radarpositionen, simulierte UI-Zustände und geglättete Zonenfolgen sind kein Nachweis kontinuierlicher WiFi-Ortung.
+> Bestandene Erfassungs- und Softwareprüfungen belegen weder verlustfreie Funkübertragung noch zuverlässige Ortung. Sequenzlücken bleiben dokumentiert; Radarpositionen und simulierte Anzeigen sind keine WiFi-Ortungsnachweise.
 
 ## Benutzeroberfläche
 
-Das Observatory-UI enthält den mmWave-Kalibrierungsassistenten und das
-Experiment-Cockpit für Setup-Profil, WiFi-Workflow, Blindaufnahmen und
-Evaluation. Die Screenshots und die vollständige Kurzanleitung stehen auf der
-[separaten Cockpit-Seite](software/experiment-cockpit.md).
+Im Experiment-Cockpit kannst du Setup-Profile, Kalibrierung, Blindaufnahmen und
+Auswertung verwalten. Die [Cockpit-Anleitung](software/experiment-cockpit.md)
+führt durch den Ablauf und den mmWave-Kalibrierungsassistenten.
 
 <a href="software/experiment-cockpit.md"><img src="project-media/ui/experiment-cockpit-setup.png" alt="Experiment-Cockpit mit Setup-Profil, Statusübersicht und simuliertem Hardwarezustand" width="760"></a>
 
-> [!NOTE]
-> Die UI-Abbildungen und der Demo-Ablauf zeigen Softwarezustände ohne angeschlossene Sensoren. Sie sind kein Nachweis realer CSI-, Radar- oder Positionsdaten.
+*Die Abbildung zeigt einen simulierten Softwarezustand ohne angeschlossene Sensoren.*
 
 ## Wie es funktioniert
 
-Ein ESP32-S3 sendet WLAN-Pakete. Vier verteilte ESP32-S3-Empfänger erfassen
-Channel State Information (CSI): Sie beschreibt, wie der Raum den Funkkanal
-verändert. Menschen beeinflussen diese Signale durch Bewegung, Abschattung
-und Reflexionen. Der Host sammelt die Rohdaten und prüft, welche Abschnitte
-für einen gemeinsamen Vergleich geeignet sind. Der RX1↔RX4-Paarpfad ergänzt
-die vier TX-Strecken um zwei weitere gerichtete Funkstrecken.
+Ein ESP32-S3 sendet WLAN-Pakete; vier Empfänger messen Channel State Information
+(CSI), also den Einfluss des Raums auf den Funkkanal. Bewegung, Abschattung und
+Reflexionen verändern diese Signale. Der Host sammelt und prüft die Rohdaten.
 
-Der angestrebte Kalibrierablauf beginnt mit einer Leerraumreferenz. Danach
-wird der Raum langsam abgelaufen; zwei mmWave-Sensoren sollen die zeitlich und
-räumlich zugeordneten Referenzpositionen liefern. Training und spätere
-Validierung verwenden getrennte Aufnahmesitzungen. Das WiFi-Modell soll
-anschließend Positionen ohne Radar als Eingang schätzen.
-
-Die [Architekturseite](experiment-reports/architecture/architecture.md)
-dokumentiert die vorhandenen Datenpfade und den bisherigen diskreten
-D6-Ansatz. Die lokalen Entwicklungsunterlagen
-beschreiben den Übergang zur Laufkalibrierung und fortlaufenden Ortung.
+Für die geplante Laufkalibrierung folgen auf eine Leerraumaufnahme langsame Wege
+durch den Raum mit mmWave als Referenz. Getrennte Trainings- und Prüfsitzungen
+sollen zeigen, ob das WiFi-Modell neue Bewegungen ohne Radar als Eingang orten kann.
+Die [Architekturseite](experiment-reports/architecture/architecture.md) erklärt
+die vorhandenen Datenpfade und den bisherigen D6-Ansatz.
 
 <p align="center">
   <a href="experiment-reports/architecture/architecture.md"><img src="experiment-reports/architecture/figures/mmwave-connection/01-ack-verbindungsfluss.png" alt="BKLIT-Diagramm des mmWave-ACK-Verbindungsflusses vom HLK-LD2450 über den ESP32-C3 und WLAN bis zum Sensing Server" width="760"></a>
 </p>
-<p align="center"><sub><strong>mmWave-Referenzpfad:</strong> Das Diagramm zeigt die Anbindung eines HLK-LD2450 über einen ESP32-C3. Der WLAN-CSI-Pfad und die gemeinsame Kalibrierung mit zwei Radaren sind hier nicht dargestellt.</sub></p>
-
-## Belastbare Ergebnisse
-
-Die Entwicklung umfasst erfolgreiche Erfassungsnachweise und gescheiterte
-Erkennungsversuche. Jeder Befund gilt für den dokumentierten Aufbau und Lauf:
-
-- **29. Oktober — Vier RX und Paarbetrieb:** Die vollständige Messfolge bis
-  zur 300-s-Paaraufnahme samt Rückkehr in den TX-only-Betrieb ist
-  bestanden.
-- **29. Oktober — 60 Minuten TX-only:** Die vorhandene Aufnahme besteht nach
-  korrigierter Offline-Auswertung mit 99,89 % gültigen gemeinsamen Fenstern.
-  Der ursprüngliche automatische Abschluss bleibt als fehlgeschlagen dokumentiert.
-- **20. September — mmWave-Transport:** Firmware 0.1.6 zeigte im untersuchten
-  [60-s-Vergleichsfenster](experiment-reports/2026-09-20_mmwave-sequenzverlustvergleich/README.md)
-  null verlorene Sequenzen. Das ist keine allgemeine Dauerlauf- oder Genauigkeitszusage.
-- **Juli/August — Präsenz und D6:** D5-abs senkte die Leerraum-Fehlpräsenz auf
-  0 %, verlor aber zugleich den Still-Recall vollständig und bestand insgesamt
-  nicht. D6 belegte den technischen Aufnahme- und Auswertungspfad, keine
-  Positionsgenauigkeit.
-
-Die [Ergebnisübersicht](experiment-reports/README.md) bündelt die historischen
-Versuchspakete mit Diagrammen und Tabellen. Die neueren RX-Abschlüsse und die verbleibenden Ortungs- und Radarprüfungen
-sind oben im aktuellen Validierungsstand zusammengefasst. Ihre ausführlichen
-Entwicklungsberichte sind noch nicht Teil des veröffentlichten Dokumentationsstands.
+<p align="center"><sub>Das Diagramm zeigt einen mmWave-Referenzpfad. WiFi-CSI und die gemeinsame Zwei-Radar-Kalibrierung sind hier nicht dargestellt.</sub></p>
 
 ## Hardware
 
-Der WiFi-Aufbau besteht aus fünf ESP32-S3-Boards: TX1 und RX1 bis RX4. Für
-die Laufkalibrierung sind zwei HLK-LD2450-Referenzknoten mit ESP32-C3 vorgesehen.
-Das Foto oben dokumentiert den früheren provisorischen Einzelradar-Aufbau.
-Die [Hardware-Dokumentation](hardware/README.md) bündelt Platinen, Breadboard-CAD,
-Bauteile und Gehäusehinweise; die [mmWave-Firmware](software/ruview/firmware/esp32-mmwave-node/README.md)
-beschreibt die Anbindung von MMWAVE1 und MMWAVE2.
+Für den WiFi-Aufbau brauchst du fünf ESP32-S3-Boards: TX1 und RX1 bis RX4.
+Zwei HLK-LD2450 mit ESP32-C3 sind als Kalibrierungs- und Referenzknoten vorgesehen.
+Oben siehst du den früheren Breadboard-Aufbau und die PCB-03-Vorschau.
 
-> [!IMPORTANT]
-> Für den aktuellen Aufbau ist ausdrücklich **PCB-03** zu verwenden. PCB-01 und PCB-02 bleiben als frühere Revisionen dokumentiert.
+- [PCB-03: aktuelle Revision, KiCad-Quellen und Fertigungsdaten](hardware/pcb-03/)
+- [Breadboard: CAD, Befestigungsteile und Bauteile](hardware/breadboard/README.md)
+- [MMWAVE1/2: Firmware und Anbindung](software/ruview/firmware/esp32-mmwave-node/README.md)
 
-- [PCB-01 Gerber- und Bohrdaten](hardware/pcb-01/)
-- [PCB-03 KiCad-Quellen, Prüfberichte und Bestellarchiv](hardware/pcb-03/)
-- [Breadboard-CAD, Befestigungsteile und mmWave-BOM](hardware/breadboard/README.md)
+PCB-01 und PCB-02 bleiben in der [Hardwareübersicht](hardware/README.md) als
+frühere Revisionen dokumentiert; für den aktuellen Aufbau ist **PCB-03** zu verwenden.
 
 ### RX-Status-LED
 
-Im Normalbetrieb leuchten RX1 blau, RX2 grün, RX3 rot und RX4 violett.
-Die Übersicht erklärt die weiteren Zustände anhand von Farbe und Blinkfolge.
+Im Normalbetrieb: RX1 blau, RX2 grün, RX3 rot, RX4 violett.
+Weitere Zustände erkennst du an Farbe und Blinkfolge:
 
 <a href="devlogs/RX_Farbmuster.png"><img src="devlogs/RX_Farbmuster.png" alt="RX-LED-Farben und Blinkmuster für Normalbetrieb, Start, WLAN/IP, fehlende TX1-CSI, Initialisierungsfehler, Transportfehler, OTA und interne Fehler" width="560"></a>
 
 ## Dokumentation
 
-| Datei | Inhalt |
+| Dein nächster Schritt | Einstieg |
 |---|---|
-| [`00-status-und-annahmen.md`](docs/project/00-status-und-annahmen.md) | Aufbau, Annahmen, Koordinaten und offene Punkte |
-| [`01-projektjournal.md`](docs/project/01-projektjournal.md) | Chronologischer Entwicklungsverlauf |
-| [`02-versuchslog.md`](docs/project/02-versuchslog.md) | Durchgeführte Versuche |
-| [`03-messprotokoll.md`](docs/project/03-messprotokoll.md) | Messabläufe und Qualitätsregeln |
-| [`04-auswertung-bis-problemfrage.md`](docs/project/04-auswertung-bis-problemfrage.md) | Auswertung entlang der Forschungsfrage |
-| [`05-erfolge-niederlagen-und-aenderungen.md`](docs/project/05-erfolge-niederlagen-und-aenderungen.md) | Erfolge, Fehlschläge und Kursänderungen |
-| [`06-ruview-anpassungen.md`](docs/project/06-ruview-anpassungen.md) | Lokale Änderungen an RuView |
-| [`07-screenshot-nachweise.md`](docs/project/07-screenshot-nachweise.md) | Visuelle Nachweise und Fehlerbilder |
-| [`08-aktueller-arbeitsstand-d6-und-position.md`](docs/project/08-aktueller-arbeitsstand-d6-und-position.md) | Historischer D6-Ansatz mit diskreten Positions-Fingerprints |
-| [`architecture.md`](experiment-reports/architecture/architecture.md) | Architektur, Datenfluss und Evidenztrennung |
-| [`hardware/README.md`](hardware/README.md) | Hardwareübersicht, Platinen, Breadboard-CAD und Befestigungsteile |
-| [`software/experiment-cockpit.md`](software/experiment-cockpit.md) | UI-Screenshots und Experiment-Workflow |
-| [`software/`](software/README.md) | Vollständiger UI-, Backend- und Firmware-Quellstand mit Herkunftsnachweis |
-| [`experiment-reports/`](experiment-reports/) | Historische Versuchspakete mit Berichten, Diagrammen und Tabellen |
-| [`project-media/`](project-media/) | Kuratierte Projektfotos, UI-Abbildungen und technische Diagramme |
-| [`project_tools/`](project_tools/) | Projektweite Prüf-, Auswertungs- und Rendering-Werkzeuge |
-| [`historical-screenshots/`](historical-screenshots/) | Zeitgestempelte historische Screenshots als qualitative Nachweise |
-| [`measurement-templates/messblatt.md`](measurement-templates/messblatt.md) | Vorlage für neue Messungen |
+| Versuche und Ergebnisse prüfen | [Historische Ergebnisberichte](experiment-reports/README.md) |
+| Software bauen und Herkunft prüfen | [Software-Einstieg](software/README.md) · [RuView-Anpassungen](docs/project/06-ruview-anpassungen.md) |
+| Eigene Messungen vorbereiten | [Messprotokoll](docs/project/03-messprotokoll.md) · [Messblatt](measurement-templates/messblatt.md) |
+| Entwicklung und Quellen nachvollziehen | [Projektjournal](docs/project/01-projektjournal.md) · [Forschungsquellen](docs/research/rf-sensing-sources.md) |
 
-## Lizenz
+## Lizenz und Credits
 
-Die Observatory-eigenen Inhalte stehen unter der
-[PolyForm Noncommercial License 1.0.0](LICENSE.md). Der eingebettete
-RuView-Quellstand und seine vendierten Komponenten behalten ihre jeweiligen
-Lizenz- und Notice-Dateien unter [`software/ruview/`](software/ruview/).
+Observatory-eigene Inhalte stehen unter [PolyForm Noncommercial 1.0.0](LICENSE.md).
+Die Software basiert auf [ruvnet/RuView](https://github.com/ruvnet/RuView);
+Drittkomponenten behalten ihre jeweiligen Lizenz- und Notice-Dateien.
 
-## Credits
-
-- [ruvnet/RuView](https://github.com/ruvnet/RuView) ist die dokumentierte
-  Softwarebasis des eingebetteten UI-, Firmware- und Server-Quellstands.
-- [Espressif](https://www.espressif.com/en/products/socs/esp32) entwickelt die
-  verwendeten ESP32-Plattformen.
-- Das ESP32-S3-WROOM-Gehäuse wurde von MakerWorld-Nutzer
-  [`aiekick`](https://makerworld.com/de/models/1456361-esp32-s3-wroom-case#profileId-1517915)
-  erstellt und wird unter der MakerWorld Standard Digital File License
-  angeboten.
-- Der filmische Prolog ist vom Intro der Serie
-  [*Person of Interest*](https://warnertv.de/serie/sendungen/person-of-interest)
-  inspiriert.
+- [Espressif](https://www.espressif.com/en/products/socs/esp32): ESP32-Plattformen.
+- [aiekick auf MakerWorld](https://makerworld.com/de/models/1456361-esp32-s3-wroom-case#profileId-1517915): ESP32-S3-WROOM-Gehäuse unter MakerWorld Standard Digital File License.
+- [*Person of Interest*](https://warnertv.de/serie/sendungen/person-of-interest): Inspiration für den Prolog.
