@@ -1,4 +1,3 @@
-<!-- Publication copy: local paths and hardware identifiers were pseudonymized; private original retained. -->
 # 03 Messprotokoll
 
 ## Zweck

@@ -75,7 +75,7 @@ is still in development. There is currently no public live demo.
 - [User interface](#user-interface)
 - [How it works](#how-it-works)
 - [Hardware](#hardware)
-- [Repository and private data](#repository-and-private-data)
+- [Project structure](#project-structure)
 - [Documentation](#documentation)
 - [License and credits](#license-and-credits)
 
@@ -195,7 +195,7 @@ RX4. The overview also covers startup, connection, transport, and error states:
 
 <a href="project-media/hardware/rx-status-led-patterns.png"><img src="project-media/hardware/rx-status-led-patterns.png" alt="RX LED colors and blink patterns" width="560"></a>
 
-## Repository and private data
+## Project structure
 
 The repository groups the editable project sources:
 
@@ -206,15 +206,9 @@ The repository groups the editable project sources:
 | `docs/` and `experiment-reports/` | Methods, result reports, and documented limits |
 | `project-media/` and `measurement-templates/` | Public illustrations and templates |
 
-Raw recordings, device/NVS and flash backups, credentials, local configurations,
-agent sessions, and migration evidence remain in private SSD storage. Builds and
-simulation do not require them. Historical reports may identify private evidence;
-these references are not public downloads. Publication copies pseudonymize local
-paths and hardware identities.
-
-The [software guide](software/README.md) documents prerequisites and checks.
-[Publication rules](docs/PUBLICATION.md) explain the boundary between public
-sources and private operational data.
+The result reports contain aggregate findings. Raw recordings and device-specific
+configuration are not distributed with the source. Build and test instructions
+are in the [software guide](software/README.md).
 
 ## Documentation
 

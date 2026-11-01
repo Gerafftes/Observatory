@@ -1,4 +1,3 @@
-<!-- Publication copy: local paths and hardware identifiers were pseudonymized; private original retained. -->
 # 05 Erfolge, Niederlagen und Änderungen
 
 Diese Datei sammelt bewusst auch negative Ergebnisse. Für den späteren Bericht sind sie wichtig, weil sie Grenzen des Systems begründen.

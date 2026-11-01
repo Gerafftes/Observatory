@@ -37,12 +37,10 @@ TX safety and maintenance tools, and local regression tests. See
 [RuView adaptations](../docs/project/06-ruview-anpassungen.md) and the
 [current result report](../docs/project/rx-unified-tag14-result-20261029.md).
 
-This is a source distribution. Local agent settings and memories, generated
-machine-specific SDK configuration, learning-session data, and an unrelated
-extracted third-party CLI research dump are omitted. Their private originals
-remain in local storage. Required runtime sources and third-party license/notice
-files remain included. Normal development dependencies are obtained through the
-package managers; no second RuView checkout or submodule initialization is needed.
+This is a source distribution with the required runtime sources and third-party
+license/notice files. Normal development dependencies are obtained through the
+package managers. Device-specific configuration and recordings are supplied
+locally.
 
 ## Prerequisites
 
@@ -73,19 +71,12 @@ measurement setup needs its own persistent private signing key; never put that
 key in an example file or a commit.
 A first build may need Internet access to download ordinary dependencies.
 
-From the repository root, run the publication and browser checks:
+From the repository root, run the source and browser checks:
 
 ```bash
 sh project_tools/verify_observatory_source.sh
-python3 project_tools/check_publication.py --secrets
 node --test software/ruview/ui/tests/*.test.mjs
 ```
-
-The secret check requires Gitleaks 8.30.1 or newer. It scans locally, includes
-archive contents up to depth two, and reports only paths and rule names. Reviewed
-synthetic fixtures are bound to their complete file hashes; a changed file must
-be reviewed again. This checks the proposed tree; a separate history scan is
-required before publishing a new commit range. See [publication rules](../docs/PUBLICATION.md).
 
 `project_tools/csi-host-ip-alias.sh` is an optional macOS operational helper,
 not part of simulation. Its privileged modes require your own TX identity in

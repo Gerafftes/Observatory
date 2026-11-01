@@ -1,4 +1,3 @@
-<!-- Publication copy: local paths and hardware identifiers were pseudonymized; private original retained. -->
 # D4/E0-Mischlauf — 2026-07-26
 
 > **Nachträglicher Gültigkeitshinweis:** Der Raum wurde während der Aufnahme zweimal kurz betreten. Der Lauf ist deshalb keine reine Leerraum-Baseline und darf nicht zur Festlegung von Schwellen oder zur Berechnung einer Leerraum-Fehlerrate verwendet werden. Die Messung bleibt als dokumentierter Mischlauf erhalten.

@@ -263,3 +263,21 @@ software/ruview/vendor/ruvector/ui/ruvocal/.env.ci
 /historical-screenshots/2026-06-26_16-08-13_udp-60byte-traffic.png
 /historical-screenshots/2026-06-26_18-13-10_first-valid-csi-frame-api-monitor.png
 /historical-screenshots/2026-06-27_23-55-54_four-rx-multistatic-fallbacks.png
+
+# Local working notes and maintainer-only tooling.
+/docs/*PUBLICATION*.md
+/project_tools/check_publication.py
+/project_tools/secret-scan-baseline.json
+/project_tools/tests/test_check_publication.py
+/docs/project/agent-*.md
+/docs/project/*review*.md
+/docs/project/*handoff*.md
+/docs/project/tracking-*
+/docs/project/*speicheranalyse*.md
+/docs/project/rx-unified-implementation-*.md
+/docs/project/rx-unified-pilot-*.md
+/docs/project/rx-unified-plan-*.md
+/docs/project/tag14-mit-*.md
+/docs/project/rx-peer-clock-kurztest-*.md
+/docs/project/*hardwarelauf-auswertung-*.md
+/docs/project/*kurzpilot-hardware-auswertung-*.md

@@ -1,4 +1,3 @@
-<!-- Publication copy: local paths and hardware identifiers were pseudonymized; private original retained. -->
 # D4/E0b: sauberer Leerraumtest — 2026-07-26
 
 ## Gültigkeit

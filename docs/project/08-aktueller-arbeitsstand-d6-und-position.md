@@ -1,4 +1,3 @@
-<!-- Publication copy: local paths and hardware identifiers were pseudonymized; private original retained. -->
 # 08 Aktueller Arbeitsstand: D6 und Positionsbestimmung
 
 Stand: 2026-08-14

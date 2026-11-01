@@ -1,15 +1,9 @@
-<!-- Publication copy: local paths and hardware identifiers were pseudonymized; private original retained. -->
-# RX Unified Tag 14 Ergebnis vom 29 Oktober 2026
+# RX Unified Tag14: Ergebnis vom 29. Oktober 2026
 
-**Die vereinbarte Messfolge Q900 → Short30 → Basis180 → Peerpilot60 → Paar300 samt TX-only-Rückkehr ist bestanden. Schritt 7 ist abgeschlossen.** Der Firmware-Freeze bleibt gesondert offen: Der [Projektplan](tag14-mit-rx-unified-20261027.md#7-was-nach-tag-14-für-den-firmware-freeze-bleibt) verlangt dafür zusätzlich einen mindestens 60-minütigen Stabilitätslauf. Dieser Abschluss umfasst keinen solchen Dauerlauf und keine Freigabe für weitere Geräteaktionen.
-
-## Bestätigter Abschlusszustand
-
-RX1/RX4 wurden nach Paar300 einmalig auf TX-only Generation 11 zurückgestellt und neu gestartet. RX2/RX3 blieben auf TX-only Generation 1. Alle vier haben leere Peerlisten, Zustand `NORMAL`, bestätigte Geräte-/Quell-/Profilbindung und fortschreitende Host- sowie Gerätezähler.
-
-Die ursprüngliche Rückkehrprüfung bestätigte **21,63 s** stabilen Standardbetrieb. Schritt 7 bestätigte denselben Zustand nochmals **21,76 s rein lesend**, mit gleichen Boots, Profilen und Netzgenerationen und ohne neue harte Transportfehler. Alle Messleases sind inaktiv, kein Recorder ist aktiv. In Schritt 7 wurden keine Profile geschrieben, Geräte neu gestartet oder Aufnahmen gestartet.
-
-Der aktive RX-only-Host ist PID `91923`, Binary-SHA256 `d262b46266878537986324fe354e9943b6920fe9dc50122cee75af45678a45d4`, mit dem passenden Rückkehr-Setup. Diese Prozessnummer ist eine Beobachtung vom Abschlusszeitpunkt, keine dauerhafte Identität.
+**Die Messfolge Q900 → Short30 → Basis180 → Peerpilot60 → Paar300 mit
+anschließender TX-only-Rückkehr ist bestanden.** Das ist ein technischer
+Erfassungsnachweis. Positioniergenauigkeit, D6-Qualifikation und eine
+Vier-RX-Mesh-Topologie werden damit nicht nachgewiesen.
 
 ## Ergebnisse der Messfolge
 
@@ -32,7 +26,7 @@ Alle TX-Kontrolllinks erreichten ebenfalls 293/293 gültige Fenster. Die neue Pi
 
 Unerklärte Sequenzlücken bleiben separat dokumentiert: Short30 **4**, gültige Basis180 **9**, frischer Pilot **4**, Paar300 **24**. Die bestandenen Phasengrenzen und der vollständige PCAP/Raw-Abgleich beweisen keine verlustfreie Funkübertragung. Die Messfolge ist außerdem kein Nachweis physischer Raumleistung, D6-Qualifikation oder einer Vier-RX-Mesh-Topologie.
 
-## Versionen und unveränderte Grenzen
+## Verwendete Software
 
 Alle Phasen verwenden denselben neuen Firmwarestand:
 
@@ -42,24 +36,16 @@ Alle Phasen verwenden denselben neuen Firmwarestand:
 
 Q900/Short30 liefen mit dem damals geprüften Host `3aa730bc…ca4d00`. Nach dem Recorderfix liefen die gültige Basis180 und die Peerphasen mit `d262b462…8a45d4`. Beide Hoststände, ihre Quellen und die tatsächlich verwendeten Setups sind pro Phase gebunden; es wird kein einzelner unveränderter Hostbuild für die gesamte Historie behauptet. Der neue Host änderte nur `recording_routes.rs`; Firmware, Raw-Auditlogik und Messgrenzen blieben unverändert. Der vollständige Host-Binärtarget-Testlauf bestand mit 555 Tests und 6 vorhandenen ignorierten Tests.
 
-Phasendauern, 900-Sekunden-Paarfenster, 50-ms-Ende-/Zeitabbildungsgrenzen, Ressourcen, Layouts, Masken, Raten und Fenstergrenzen wurden nicht gelockert. Die äußere Freigabe wurde ausdrücklich auf 29.10.2026, 18:00 Uhr Europe/Berlin verlängert. Das davon getrennte native Audit-Rechenbudget wurde ausdrücklich auf **90 s gesamt** erhöht; einschließlich der negativen ersten Basis wurden **64,87 s** verbraucht. Der Ledger wurde nicht zurückgesetzt.
-
 ## Negative Befunde bleiben erhalten
 
 Die erste Basis180 vom 29.10. bleibt **negativ**: Vier zusätzliche gültige Datagramme im PCAP fehlten im Raw-Nachweis. Die Offlineanalyse reproduzierte blockierende Dateiarbeit in der Statusroute und fehlende Recorderbilanzierung früher Queueverluste. Der korrigierte Host lagert den Scan aus und bilanziert neue CSI-Queueverluste konservativ bis zum Writerabschluss. Historische Verluste werden über einen eigenen Aufnahmestartstand abgegrenzt. Die gültige neue Basis wurde separat gemessen; sie wertet die alte Datei nicht nachträglich auf.
 
 Die zusätzliche aktuelle Schlussprüfung verifizierte **124 unveränderliche Nachweisdateien** gegen gespeicherte Hashes und prüfte die Raw-/PCAP-Bindungen der akzeptierten Phasen. Das weiterlaufende operative Hostlog wurde ausdrücklich nicht als unveränderliche geschlossene Datei behandelt.
 
-## Private Nachweise
+## Einordnung
 
-Die folgende Ablage enthält private Belege; Rohdaten, vollständige Diagnosen, Geräteidentitäten und Tokenwerte werden nicht in dieses Repository kopiert.
-
-- Abschluss Schritt 7: `PRIVATE_EVIDENCE/rx-tag14-closeout-20261029-run01/` – `SUMMARY.private.json`, `LIVE-DEFAULT-PASS.private.json`, `EVIDENCE-VERIFICATION.private.json` und Ledger-Snapshot.
-- Paar300 und Rückkehr: `PRIVATE_EVIDENCE/rx-peer-paar300-20261029-run01/` – `RESULT.private.json`, `AUDIT-RECHECK.private.json`, `default-final-20s-01/PASS.private.json`, `CURRENT-STATE.private.json`, Hashmanifest und finale Auswertung.
-- Gültige Basis: `PRIVATE_EVIDENCE/rx-peer-basis180-fixedhost-20261029-run01/`.
-- Short30: `PRIVATE_EVIDENCE/rx-peer-short30-20261029-run01/`.
-- Q900: `PRIVATE_EVIDENCE/rx-peer-q900-20261029-run01/`.
-- Negative erste Basis und Untersuchung: `PRIVATE_EVIDENCE/rx-peer-basis180-20261029-run01/` und `PRIVATE_EVIDENCE/rx-basis180-host-gap-offline-20261029-run01/`.
-- Hostfix: `PRIVATE_EVIDENCE/rx-host-gap-fix-offline-20261029-run01/`.
-
-Die historischen [Ergebnisse vom 27. Oktober](rx-unified-tag14-result-20261027.md) und der [Expiry-Handoff](rx-peer-expiry-handoff-20261028.md) bleiben als damalige Befunde erhalten. Nächster gesonderter Planungsschritt für den Firmware-Freeze ist der im Projektplan geforderte Stabilitätslauf; eine automatische Fortsetzung ist mit diesem Abschluss nicht verbunden.
+Die [Ergebnisse vom 27. Oktober](rx-unified-tag14-result-20261027.md) bleiben
+als negativer Vorläufer erhalten. Ein vollständiger Firmware-Freeze benötigt
+zusätzliche Stabilitätsnachweise; dieser Bericht behauptet keinen 60-Minuten-Lauf.
+Rohdaten und gerätespezifische Diagnosen sind nicht Bestandteil des öffentlichen
+Repositorys.
