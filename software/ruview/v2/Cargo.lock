@@ -4278,42 +4278,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "830b246a0e5f20af87141b25c173cd1b609bd7779a4617d6ec582abaf90870f3"
 
 [[package]]
-name = "nvsim"
-version = "0.3.0"
-dependencies = [
- "approx",
- "criterion",
- "js-sys",
- "rand 0.8.5",
- "rand_chacha 0.3.1",
- "serde",
- "serde-wasm-bindgen",
- "serde_json",
- "sha2",
- "thiserror 2.0.18",
- "tracing",
- "wasm-bindgen",
-]
-
-[[package]]
-name = "nvsim-server"
-version = "0.3.0"
-dependencies = [
- "axum",
- "clap",
- "futures-util",
- "nvsim",
- "serde",
- "serde_json",
- "thiserror 2.0.18",
- "tokio",
- "tower 0.4.13",
- "tower-http",
- "tracing",
- "tracing-subscriber",
-]
-
-[[package]]
 name = "object"
 version = "0.37.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"

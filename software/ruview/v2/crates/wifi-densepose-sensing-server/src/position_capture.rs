@@ -30,6 +30,63 @@ const FREQUENCY_BANDS: usize = 8;
 const POSITION_LAYOUT_FLAGS_MASK: u8 = !0x10;
 pub(crate) const POSITION_FEATURE_COUNT: usize = 28;
 
+/// Identity continuity is checked before grid selection as well as at feature
+/// extraction. A legitimate off-grid frame may still expose a new epoch.
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct PositionInputEpoch {
+    physical_configuration: Option<(u8,u8,u8)>,
+    boot: Option<(u8, u64, Option<u32>, Option<u8>)>,
+    receiver_radio: (u32, u8),
+    source: Option<SourceBinding>,
+    unified_rx: Option<raw_csi_recording::RxMeasurementIdentity>,
+}
+
+#[derive(Debug, Default)]
+pub(crate) struct PositionEpochGuard {
+    host_epoch: Option<Option<String>>,
+    receivers: BTreeMap<u8, PositionInputEpoch>,
+}
+
+impl PositionEpochGuard {
+    pub(crate) fn observe(&mut self, frame: &RawCsiFrame) -> Result<(), String> {
+        let host_changed = self
+            .host_epoch
+            .as_ref()
+            .is_some_and(|previous| previous != &frame.clock_epoch_id);
+        let epoch = PositionInputEpoch {
+            physical_configuration:frame.physical_layout.map(|e|(e.processing,e.shift,e.iq_order)),
+            boot: frame.protocol_identity.map(|identity| {
+                (
+                    identity.protocol_version,
+                    identity.boot_id,
+                    identity.csi_config_flags,
+                    identity.antenna_index,
+                )
+            }),
+            receiver_radio: (frame.center_frequency_mhz, frame.antenna_count),
+            source: frame.source_binding.clone(),
+            unified_rx: frame.protocol_identity.and_then(|identity| identity.unified_rx)
+                .map(|identity| identity.measurement_identity(frame.protocol_identity.and_then(|identity| identity.callback_started_us).unwrap_or(0))),
+        };
+        let receiver_changed = self
+            .receivers
+            .get(&frame.rx_id)
+            .is_some_and(|previous| previous != &epoch);
+        if host_changed {
+            self.receivers.clear();
+        }
+        self.host_epoch = Some(frame.clock_epoch_id.clone());
+        self.receivers.insert(frame.rx_id, epoch);
+        if host_changed || receiver_changed {
+            return Err(format!(
+                "RX{} changed boot/source/config/host epoch",
+                frame.rx_id
+            ));
+        }
+        Ok(())
+    }
+}
+
 /// Exact CSI grid identity used by position features.
 ///
 /// The layout-relevant flag bits are bandwidth, STBC, and LDPC. The transient
@@ -316,6 +373,22 @@ struct PositionCaptureSidecar {
     recording_id: String,
     setup_id: Option<String>,
     setup_sha256: Option<String>,
+    #[serde(default)]
+    clock_epoch_id: Option<String>,
+    #[serde(default)]
+    started_at_monotonic_ns: Option<u64>,
+    #[serde(default)]
+    ended_at_monotonic_ns: Option<u64>,
+    #[serde(default)]
+    finalized_at_monotonic_ns: Option<u64>,
+    #[serde(default)]
+    raw_sha256: Option<String>,
+    #[serde(default)]
+    sealed_setup: Option<super::position_setup::SealedPositionSetup>,
+    #[serde(default)]
+    link_summaries: Vec<raw_csi_recording::RawCsiLinkSummary>,
+    #[serde(default)]
+    rx_summary_scope: Option<String>,
     server_version: String,
     started_at_unix_seconds: u64,
     started_at_unix_ns: u64,
@@ -377,6 +450,9 @@ pub(crate) fn load_position_capture(path: &Path) -> Result<PositionCapture, Stri
     let metadata: PositionCaptureSidecar = serde_json::from_slice(&metadata_bytes)
         .map_err(|error| format!("invalid sidecar {}: {error}", metadata_path.display()))?;
     validate_sidecar(recording_id, &metadata)?;
+    if let Some(setup) = &metadata.sealed_setup {
+        setup.validate_recording_identity(metadata.setup_id.as_deref(), metadata.setup_sha256.as_deref())?;
+    }
 
     let file = File::open(path)
         .map_err(|error| format!("could not open capture {}: {error}", path.display()))?;
@@ -385,6 +461,8 @@ pub(crate) fn load_position_capture(path: &Path) -> Result<PositionCapture, Stri
     let mut previous_timestamp = None;
     let mut line_number = 0usize;
     let mut encoded = String::new();
+    let mut epochs = raw_csi_recording::RecordingEpochGuard::default();
+    let mut links = BTreeMap::<(u8, u8), raw_csi_recording::RawCsiLinkSummary>::new();
     loop {
         encoded.clear();
         let bytes_read = reader
@@ -406,6 +484,18 @@ pub(crate) fn load_position_capture(path: &Path) -> Result<PositionCapture, Stri
             )
         })?;
         validate_loaded_frame(&metadata, &frame, previous_timestamp, path, line_number)?;
+        if frame.protocol_identity.and_then(|identity| identity.unified_rx).is_some()
+            && (metadata.sealed_setup.is_none() || metadata.capture_scope != "source_validated_csi_all_links_and_grids") {
+            return Err("unified capture is missing its sealed setup or multilink capture scope".into());
+        }
+        if let Some(setup) = &metadata.sealed_setup {
+            setup.validate_raw_csi_source_identity(&frame)?;
+        }
+        epochs.validate(&frame)?; epochs.observe_written(&frame);
+        match links.get_mut(&raw_csi_recording::RawCsiLinkSummary::key(&frame)) {
+            Some(link) => { link.validate_next(&frame)?; link.observe_written(&frame); }
+            None => { links.insert(raw_csi_recording::RawCsiLinkSummary::key(&frame), raw_csi_recording::RawCsiLinkSummary::first_written(&frame)); }
+        }
         previous_timestamp = Some(frame.host_timestamp_unix_ns);
         frames.push(frame);
     }
@@ -422,6 +512,26 @@ pub(crate) fn load_position_capture(path: &Path) -> Result<PositionCapture, Stri
         return Err(format!("{} contains no frames", metadata.recording_id));
     }
     validate_sidecar_rx_summaries(&metadata, &frames)?;
+    if metadata.capture_scope == "source_validated_csi_all_links_and_grids" {
+        let begin = metadata.started_at_monotonic_ns.ok_or("unified capture start clock missing")?;
+        let end = metadata.ended_at_monotonic_ns.ok_or("unified capture end clock missing")?;
+        if end < begin || metadata.finalized_at_monotonic_ns.is_none()
+            || frames.iter().any(|frame| frame.clock_epoch_id != metadata.clock_epoch_id
+                || frame.host_monotonic_ns.is_none_or(|time| time < begin || time > end)) {
+            return Err("unified capture clock/producer boundaries do not cover its frames".into());
+        }
+        let raw_hash = super::position_artifact::sha256_file(path).map_err(|error| error.to_string())?;
+        if metadata.raw_sha256.as_deref() != Some(raw_hash.as_str()) {
+            return Err("unified recording raw hash differs from the closed receipt".into());
+        }
+        if metadata.rx_summary_scope.as_deref() != Some("primary_tx_selected_grid")
+            || metadata.link_summaries != links.into_values().collect::<Vec<_>>() {
+            return Err("unified capture link summaries/scope do not match its raw frames".into());
+        }
+        // Model input is an explicit primary-source projection. The source
+        // file and its digest still bind the complete, validated peer data.
+        frames.retain(|frame| raw_csi_recording::RawCsiLinkSummary::key(frame).1 == 0);
+    }
 
     let capture = PositionCapture {
         recording_id: metadata.recording_id,
@@ -1026,7 +1136,7 @@ fn distinct_grids(frames: &[&RawCsiFrame]) -> Vec<PositionGridIdentity> {
 
 fn validate_projection(
     frame: &RawCsiFrame,
-    projection: EmptyProjection,
+    mut projection: EmptyProjection,
 ) -> Result<ProjectedFrame, String> {
     let expected_bins = usize::from(frame.antenna_count)
         .checked_mul(usize::from(frame.subcarrier_count))
@@ -1047,6 +1157,10 @@ fn validate_projection(
             "projection returned {} stable-bin flags for {expected_bins} CSI bins",
             projection.stable_bins.len()
         ));
+    }
+    if frame.physical_layout.is_some() {
+        let (_,mask)=super::csi_layout::qualified(frame)?;
+        for (stable,valid) in projection.stable_bins.iter_mut().zip(mask) { *stable &= valid; }
     }
     if projection
         .stable_bins
@@ -1198,6 +1312,10 @@ fn validate_capture(capture: &PositionCapture) -> Result<(), String> {
         }
     }
     position_source_binding(capture)?;
+    let mut epochs = PositionEpochGuard::default();
+    for frame in &capture.frames {
+        epochs.observe(frame)?;
+    }
     Ok(())
 }
 
@@ -1353,7 +1471,7 @@ fn validate_sidecar(recording_id: &str, metadata: &PositionCaptureSidecar) -> Re
             "{recording_id} has an invalid max_duration_seconds watchdog"
         ));
     }
-    if metadata.capture_scope != EXPECTED_CAPTURE_SCOPE {
+    if metadata.capture_scope != EXPECTED_CAPTURE_SCOPE && metadata.capture_scope != "source_validated_csi_all_links_and_grids" {
         return Err(format!(
             "{recording_id} capture_scope {:?} is unsupported",
             metadata.capture_scope
@@ -1400,6 +1518,11 @@ fn validate_sidecar_rx_summaries(
 
     let mut actual = BTreeMap::<u8, raw_csi_recording::RawCsiRxSummary>::new();
     for frame in frames {
+        if metadata.capture_scope == "source_validated_csi_all_links_and_grids"
+            && (raw_csi_recording::RawCsiLinkSummary::key(frame).1 != 0
+                || !metadata.sealed_setup.as_ref().is_some_and(|setup| setup.raw_csi_frame_matches_expected_grid(frame).unwrap_or(false))) {
+            continue;
+        }
         match actual.get_mut(&frame.rx_id) {
             Some(summary) => {
                 summary
@@ -1687,6 +1810,7 @@ mod tests {
         flags: u8,
     ) -> RawCsiFrame {
         RawCsiFrame {
+            physical_layout: None,
             schema_version: raw_csi_recording::RAW_CSI_SCHEMA_VERSION,
             host_timestamp_unix_ns: timestamp_unix_ns,
             host_monotonic_ns: Some(timestamp_unix_ns),
@@ -2215,5 +2339,128 @@ mod tests {
             serde_json::to_vec(&first).expect("first JSON"),
             serde_json::to_vec(&second).expect("second JSON")
         );
+    }
+
+    #[test]
+    fn contract_host_epoch_boundary_must_reject() {
+        let mut capture = regular_capture("host-boundary");
+        capture.frames[10].clock_epoch_id = Some("another-host-epoch".into());
+        assert!(
+            extract_position_feature_window(&capture, &SyntheticProjection, FEATURE_START).is_err()
+        );
+    }
+    #[test]
+    fn contract_boot_boundary_must_reject() {
+        let mut capture = regular_capture("boot-boundary");
+        for frame in &mut capture.frames {
+            frame.protocol_identity = Some(raw_csi_recording::CsiProtocolIdentity {
+                protocol_version: 2,
+                role: 1,
+                boot_id: if frame.rx_id == 2
+                    && frame.host_timestamp_unix_ns >= FEATURE_START + 1_000_000_000
+                {
+                    11
+                } else {
+                    10
+                },
+                callback_started_us: None,
+                driver_rx_timestamp_us: None,
+                quality_flags: None,
+                rx_state: None,
+                antenna_index: None,
+                gain_db: None,
+                csi_config_flags: None,
+                sync_age_ms: None,
+                unified_rx: None,
+            });
+        }
+        assert!(
+            extract_position_feature_window(&capture, &SyntheticProjection, FEATURE_START).is_err()
+        );
+    }
+
+    #[test]
+    fn unified_profile_and_trial_boundary_reset_epoch_but_send_jitter_does_not() {
+        let mut frame = RawCsiFrame::from_packet(
+            &raw_csi_recording::tests::unified_c_golden(),
+            raw_csi_recording::RawCsiFrameContext::default(),
+        ).unwrap();
+        let mut guard = PositionEpochGuard::default();
+        guard.observe(&frame).unwrap();
+        let identity = frame.protocol_identity.as_mut().unwrap();
+        let unified = identity.unified_rx.as_mut().unwrap();
+        unified.send_attempt_us += 100;
+        guard.observe(&frame).unwrap();
+        frame.protocol_identity.as_mut().unwrap().unified_rx.as_mut().unwrap().generation += 1;
+        assert!(guard.observe(&frame).is_err());
+        guard.observe(&frame).unwrap();
+        let identity = frame.protocol_identity.as_mut().unwrap();
+        let unified = identity.unified_rx.as_mut().unwrap();
+        unified.mode = 1; unified.peer_count = 1;
+        identity.callback_started_us = Some(899_999_999);
+        assert!(guard.observe(&frame).is_err());
+        guard.observe(&frame).unwrap();
+        frame.protocol_identity.as_mut().unwrap().callback_started_us = Some(900_000_000);
+        assert!(guard.observe(&frame).is_err());
+    }
+
+    #[test]
+    fn contract_excluded_format_does_not_hide_epoch_or_refresh_features() {
+        let mut guard = PositionEpochGuard::default();
+        let base = regular_capture("epoch-selection").frames[0].clone();
+        guard.observe(&base).unwrap();
+        let mut excluded = base.clone();
+        excluded.subcarrier_count = 64;
+        excluded.iq_pairs.resize(64, IqPair { i: 1, q: 2 });
+        guard
+            .observe(&excluded)
+            .expect("layout alone is not an epoch");
+        excluded.source_binding.as_mut().unwrap().tx_filter_sha256 = "a".repeat(64);
+        assert!(guard.observe(&excluded).is_err());
+        assert!(
+            guard.observe(&base).is_err(),
+            "return to old source is another boundary"
+        );
+    }
+
+    #[test]
+    fn contract_selected_128_features_match_live_and_offline() {
+        let mut capture = regular_capture("selected-128");
+        for frame in &mut capture.frames {
+            frame.subcarrier_count = 128;
+            frame.iq_pairs = vec![frame.iq_pairs[0]; 128];
+        }
+        let control = extract_position_feature_blocks(&capture, &SyntheticProjection).unwrap();
+        let live =
+            extract_position_feature_window(&capture, &SyntheticProjection, FEATURE_START).unwrap();
+        assert_eq!(live, control.accepted_blocks[0]);
+        for subcarriers in [64, 192] {
+            let mut excluded = capture.frames[0].clone();
+            excluded.subcarrier_count = subcarriers;
+            excluded
+                .iq_pairs
+                .resize(subcarriers as usize, IqPair { i: 1, q: 2 });
+            let mut mixed = capture.clone();
+            mixed.frames.push(excluded);
+            assert!(
+                extract_position_feature_window(&mixed, &SyntheticProjection, FEATURE_START)
+                    .unwrap_err()
+                    .contains("MixedGrid")
+            );
+        }
+    }
+
+    #[test]
+    fn contract_radio_change_is_not_a_harmless_format_exclusion() {
+        let base = regular_capture("radio-boundary").frames[0].clone();
+        let mut guard = PositionEpochGuard::default();
+        guard.observe(&base).unwrap();
+        let mut changed = base.clone();
+        changed.center_frequency_mhz += 5;
+        assert!(guard.observe(&changed).is_err());
+        assert!(guard.observe(&base).is_err());
+        changed = base.clone();
+        changed.antenna_count = 2;
+        assert!(guard.observe(&changed).is_err());
     }
 }

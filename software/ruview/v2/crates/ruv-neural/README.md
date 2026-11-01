@@ -25,19 +25,13 @@ edge (ESP32).
 > for whom sensory gamma stimulation does anything — and for running those
 > protocols safely and reproducibly.
 
-[![rUv Neural web console — local-first evidence verification](docs/images/overview.png)](apps/ruv-neural-ui)
-
-<sub>The in-browser console plays back **signed evidence bundles** and re-verifies
-them entirely locally — no backend, no accounts, no data leaves the page.
-[See the full UI ↓](#web-console--ruv-neural-ui)</sub>
-
 ## Contents
 
 [Thesis](#the-thesis--the-wave-is-protocol-optimization) ·
 [Five primitives](#five-primitives) · [Who it's for](#who-its-for) ·
 [Why now](#why-now--the-research-wave) · [The wedge](#the-wedge--40-hz-protocol-workbench) ·
 [Ethics](#ethics--responsible-use) · [Closed loop (Ruflo)](#closed-loop-sensory-neuromodulation-ruflo) ·
-[Web console](#web-console--ruv-neural-ui) · [How it observes](#how-it-observes--brain-network-topology) ·
+[How it observes](#how-it-observes--brain-network-topology) ·
 [Architecture](#architecture) · [Crate map](#crate-map) ·
 [Hardware BOM](#hardware-parts-list) · [Witness verification](#cryptographic-witness-verification)
 
@@ -213,48 +207,6 @@ assert!(controller.sign_session().verify());   // Ed25519-attested audit head
 Design decisions are documented as Architecture Decision Records in
 [`docs/adr/`](docs/adr/0000-template.md); the drive-to-validated iteration log is
 in [`docs/closed-loop-loop-log.md`](docs/closed-loop-loop-log.md).
-
-### Web console — rUv Neural UI
-
-A **static, local-first** web console ([`apps/ruv-neural-ui`](apps/ruv-neural-ui),
-[ADR-0014](docs/adr/0014-web-console.md)) makes Ruflo understandable in five
-minutes and **verifies the evidence entirely in your browser** — no backend, no
-accounts, no health data leaves the page. It plays back real, signed evidence
-bundles (`ruv-neural neuromod --bundle … --sign`) in **Demo** mode and verifies
-any imported bundle in **Replay** mode: schema validity, a **recomputed** hash
-chain, receipt integrity + frequency tolerance, fail-safe-stop semantics, the
-Ed25519 signature, and the acceptance result. The Rust exporter and the
-TypeScript verifier hash from the *same* fixed-precision canonical string, so the
-chain is reproduced, not trusted.
-
-| Overview — session summary + local verification | Live session — convergence |
-|---|---|
-| ![Overview](docs/images/overview.png) | ![Live session](docs/images/session.png) |
-
-| Stimulus verifier — verified 40 Hz receipts | Safety envelope — fail-safe stop |
-|---|---|
-| ![Stimulus verifier](docs/images/stimulus.png) | ![Safety envelope](docs/images/safety.png) |
-
-A **gated Real mode** (Phase 4) adds explicit opt-in/consent + contraindication
-screening, a Web Serial bridge (with an in-browser mock device so the flow is
-demonstrable without hardware), a hardware-validation handshake, an
-always-visible emergency stop, an enforced intensity ceiling, and a
-hash-chained device-event log — all local-only, off by default. A guided
-**Research workflow** (Phase 5) walks consent → contraindication → baseline →
-protocol → verified session → survey → **signed evidence export**, re-verifiable
-in Replay mode, with nothing uploaded.
-
-| Real mode — gated local hardware | Research workflow — signed study export |
-|---|---|
-| ![Real mode](docs/images/realmode.png) | ![Research workflow](docs/images/research.png) |
-
-```bash
-cd apps/ruv-neural-ui
-npm install
-npm run test      # vitest — schema + verifier + tamper-detection (Rust↔TS hash parity)
-npm run dev       # local dev server
-npm run build     # static build → dist/ (deploys to GitHub Pages)
-```
 
 ## Hardware Parts List
 

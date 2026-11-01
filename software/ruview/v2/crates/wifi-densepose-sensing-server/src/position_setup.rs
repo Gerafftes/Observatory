@@ -16,13 +16,14 @@ use super::raw_csi_recording::{
 };
 
 const MIN_SETUP_SCHEMA_VERSION: u16 = 1;
-const SETUP_SCHEMA_VERSION: u16 = 5;
+const SETUP_SCHEMA_VERSION: u16 = 6;
 const SETUP_ARTIFACT_KIND: &str = "ruview.position-setup";
 const SETUP_HASH_DOMAIN_V1: &[u8] = b"ruview.position-setup.v1\0";
 const SETUP_HASH_DOMAIN_V2: &[u8] = b"ruview.position-setup.v2\0";
 const SETUP_HASH_DOMAIN_V3: &[u8] = b"ruview.position-setup.v3\0";
 const SETUP_HASH_DOMAIN_V4: &[u8] = b"ruview.position-setup.v4\0";
 const SETUP_HASH_DOMAIN_V5: &[u8] = b"ruview.position-setup.v5\0";
+const SETUP_HASH_DOMAIN_V6: &[u8] = b"ruview.position-setup.v6\0";
 const CAD_EXTERIOR_RULE: &str = "horizontal-euclidean-distance-to-room-contour-inclusive-v1";
 const COORDINATE_SYSTEM: &str = "x_length_y_height_z_width_lower_left_floor";
 const RECORDING_HOST_KIND: &str = "mac";
@@ -196,6 +197,20 @@ struct ReceiverDefinition {
     calibration_position_mm: Option<[u32; 3]>,
     firmware: FirmwareIdentity,
     expected_grid: ExpectedGridIdentity,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    rx_profile: Option<RxProfileBinding>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct RxProfileBinding {
+    pub(crate) generation: u32,
+    pub(crate) mode: u8,
+    pub(crate) rate_hz: u8,
+    pub(crate) config_sha256: String,
+    /// SHA-256 of the six physical station MAC bytes, as in /capabilities.
+    pub(crate) device_id: String,
+    pub(crate) peer_ids: Vec<u8>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -325,6 +340,16 @@ pub(crate) struct SealedPositionSetup {
 }
 
 impl SealedPositionSetup {
+    pub(crate) fn rx_profile(&self, rx_id:u8) -> Option<&RxProfileBinding> {
+        self.definition.receivers.iter().find(|rx| rx.rx_id==rx_id)?.rx_profile.as_ref()
+    }
+    pub(crate) fn validate_recording_identity(&self, setup_id: Option<&str>, setup_sha256: Option<&str>) -> Result<(), String> {
+        self.validate()?;
+        if setup_id != Some(self.setup_id()) || setup_sha256 != Some(self.setup_sha256()) {
+            return Err("recording sealed setup does not match its declared identity".into());
+        }
+        Ok(())
+    }
     pub(crate) fn setup_id(&self) -> &str {
         &self.setup_id
     }
@@ -702,7 +727,36 @@ impl SealedPositionSetup {
         &self,
         frame: &RawCsiFrame,
     ) -> Result<(), String> {
-        self.receiver_for_raw_csi_frame(frame)?;
+        let receiver = self.receiver_for_raw_csi_frame(frame)?;
+        let unified = frame.protocol_identity.and_then(|identity| identity.unified_rx);
+        if unified.is_some() && frame.physical_layout.is_none() {return Err("unified measurement needs explicit physical LTF/mask evidence".into());}
+        if unified.is_some() { frame.validate().map_err(|error| format!("invalid raw CSI frame: {error}"))?; }
+        let expected_source = match (&receiver.rx_profile, unified) {
+            (Some(profile), Some(observed)) => {
+                if matches!(profile.mode, 1 | 2)
+                    && frame.protocol_identity.and_then(|identity| identity.callback_started_us)
+                        .is_none_or(|time| time >= 900_000_000) {
+                    return Err("sealed RX trial profile expired; fresh boot/profile qualification required".into());
+                }
+                if observed.generation != profile.generation || observed.mode != profile.mode
+                    || observed.config_sha256.iter().map(|v| format!("{v:02x}")).collect::<String>() != profile.config_sha256
+                    || usize::from(observed.peer_count) != profile.peer_ids.len()
+                    || sha256_bytes(&observed.receiver_mac) != profile.device_id {
+                    return Err(format!("RX{} active profile/device differs from sealed setup", frame.rx_id));
+                }
+                if observed.source_node_id == 0 {
+                    &self.definition.radio.tx_filter_identity.sha256
+                } else {
+                    if !profile.peer_ids.contains(&observed.source_node_id) {
+                        return Err(format!("RX{} peer source is not configured in the sealed profile", frame.rx_id));
+                    }
+                    &self.definition.receivers[usize::from(observed.source_node_id - 1)]
+                        .rx_profile.as_ref().ok_or("peer device binding missing")?.device_id
+                }
+            }
+            (None, None) => &self.definition.radio.tx_filter_identity.sha256,
+            _ => return Err(format!("RX{} unified profile binding is missing or protocol changed", frame.rx_id)),
+        };
         let binding = frame.source_binding.as_ref().ok_or_else(|| {
             format!(
                 "raw CSI frame from RX{} has no TX-source binding trailer",
@@ -729,7 +783,7 @@ impl SealedPositionSetup {
                 frame.rx_id, binding.scheme, self.definition.radio.tx_filter_identity.scheme
             ));
         }
-        if binding.tx_filter_sha256 != self.definition.radio.tx_filter_identity.sha256 {
+        if &binding.tx_filter_sha256 != expected_source {
             return Err(format!(
                 "raw CSI frame from RX{} TX-filter identity does not match the sealed setup",
                 frame.rx_id
@@ -746,9 +800,10 @@ impl SealedPositionSetup {
     ) -> Result<bool, String> {
         let receiver = self.receiver_for_raw_csi_frame(frame)?;
         let expected = receiver.expected_grid;
-        let actual_flags = frame.flags & POSITION_LAYOUT_FLAGS_MASK;
+        let actual_flags = frame.flags & POSITION_LAYOUT_FLAGS_MASK & if receiver.rx_profile.is_some() {!32} else {255};
         let expected_flags = expected.layout_flags & POSITION_LAYOUT_FLAGS_MASK;
         Ok(frame.center_frequency_mhz == expected.center_frequency_mhz
+            && (receiver.rx_profile.is_none() || super::csi_layout::qualified(frame).is_ok())
             && frame.antenna_count == expected.antenna_count
             && frame.subcarrier_count == expected.subcarrier_count
             && frame.ppdu_type == expected.ppdu_type
@@ -759,6 +814,10 @@ impl SealedPositionSetup {
     /// experiment, including the selected CSI grid.
     pub(crate) fn validate_raw_csi_frame(&self, frame: &RawCsiFrame) -> Result<(), String> {
         self.validate_raw_csi_source_identity(frame)?;
+        if frame.protocol_identity.and_then(|identity| identity.unified_rx)
+            .is_some_and(|identity| identity.source_node_id != 0) {
+            return Err("peer CSI is raw link evidence; the primary TX feature/model contract excludes it".into());
+        }
         if !self.raw_csi_frame_matches_expected_grid(frame)? {
             let expected = self.receiver_for_raw_csi_frame(frame)?.expected_grid;
             let actual_flags = frame.flags & POSITION_LAYOUT_FLAGS_MASK;
@@ -1252,6 +1311,41 @@ fn validate_spec(spec: &PositionSetupSpec) -> Result<(), String> {
     validate_definition(&definition)
 }
 
+fn validate_rx_profiles(definition: &PositionSetupDefinition) -> Result<(), String> {
+    let receivers = &definition.receivers;
+    if !receivers.iter().any(|rx| rx.rx_profile.is_some()) { return Ok(()); }
+    if definition.schema_version < 6 || receivers.iter().any(|rx| rx.rx_profile.is_none()) {
+        return Err("unified RX profiles require schema v6 and bindings for all four receivers".into());
+    }
+    let mut devices = HashSet::new();
+    for receiver in receivers {
+        let profile = receiver.rx_profile.as_ref().unwrap();
+        let expected_count = match profile.mode { 0 => 0, 1 | 3 => 1, 2 | 4 => 3,
+            _ => return Err("unknown unified RX profile mode".into()) };
+        validate_sha256("rx_profile.config_sha256", &profile.config_sha256)?;
+        validate_sha256("rx_profile.device_id", &profile.device_id)?;
+        if profile.generation == 0 || !(20..=50).contains(&profile.rate_hz) || profile.rate_hz % 5 != 0
+            || profile.config_sha256 == "0".repeat(64)
+            || profile.device_id == "0".repeat(64) || profile.device_id == definition.radio.tx_filter_identity.sha256
+            || !devices.insert(&profile.device_id) || profile.peer_ids.len() != expected_count
+            || profile.peer_ids.windows(2).any(|ids| ids[0] >= ids[1])
+            || profile.peer_ids.iter().any(|id| !(1..=4).contains(id) || *id == receiver.rx_id) {
+            return Err(format!("RX{} has invalid or duplicate physical/profile identity", receiver.rx_id));
+        }
+        if receiver.firmware != receivers[0].firmware || receiver.firmware.target != "esp32s3" {
+            return Err("unified RX profiles must use the same S3 firmware image and version".into());
+        }
+        for peer in &profile.peer_ids {
+            let partner = &receivers[usize::from(*peer - 1)];
+            let partner_profile = partner.rx_profile.as_ref().unwrap();
+            if partner_profile.mode != profile.mode || !partner_profile.peer_ids.contains(&receiver.rx_id) {
+                return Err("unified peer topology must be reciprocal and use the same profile mode".into());
+            }
+        }
+    }
+    Ok(())
+}
+
 fn validate_definition(definition: &PositionSetupDefinition) -> Result<(), String> {
     if !(MIN_SETUP_SCHEMA_VERSION..=SETUP_SCHEMA_VERSION).contains(&definition.schema_version) {
         return Err(format!(
@@ -1260,8 +1354,8 @@ fn validate_definition(definition: &PositionSetupDefinition) -> Result<(), Strin
         ));
     }
     match (&definition.cad, definition.schema_version) {
-        (Some(cad), 4 | 5) => cad.validate()?,
-        (None, 4 | 5) => return Err("schema v4/v5 requires a complete CAD binding".to_string()),
+        (Some(cad), 4..=6) => cad.validate()?,
+        (None, 4..=6) => return Err("schema v4/v5/v6 requires a complete CAD binding".to_string()),
         (Some(_), _) => {
             return Err("legacy setup schemas must not contain a CAD binding".to_string())
         }
@@ -1278,7 +1372,7 @@ fn validate_definition(definition: &PositionSetupDefinition) -> Result<(), Strin
             definition.room_dimensions_mm,
         )?,
         2 => return Err("schema v2 must use the legacy mmwave object".to_string()),
-        3..=5 if definition.mmwave.is_none() => {
+        3..=6 if definition.mmwave.is_none() => {
             if definition.mmwave_sensors.is_empty() || definition.mmwave_sensors.len() > 2 {
                 return Err("schema v3 mmwave_sensors must contain one or two sensors".to_string());
             }
@@ -1299,7 +1393,7 @@ fn validate_definition(definition: &PositionSetupDefinition) -> Result<(), Strin
                 }
             }
         }
-        3..=5 => return Err("schema v3/v4/v5 must use mmwave_sensors, not mmwave".to_string()),
+        3..=6 => return Err("schema v3/v4/v5/v6 must use mmwave_sensors, not mmwave".to_string()),
         _ => unreachable!("schema range checked above"),
     }
     if definition.coordinate_system != COORDINATE_SYSTEM {
@@ -1339,6 +1433,7 @@ fn validate_definition(definition: &PositionSetupDefinition) -> Result<(), Strin
             "receivers must be exactly RX1-RX4 in order, got {receiver_ids:?}"
         ));
     }
+    validate_rx_profiles(definition)?;
     let mut receiver_positions = HashSet::new();
     for receiver in &definition.receivers {
         let expected_node_id = format!("RX{}", receiver.rx_id);
@@ -1372,6 +1467,9 @@ fn validate_definition(definition: &PositionSetupDefinition) -> Result<(), Strin
             definition.radio.channel,
             receiver.expected_grid,
         )?;
+        if receiver.rx_profile.is_some() && receiver.expected_grid.layout_flags&32!=0 {
+            return Err("unified expected grid must keep invalid-prefix quality in the physical mask, not layout flags".into());
+        }
     }
 
     if definition.recording_host.kind != RECORDING_HOST_KIND {
@@ -1559,6 +1657,7 @@ fn definition_sha256(definition: &PositionSetupDefinition) -> Result<String, Str
         3 => SETUP_HASH_DOMAIN_V3,
         4 => SETUP_HASH_DOMAIN_V4,
         5 => SETUP_HASH_DOMAIN_V5,
+        6 => SETUP_HASH_DOMAIN_V6,
         _ => return Err("unsupported setup schema for hashing".to_string()),
     };
     let mut sealed = Vec::with_capacity(domain.len() + canonical.len());
@@ -2004,7 +2103,7 @@ pub(crate) mod tests {
         let (profile, _) = cad_setup_fixture();
         assert_eq!(
             observatory_profile_setup_draft(&profile).unwrap()["spec"]["schema_version"],
-            5
+            SETUP_SCHEMA_VERSION
         );
         let mut value = complete_cad_spec(&profile);
         value["schema_version"] = json!(5);
@@ -2313,6 +2412,7 @@ pub(crate) mod tests {
 
     fn raw_frame(rx_id: u8, flags: u8) -> RawCsiFrame {
         RawCsiFrame {
+            physical_layout: None,
             schema_version: RAW_CSI_SCHEMA_VERSION,
             host_timestamp_unix_ns: 1,
             host_monotonic_ns: Some(1),
@@ -2756,4 +2856,82 @@ pub(crate) mod tests {
             .insert("unknown".to_string(), json!(true));
         assert!(serde_json::from_value::<SealedPositionSetup>(encoded).is_err());
     }
+    pub(crate) fn unified_setup_and_frame(mode: u8) -> (SealedPositionSetup, RawCsiFrame) {
+        let (profile, _) = cad_setup_fixture();
+        let mut spec = complete_cad_spec(&profile);
+        spec["schema_version"] = json!(6);
+        let packet = super::super::raw_csi_recording::tests::unified_c_golden();
+        let mut frame = RawCsiFrame::from_packet(&packet, Default::default()).unwrap();
+        frame.flags &= !32;
+        frame.physical_layout.as_mut().unwrap().first_word_invalid=false;
+        frame.protocol_identity.as_mut().unwrap().quality_flags.as_mut().map(|flags| *flags &= !1);
+        let unified = frame.protocol_identity.as_mut().unwrap().unified_rx.as_mut().unwrap();
+        unified.mode = mode;
+        unified.peer_count = match mode { 0 => 0, 1 | 3 => 1, _ => 3 };
+        for index in 0..4 {
+            let node = index + 1;
+            let rx_mode = if matches!(mode, 1 | 3) && (node == 2 || node == 3) { 0 } else { mode };
+            let peers: Vec<usize> = match rx_mode {
+                0 => vec![], 1 | 3 => vec![if node == 1 { 4 } else { 1 }],
+                _ => (1..=4).filter(|id| *id != node).collect(),
+            };
+            spec["receivers"][index]["firmware"] = json!({
+                "target":"esp32s3", "version":"rx-unified-test", "artifact_sha256":hash('a'),
+            });
+            spec["receivers"][index]["expected_grid"] = json!({
+                "center_frequency_mhz":2437, "antenna_count":1, "subcarrier_count":128,
+                "ppdu_type":0, "layout_flags":0,
+            });
+            spec["receivers"][index]["rx_profile"] = json!({
+                "generation":7, "mode":rx_mode, "rate_hz":50,"config_sha256":format!("{:02x}",0xa7+index).repeat(32),
+                "device_id":sha256_bytes(&[2,0,0,0,3,node as u8]), "peer_ids":peers,
+            });
+        }
+        spec["radio"]["tx_filter_identity"]["sha256"] = json!(frame.source_binding.as_ref().unwrap().tx_filter_sha256);
+        let directory = TempDir::new().unwrap();
+        let executable = executable_fixture(&directory, b"unified profile host fixture");
+        let setup = create_position_setup_with_executable(parse_spec(spec).unwrap(), &executable).unwrap();
+        frame.host_timestamp_unix_ns = 1_000_000_000;
+        (setup, frame)
+    }
+
+    #[test]
+    fn unified_profiles_bind_physical_links_and_reject_generation_topology_or_image_drift() {
+        let (setup, mut frame) = unified_setup_and_frame(1);
+        setup.validate_raw_csi_source_identity(&frame).unwrap();
+        let first_seal = setup.setup_sha256().to_string();
+        frame.protocol_identity.as_mut().unwrap().unified_rx.as_mut().unwrap().generation += 1;
+        assert!(setup.validate_raw_csi_source_identity(&frame).is_err());
+        frame.protocol_identity.as_mut().unwrap().unified_rx.as_mut().unwrap().generation -= 1;
+        let unified = frame.protocol_identity.as_mut().unwrap().unified_rx.as_mut().unwrap();
+        unified.source_node_id = 4; unified.source_mac = [2,0,0,0,3,4];
+        frame.source_binding.as_mut().unwrap().tx_filter_sha256 = sha256_bytes(&[2,0,0,0,3,4]);
+        setup.validate_raw_csi_source_identity(&frame).unwrap();
+        assert!(setup.validate_raw_csi_frame(&frame).is_err(), "peer never enters a TX-only feature contract");
+        frame.protocol_identity.as_mut().unwrap().unified_rx.as_mut().unwrap().source_node_id = 2;
+        assert!(setup.validate_raw_csi_source_identity(&frame).is_err());
+        let mut changed = setup.clone();
+        changed.definition.receivers[0].rx_profile.as_mut().unwrap().generation += 1;
+        assert_ne!(first_seal, definition_sha256(&changed.definition).unwrap());
+        changed.definition.receivers[0].firmware.artifact_sha256 = hash('b');
+        assert!(validate_definition(&changed.definition).is_err());
+        let mut changed = setup.definition.clone();
+        changed.receivers[3].rx_profile.as_mut().unwrap().peer_ids.clear();
+        assert!(validate_definition(&changed).is_err());
+    }
+
+    #[test]
+    fn unified_old_setup_cannot_accept_v4_and_trial_expiry_is_a_hard_measurement_boundary() {
+        let (_, legacy) = cad_setup_fixture();
+        let (setup, mut frame) = unified_setup_and_frame(1);
+        assert!(legacy.validate_raw_csi_source_identity(&frame).is_err());
+        frame.protocol_identity.as_mut().unwrap().callback_started_us = Some(900_000_000);
+        assert!(setup.validate_raw_csi_source_identity(&frame).is_err());
+        let (continuous, mut frame) = unified_setup_and_frame(3);
+        let identity = frame.protocol_identity.as_mut().unwrap();
+        identity.callback_started_us = Some(900_000_001);
+        let u = identity.unified_rx.as_mut().unwrap(); u.dequeued_us=900_000_002; u.send_attempt_us=900_000_003;
+        continuous.validate_raw_csi_source_identity(&frame).unwrap();
+    }
+
 }

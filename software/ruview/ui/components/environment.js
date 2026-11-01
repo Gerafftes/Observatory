@@ -361,7 +361,7 @@ export class Environment {
     canvas.width = 128;
     canvas.height = 32;
 
-    ctx.font = 'bold 14px monospace';
+    ctx.font = 'bold 14px "JetBrains Mono", monospace';
     ctx.fillStyle = '#' + new THREE.Color(color).getHexString();
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';

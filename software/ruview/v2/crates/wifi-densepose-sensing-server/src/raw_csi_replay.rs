@@ -20,6 +20,7 @@ const REPLAY_EVALUATION_HZ: u16 = 1;
 const REPLAY_WARMUP_SECONDS: u64 = 5;
 const NANOS_PER_SECOND: u64 = 1_000_000_000;
 const EXPECTED_CAPTURE_SCOPE: &str = "validated_udp_csi_all_grids";
+const MULTILINK_CAPTURE_SCOPE: &str = "source_validated_csi_all_links_and_grids";
 
 /// Complete deterministic result of one empty-room calibration followed by
 /// one or more chronological measurement captures.
@@ -58,6 +59,7 @@ pub(crate) struct ReplayCaptureInfo {
     pub(crate) frames_total: u64,
     pub(crate) frames_accepted: u64,
     pub(crate) frames_grid_rejected: u64,
+    pub(crate) frames_peer_excluded: u64,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -82,6 +84,7 @@ pub(crate) struct ReplaySecond {
     pub(crate) frames_total: u64,
     pub(crate) frames_accepted: u64,
     pub(crate) frames_grid_rejected: u64,
+    pub(crate) frames_peer_excluded: u64,
     pub(crate) gap: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) sample_timestamp_unix_ns: Option<u64>,
@@ -148,6 +151,7 @@ struct RecordingMetadata {
     room_dimensions: Option<[f64; 3]>,
     setup_id: Option<String>,
     setup_sha256: Option<String>,
+    sealed_setup: Option<position_setup::SealedPositionSetup>,
     capture_scope: String,
     status: String,
     frames_written: u64,
@@ -187,7 +191,7 @@ struct LoadedCapture {
 }
 
 impl LoadedCapture {
-    fn info(&self, frames_accepted: u64, frames_grid_rejected: u64) -> ReplayCaptureInfo {
+    fn info(&self, frames_accepted: u64, frames_grid_rejected: u64, frames_peer_excluded: u64) -> ReplayCaptureInfo {
         ReplayCaptureInfo {
             recording_id: self.metadata.recording_id.clone(),
             label: self.metadata.label.clone(),
@@ -203,6 +207,7 @@ impl LoadedCapture {
             frames_total: self.frames.len() as u64,
             frames_accepted,
             frames_grid_rejected,
+            frames_peer_excluded,
         }
     }
 }
@@ -212,6 +217,7 @@ struct ReplaySecondAccumulator {
     frames_total: u64,
     frames_accepted: u64,
     frames_grid_rejected: u64,
+    frames_peer_excluded: u64,
     last_sample: Option<ReplaySample>,
 }
 
@@ -325,6 +331,9 @@ fn load_capture(path: &std::path::Path) -> Result<LoadedCapture, String> {
     let metadata: RecordingMetadata = serde_json::from_slice(&metadata_bytes)
         .map_err(|error| format!("invalid sidecar {}: {error}", metadata_path.display()))?;
     validate_metadata(recording_id, &metadata)?;
+    if let Some(setup) = &metadata.sealed_setup {
+        setup.validate_recording_identity(metadata.setup_id.as_deref(), metadata.setup_sha256.as_deref())?;
+    }
     let geometry = metadata.geometry()?;
     validate_geometry(&metadata.recording_id, &geometry)?;
     validate_ground_truth(
@@ -340,6 +349,7 @@ fn load_capture(path: &std::path::Path) -> Result<LoadedCapture, String> {
     let mut previous_timestamp = None;
     let mut line = String::new();
     let mut line_number = 0usize;
+    let mut epochs = raw_csi_recording::RecordingEpochGuard::default();
     loop {
         line.clear();
         let bytes_read = reader
@@ -360,6 +370,15 @@ fn load_capture(path: &std::path::Path) -> Result<LoadedCapture, String> {
                 line_number
             )
         })?;
+        if frame.protocol_identity.and_then(|identity| identity.unified_rx).is_some()
+            && (metadata.sealed_setup.is_none() || metadata.capture_scope != MULTILINK_CAPTURE_SCOPE) {
+            return Err("unified recording is missing its sealed setup or multilink capture scope".into());
+        }
+        if let Some(setup) = &metadata.sealed_setup {
+            setup.validate_raw_csi_source_identity(&frame)?;
+        }
+        epochs.validate(&frame)?;
+        epochs.observe_written(&frame);
         validate_frame(
             &metadata,
             &geometry,
@@ -415,7 +434,7 @@ fn validate_metadata(recording_id: &str, metadata: &RecordingMetadata) -> Result
     if metadata.server_version.trim().is_empty() {
         return Err(format!("{recording_id} has an empty server_version"));
     }
-    if metadata.capture_scope != EXPECTED_CAPTURE_SCOPE {
+    if metadata.capture_scope != EXPECTED_CAPTURE_SCOPE && metadata.capture_scope != MULTILINK_CAPTURE_SCOPE {
         return Err(format!(
             "{recording_id} capture_scope is {:?}; expected {:?}",
             metadata.capture_scope, EXPECTED_CAPTURE_SCOPE
@@ -652,6 +671,10 @@ fn validate_capture_sequence(
 ) -> Result<(), String> {
     let mut previous_end = calibration.metadata.ended_at_unix_ns;
     for measurement in measurements {
+        if measurement.metadata.setup_id != calibration.metadata.setup_id
+            || measurement.metadata.setup_sha256 != calibration.metadata.setup_sha256 {
+            return Err("measurement setup/profile differs from the calibration context".into());
+        }
         if measurement.geometry != calibration.geometry {
             return Err(format!(
                 "{} geometry differs from calibration {}",
@@ -692,28 +715,26 @@ fn replay_calibration(
 
     let mut accepted = 0u64;
     let mut rejected = 0u64;
+    let mut peers = 0u64;
     for recorded in &capture.frames {
         let now = logical_time(
             origin_unix_ns,
             logical_origin,
             recorded.frame.host_timestamp_unix_ns,
         )?;
-        if process_frame(
-            &capture.metadata.recording_id,
-            recorded,
-            now,
-            d5_presence::CalibrationPhase::Collecting,
-            node_states,
+        match process_frame(
+            &capture.metadata.recording_id, recorded, now,
+            d5_presence::CalibrationPhase::Collecting, node_states,
         )? {
-            accepted += 1;
-        } else {
-            rejected += 1;
+            ReplayFrameOutcome::Accepted => accepted += 1,
+            ReplayFrameOutcome::GridExcluded => rejected += 1,
+            ReplayFrameOutcome::PeerExcluded => peers += 1,
         }
     }
 
     install_calibration_references(node_states, fusion, started_at, ended_at)?;
     Ok(ReplayCalibrationReport {
-        capture: capture.info(accepted, rejected),
+        capture: capture.info(accepted, rejected, peers),
         nodes: snapshot_nodes(node_states, ended_at),
     })
 }
@@ -827,6 +848,7 @@ fn replay_measurement(
         .collect();
 
     let mut accepted_total = 0u64;
+    let mut peer_total = 0u64;
     let mut rejected_total = 0u64;
     for recorded in &capture.frames {
         let bucket_index = second_index(
@@ -860,10 +882,10 @@ fn replay_measurement(
             d5_presence::CalibrationPhase::Ready,
             node_states,
         )?;
-        if !accepted {
-            bucket.frames_grid_rejected += 1;
-            rejected_total += 1;
-            continue;
+        match accepted {
+            ReplayFrameOutcome::PeerExcluded => { bucket.frames_peer_excluded += 1; peer_total += 1; continue; }
+            ReplayFrameOutcome::GridExcluded => { bucket.frames_grid_rejected += 1; rejected_total += 1; continue; }
+            ReplayFrameOutcome::Accepted => {}
         }
 
         bucket.frames_accepted += 1;
@@ -921,6 +943,7 @@ fn replay_measurement(
             frames_total: bucket.frames_total,
             frames_accepted: bucket.frames_accepted,
             frames_grid_rejected: bucket.frames_grid_rejected,
+            frames_peer_excluded: bucket.frames_peer_excluded,
             gap,
             sample_timestamp_unix_ns,
             classification,
@@ -931,11 +954,14 @@ fn replay_measurement(
 
     let summary = summarize_measurement(&seconds, capture.metadata.ground_truth.as_ref());
     Ok(ReplayMeasurementReport {
-        capture: capture.info(accepted_total, rejected_total),
+        capture: capture.info(accepted_total, rejected_total, peer_total),
         seconds,
         summary,
     })
 }
+
+#[derive(Debug, PartialEq, Eq)]
+enum ReplayFrameOutcome { Accepted, GridExcluded, PeerExcluded }
 
 fn process_frame(
     recording_id: &str,
@@ -943,7 +969,10 @@ fn process_frame(
     now: Instant,
     phase: d5_presence::CalibrationPhase,
     node_states: &mut HashMap<u8, NodeState>,
-) -> Result<bool, String> {
+) -> Result<ReplayFrameOutcome, String> {
+    if raw_csi_recording::RawCsiLinkSummary::key(&recorded.frame).1 != 0 {
+        return Ok(ReplayFrameOutcome::PeerExcluded);
+    }
     let packet = recorded.frame.to_packet().map_err(|error| {
         format!(
             "{recording_id} line {} could not rebuild its wire packet: {error}",
@@ -971,9 +1000,28 @@ fn process_frame(
     let node = node_states
         .entry(frame.node_id)
         .or_insert_with(NodeState::new);
+    let identity = recorded.frame.protocol_identity;
+    let measurement_identity = identity
+        .and_then(|identity| identity.unified_rx)
+        .map(|identity| {
+            identity.measurement_identity(
+                recorded
+                    .frame
+                    .protocol_identity
+                    .and_then(|identity| identity.callback_started_us)
+                    .unwrap_or(0),
+            )
+        });
+    if node.rx_measurement_identity != measurement_identity
+        || node.boot_id != identity.map(|identity| identity.boot_id)
+    {
+        *node = NodeState::new();
+    }
+    node.rx_measurement_identity = measurement_identity;
+    node.boot_id = identity.map(|identity| identity.boot_id);
     if !node.accept_grid(frame.grid()) {
         node.observe_csi_frame_arrival(now);
-        return Ok(false);
+        return Ok(ReplayFrameOutcome::GridExcluded);
     }
     let _ = observe_frame_for_presence(
         node,
@@ -982,7 +1030,7 @@ fn process_frame(
         phase,
         recorded.frame.host_monotonic_ns.unwrap_or_default(),
     );
-    Ok(true)
+    Ok(ReplayFrameOutcome::Accepted)
 }
 
 fn snapshot_nodes(node_states: &HashMap<u8, NodeState>, now: Instant) -> Vec<ReplayNodeSnapshot> {

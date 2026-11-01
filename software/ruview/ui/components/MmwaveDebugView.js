@@ -400,13 +400,27 @@ function createMarkerLabel(text, color, THREE) {
   context.fillStyle = `#${color.toString(16).padStart(6, '0')}`;
   context.fillRect(2, 2, 9, canvas.height - 4);
   context.fillStyle = '#111111';
-  context.font = `bold ${labelText.length > 8 ? 30 : 38}px monospace`;
+  context.font = `bold ${labelText.length > 8 ? 30 : 38}px "JetBrains Mono", monospace`;
   context.textAlign = 'center';
   context.textBaseline = 'middle';
   context.fillText(labelText, canvas.width / 2, canvas.height / 2);
 
   const texture = new THREE.CanvasTexture(canvas);
   texture.minFilter = THREE.LinearFilter;
+  if (document.fonts?.load) {
+    document.fonts.load(context.font).then(() => {
+      context.clearRect(0, 0, canvas.width, canvas.height);
+      context.fillStyle = 'rgba(250, 250, 248, 0.96)';
+      context.fillRect(0, 0, canvas.width, canvas.height);
+      context.strokeStyle = '#111111';
+      context.strokeRect(2, 2, canvas.width - 4, canvas.height - 4);
+      context.fillStyle = `#${color.toString(16).padStart(6, '0')}`;
+      context.fillRect(2, 2, 9, canvas.height - 4);
+      context.fillStyle = '#111111';
+      context.fillText(labelText, canvas.width / 2, canvas.height / 2);
+      texture.needsUpdate = true;
+    }).catch(() => {});
+  }
   const sprite = new THREE.Sprite(new THREE.SpriteMaterial({
     map: texture,
     transparent: true,

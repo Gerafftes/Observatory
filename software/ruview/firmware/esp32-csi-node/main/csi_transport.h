@@ -92,6 +92,8 @@ void csi_transport_test_reset(void);
 bool csi_transport_test_process_one(void);
 void csi_transport_test_fail_next_publish(void);
 void csi_transport_test_fail_next_serialization(void);
+void csi_transport_test_after_claim(void (*hook)(void));
+bool csi_transport_test_stopping(void);
 #endif
 
 #endif /* CSI_TRANSPORT_H */

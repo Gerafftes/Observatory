@@ -20,7 +20,10 @@ async fn list_recordings(State(state): State<SharedState>) -> Json<serde_json::V
             .clone()
             .map(|id| (id, s.recording_phase))
     };
-    let mut recordings = scan_recording_files();
+    let mut recordings = match tokio::task::spawn_blocking(scan_recording_files).await {
+        Ok(recordings) => recordings,
+        Err(error) => return error_response::internal_error_json("recording list scan", error),
+    };
     if let Some((current_id, phase)) = current {
         let live_status = match phase {
             RecordingLifecyclePhase::Recording => "recording",
@@ -145,14 +148,8 @@ async fn start_recording(
         }
     };
     let metadata_path = recordings_dir.join(format!("{id}.raw-csi.v1.meta.json"));
-    let started_at_unix_ns = match raw_csi_recording::now_unix_ns() {
-        Ok(timestamp) => timestamp,
-        Err(error) => {
-            drop(file);
-            let _ = std::fs::remove_file(&rec_path);
-            return error_response::internal_error_json("recording start timestamp", error);
-        }
-    };
+    let started_at = server_clock::now();
+    let started_at_unix_ns = started_at.host_unix_ns;
     let recording_rx_positions: Vec<[f64; 3]> = s
         .position_setup
         .as_deref()
@@ -171,9 +168,12 @@ async fn start_recording(
         "ground_truth": ground_truth.clone(),
         "setup_id": setup_id,
         "setup_sha256": setup_sha256,
+        "sealed_setup": s.position_setup.as_deref(),
         "server_version": env!("CARGO_PKG_VERSION"),
         "started_at_unix_seconds": chrono_timestamp(),
         "started_at_unix_ns": started_at_unix_ns,
+        "started_at_monotonic_ns": started_at.host_monotonic_ns,
+        "clock_epoch_id": started_at.clock_epoch_id,
         "tx_position": s.tx_position,
         "rx_positions": recording_rx_positions,
         "room_dimensions": s.room_dimensions,
@@ -225,9 +225,12 @@ async fn start_recording(
     // Create a stop signal channel
     let (stop_tx, mut stop_rx) = tokio::sync::watch::channel(false);
     let (done_tx, done_rx) = tokio::sync::oneshot::channel();
+    let ingress_diagnostics = s.csi_ingress_diagnostics.clone();
+    let ingress_loss_start = ingress_diagnostics.snapshot();
     s.recording_phase = RecordingLifecyclePhase::Recording;
     s.recording_active = true;
     s.recording_start_time = Some(std::time::Instant::now());
+    s.recording_started_at = Some(started_at.clone());
     s.recording_current_id = Some(id.clone());
     s.recording_stop_tx = Some(stop_tx);
     s.recording_done_rx = Some(done_rx);
@@ -370,6 +373,7 @@ async fn start_recording(
                 append_recording_writer_error(&mut result, flush_error);
             }
         }
+        account_ingress_losses(&mut result, &ingress_loss_start, &ingress_diagnostics.snapshot());
         info!(
             "Recording {rec_id} finished: {} frames written, {} dropped, incomplete={}",
             result.frames_written,
@@ -379,7 +383,7 @@ async fn start_recording(
         let writer_failed = result.error.is_some();
         let _ = done_tx.send(result);
         if writer_failed {
-            match finalize_active_recording(&writer_state).await {
+            match finalize_active_recording(&writer_state,Some(&rec_id)).await {
                 Ok((recording_id, _, result)) => {
                     warn!(
                         "Recording {recording_id} was stopped automatically after a writer error: {:?}",
@@ -403,7 +407,7 @@ async fn start_recording(
                     && state.recording_current_id.as_deref() == Some(watchdog_recording_id.as_str())
             };
             if should_finalize {
-                match finalize_active_recording(&watchdog_state).await {
+                match finalize_active_recording(&watchdog_state,Some(&watchdog_recording_id)).await {
                     Ok((recording_id, _, result)) => {
                         warn!(
                             "Recording {recording_id} reached its server-side maximum duration; \
@@ -426,12 +430,20 @@ async fn start_recording(
         "success": true,
         "recording_id": id,
         "max_duration_seconds": max_duration_seconds,
+        "status":"recording",
+        "started_at_unix_ns":started_at.host_unix_ns,
+        "started_at_monotonic_ns":started_at.host_monotonic_ns,
+        "clock_epoch_id":started_at.clock_epoch_id,
     }))
 }
 
 /// POST /api/v1/recording/stop — stop recording CSI data.
-async fn stop_recording(State(state): State<SharedState>) -> Json<serde_json::Value> {
-    match finalize_active_recording(&state).await {
+async fn stop_recording(State(state): State<SharedState>, body: Option<Json<serde_json::Value>>) -> Json<serde_json::Value> {
+    let id=body.as_ref().and_then(|Json(value)|value.get("recording_id"));
+    if id.is_some_and(|value|value.as_str().is_none()) {
+        return Json(serde_json::json!({"success":false,"error":"recording_id must be a string"}));
+    }
+    match finalize_active_recording(&state,id.and_then(|value|value.as_str())).await {
         Ok((recording_id, duration_secs, result)) => {
             let incomplete = result.incomplete();
             if incomplete {
@@ -449,6 +461,9 @@ async fn stop_recording(State(state): State<SharedState>) -> Json<serde_json::Va
                 "duration_secs": duration_secs,
                 "frames_written": result.frames_written,
                 "rx_summaries": result.rx_summaries.values().collect::<Vec<_>>(),
+                "link_summaries": result.link_summaries.values().collect::<Vec<_>>(),
+                "closed_at":result.closed_at,
+                "raw_sha256":result.raw_sha256,
                 "dropped_frames": result.dropped_frames,
                 "incomplete": incomplete,
                 "writer_error": result.error,
@@ -524,6 +539,25 @@ async fn delete_recording(
         Json(serde_json::json!({ "success": true, "deleted": id }))
     } else {
         Json(serde_json::json!({ "error": "recording not found", "success": false }))
+    }
+}
+
+// The writer cannot observe datagrams discarded before its broadcast channel.
+// Include losses through final flush conservatively; a new recording snapshots
+// its own baseline so historical drops do not contaminate later captures.
+fn account_ingress_losses(
+    result: &mut RecordingWriterResult,
+    before: &csi_diagnostics::CsiIngressDiagnosticsSnapshot,
+    after: &csi_diagnostics::CsiIngressDiagnosticsSnapshot,
+) {
+    let stale = after.csi_queue_stale_datagrams.checked_sub(before.csi_queue_stale_datagrams);
+    let overflow = after.csi_queue_overflow_datagrams.checked_sub(before.csi_queue_overflow_datagrams);
+    match stale.zip(overflow) {
+        Some((stale, overflow)) => {
+            let lost = stale.saturating_add(overflow);
+            result.dropped_frames = result.dropped_frames.saturating_add(lost);
+        }
+        None => append_recording_writer_error(result, "CSI ingress loss counters regressed".into()),
     }
 }
 
@@ -685,6 +719,7 @@ pub(crate) fn scan_recording_files() -> Vec<serde_json::Value> {
                     "setup_sha256": metadata.get("setup_sha256"),
                     "duration_secs": metadata.get("duration_secs"),
                     "rx_summaries": metadata.get("rx_summaries"),
+                    "link_summaries": metadata.get("link_summaries"),
                 }));
             }
         }
@@ -727,6 +762,7 @@ mod raw_recording_lifecycle_tests {
             ppdu_type: 0,
             flags: 0,
             mesh_timestamp_us: None,
+            physical_layout: None,
             source_binding: None,
             protocol_identity: None,
             iq_pairs: vec![IqPair { i: 20, q: 0 }; 64],
@@ -991,6 +1027,7 @@ mod raw_recording_lifecycle_tests {
             dropped_frames: 0,
             error: None,
             rx_summaries: BTreeMap::new(),
+            ..Default::default()
         };
         finalize_recording_metadata_in_dir(&dir, recording_id, 12, &result)
             .expect("atomically finalize metadata");
@@ -1063,4 +1100,171 @@ mod raw_recording_lifecycle_tests {
 
         std::fs::remove_dir_all(&dir).expect("remove test directory");
     }
+
+    #[test]
+    fn selected_grid_reaches_actual_recorder_and_live_entry_equally() {
+        use std::io::Write;
+        let directory = tempfile::TempDir::new().unwrap();
+        let path = directory.path().join("selected.jsonl");
+        let file = create_private_recording_file(&path).unwrap();
+        let mut writer = std::io::BufWriter::new(file);
+        let mut result = RecordingWriterResult::default();
+        let mut tracker = position_live::LivePositionTracker::new(None);
+        let mut node = NodeState::new();
+        let pin: CsiGridPin = "2437,1,128,0,0x00".parse().unwrap();
+        let mut accepted = Vec::new();
+        for (index, subcarriers) in [128, 64, 128, 192, 128].into_iter().enumerate() {
+            let mut raw = live_raw_frame(10_000_000_000 + index as u64 * 100_000_000, index as u32);
+            raw.subcarrier_count = subcarriers;
+            raw.iq_pairs
+                .resize(subcarriers as usize, IqPair { i: 20, q: 0 });
+            raw.source_binding = Some(raw_csi_recording::SourceBinding {
+                trailer_version: raw_csi_recording::TX_SOURCE_BINDING_VERSION,
+                flags: raw_csi_recording::SOURCE_BINDING_REQUIRED_FLAGS,
+                scheme: raw_csi_recording::TX_SOURCE_BINDING_SCHEME.to_string(),
+                tx_filter_sha256: "a".repeat(64),
+            });
+            let packet = raw.to_packet().unwrap();
+            let parsed = parse_esp32_frame(&packet).unwrap();
+            raw.validate().unwrap();
+            let observation = validated_complete_source_binding(
+                raw.source_binding.as_ref(),
+                std::time::Instant::now(),
+                true,
+            )
+            .unwrap();
+            let selected = node.observe_validated_grid(
+                raw.sequence,
+                observation,
+                parsed.grid(),
+                pin.matches(&raw),
+            );
+            tracker.observe_input_epoch(&raw).unwrap();
+            if !selected {
+                continue;
+            }
+            accepted.push(raw.sequence);
+            append_raw_recording_frame(
+                &mut writer,
+                raw.clone(),
+                None,
+                &None,
+                &None,
+                &None,
+                &mut result,
+            )
+            .unwrap();
+            route_raw_frame_to_live_position(&mut tracker, None, true, raw).unwrap();
+        }
+        writer.flush().unwrap();
+        let recorded: Vec<_> = std::fs::read_to_string(path)
+            .unwrap()
+            .lines()
+            .map(|line| raw_csi_recording::decode_json_line(line).unwrap())
+            .collect();
+        assert_eq!(accepted, vec![0, 2, 4]);
+        assert_eq!(
+            recorded
+                .iter()
+                .map(|frame| frame.sequence)
+                .collect::<Vec<_>>(),
+            accepted
+        );
+        assert!(recorded
+            .iter()
+            .all(|frame| frame.subcarrier_count == 128 && frame.iq_pairs.len() == 128));
+        assert_eq!(tracker.buffered_frame_count(), recorded.len());
+        assert_eq!(result.frames_written, 3);
+        assert_eq!(node.skipped_grid_frames, 2);
+    }
+    #[test]
+    fn unified_recording_keeps_peer_and_all_layouts_with_primary_model_projection() {
+        let (setup, template) = position_setup::tests::unified_setup_and_frame(3);
+        let directory = tempfile::TempDir::new().unwrap();
+        let id = "unified-recording";
+        let path = directory.path().join(format!("{id}.raw-csi.v1.jsonl"));
+        let mut writer = std::io::BufWriter::new(create_private_recording_file(&path).unwrap());
+        let clock=server_clock::now(); let start=clock.host_unix_ns;
+        let mut result = RecordingWriterResult::default();
+        let session = Some(id.to_string());
+        let mut tx1 = template.clone();
+        for node in 1..=4 {
+            let mut frame = template.clone(); frame.rx_id = node;
+            frame.schema_version = RAW_CSI_SCHEMA_VERSION;
+            frame.host_timestamp_unix_ns = start+u64::from(node)*1_000_000;
+            frame.host_monotonic_ns = Some(clock.host_monotonic_ns+u64::from(node)*1_000_000);
+            frame.clock_epoch_id = Some(clock.clock_epoch_id.clone());
+            let u = frame.protocol_identity.as_mut().unwrap().unified_rx.as_mut().unwrap();
+            u.receiver_mac[5] = node; u.config_sha256 = [0xa7+node-1;32];
+            if node==2 || node==3 { u.mode=0; u.peer_count=0; }
+            if node==1 { tx1=frame.clone(); }
+            append_raw_recording_frame(&mut writer,frame,Some(&setup),&session,&None,&None,&mut result).unwrap();
+        }
+        let mut peer=tx1.clone(); peer.host_timestamp_unix_ns=start+5_000_000; peer.host_monotonic_ns=Some(clock.host_monotonic_ns+5_000_000);
+        let u=peer.protocol_identity.as_mut().unwrap().unified_rx.as_mut().unwrap();
+        u.source_node_id=4; u.source_mac=[2,0,0,0,3,4]; u.sig_mode=0;
+        let e=peer.physical_layout.as_mut().unwrap();e.sig_mode=0;e.iq_bytes=256;
+        peer.source_binding.as_mut().unwrap().tx_filter_sha256=position_artifact::sha256_bytes(&[2,0,0,0,3,4]);
+        append_raw_recording_frame(&mut writer,peer.clone(),Some(&setup),&session,&None,&None,&mut result).unwrap();
+        peer.host_timestamp_unix_ns+=1_000_000; peer.host_monotonic_ns=Some(clock.host_monotonic_ns+6_000_000); peer.subcarrier_count=64; peer.iq_pairs.truncate(64);
+        peer.physical_layout.as_mut().unwrap().iq_bytes=128;peer.physical_layout.as_mut().unwrap().sig_mode=0;
+        append_raw_recording_frame(&mut writer,peer.clone(),Some(&setup),&session,&None,&None,&mut result).unwrap();
+        let mut offgrid=tx1.clone(); offgrid.host_timestamp_unix_ns=start+7_000_000; offgrid.host_monotonic_ns=Some(clock.host_monotonic_ns+7_000_000);
+        offgrid.subcarrier_count=64; offgrid.iq_pairs.truncate(64);
+        offgrid.physical_layout.as_mut().unwrap().iq_bytes=128;
+        append_raw_recording_frame(&mut writer,offgrid,Some(&setup),&session,&None,&None,&mut result).unwrap();
+        let mut invalid=peer.clone(); invalid.protocol_identity.as_mut().unwrap().unified_rx.as_mut().unwrap().generation+=1;
+        assert!(append_raw_recording_frame(&mut writer,invalid,Some(&setup),&session,&None,&None,&mut result).is_err());
+        let mut reboot=tx1.clone(); reboot.protocol_identity.as_mut().unwrap().boot_id+=1;
+        assert!(append_raw_recording_frame(&mut writer,reboot,Some(&setup),&session,&None,&None,&mut result).is_err());
+        assert_eq!(result.frames_written,7);
+        assert_eq!(result.link_summaries.len(),5);
+        assert_eq!(result.link_summaries[&(1,4)].frames_written,2);
+        assert_eq!(result.link_summaries[&(1,4)].grids.len(),2);
+        assert_eq!(result.rx_summaries[&1].frames_written,1);
+        use std::io::Write; writer.flush().unwrap(); drop(writer);
+        let metadata=serde_json::json!({
+            "schema_version":RAW_CSI_SCHEMA_VERSION,"recording_id":id,
+            "setup_id":setup.setup_id(),"setup_sha256":setup.setup_sha256(),"sealed_setup":setup,
+            "server_version":"unified-test", "started_at_unix_seconds":start/1_000_000_000,
+            "started_at_unix_ns":start,"started_at_monotonic_ns":clock.host_monotonic_ns,"clock_epoch_id":clock.clock_epoch_id,"tx_position":setup.transmitter_position_m(),
+            "rx_positions":setup.receiver_positions_m(),"room_dimensions":setup.room_dimensions_m(),
+            "capture_scope":"validated_udp_csi_all_grids", "max_duration_seconds":30,
+        });
+        let metadata_path=directory.path().join(format!("{id}.raw-csi.v1.meta.json"));
+        std::fs::write(&metadata_path,serde_json::to_vec(&metadata).unwrap()).unwrap();
+        std::thread::sleep(Duration::from_millis(12)); result.closed_at=Some(server_clock::now());
+        finalize_recording_metadata_in_dir(directory.path(),id,1,&result).unwrap();
+        let captured=position_capture::load_position_capture(&path).unwrap();
+        assert_eq!(captured.frames.len(),5,"four primary frames plus an explicit off-grid primary observation");
+        assert!(captured.frames.iter().all(|f| raw_csi_recording::RawCsiLinkSummary::key(f).1==0));
+        let metadata:serde_json::Value=serde_json::from_slice(&std::fs::read(metadata_path).unwrap()).unwrap();
+        assert_eq!(metadata["link_summaries"].as_array().unwrap().len(),5);
+        assert_eq!(metadata["frames_written"],7);
+        let mut tracker=position_live::LivePositionTracker::new(None);
+        route_raw_frame_to_live_position(&mut tracker,Some(&setup),true,tx1).unwrap();
+        assert!(route_raw_frame_to_live_position(&mut tracker,Some(&setup),true,peer).is_err());
+        assert_eq!(tracker.buffered_frame_count(),1,"peer observations do not modify a primary-source model window");
+    }
+
+    #[test]
+    fn ingress_losses_make_populated_recording_incomplete_without_historical_drops() {
+        let diagnostics = csi_diagnostics::CsiIngressDiagnostics::default();
+        diagnostics.note_csi_stale_in_queue();
+        let before = diagnostics.snapshot();
+        let mut healthy = RecordingWriterResult { frames_written: 10, ..Default::default() };
+        account_ingress_losses(&mut healthy, &before, &diagnostics.snapshot());
+        assert!(!healthy.incomplete());
+        diagnostics.note_csi_stale_in_queue();
+        diagnostics.note_queue_overflow(true);
+        diagnostics.note_queue_overflow(false);
+        let mut result = RecordingWriterResult { frames_written: 10, dropped_frames: 2, ..Default::default() };
+        account_ingress_losses(&mut result, &before, &diagnostics.snapshot());
+        assert_eq!(result.dropped_frames, 4);
+        assert!(result.incomplete());
+        let mut regressed = RecordingWriterResult { frames_written: 10, ..Default::default() };
+        account_ingress_losses(&mut regressed, &diagnostics.snapshot(), &before);
+        assert!(regressed.incomplete());
+    }
+
 }

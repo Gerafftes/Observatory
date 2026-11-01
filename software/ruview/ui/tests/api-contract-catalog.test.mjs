@@ -31,7 +31,10 @@ test('the production shell contains no removed placeholder tabs or claims', () =
   assert.doesNotMatch(sensing, /id="val(?:Variance|Motion|Breath|Spectral)">0/);
   const serviceWorker = fs.readFileSync(new URL('../sw.js', import.meta.url), 'utf8');
   assert.match(serviceWorker, /components\/ServerControlPanel\.js/);
-  assert.match(serviceWorker, /ruview-v11-device-identities/);
+  assert.match(serviceWorker, /utils\/csi-reception\.js/);
+  assert.match(serviceWorker, /ruview-v13-fonts/);
+  assert.match(serviceWorker, /fonts\/JetBrainsMono-Variable\.woff2/);
+  assert.match(serviceWorker, /fonts\/DepartureMono-Regular\.woff2/);
 });
 
 test('unregistered compatibility paths are explicit legacy endpoints', () => {

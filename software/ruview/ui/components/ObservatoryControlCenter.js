@@ -2,6 +2,9 @@ import { apiService } from '../services/api.service.js';
 import { experimentService } from '../services/experiment.service.js';
 import { deviceColor, receiverIdentity } from '../device-identity.js';
 import {
+  CSI_RATE_HELP, FORMAT_EXCLUSIONS_HELP, SEQUENCE_GAPS_HELP, formatCsiReceptionMetric,
+} from '../utils/csi-reception.js';
+import {
   DEFAULT_MMWAVE_POSITION_M,
   DEFAULT_SENSOR_MOUNT_RADIUS_M,
   mmwaveMountingPosition,
@@ -290,6 +293,8 @@ export class ObservatoryControlCenter {
     this.models = [];
     this.benchmarkCatalog = null;
     this.selectedProfile = null;
+    this._manualProfileSelection = false;
+    this._refreshGeneration = 0;
     this.selectedRun = null;
     this.profileDraft = defaultSetupProfileDocument();
     this.profileDraftDirty = false;
@@ -333,6 +338,7 @@ export class ObservatoryControlCenter {
 
   dispose() {
     this._mounted = false;
+    this._refreshGeneration++;
     if (this._pollTimer) clearInterval(this._pollTimer);
     this._pollTimer = null;
     this._clearEmptyCalibrationTimer();
@@ -343,6 +349,7 @@ export class ObservatoryControlCenter {
   async refresh({ quiet = false, allowWhileBusy = false } = {}) {
     if (!this._mounted || (this.busy && !allowWhileBusy)) return;
     if (quiet && this.connectionState === 'offline' && Date.now() < this._nextRetryAt) return;
+    const generation = ++this._refreshGeneration;
     if (!quiet) {
       this.message = 'Aktualisiere …';
       this.error = '';
@@ -359,22 +366,18 @@ export class ObservatoryControlCenter {
         apiService.get('/api/v1/models').then((payload) => payload?.models || []).catch(() => []),
         experimentService.getBenchmarkCatalog().catch(() => null),
       ]);
+      if (!this._mounted || generation !== this._refreshGeneration) return;
       this.status = status;
       this.profiles = profiles;
       this.runs = runs;
       this.recordings = recordings;
       this.models = models;
       this.benchmarkCatalog = benchmarkCatalog;
-      if (this.selectedProfile) {
-        const storedProfile = profiles.find((profile) => profile.id === this.selectedProfile.id) || null;
-        if (storedProfile) {
-          this._selectProfile(storedProfile);
-        } else {
-          this.selectedProfile = null;
-        }
+      if (!this.profileDraftDirty && !this._manualProfileSelection) {
+        if (profiles[0]) this._selectProfile(profiles[0]);
+        else this.selectedProfile = null;
       }
-      if (!this.selectedProfile && profiles[0]) this._selectProfile(profiles[0]);
-      if (!this.selectedProfile && !profiles.length) {
+      if (!this.selectedProfile && !profiles.length && !this.profileDraftDirty) {
         this.profileSource = 'fallback';
         this.profileLabel = 'Fallback-Setup';
         this.profileDraft = defaultSetupProfileDocument();
@@ -390,11 +393,13 @@ export class ObservatoryControlCenter {
           profileRevisionId: calibrationContext.profile_revision_id,
         }).catch(() => ({ available: false }))
         : null;
+      if (!this._mounted || generation !== this._refreshGeneration) return;
       if (!quiet) this.message = '';
-      this.error = '';
+      if (!this.profileDraftDirty) this.error = '';
       this.connectionState = 'ready';
       this._nextRetryAt = 0;
     } catch (error) {
+      if (!this._mounted || generation !== this._refreshGeneration) return;
       this.connectionState = serverReached ? 'degraded' : 'offline';
       if (!serverReached) this.status = null;
       this._nextRetryAt = Date.now() + 30000;
@@ -403,8 +408,13 @@ export class ObservatoryControlCenter {
         ? 'Daten teilweise verfügbar. Aktualisieren oder Server prüfen.'
         : 'Server nicht erreichbar. Aktionen gesperrt.';
     } finally {
-      if (!quiet || !this._editorHasFocus()) this._render();
+      if (generation === this._refreshGeneration && (!quiet || !this._editorHasFocus())) this._render();
     }
+  }
+
+  async reopen() {
+    if (!this.profileDraftDirty) this._manualProfileSelection = false;
+    await this.refresh({ quiet: true });
   }
 
   _editorHasFocus() {
@@ -413,11 +423,14 @@ export class ObservatoryControlCenter {
     return Boolean(active && this.container?.contains(active) && active.matches('input, select, textarea'));
   }
 
-  _selectProfile(profile, { forceDraft = false } = {}) {
+  _selectProfile(profile, { forceDraft = false, manual = false } = {}) {
+    if (!forceDraft && this.selectedProfile?.id === profile?.id
+      && this.selectedProfile.version > profile.version) return;
     const keepDraft = !forceDraft
       && this.selectedProfile?.id === profile?.id
       && this.profileDraftDirty;
     this.selectedProfile = profile;
+    this._manualProfileSelection = manual;
     this.profileSource = 'sqlite';
     if (keepDraft) return;
     this.profileLabel = profile.label;
@@ -545,6 +558,7 @@ export class ObservatoryControlCenter {
         <section class="occ-panel occ-wide-panel occ-room-panel">
           ${panelHeading('SETUP', 'Raum-Setup', 'Setup-Profil', 'Speichert Raum, TX, RX und mmWave-Montagepunkt als versioniertes Profil. P01–P09 bleibt Legacy.')}
           <p class="occ-panel-intro">Maße in m · Achsen: <strong>x / y / z</strong>.</p>
+          ${this._profileIdentityMarkup()}
           <div id="occRoomCadEditor" class="occ-cad-editor"></div>
           <button type="button" class="occ-room-details-toggle" data-occ-action="toggle-room-details" aria-expanded="${this.roomDetailsExpanded ? 'true' : 'false'}" aria-controls="occRoomDetails">
             <span class="occ-room-details-title"><span class="occ-route-kicker">SETUP</span><strong>Profil- und Sensorpositionen</strong></span>
@@ -643,7 +657,7 @@ export class ObservatoryControlCenter {
           selectedIds: previousGeometrySelection,
           onChange: (document) => {
             this.profileDraft = document;
-            this.profileDraftDirty = true;
+            this._markProfileDraftDirty();
             this._syncProfileFormFromDraft();
           },
         onSave: (document) => this._saveGeometryDocument(document),
@@ -658,6 +672,27 @@ export class ObservatoryControlCenter {
       this.geometryEditor.snap = previousGeometrySnap;
       this.geometryEditor.mount();
     }
+  }
+
+  _profileIdentityMarkup() {
+    const profile = this.selectedProfile;
+    const confirmed = this.connectionState === 'ready';
+    const source = confirmed ? '' : 'Profilquelle nicht bestätigt. ';
+    if (!profile) {
+      return `<p class="occ-helper" data-occ-loaded-profile>${source}${this.profileDraftDirty
+        ? 'Ungespeicherter Entwurf.'
+        : confirmed ? 'Kein gespeichertes Profil in dieser Serverablage. Beispielaufbau (Fallback).'
+          : 'Beispielaufbau (Fallback); kein gespeichertes Profil geladen.'}</p>`;
+    }
+    const sealedHash = this.status?.mmwave?.sealed_cad?.profile_sha256;
+    return `<p class="occ-helper" data-occ-loaded-profile data-profile-sha256="${attribute(profile.profile_sha256 || '')}">${source}${this.profileDraftDirty ? 'Ungespeicherter Entwurf · letzter Speicherstand: ' : 'CAD-Speicherstand: '}<strong>${escapeHTML(profile.revision_id || profile.id)}</strong> · ${escapeHTML(formatTime(profile.updated_at))} · <span title="${attribute(profile.profile_sha256 || '')}">SHA-256 ${escapeHTML((profile.profile_sha256 || '').slice(0, 16))}…</span>${sealedHash && sealedHash !== profile.profile_sha256
+      ? '<br>Der aktive Versuch behält seine abweichende versiegelte Geometrie.' : ''}</p>`;
+  }
+
+  _markProfileDraftDirty() {
+    this.profileDraftDirty = true;
+    const identity = this.container?.querySelector?.('[data-occ-loaded-profile]');
+    if (identity) identity.outerHTML = this._profileIdentityMarkup();
   }
 
   _overviewMarkup() {
@@ -1258,7 +1293,7 @@ export class ObservatoryControlCenter {
   _nodesMarkup() {
     const nodes = Array.isArray(this.status?.nodes) ? this.status.nodes : [];
     if (!nodes.length) return '<div class="occ-empty">Keine CSI-Nodes.</div>';
-    return `<div class="occ-table-wrap"><table class="occ-table"><thead><tr><th>Node</th><th>Status</th><th>RSSI ${infoTip('RSSI', 'Empfangsstärke des letzten Pakets.')}</th><th>CSI-Rate ${infoTip('CSI-Rate', 'Frames pro Sekunde.')}</th><th>Verlust ${infoTip('Verlust', 'Aus Sequenzlücken geschätzt.')}</th><th>Seq.</th><th>Zeit / Sync ${infoTip('Zeit / Sync', 'Zeitbezug zum Mesh.')}</th></tr></thead><tbody>${nodes.map((node) => {
+    return `<div class="occ-table-wrap"><table class="occ-table"><thead><tr><th>Node</th><th>Status</th><th>RSSI ${infoTip('RSSI', 'Empfangsstärke des letzten Pakets.')}</th><th>CSI-Rate ${infoTip('CSI-Rate', CSI_RATE_HELP)}</th><th>Formatausschlüsse ${infoTip('Formatausschlüsse', FORMAT_EXCLUSIONS_HELP)}</th><th>Ungeklärte Sequenzlücken ${infoTip('Ungeklärte Sequenzlücken', SEQUENCE_GAPS_HELP)}</th><th>Seq.</th><th>Zeit / Sync ${infoTip('Zeit / Sync', 'Zeitbezug zum Mesh.')}</th></tr></thead><tbody>${nodes.map((node) => {
       const identity = receiverIdentity(node.node_id);
       const label = identity?.id || node.display_name || `RX?`;
       const active = node.status === 'active';
@@ -1267,10 +1302,10 @@ export class ObservatoryControlCenter {
         ? `zuletzt vor ${ageMs < 60000 ? `${Math.floor(ageMs / 1000)} s` : ageMs < 3600000 ? `${Math.floor(ageMs / 60000)} min` : `${Math.floor(ageMs / 3600000)} h`}`
         : 'kein Empfang';
       if (!active) {
-        return `<tr><td><strong class="device-identity-label" style="--device-color:${deviceColor(label)}"><i aria-hidden="true"></i>${escapeHTML(label)}</strong><small>${escapeHTML(node.role || 'unbekannt')}</small></td><td><span class="occ-node-state is-stale">offline</span><small>${escapeHTML(lastSeen)}</small></td><td>--</td><td>0.0 Hz<small>kein aktueller Empfang</small></td><td>--<small>keine aktuellen Daten</small></td><td>${escapeHTML(node.latest_sequence ?? '--')}<small>zuletzt empfangen</small></td><td>veraltet</td></tr>`;
+        return `<tr><td><strong class="device-identity-label" style="--device-color:${deviceColor(label)}"><i aria-hidden="true"></i>${escapeHTML(label)}</strong><small>${escapeHTML(node.role || 'unbekannt')}</small></td><td><span class="occ-node-state is-stale">offline</span><small>${escapeHTML(lastSeen)}</small></td><td>--</td><td>0.0 Hz<small>kein aktueller Empfang</small></td><td>--<small>keine aktuellen Daten</small></td><td>--<small>keine aktuellen Daten</small></td><td>${escapeHTML(node.latest_sequence ?? '--')}<small>zuletzt empfangen</small></td><td>veraltet</td></tr>`;
       }
       return `
-      <tr><td><strong class="device-identity-label" style="--device-color:${deviceColor(label)}"><i aria-hidden="true"></i>${escapeHTML(label)}</strong><small>${escapeHTML(node.role || 'unbekannt')}</small></td><td><span class="occ-node-state is-active">${escapeHTML(node.status)}</span><small>${escapeHTML(lastSeen)}</small></td><td>${node.rssi_dbm == null ? '--' : `${Number(node.rssi_dbm).toFixed(1)} dBm`}</td><td>${node.frame_rate_hz == null ? `wird ermittelt (${escapeHTML(node.frame_rate_samples ?? 0)})` : `${Number(node.frame_rate_hz).toFixed(1)} Hz`}</td><td>${node.packet_loss_percent == null ? '--' : `${Number(node.packet_loss_percent).toFixed(1)}%`}<small>${escapeHTML(node.inferred_lost_frames ?? 0)} geschätzt</small></td><td>${escapeHTML(node.latest_sequence ?? '--')}</td><td>${node.sync ? `${escapeHTML(node.sync.is_valid && Number.isFinite(node.sync.staleness_ms) && node.sync.staleness_ms <= 9000 ? 'gültig' : 'veraltet')} · ${escapeHTML(node.sync.offset_us)} µs` : 'kein Mesh-Sync'}</td></tr>`;
+      <tr><td><strong class="device-identity-label" style="--device-color:${deviceColor(label)}"><i aria-hidden="true"></i>${escapeHTML(label)}</strong><small>${escapeHTML(node.role || 'unbekannt')}</small></td><td><span class="occ-node-state is-active">${escapeHTML(node.status)}</span><small>${escapeHTML(lastSeen)}</small></td><td>${node.rssi_dbm == null ? '--' : `${Number(node.rssi_dbm).toFixed(1)} dBm`}</td><td>${node.frame_rate_hz == null ? `wird ermittelt (${escapeHTML(node.frame_rate_samples ?? 0)})` : `${Number(node.frame_rate_hz).toFixed(1)} Hz`}</td><td>${escapeHTML(formatCsiReceptionMetric(node, 'format_exclusions'))}</td><td>${escapeHTML(formatCsiReceptionMetric(node, 'unexplained_sequence_gaps'))}</td><td>${escapeHTML(node.latest_sequence ?? '--')}</td><td>${node.sync ? `${escapeHTML(node.sync.is_valid && Number.isFinite(node.sync.staleness_ms) && node.sync.staleness_ms <= 9000 ? 'gültig' : 'veraltet')} · ${escapeHTML(node.sync.offset_us)} µs` : 'kein Mesh-Sync'}</td></tr>`;
     }).join('')}</tbody></table></div>`;
   }
 
@@ -1430,7 +1465,7 @@ export class ObservatoryControlCenter {
     if (profileForm) {
       this.profileLabel = String(profileForm.querySelector('[name="profile_label"]')?.value || '');
       this.profileDraft = this._readProfileFromForm(profileForm);
-      this.profileDraftDirty = true;
+      this._markProfileDraftDirty();
       this.geometryEditor?.setDocument(this.profileDraft);
     }
     if (target.matches('[name="workflow_label"]')) this.workflowLabel = String(target.value || '');
@@ -1468,7 +1503,7 @@ export class ObservatoryControlCenter {
     if (profileButton) {
       const profile = this.profiles.find((candidate) => candidate.id === profileButton.dataset.occProfileId);
       if (profile) {
-        this._selectProfile(profile, { forceDraft: true });
+        this._selectProfile(profile, { forceDraft: true, manual: true });
         this.calibrationAvailability = null;
         this._render();
         const workflow = this.selectedRun?.workflow;
@@ -1693,8 +1728,9 @@ export class ObservatoryControlCenter {
       return;
     }
     this.profileDraft = document;
-    this.profileDraftDirty = true;
+    this._markProfileDraftDirty();
     this.busy = true;
+    this._refreshGeneration++;
     this.error = '';
     this._render();
     try {
@@ -1739,7 +1775,7 @@ export class ObservatoryControlCenter {
     });
     this.profileLabel = String(form.querySelector('[name="profile_label"]')?.value || this.profileLabel);
     this.profileDraft = this._readProfileFromForm(form);
-    this.profileDraftDirty = true;
+    this._markProfileDraftDirty();
     this.message = 'Optionales P01–P09-Kontrollraster aktualisiert. Die reguläre Kalibrierung verwendet mmWave-Koordinaten.';
     this._render();
   }

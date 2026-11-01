@@ -259,7 +259,7 @@ export class SignalVisualization {
       ctx.fillRect(0, 0, canvas.width, canvas.height);
     }
 
-    ctx.font = `${opts.fontSize || 14}px monospace`;
+    ctx.font = `${opts.fontSize || 14}px "JetBrains Mono", monospace`;
     ctx.fillStyle = opts.color || '#88aacc';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';

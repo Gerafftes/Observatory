@@ -129,7 +129,9 @@ pub fn parse_esp32_frame(buf: &[u8]) -> Option<Esp32Frame> {
         return None;
     }
 
-    let identity = raw_csi_recording::csi_protocol_identity(buf).ok().flatten();
+    let (identity,physical) = raw_csi_recording::csi_protocol_metadata(buf).ok()?;
+    let validity_mask=physical.and_then(|e|e.mask().ok());
+    if validity_mask.as_ref().is_some_and(|mask|mask.len()!=n_pairs) {return None;}
     let q_first = identity.is_some_and(|identity| {
         identity.protocol_version >= raw_csi_recording::CSI_PROTOCOL_VERSION
     });
@@ -159,13 +161,16 @@ pub fn parse_esp32_frame(buf: &[u8]) -> Option<Esp32Frame> {
         amplitudes.push((i_val * i_val + q_val * q_val).sqrt());
         phases.push(q_val.atan2(i_val));
     }
-    if invalid_prefix_pairs > 0 {
+    if invalid_prefix_pairs > 0 && validity_mask.is_none() {
         let first_valid_amplitude = amplitudes[2];
         let first_valid_phase = phases[2];
         amplitudes[..invalid_prefix_pairs].fill(first_valid_amplitude);
         phases[..invalid_prefix_pairs].fill(first_valid_phase);
     }
 
+    if let Some(mask)=&validity_mask {
+        for (index,valid) in mask.iter().enumerate() {if !valid {amplitudes[index]=0.0;phases[index]=0.0;}}
+    }
     Some(Esp32Frame {
         magic,
         node_id,
@@ -185,8 +190,9 @@ pub fn parse_esp32_frame(buf: &[u8]) -> Option<Esp32Frame> {
         gain_db: identity.and_then(|identity| identity.gain_db),
         csi_config_flags: identity.and_then(|identity| identity.csi_config_flags),
         sync_age_ms: identity.and_then(|identity| identity.sync_age_ms),
+        interpolated_prefix_pairs: if validity_mask.is_some() {0} else {invalid_prefix_pairs as u8},
+        validity_mask,
         invalid_prefix_pairs: invalid_prefix_pairs as u8,
-        interpolated_prefix_pairs: invalid_prefix_pairs as u8,
         amplitudes,
         phases,
     })
@@ -1035,7 +1041,8 @@ pub fn generate_simulated_frame(tick: u64) -> Esp32Frame {
         gain_db: None,
         csi_config_flags: None,
         sync_age_ms: None,
-        invalid_prefix_pairs: 0,
+        validity_mask: None,
+            invalid_prefix_pairs: 0,
         interpolated_prefix_pairs: 0,
         amplitudes,
         phases,

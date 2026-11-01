@@ -4,7 +4,7 @@
 import { modelService } from '../services/model.service.js';
 
 const MP_STYLES = `
-.mp-panel{background:rgba(17,24,39,.9);border:1px solid rgba(56,68,89,.6);border-radius:8px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;color:#e0e0e0;overflow:hidden}
+.mp-panel{background:rgba(17,24,39,.9);border:1px solid rgba(56,68,89,.6);border-radius:8px;font-family:var(--font-interface);color:#e0e0e0;overflow:hidden}
 .mp-header{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;background:rgba(13,17,23,.95);border-bottom:1px solid rgba(56,68,89,.6)}
 .mp-title{font-size:14px;font-weight:600;color:#e0e0e0}
 .mp-badge{background:rgba(102,126,234,.2);color:#8ea4f0;font-size:11px;font-weight:600;padding:2px 8px;border-radius:10px;border:1px solid rgba(102,126,234,.3)}

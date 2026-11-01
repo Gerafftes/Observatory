@@ -8,7 +8,7 @@ export function trainingCapability(status, name) {
 }
 
 const TP_STYLES = `
-.tp-panel{background:rgba(17,24,39,.9);border:1px solid rgba(56,68,89,.6);border-radius:8px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;color:#e0e0e0;overflow:hidden}
+.tp-panel{background:rgba(17,24,39,.9);border:1px solid rgba(56,68,89,.6);border-radius:8px;font-family:var(--font-interface);color:#e0e0e0;overflow:hidden}
 .tp-header{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;background:rgba(13,17,23,.95);border-bottom:1px solid rgba(56,68,89,.6)}
 .tp-title{font-size:14px;font-weight:600;color:#e0e0e0}
 .tp-badge{font-size:11px;font-weight:600;padding:2px 8px;border-radius:10px}
@@ -375,7 +375,7 @@ export default class TrainingPanel {
     const ctx = cv.getContext('2d'), w = cv.width, h = cv.height;
     const p = { t: 20, r: 10, b: 24, l: 44 };
     ctx.fillStyle = '#0d1117'; ctx.fillRect(0, 0, w, h);
-    ctx.fillStyle = '#8899aa'; ctx.font = '11px -apple-system,sans-serif'; ctx.fillText(opts.label, p.l, 14);
+    ctx.fillStyle = '#8899aa'; ctx.font = '11px "JetBrains Mono", monospace'; ctx.fillText(opts.label, p.l, 14);
     if (!data.length) { ctx.fillStyle = '#6b7a8d'; ctx.fillText('No data', w / 2 - 20, h / 2); return; }
     const pw = w - p.l - p.r, ph = h - p.t - p.b;
     let yMin = opts.yMin ?? Math.min(...data), yMax = opts.yMax ?? Math.max(...data);
@@ -385,7 +385,7 @@ export default class TrainingPanel {
       const y = p.t + (ph / 4) * i;
       ctx.beginPath(); ctx.moveTo(p.l, y); ctx.lineTo(w - p.r, y); ctx.stroke();
       const v = yMax - ((yMax - yMin) / 4) * i;
-      ctx.fillStyle = '#6b7a8d'; ctx.font = '9px sans-serif'; ctx.fillText(v.toFixed(v >= 1 ? 2 : 3), 2, y + 3);
+      ctx.fillStyle = '#6b7a8d'; ctx.font = '9px "JetBrains Mono", monospace'; ctx.fillText(v.toFixed(v >= 1 ? 2 : 3), 2, y + 3);
     }
     const xl = Math.min(data.length, 5);
     for (let i = 0; i < xl; i++) {

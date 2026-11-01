@@ -10,6 +10,12 @@
 install:
 	@./install.sh
 
+# Common Observatory RX image. This only builds into a new external directory.
+.PHONY: rx-release
+rx-release:
+	@test -n "$(RX_OUTPUT)" || (echo 'Set RX_OUTPUT to a new external output directory'; exit 2)
+	@./install.sh --profile observatory-rx --rx-output "$(RX_OUTPUT)"
+
 # Profile-specific installs (non-interactive)
 install-verify:
 	@./install.sh --profile verify --yes

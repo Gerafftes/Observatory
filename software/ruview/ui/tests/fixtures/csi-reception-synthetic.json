@@ -1,0 +1,51 @@
+{
+  "nodes": [
+    {
+      "node_id": 1,
+      "status": "active",
+      "last_seen_ms": 100,
+      "packet_loss_percent": 75,
+      "inferred_lost_frames": 3,
+      "csi_reception": {
+        "scope": "cumulative_rx_boot",
+        "valid_frames": 5,
+        "latest_sequence": 104,
+        "format_exclusions": { "count": 3, "denominator": 5, "valid": true, "percent": 60 },
+        "unexplained_sequence_gaps": { "count": 0, "forward_transitions": 4, "denominator": 4, "valid": true, "percent": 0 }
+      }
+    },
+    {
+      "node_id": 2,
+      "status": "active",
+      "last_seen_ms": 100,
+      "packet_loss_percent": 75,
+      "inferred_lost_frames": 3,
+      "csi_reception": {
+        "scope": "cumulative_rx_boot",
+        "valid_frames": 4,
+        "latest_sequence": 104,
+        "format_exclusions": { "count": 2, "denominator": 4, "valid": true, "percent": 50 },
+        "unexplained_sequence_gaps": { "count": 1, "forward_transitions": 3, "denominator": 4, "valid": true, "percent": 25 }
+      }
+    },
+    {
+      "node_id": 3,
+      "status": "active",
+      "last_seen_ms": 100,
+      "packet_loss_percent": 91.2,
+      "inferred_lost_frames": 103
+    },
+    {
+      "node_id": 4,
+      "status": "active",
+      "last_seen_ms": 100,
+      "csi_reception": {
+        "scope": "cumulative_rx_boot",
+        "valid_frames": 1,
+        "latest_sequence": 100,
+        "format_exclusions": { "count": 0, "denominator": 1, "valid": true, "percent": 0 },
+        "unexplained_sequence_gaps": { "count": 0, "forward_transitions": 0, "denominator": 0, "valid": false, "percent": null }
+      }
+    }
+  ]
+}

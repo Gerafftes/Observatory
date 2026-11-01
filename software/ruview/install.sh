@@ -27,6 +27,15 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 RUST_DIR="${SCRIPT_DIR}/v2"
 
+# Keep RX software packaging out of the general installer/hardware detection.
+if [[ "${1:-}" == "--profile" && "${2:-}" == "observatory-rx" ]]; then
+    if [[ "$#" -ne 4 || "${3:-}" != "--rx-output" || -z "${4:-}" ]]; then
+        echo 'Usage: install.sh --profile observatory-rx --rx-output NEW_EXTERNAL_DIRECTORY' >&2
+        exit 2
+    fi
+    exec python3 "${SCRIPT_DIR}/firmware/esp32-csi-node/build_rx_release.py" --output "$4"
+fi
+
 # ─── Colors ───────────────────────────────────────────────────────────
 if [ -t 1 ]; then
     RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'
@@ -99,6 +108,7 @@ usage() {
     echo "  rust     Rust pipeline (signal processing, benchmarks)"
     echo "  browser  WASM build for browser deployment (~10MB)"
     echo "  iot      ESP32 sensor mesh + aggregator"
+    echo "  observatory-rx  Shared S3 RX build only; use --rx-output NEW_EXTERNAL_DIRECTORY"
     echo "  docker   Docker-based deployment"
     echo "  field    WiFi-Mat disaster response field kit (~62MB)"
     echo "  full     Everything"

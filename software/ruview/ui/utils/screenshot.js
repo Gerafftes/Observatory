@@ -88,7 +88,7 @@ export class ScreenshotTool {
 
     // Add timestamp watermark
     ctx.fillStyle = 'rgba(255,255,255,0.3)';
-    ctx.font = '12px monospace';
+    ctx.font = '12px "JetBrains Mono", monospace';
     ctx.fillText(`RuView - ${new Date().toLocaleString()}`, 10, mergedCanvas.height - 10);
 
     const dataUrl = mergedCanvas.toDataURL('image/png');
@@ -139,7 +139,7 @@ export class ScreenshotTool {
 
     // Watermark
     ctx.fillStyle = 'rgba(255,255,255,0.15)';
-    ctx.font = '11px monospace';
+    ctx.font = '11px "JetBrains Mono", monospace';
     ctx.fillText(`RuView - ${new Date().toLocaleString()}`, 10, rect.height - 10);
 
     return canvas;

@@ -105,6 +105,7 @@ pub struct Esp32Frame {
     pub gain_db: Option<i8>,
     pub csi_config_flags: Option<u32>,
     pub sync_age_ms: Option<u32>,
+    pub validity_mask: Option<Vec<bool>>,
     pub invalid_prefix_pairs: u8,
     pub interpolated_prefix_pairs: u8,
     pub amplitudes: Vec<f64>,

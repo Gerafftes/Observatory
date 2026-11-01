@@ -597,13 +597,25 @@ export class GaussianSplatRenderer {
     context.lineWidth = 4;
     context.strokeRect(2, 2, canvas.width - 4, canvas.height - 4);
     context.fillStyle = '#ffffff';
-    context.font = 'bold 38px monospace';
+    context.font = 'bold 38px "JetBrains Mono", monospace';
     context.textAlign = 'center';
     context.textBaseline = 'middle';
     context.fillText(text, canvas.width / 2, canvas.height / 2);
 
     const texture = new THREE.CanvasTexture(canvas);
     texture.minFilter = THREE.LinearFilter;
+    if (document.fonts?.load) {
+      document.fonts.load(context.font).then(() => {
+        context.clearRect(0, 0, canvas.width, canvas.height);
+        context.fillStyle = 'rgba(5, 10, 18, 0.78)';
+        context.fillRect(0, 0, canvas.width, canvas.height);
+        context.strokeStyle = `#${color.toString(16).padStart(6, '0')}`;
+        context.strokeRect(2, 2, canvas.width - 4, canvas.height - 4);
+        context.fillStyle = '#ffffff';
+        context.fillText(text, canvas.width / 2, canvas.height / 2);
+        texture.needsUpdate = true;
+      }).catch(() => {});
+    }
     const sprite = new THREE.Sprite(new THREE.SpriteMaterial({
       map: texture,
       transparent: true,

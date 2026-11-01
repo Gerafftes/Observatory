@@ -45,4 +45,8 @@ esp_err_t ota_update_init_ex(void **out_server);
  */
 esp_err_t ota_update_complete_boot_self_test(bool essential_runtime_ready);
 
+#if CONFIG_RX_UNIFIED
+int ota_update_format_progress(char *buffer, size_t size);
+#endif
+
 #endif /* OTA_UPDATE_H */

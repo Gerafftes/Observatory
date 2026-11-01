@@ -122,6 +122,8 @@ pub(crate) struct ExperimentWorkflow {
 pub(crate) struct ExperimentStore {
     pool: SqlitePool,
     db_path: PathBuf,
+    profile_pool: SqlitePool,
+    profile_db_path: PathBuf,
 }
 
 impl ExperimentStore {
@@ -147,7 +149,39 @@ impl ExperimentStore {
 
         migrate(&pool).await?;
 
-        Ok(Self { pool, db_path })
+        Ok(Self {
+            profile_pool: pool.clone(),
+            profile_db_path: db_path.clone(),
+            pool,
+            db_path,
+        })
+    }
+
+    pub(crate) async fn open_with_profile_dir(
+        data_dir: &Path,
+        profile_dir: &Path,
+    ) -> Result<Self, String> {
+        let mut store = Self::open(data_dir).await?;
+        let profiles = Self::open(profile_dir).await?;
+        let profile_path = fs::canonicalize(profiles.db_path())
+            .await
+            .map_err(|error| format!("resolve profile database: {error}"))?;
+        let runtime_path = fs::canonicalize(store.db_path())
+            .await
+            .map_err(|error| format!("resolve runtime database: {error}"))?;
+        if profile_path != runtime_path {
+            store.profile_pool = profiles.pool;
+            store.profile_db_path = profile_path;
+        }
+        Ok(store)
+    }
+
+    pub(crate) fn profile_db_path(&self) -> &Path {
+        &self.profile_db_path
+    }
+
+    fn profiles_are_separate(&self) -> bool {
+        self.db_path != self.profile_db_path
     }
 
     pub(crate) fn db_path(&self) -> &Path {
@@ -170,7 +204,7 @@ impl ExperimentStore {
                ON r.profile_id = p.id AND r.version = p.version
              ORDER BY p.updated_at DESC, p.id DESC",
         )
-        .fetch_all(&self.pool)
+        .fetch_all(&self.profile_pool)
         .await
         .map_err(|error| format!("list setup profiles: {error}"))?;
 
@@ -187,7 +221,7 @@ impl ExperimentStore {
              WHERE p.id = ?",
         )
         .bind(id)
-        .fetch_optional(&self.pool)
+        .fetch_optional(&self.profile_pool)
         .await
         .map_err(|error| format!("get setup profile: {error}"))?;
 
@@ -199,20 +233,12 @@ impl ExperimentStore {
         profile_id: &str,
         revision_id: &str,
     ) -> Result<Option<SetupProfile>, String> {
-        let row = sqlx::query(
-            "SELECT revision_id, profile_id, label, version, profile_sha256,
-                    profile_context_sha256, document_json, created_at,
-                    created_at AS updated_at
-             FROM setup_profile_revisions
-             WHERE profile_id = ? AND revision_id = ?",
-        )
-        .bind(profile_id)
-        .bind(revision_id)
-        .fetch_optional(&self.pool)
-        .await
-        .map_err(|error| format!("get setup profile revision: {error}"))?;
-
-        row.as_ref().map(profile_revision_from_row).transpose()
+        let saved = load_profile_revision(&self.profile_pool, profile_id, revision_id).await?;
+        if saved.is_some() || !self.profiles_are_separate() {
+            return Ok(saved);
+        }
+        // Historical runs can still resolve their exact snapshot after a catalogue change.
+        load_profile_revision(&self.pool, profile_id, revision_id).await
     }
 
     pub(crate) async fn create_profile(
@@ -230,7 +256,7 @@ impl ExperimentStore {
         let document_json = serde_json::to_string(&document)
             .map_err(|error| format!("serialize setup profile document: {error}"))?;
         let mut transaction = self
-            .pool
+            .profile_pool
             .begin()
             .await
             .map_err(|error| format!("begin setup profile creation: {error}"))?;
@@ -299,7 +325,7 @@ impl ExperimentStore {
         let revision_id = new_profile_revision_id(id, next_version);
         let now = timestamp();
         let mut transaction = self
-            .pool
+            .profile_pool
             .begin()
             .await
             .map_err(|error| format!("begin setup profile update: {error}"))?;
@@ -403,6 +429,10 @@ impl ExperimentStore {
             .begin()
             .await
             .map_err(|error| format!("begin workflow creation: {error}"))?;
+
+        if self.profiles_are_separate() {
+            pin_profile_revision(&mut transaction, &profile).await?;
+        }
 
         sqlx::query(
             "INSERT INTO experiment_runs
@@ -797,6 +827,20 @@ impl ExperimentStore {
         bundle: &CalibrationBundle,
     ) -> Result<CalibrationSummary, String> {
         bundle.validate()?;
+        let profile = if self.profiles_are_separate() {
+            let profile = self
+                .get_profile_revision(&bundle.profile_id, &bundle.profile_revision_id)
+                .await?
+                .ok_or_else(|| "calibration profile revision not found".to_string())?;
+            if profile.profile_sha256 != bundle.profile_sha256
+                || profile.profile_context_sha256 != bundle.profile_context_sha256
+            {
+                return Err("calibration profile revision hash mismatch".to_string());
+            }
+            Some(profile)
+        } else {
+            None
+        };
         let data_root = self.db_path.parent().unwrap_or_else(|| Path::new("data"));
         let calibration_dir = data_root.join("calibrations");
         fs::create_dir_all(&calibration_dir)
@@ -821,6 +865,9 @@ impl ExperimentStore {
             .begin()
             .await
             .map_err(|error| format!("begin calibration registration: {error}"))?;
+        if let Some(profile) = profile {
+            pin_profile_revision(&mut transaction, &profile).await?;
+        }
         sqlx::query(
             "INSERT INTO calibration_bundles
              (calibration_id, profile_id, profile_revision_id, profile_sha256,
@@ -1392,6 +1439,89 @@ fn profile_from_row(row: &sqlx::sqlite::SqliteRow) -> Result<SetupProfile, Strin
         created_at: row.get("created_at"),
         updated_at: row.get("updated_at"),
     })
+}
+
+async fn load_profile_revision(
+    pool: &SqlitePool,
+    profile_id: &str,
+    revision_id: &str,
+) -> Result<Option<SetupProfile>, String> {
+    let row = sqlx::query(
+        "SELECT revision_id, profile_id, label, version, profile_sha256,
+                profile_context_sha256, document_json, created_at,
+                created_at AS updated_at
+         FROM setup_profile_revisions WHERE profile_id = ? AND revision_id = ?",
+    )
+    .bind(profile_id)
+    .bind(revision_id)
+    .fetch_optional(pool)
+    .await
+    .map_err(|error| format!("get setup profile revision: {error}"))?;
+    row.as_ref().map(profile_revision_from_row).transpose()
+}
+
+/// Copy only the explicitly bound revision into the run database. Never update a snapshot.
+async fn pin_profile_revision(
+    transaction: &mut sqlx::Transaction<'_, sqlx::Sqlite>,
+    profile: &SetupProfile,
+) -> Result<(), String> {
+    let document = serde_json::to_string(&profile.document)
+        .map_err(|error| format!("serialize bound profile: {error}"))?;
+    sqlx::query(
+        "INSERT OR IGNORE INTO setup_profiles
+         (id, label, version, profile_sha256, document_json, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?)",
+    )
+    .bind(&profile.id)
+    .bind(&profile.label)
+    .bind(profile.version)
+    .bind(&profile.profile_sha256)
+    .bind(&document)
+    .bind(&profile.created_at)
+    .bind(&profile.updated_at)
+    .execute(&mut **transaction)
+    .await
+    .map_err(|error| format!("pin runtime profile: {error}"))?;
+    sqlx::query(
+        "INSERT OR IGNORE INTO setup_profile_revisions
+         (revision_id, profile_id, version, label, profile_sha256,
+          profile_context_sha256, document_json, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+    )
+    .bind(&profile.revision_id)
+    .bind(&profile.id)
+    .bind(profile.version)
+    .bind(&profile.label)
+    .bind(&profile.profile_sha256)
+    .bind(&profile.profile_context_sha256)
+    .bind(&document)
+    .bind(&profile.updated_at)
+    .execute(&mut **transaction)
+    .await
+    .map_err(|error| format!("pin runtime profile revision: {error}"))?;
+    let row = sqlx::query(
+        "SELECT revision_id, profile_id, label, version, profile_sha256,
+                profile_context_sha256, document_json, created_at,
+                created_at AS updated_at
+         FROM setup_profile_revisions WHERE revision_id = ?",
+    )
+    .bind(&profile.revision_id)
+    .fetch_optional(&mut **transaction)
+    .await
+    .map_err(|error| format!("check pinned profile revision: {error}"))?;
+    let pinned = row.as_ref().map(profile_revision_from_row).transpose()?;
+    let matches = pinned.is_some_and(|pinned| {
+        pinned.id == profile.id
+            && pinned.version == profile.version
+            && pinned.label == profile.label
+            && pinned.profile_sha256 == profile.profile_sha256
+            && pinned.profile_context_sha256 == profile.profile_context_sha256
+            && pinned.document == profile.document
+    });
+    if !matches {
+        return Err("bound runtime profile revision conflicts with the CAD catalogue".to_string());
+    }
+    Ok(())
 }
 
 fn profile_revision_from_row(row: &sqlx::sqlite::SqliteRow) -> Result<SetupProfile, String> {
@@ -2305,6 +2435,414 @@ mod tests {
             .expect_err("unknown fixture must fail");
         assert!(error.contains("unsupported fixture_id"));
         assert_eq!(store.run_count().await.expect("count runs"), 0);
+    }
+
+    #[tokio::test]
+    async fn latest_profile_persists_with_both_radars_and_deterministic_timestamp_ties() {
+        let directory = tempfile::tempdir().unwrap();
+        let store = ExperimentStore::open(directory.path()).await.unwrap();
+        let first = store
+            .create_profile("first", &valid_profile())
+            .await
+            .unwrap();
+        let second = store
+            .create_profile("second", &valid_profile())
+            .await
+            .unwrap();
+        let mut document = valid_profile();
+        document["mmwave_sensors"] = json!([
+            {"node_id":"MMWAVE1", "sensor":"HLK-LD2450", "mounting_position_m":[0.1,1.45,0.1], "yaw_mdeg":39000, "raw_x_inverted":false},
+            {"node_id":"MMWAVE2", "sensor":"HLK-LD2450", "mounting_position_m":[3.9,1.45,3.3], "yaw_mdeg":219000, "raw_x_inverted":true}
+        ]);
+        let saved = store
+            .update_profile(&first.id, "latest", &document)
+            .await
+            .unwrap();
+        assert_eq!(
+            store.list_profiles().await.unwrap()[0].revision_id,
+            saved.revision_id
+        );
+        let mut invalid = document.clone();
+        invalid["room_dimensions_m"] = json!([0, 0, 0]);
+        assert!(store
+            .update_profile(&first.id, "invalid", &invalid)
+            .await
+            .is_err());
+        sqlx::query("PRAGMA query_only = ON")
+            .execute(&store.pool)
+            .await
+            .unwrap();
+        assert!(store
+            .update_profile(&first.id, "write must fail", &document)
+            .await
+            .is_err());
+        store.pool.close().await;
+        let reopened = ExperimentStore::open(directory.path()).await.unwrap();
+        let loaded = reopened.list_profiles().await.unwrap().remove(0);
+        assert_eq!(loaded.revision_id, saved.revision_id);
+        assert_eq!(loaded.profile_sha256, saved.profile_sha256);
+        assert_eq!(loaded.document, saved.document);
+        assert_eq!(
+            loaded.document["mmwave_sensors"].as_array().unwrap().len(),
+            2
+        );
+        assert_eq!(
+            reopened
+                .get_profile_revision(&first.id, &first.revision_id)
+                .await
+                .unwrap()
+                .unwrap()
+                .profile_sha256,
+            first.profile_sha256
+        );
+        // Match the catalogue's documented tie rule rather than filesystem time.
+        sqlx::query("UPDATE setup_profiles SET updated_at = ?")
+            .bind("2026-10-04T09:28:29.000000+00:00")
+            .execute(&reopened.pool)
+            .await
+            .unwrap();
+        assert_eq!(
+            reopened.list_profiles().await.unwrap()[0].id,
+            std::cmp::max(first.id, second.id)
+        );
+    }
+
+    #[tokio::test]
+    async fn separate_cad_catalogue_survives_rx_directory_changes_and_pins_runs() {
+        let catalogue_dir = tempfile::tempdir().unwrap();
+        let rx_a = tempfile::tempdir().unwrap();
+        let rx_b = tempfile::tempdir().unwrap();
+        let catalogue = ExperimentStore::open(catalogue_dir.path()).await.unwrap();
+        let profile = catalogue
+            .create_profile("room", &valid_profile())
+            .await
+            .unwrap();
+        let legacy = ExperimentStore::open(rx_a.path()).await.unwrap();
+        let old_rx_profile = legacy
+            .create_profile("unrelated RX profile", &valid_profile())
+            .await
+            .unwrap();
+        let store = ExperimentStore::open_with_profile_dir(rx_a.path(), catalogue_dir.path())
+            .await
+            .unwrap();
+        assert_ne!(store.db_path(), store.profile_db_path());
+        assert_eq!(store.list_profiles().await.unwrap()[0].id, profile.id);
+        assert_eq!(store.list_profiles().await.unwrap().len(), 1);
+        let run = store
+            .create_workflow_run(
+                "bound run",
+                &profile.id,
+                Some(&profile.revision_id),
+                "test",
+                "test",
+                7,
+            )
+            .await
+            .unwrap();
+        assert_eq!(catalogue.run_count().await.unwrap(), 0);
+        let mut changed = profile.document.clone();
+        changed["room_dimensions_m"][0] = json!(4.14);
+        let saved = store
+            .update_profile(&profile.id, "latest CAD", &changed)
+            .await
+            .unwrap();
+        assert_eq!(
+            catalogue.list_profiles().await.unwrap()[0].revision_id,
+            saved.revision_id
+        );
+        let local_head = legacy.get_profile(&profile.id).await.unwrap().unwrap();
+        assert_eq!(local_head.revision_id, profile.revision_id);
+        assert_eq!(local_head.profile_sha256, profile.profile_sha256);
+        assert!(legacy
+            .get_profile_revision(&profile.id, &saved.revision_id)
+            .await
+            .unwrap()
+            .is_none());
+        assert!(legacy
+            .get_profile(&old_rx_profile.id)
+            .await
+            .unwrap()
+            .is_some());
+        let workflow_before = serde_json::to_value(run.workflow.unwrap()).unwrap();
+        let next_run = store
+            .create_workflow_run(
+                "new revision run",
+                &saved.id,
+                Some(&saved.revision_id),
+                "test",
+                "test",
+                8,
+            )
+            .await
+            .unwrap();
+        assert_eq!(
+            next_run.workflow.unwrap().profile_sha256,
+            saved.profile_sha256
+        );
+        let old_run = store.get_run(&run.id).await.unwrap().unwrap();
+        assert_eq!(
+            serde_json::to_value(old_run.workflow).unwrap(),
+            workflow_before
+        );
+        assert_eq!(
+            legacy
+                .get_profile_revision(&profile.id, &profile.revision_id)
+                .await
+                .unwrap()
+                .unwrap()
+                .document,
+            profile.document
+        );
+        assert_eq!(
+            legacy
+                .get_profile_revision(&saved.id, &saved.revision_id)
+                .await
+                .unwrap()
+                .unwrap()
+                .document,
+            saved.document
+        );
+        store.pool.close().await;
+        store.profile_pool.close().await;
+        let reopened = ExperimentStore::open_with_profile_dir(rx_a.path(), catalogue_dir.path())
+            .await
+            .unwrap();
+        assert_eq!(
+            reopened.list_profiles().await.unwrap()[0].profile_sha256,
+            saved.profile_sha256
+        );
+        assert!(reopened.get_run(&run.id).await.unwrap().is_some());
+        let other_rx = ExperimentStore::open_with_profile_dir(rx_b.path(), catalogue_dir.path())
+            .await
+            .unwrap();
+        assert_eq!(
+            other_rx.list_profiles().await.unwrap()[0].revision_id,
+            saved.revision_id
+        );
+        assert_eq!(other_rx.run_count().await.unwrap(), 0);
+        assert_eq!(
+            sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM setup_profiles")
+                .fetch_one(&other_rx.pool)
+                .await
+                .unwrap(),
+            0
+        );
+        let empty_catalogue = ExperimentStore::open_with_profile_dir(rx_a.path(), rx_b.path())
+            .await
+            .unwrap();
+        assert!(empty_catalogue.list_profiles().await.unwrap().is_empty());
+        assert_eq!(
+            empty_catalogue
+                .get_profile_revision(&profile.id, &profile.revision_id)
+                .await
+                .unwrap()
+                .unwrap()
+                .profile_sha256,
+            profile.profile_sha256
+        );
+        let same_database =
+            ExperimentStore::open_with_profile_dir(catalogue_dir.path(), catalogue_dir.path())
+                .await
+                .unwrap();
+        assert!(!same_database.profiles_are_separate());
+    }
+
+    #[tokio::test]
+    async fn separate_cad_failures_do_not_fall_back_or_overwrite_runtime_snapshots() {
+        let catalogue_dir = tempfile::tempdir().unwrap();
+        let rx = tempfile::tempdir().unwrap();
+        let catalogue = ExperimentStore::open(catalogue_dir.path()).await.unwrap();
+        let profile = catalogue
+            .create_profile("room", &valid_profile())
+            .await
+            .unwrap();
+        let store = ExperimentStore::open_with_profile_dir(rx.path(), catalogue_dir.path())
+            .await
+            .unwrap();
+        store
+            .create_workflow_run("bound", &profile.id, None, "test", "test", 1)
+            .await
+            .unwrap();
+        // A preserved legacy JSON representation may use different whitespace.
+        sqlx::query("UPDATE setup_profile_revisions SET document_json = ? WHERE revision_id = ?")
+            .bind(serde_json::to_string_pretty(&profile.document).unwrap())
+            .bind(&profile.revision_id)
+            .execute(&store.pool)
+            .await
+            .unwrap();
+        store
+            .create_workflow_run(
+                "same geometry",
+                &profile.id,
+                Some(&profile.revision_id),
+                "test",
+                "test",
+                2,
+            )
+            .await
+            .unwrap();
+        sqlx::query(
+            "UPDATE setup_profile_revisions SET profile_sha256 = 'conflict' WHERE revision_id = ?",
+        )
+        .bind(&profile.revision_id)
+        .execute(&store.pool)
+        .await
+        .unwrap();
+        let error = store
+            .create_workflow_run(
+                "conflicting snapshot",
+                &profile.id,
+                Some(&profile.revision_id),
+                "test",
+                "test",
+                2,
+            )
+            .await
+            .unwrap_err();
+        assert!(error.contains("conflicts"));
+        assert_eq!(store.run_count().await.unwrap(), 2);
+        let snapshot: String = sqlx::query_scalar(
+            "SELECT profile_sha256 FROM setup_profile_revisions WHERE revision_id = ?",
+        )
+        .bind(&profile.revision_id)
+        .fetch_one(&store.pool)
+        .await
+        .unwrap();
+        assert_eq!(snapshot, "conflict");
+        sqlx::query("PRAGMA query_only = ON")
+            .execute(&store.profile_pool)
+            .await
+            .unwrap();
+        assert!(store
+            .update_profile(&profile.id, "cannot write", &profile.document)
+            .await
+            .is_err());
+        assert_eq!(
+            store
+                .get_profile(&profile.id)
+                .await
+                .unwrap()
+                .unwrap()
+                .revision_id,
+            profile.revision_id
+        );
+        store.profile_pool.close().await;
+        assert!(store.list_profiles().await.is_err());
+        assert_eq!(store.run_count().await.unwrap(), 2);
+    }
+
+    #[tokio::test]
+    async fn separate_cad_calibration_files_and_bindings_stay_in_the_runtime_directory() {
+        let catalogue_dir = tempfile::tempdir().unwrap();
+        let rx = tempfile::tempdir().unwrap();
+        let catalogue = ExperimentStore::open(catalogue_dir.path()).await.unwrap();
+        let profile = catalogue
+            .create_profile("room", &valid_profile())
+            .await
+            .unwrap();
+        let store = ExperimentStore::open_with_profile_dir(rx.path(), catalogue_dir.path())
+            .await
+            .unwrap();
+        let bundle = test_calibration_bundle(&profile, "test-setup", &"a".repeat(64));
+        let summary = store.persist_calibration_bundle(&bundle).await.unwrap();
+        assert!(rx
+            .path()
+            .join(format!("calibrations/{}.json", summary.calibration_id))
+            .is_file());
+        assert!(!catalogue_dir.path().join("calibrations").exists());
+        let mut changed = profile.document.clone();
+        changed["receivers"][0]["position_m"][0] = json!(0.2);
+        store
+            .update_profile(&profile.id, "new CAD", &changed)
+            .await
+            .unwrap();
+        let restored = store
+            .latest_calibration_for_setup("test-setup", &"a".repeat(64))
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(restored.profile_revision_id, profile.revision_id);
+        assert_eq!(restored.profile_sha256, profile.profile_sha256);
+        let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM calibration_bundles")
+            .fetch_one(&catalogue.pool)
+            .await
+            .unwrap();
+        assert_eq!(count, 0);
+    }
+
+    /// Manual browser fixture for the real SQLite store and CAD component.
+    /// Starts only loopback HTTP: no AppState, receiver, device poller or runtime seal.
+    #[tokio::test]
+    #[ignore = "requires CAD_FIXTURE_DATA_DIR and CAD_FIXTURE_UI_DIR pointing at isolated test data"]
+    async fn cad_profile_browser_fixture() {
+        use axum::{extract::State, http::StatusCode, routing::get, Json, Router};
+        use tower_http::services::ServeDir;
+
+        async fn list(
+            State(store): State<ExperimentStore>,
+        ) -> Result<Json<Value>, (StatusCode, String)> {
+            store
+                .list_profiles()
+                .await
+                .map(|profiles| {
+                    Json(json!({"profiles": profiles, "schema_version": 1,
+                    "profile_database_path": store.profile_db_path().display().to_string()}))
+                })
+                .map_err(|error| (StatusCode::SERVICE_UNAVAILABLE, error))
+        }
+        async fn create(
+            State(store): State<ExperimentStore>,
+            Json(body): Json<Value>,
+        ) -> Result<Json<Value>, (StatusCode, String)> {
+            store
+                .create_profile(body["label"].as_str().unwrap_or(""), &body["document"])
+                .await
+                .map(|profile| Json(serde_json::to_value(profile).unwrap()))
+                .map_err(|error| (StatusCode::BAD_REQUEST, error))
+        }
+        async fn update(
+            State(store): State<ExperimentStore>,
+            axum::extract::Path(id): axum::extract::Path<String>,
+            Json(body): Json<Value>,
+        ) -> Result<Json<Value>, (StatusCode, String)> {
+            store
+                .update_profile(&id, body["label"].as_str().unwrap_or(""), &body["document"])
+                .await
+                .map(|profile| Json(serde_json::to_value(profile).unwrap()))
+                .map_err(|error| (StatusCode::BAD_REQUEST, error))
+        }
+        let data = std::env::var("CAD_FIXTURE_DATA_DIR").expect("isolated SQLite test directory");
+        let ui = std::env::var("CAD_FIXTURE_UI_DIR").expect("UI source directory");
+        let port: u16 = std::env::var("CAD_FIXTURE_PORT")
+            .unwrap_or_else(|_| "18081".into())
+            .parse()
+            .unwrap();
+        let store = match std::env::var("CAD_FIXTURE_PROFILE_DIR") {
+            Ok(profile_dir) => {
+                ExperimentStore::open_with_profile_dir(Path::new(&data), Path::new(&profile_dir))
+                    .await
+            }
+            Err(_) => ExperimentStore::open(Path::new(&data)).await,
+        }
+        .expect("open isolated store");
+        let app = Router::new()
+            .route("/api/v1/experiments/setup-profiles", get(list).post(create))
+            .route("/api/v1/experiments/setup-profiles/:id", axum::routing::put(update))
+            .route("/api/v1/control-center/status", get(|| async { Json(json!({"nodes": [], "mmwave": {"sealed_cad": {"profile_sha256": "fixture-old-seal"}}})) }))
+            .route("/api/v1/experiments/runs", get(|| async { Json(json!({"runs": []})) }))
+            .route("/api/v1/recording/list", get(|| async { Json(json!({"recordings": []})) }))
+            .route("/api/v1/models", get(|| async { Json(json!({"models": []})) }))
+            .route("/api/v1/classification/calibration/availability", get(|| async { Json(json!({"available": false})) }))
+            .route("/api/v1/benchmark/catalog", get(|| async { Json(json!({})) }))
+            .nest_service("/ui", ServeDir::new(ui))
+            .with_state(store);
+        let listener = tokio::net::TcpListener::bind((std::net::Ipv4Addr::LOCALHOST, port))
+            .await
+            .expect("loopback HTTP");
+        println!("CAD fixture ready at http://127.0.0.1:{port}/ui/tests/cad-profile-browser.html");
+        axum::serve(listener, app)
+            .await
+            .expect("serve isolated CAD fixture");
     }
 
     #[tokio::test]

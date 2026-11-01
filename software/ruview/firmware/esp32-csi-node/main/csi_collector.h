@@ -10,6 +10,7 @@
 #include <stddef.h>
 #include "esp_err.h"
 #include "esp_wifi_types.h"
+#include "sdkconfig.h"
 
 /** ADR-018 magic number. */
 #define CSI_MAGIC 0xC5110001
@@ -44,10 +45,20 @@
 
 /** Versioned RX boot/timing/quality trailer, appended after source binding. */
 #define CSI_IDENTITY_MAGIC        0xC511A061u
+#if CONFIG_RX_UNIFIED
+#define CSI_PROTOCOL_VERSION      4u
+#else
 #define CSI_PROTOCOL_VERSION      3u
+#endif
 #define CSI_IDENTITY_ROLE_RX      1u
 #define CSI_IDENTITY_V2_TRAILER_SIZE 24u
+#if CONFIG_RX_UNIFIED
+#define CSI_IDENTITY_TRAILER_SIZE 112u
+#define CSI_PHYSICAL_TRAILER_SIZE 32u
+#else
 #define CSI_IDENTITY_TRAILER_SIZE 48u
+#define CSI_PHYSICAL_TRAILER_SIZE 0u
+#endif
 
 #define CSI_QUALITY_FIRST_WORD_INVALID (1u << 0)
 #define CSI_QUALITY_NOISE_FLOOR_VALID  (1u << 1)
@@ -69,7 +80,7 @@
 #define CSI_MAX_IQ_SIZE (4 * 256 * 2)
 #define CSI_MAX_FRAME_SIZE \
     (CSI_HEADER_SIZE + CSI_MAX_IQ_SIZE + CSI_SOURCE_BINDING_SIZE \
-     + CSI_IDENTITY_TRAILER_SIZE)
+     + CSI_IDENTITY_TRAILER_SIZE + CSI_PHYSICAL_TRAILER_SIZE)
 
 /** Maximum number of channels in the hop table (ADR-029). */
 #define CSI_HOP_CHANNELS_MAX 6
@@ -120,7 +131,7 @@ typedef struct {
  * Initialize CSI collection.
  * Registers the WiFi CSI callback.
  */
-void csi_collector_init(void);
+esp_err_t csi_collector_init(void);
 
 /**
  * Capture node_id BEFORE wifi_init_sta() or any other heavy init.

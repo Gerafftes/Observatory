@@ -82,7 +82,7 @@ export class HolographicPanel {
       const ctx = canvas.getContext('2d');
       ctx.fillStyle = 'transparent';
       ctx.fillRect(0, 0, 512, 64);
-      ctx.font = '600 28px "Courier New", monospace';
+      ctx.font = '600 28px "JetBrains Mono", monospace';
       ctx.fillStyle = `#${color.getHexString()}`;
       ctx.textAlign = 'center';
       ctx.fillText(opts.title.toUpperCase(), 256, 42);

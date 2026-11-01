@@ -660,6 +660,7 @@ mod tests {
 
     fn test_frame() -> RawCsiFrame {
         RawCsiFrame {
+            physical_layout: None,
             schema_version: raw_csi_recording::RAW_CSI_SCHEMA_VERSION,
             host_timestamp_unix_ns: 1_500_000_000,
             host_monotonic_ns: Some(1_500_000_000),

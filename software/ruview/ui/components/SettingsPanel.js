@@ -347,7 +347,7 @@ export class SettingsPanel {
         background: #0d1117;
         border: 1px solid rgba(56, 68, 89, 0.6);
         border-radius: 8px;
-        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        font-family: var(--font-interface);
         overflow: hidden;
         color: #e0e0e0;
       }

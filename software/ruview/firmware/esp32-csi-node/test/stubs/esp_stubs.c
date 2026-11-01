@@ -17,6 +17,9 @@
 /** Monotonically increasing microsecond counter for esp_timer_get_time(). */
 static int64_t s_fake_time_us = 0;
 static int64_t s_fake_time_step_us = 50000;
+static uint32_t s_promiscuous_mask;
+void esp_test_note_promiscuous_mask(uint32_t mask) { s_promiscuous_mask = mask; }
+uint32_t esp_test_promiscuous_mask(void) { return s_promiscuous_mask; }
 
 int64_t esp_timer_get_time(void)
 {
@@ -33,6 +36,18 @@ void esp_test_set_time_step_us(int64_t step_us) {
 void esp_test_advance_time_us(int64_t delta_us) {
     (void)__atomic_add_fetch(&s_fake_time_us, delta_us, __ATOMIC_RELAXED);
 }
+
+#ifdef CSI_DIAGNOSTICS_THREAD_SAFE_STUBS
+static void (*s_before_critical)(void);
+void esp_test_before_critical_once(void (*hook)(void)) {
+    __atomic_store_n(&s_before_critical, hook, __ATOMIC_RELAXED);
+}
+void esp_test_enter_critical(portMUX_TYPE *lock) {
+    void (*hook)(void) = __atomic_exchange_n(&s_before_critical, NULL, __ATOMIC_RELAXED);
+    if (hook) hook();
+    (void)pthread_mutex_lock(lock);
+}
+#endif
 
 QueueHandle_t xQueueCreateStatic(size_t capacity, size_t item_size,
                                 uint8_t *storage, StaticQueue_t *control)

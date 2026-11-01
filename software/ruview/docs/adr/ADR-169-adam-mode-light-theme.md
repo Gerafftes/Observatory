@@ -1,5 +1,7 @@
 # ADR-169: adam-mode — light theme toggle for the three.js realtime demo
 
+> Historical note (2026-10-28): the three.js demo files were removed from this repository. This proposal is retained for context.
+
 | Field | Value |
 |-------|-------|
 | **Status** | Proposed |

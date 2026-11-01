@@ -1803,6 +1803,7 @@ mod tests {
 
     fn protocol_test_frame(recording_id: &str, timestamp: u64, sequence: u32) -> RawCsiFrame {
         RawCsiFrame {
+            physical_layout: None,
             schema_version: RAW_CSI_SCHEMA_VERSION,
             host_timestamp_unix_ns: timestamp,
             host_monotonic_ns: Some(timestamp),
@@ -2045,6 +2046,7 @@ mod tests {
             let timestamp = started_at_unix_ns + tick_index.saturating_mul(SYNTHETIC_FRAME_STEP_NS);
             for rx_id in 1u8..=4 {
                 let frame = RawCsiFrame {
+                    physical_layout: None,
                     schema_version: RAW_CSI_SCHEMA_VERSION,
                     host_timestamp_unix_ns: timestamp,
                     host_monotonic_ns: Some(timestamp),

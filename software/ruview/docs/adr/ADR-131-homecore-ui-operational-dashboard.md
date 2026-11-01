@@ -1,5 +1,7 @@
 # ADR-131: HOMECORE-UI — Operational dashboard for the two-tier Cognitum stack
 
+> Historical note (2026-10-28): the bundled HOMECORE dashboard was removed. The server's API and gateway remain, and an external UI can still be configured.
+
 | Field | Value |
 |-------|-------|
 | **Status** | Accepted — UI implemented (§10); full backend wiring specified (§11–§12) |

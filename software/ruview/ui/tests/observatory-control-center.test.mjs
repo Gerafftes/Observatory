@@ -11,6 +11,133 @@ import {
   defaultSetupProfileDocument,
 } from '../components/ObservatoryControlCenter.js';
 
+function savedProfile(id, version = 1) {
+  return {
+    id, version, revision_id: `${id}-v${version}`, label: id,
+    profile_sha256: String(version).padStart(64, '0'),
+    updated_at: '2026-10-04T09:28:29.451828+00:00',
+    document: defaultSetupProfileDocument(),
+  };
+}
+
+function profileRefreshHarness(t, profiles) {
+  const center = new ObservatoryControlCenter({ innerHTML: '' });
+  center._mounted = true;
+  t.mock.method(experimentService, 'getControlCenterStatus', async () => ({ nodes: [] }));
+  t.mock.method(experimentService, 'listProfiles', async () => profiles);
+  t.mock.method(experimentService, 'listRuns', async () => []);
+  t.mock.method(experimentService, 'getBenchmarkCatalog', async () => null);
+  t.mock.method(experimentService, 'getCalibrationAvailability', async () => ({ available: false }));
+  t.mock.method(apiService, 'get', async () => ({}));
+  return center;
+}
+
+test('latest saved profile is the default again after reopening, but drafts survive', async (t) => {
+  const latest = savedProfile('new-room', 24);
+  const old = savedProfile('old-room', 6);
+  const center = profileRefreshHarness(t, [latest, old]);
+  await center.refresh();
+  assert.equal(center.selectedProfile.revision_id, latest.revision_id);
+  center._selectProfile(old, { forceDraft: true, manual: true });
+  await center.refresh({ quiet: true });
+  assert.equal(center.selectedProfile.id, old.id);
+  await center.reopen();
+  assert.equal(center.selectedProfile.id, latest.id);
+  center.profileDraftDirty = true;
+  center.profileDraft.mmwave_sensors[1].yaw_mdeg = 12345;
+  await center.reopen();
+  assert.equal(center.profileDraft.mmwave_sensors[1].yaw_mdeg, 12345);
+  assert.equal(center.profileDraftDirty, true);
+});
+
+test('refresh does not replace a manually selected revision or an unsaved new room', async (t) => {
+  const latest = savedProfile('room', 24);
+  const center = profileRefreshHarness(t, [latest]);
+  const historical = savedProfile('room', 23);
+  center._selectProfile(historical, { forceDraft: true, manual: true });
+  await center.refresh({ quiet: true });
+  assert.equal(center.selectedProfile.revision_id, historical.revision_id);
+  center.selectedProfile = null;
+  center.profileDraftDirty = true;
+  const draft = structuredClone(center.profileDraft);
+  await center.refresh();
+  assert.equal(center.selectedProfile, null);
+  assert.deepEqual(center.profileDraft, draft);
+});
+
+test('late refresh cannot roll back the acknowledged save or mask a save failure', async (t) => {
+  const old = savedProfile('room', 23);
+  const saved = savedProfile('room', 24);
+  saved.document.mmwave_sensors[1].yaw_mdeg = 219298;
+  const center = profileRefreshHarness(t, [old]);
+  center._selectProfile(old);
+  let deliverOld;
+  let started;
+  const requested = new Promise((resolve) => { started = resolve; });
+  t.mock.method(experimentService, 'listProfiles', () => {
+    started();
+    return new Promise((resolve) => { deliverOld = resolve; });
+  });
+  const pending = center.refresh({ quiet: true });
+  await requested;
+  t.mock.method(experimentService, 'listProfiles', async () => [saved]);
+  t.mock.method(experimentService, 'updateProfile', async () => saved);
+  await center._saveProfile(null, saved.document);
+  deliverOld([old]);
+  await pending;
+  assert.equal(center.selectedProfile.revision_id, saved.revision_id);
+  assert.equal(center.profileDraft.mmwave_sensors[1].yaw_mdeg, 219298);
+  // Even a stale response to the post-save refresh must not undo its receipt.
+  t.mock.method(experimentService, 'listProfiles', async () => [old]);
+  await center.refresh();
+  assert.equal(center.selectedProfile.revision_id, saved.revision_id);
+  t.mock.method(experimentService, 'updateProfile', async () => { throw new Error('SQLite write failed'); });
+  await center._saveProfile(null, saved.document);
+  assert.match(center.error, /SQLite write failed/);
+  assert.equal(center.profileDraftDirty, true);
+  await center.refresh({ quiet: true });
+  assert.match(center.error, /SQLite write failed/);
+  assert.equal(center.profileDraftDirty, true);
+});
+
+test('empty persistence and API failure are explicit and do not erase a draft', async (t) => {
+  const center = profileRefreshHarness(t, []);
+  await center.refresh();
+  assert.match(center.container.innerHTML, /Kein gespeichertes Profil in dieser Serverablage/);
+  center.profileDraftDirty = true;
+  center.profileDraft.mmwave_sensors[1].yaw_mdeg = 12345;
+  await center.refresh();
+  assert.equal(center.profileDraft.mmwave_sensors[1].yaw_mdeg, 12345);
+  t.mock.method(experimentService, 'listProfiles', async () => { throw new Error('DB unavailable'); });
+  await center.refresh();
+  assert.equal(center.connectionState, 'degraded');
+  assert.match(center.container.innerHTML, /Profilquelle nicht bestätigt/);
+});
+
+test('profile identity exposes the saved revision while an older runtime seal stays unchanged', async (t) => {
+  const latest = savedProfile('room', 24);
+  const center = profileRefreshHarness(t, [latest]);
+  const status = { nodes: [], mmwave: { sealed_cad: { profile_sha256: 'old-seal' } } };
+  const before = structuredClone(status);
+  t.mock.method(experimentService, 'getControlCenterStatus', async () => status);
+  await center.refresh();
+  assert.match(center.container.innerHTML, /room-v24/);
+  assert.match(center.container.innerHTML, /versiegelte Geometrie/);
+  assert.match(center.container.innerHTML, new RegExp(latest.profile_sha256));
+  assert.deepEqual(status, before);
+});
+
+test('editing immediately marks the visible profile identity as an unsaved draft', () => {
+  const identity = { outerHTML: '' };
+  const center = new ObservatoryControlCenter({ querySelector() { return identity; } });
+  center._selectProfile(savedProfile('room', 24));
+  center.connectionState = 'ready';
+  center._markProfileDraftDirty();
+  assert.equal(center.profileDraftDirty, true);
+  assert.match(identity.outerHTML, /Ungespeicherter Entwurf/);
+  assert.match(identity.outerHTML, /room-v24/);
+});
+
 test('default setup profile keeps the legacy point grid only for schema compatibility', () => {
   const profile = defaultSetupProfileDocument();
 
@@ -902,7 +1029,7 @@ test('offline receivers hide historical measurements and valid sync flags', () =
   assert.match(markup, /zuletzt vor 13 h/);
   assert.match(markup, /0.0 Hz/);
   assert.match(markup, /zuletzt empfangen/);
-  assert.doesNotMatch(markup, /-39.0 dBm|22.1 Hz|72.8%|gültig|µs/);
+  assert.doesNotMatch(markup.split('<tbody>')[1], /-39.0 dBm|22.1 Hz|72.8%|gültig|µs/);
 });
 
 test('active receivers keep current measurements but expire an old sync', () => {

@@ -75,6 +75,96 @@ per ADR-022 Phase 3.
 | `position_setup` | Canonical sealed setup identity for room, devices, radio grid, and software revision |
 | `position_live` | Fail-closed live fingerprint runtime with D6 presence gating and temporal consensus |
 
+## RX reception diagnostics
+
+Both `/api/v1/nodes` and `/api/v1/control-center/status` expose the additive
+`nodes[].csi_reception` object for RX1–RX4. Its counters observe only new,
+identity-admitted, source-validated CSI frames at the existing grid gate,
+before the grid decision. Duplicate, out-of-order, invalid and unattested
+frames receive no credit. Existing admission and grid rules are unchanged.
+
+- `valid_frames` counts all such frames, including off-grid frames.
+- `format_exclusions.count` counts valid frames rejected by the grid gate.
+  Its `denominator` is `valid_frames`.
+- `unexplained_sequence_gaps.count` sums missing positions in forward
+  wrapping-u32 transitions between those valid arrivals. Observed off-grid
+  frames close sequence positions. Its `denominator` is `forward_transitions`
+  plus missing positions; the first frame establishes an anchor only.
+- Each metric exposes `count`, `denominator`, `percent` and `valid`.
+  `valid` describes the percentage basis: a zero denominator yields
+  `valid: false` and `percent: null`. A measured zero with a positive
+  denominator yields `valid: true` and `percent: 0`.
+
+`scope: "cumulative_rx_boot"` means cumulative since the current RX/server
+state began, with a reset on an admitted boot change or a reboot recognized
+by the existing sync logic. A server restart starts new state. There is no
+rolling window. The two percentage denominators differ; these metrics are
+not complementary shares and neither establishes WLAN or TX loss.
+
+The legacy `packet_loss_percent` retains its original calculation:
+`100 * inferred_lost_frames / (sequence_observations + inferred_lost_frames)`
+between **accepted grid frames**. It may include valid received format
+exclusions and must not be interpreted as transport loss or corrected by
+subtracting lifetime `skipped_grid_frames`.
+
+Synthetic example: sequences 100–104 arrive, with only 100 and 104 on-grid:
+
+```json
+{
+  "scope": "cumulative_rx_boot",
+  "valid_frames": 5,
+  "latest_sequence": 104,
+  "format_exclusions": { "count": 3, "denominator": 5, "valid": true, "percent": 60.0 },
+  "unexplained_sequence_gaps": { "count": 0, "forward_transitions": 4, "denominator": 4, "valid": true, "percent": 0.0 }
+}
+```
+
+Both displays show `Formatausschlüsse 3 · 60.0%` and
+`Ungeklärte Sequenzlücken 0 · 0.0%`. If 102 is absent, they show
+`2 · 50.0%` (denominator 4 valid arrivals) and `1 · 25.0%`
+(denominator 3 transitions + 1 missing position). The legacy percentage
+remains 75% in both examples. Older responses without `csi_reception` show
+`nicht verfügbar`; a missing percentage basis shows `--`. Stale RX values
+are hidden as historical data, including an off-grid-only RX with no recent
+accepted grid frame. The existing `frame_rate_hz` remains a sync-sequence
+rate estimate. Global UDP outcome counters retain their separate semantics.
+
+Synthetic API/UI fixtures are in
+[`ui/tests/fixtures/csi-reception-synthetic.json`](../../../ui/tests/fixtures/csi-reception-synthetic.json).
+Offline gate/API tests run from `v2/` with
+`cargo test --offline --locked -p wifi-densepose-sensing-server --bin sensing-server`;
+UI tests run from `software/ruview/` with `node --test ui/tests/*.test.mjs`.
+
+### Separate CAD profiles from RX run data
+
+For the next regular server start, pass both storage roots explicitly:
+
+```text
+--data-dir /absolute/private/runtime-directory
+--cad-profile-dir /absolute/project/profile-directory
+--ui-path /absolute/project/ui
+```
+
+`--cad-profile-dir` must name an absolute directory containing the existing
+`observatory-experiments.sqlite3`. CAD reads and saves use this catalogue,
+independently of the RX runtime directory, UI copy or launch working directory.
+A missing directory/database is rejected; catalogue errors never select an old
+RX profile instead. Omitting the flag retains the previous single-store behavior.
+
+Runs, artifacts and calibration files remain under `--data-dir`. Creating a run
+or registering a calibration pins only its explicitly bound profile revision in
+that runtime database. These immutable snapshots preserve foreign keys and
+historical bindings; a later CAD save does not update them. Existing run-local
+profiles are retained and are not merged into the CAD catalogue.
+
+`GET /api/v1/experiments/status` reports `database_path` and
+`profile_database_path`; the profile catalogue response also reports
+`profile_database_path`. Check these paths and the selected revision/hash after
+the next regular start. This is startup configuration: do not restart an active
+RX run merely to activate it, and do not change its sealed runtime geometry.
+These checks establish software behavior, not a format-cause fix or hardware
+success.
+
 ## Setup schema v5: deliberately unrecorded cabling
 
 The CAD importer emits schema v5. Its recording host can retain a real
@@ -120,6 +210,12 @@ cargo run -p wifi-densepose-sensing-server -- \
     --udp-port 5005 \
     --static-dir ./ui
 ```
+
+For an RX-only CSI session, pass `--rx-session-only`. This disables the mmWave
+UDP receiver, LAN discovery, node diagnostics poller, session ticker and
+mmWave control routes, and skips loading the radar bearer token. CSI ingestion,
+recording and the remaining HTTP routes stay available. The flag does not
+change the host network or configure any device.
 
 The server refuses to start without `WDP_RUFIELD_SIGNING_SEED`; it never uses
 a built-in signing key. The default bind is loopback-only. For a routable

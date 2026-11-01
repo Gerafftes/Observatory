@@ -28,8 +28,6 @@ members = [
     # geo + worldgraph extracted to ruvnet/worldgraph submodule (see crates/worldgraph)
     "crates/wifi-densepose-engine",      # ADR-135..146 integration/composition layer
     "crates/wifi-densepose-calibration", # ADR-151 — per-room calibration & specialist training
-    "crates/nvsim",
-    "crates/nvsim-server",
     "crates/homecore",                 # ADR-127 — HOMECORE state machine
     "crates/homecore-plugins",         # ADR-128 — HOMECORE-PLUGINS WASM runtime (P1 scaffold)
     "crates/homecore-api",             # ADR-130 — HOMECORE REST + WS API

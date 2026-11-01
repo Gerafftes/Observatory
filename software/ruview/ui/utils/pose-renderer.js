@@ -108,7 +108,7 @@ export class PoseRenderer {
 
   initializeContext() {
     this.ctx.imageSmoothingEnabled = this.config.enableSmoothing;
-    this.ctx.font = `${this.config.fontSize}px Arial`;
+    this.ctx.font = `${this.config.fontSize}px "JetBrains Mono", monospace`;
     this.ctx.textAlign = 'left';
     this.ctx.textBaseline = 'top';
   }
@@ -443,7 +443,7 @@ export class PoseRenderer {
         // Add keypoint labels in enhanced mode
         if (enhancedMode && this.config.showDebugInfo) {
           this.ctx.fillStyle = this.config.confidenceColor;
-          this.ctx.font = '10px Arial';
+          this.ctx.font = '10px "JetBrains Mono", monospace';
           this.ctx.fillText(`${index}`, x + radius + 2, y - radius);
         }
       }
@@ -535,7 +535,7 @@ export class PoseRenderer {
   // Render error message
   renderErrorMessage(message) {
     this.ctx.fillStyle = '#ff0000';
-    this.ctx.font = '16px Arial';
+    this.ctx.font = '16px "JetBrains Mono", monospace';
     this.ctx.textAlign = 'center';
     this.ctx.fillText(
       `Render Error: ${message}`, 
@@ -543,13 +543,13 @@ export class PoseRenderer {
       this.canvas.height / 2
     );
     this.ctx.textAlign = 'left';
-    this.ctx.font = `${this.config.fontSize}px Arial`;
+    this.ctx.font = `${this.config.fontSize}px "JetBrains Mono", monospace`;
   }
 
   // Render no data message
   renderNoDataMessage() {
     this.ctx.fillStyle = '#888888';
-    this.ctx.font = '16px Arial';
+    this.ctx.font = '16px "JetBrains Mono", monospace';
     this.ctx.textAlign = 'center';
     this.ctx.fillText(
       'No pose data available', 
@@ -562,7 +562,7 @@ export class PoseRenderer {
       this.canvas.height / 2 + 25
     );
     this.ctx.textAlign = 'left';
-    this.ctx.font = `${this.config.fontSize}px Arial`;
+    this.ctx.font = `${this.config.fontSize}px "JetBrains Mono", monospace`;
   }
 
   // Test method to verify canvas is working
@@ -582,7 +582,7 @@ export class PoseRenderer {
     
     // Draw test text
     this.ctx.fillStyle = '#0000ff';
-    this.ctx.font = '16px Arial';
+    this.ctx.font = '16px "JetBrains Mono", monospace';
     this.ctx.fillText('Canvas Test', 50, 200);
     
     console.log('✅ [RENDERER] Test shape rendered');

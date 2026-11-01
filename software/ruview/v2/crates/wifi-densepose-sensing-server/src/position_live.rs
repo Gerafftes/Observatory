@@ -224,6 +224,7 @@ impl PositionIndexRuntime {
 pub(crate) struct LivePositionTracker {
     runtime: Option<PositionIndexRuntime>,
     frames: VecDeque<RawCsiFrame>,
+    epochs: super::position_capture::PositionEpochGuard,
     max_buffered_frames: usize,
     fresh_buffer_started_at_unix_ns: Option<u64>,
     last_accepted_frame_unix_ns: Option<u64>,
@@ -251,6 +252,7 @@ impl LivePositionTracker {
             },
             runtime,
             frames: VecDeque::with_capacity(max_buffered_frames.min(256)),
+            epochs: super::position_capture::PositionEpochGuard::default(),
             max_buffered_frames,
             fresh_buffer_started_at_unix_ns: None,
             last_accepted_frame_unix_ns: None,
@@ -264,6 +266,7 @@ impl LivePositionTracker {
     /// always discarded so two setup/model identities cannot mix.
     pub(crate) fn install_runtime(&mut self, runtime: Option<PositionIndexRuntime>) {
         self.runtime = runtime;
+        self.epochs = super::position_capture::PositionEpochGuard::default();
         self.frames.clear();
         self.fresh_buffer_started_at_unix_ns = None;
         self.last_accepted_frame_unix_ns = None;
@@ -275,6 +278,16 @@ impl LivePositionTracker {
         } else {
             LivePositionState::Uncalibrated
         };
+    }
+
+    /// Observe identity before format selection, without crediting feature freshness.
+    pub(crate) fn observe_input_epoch(&mut self, frame: &RawCsiFrame) -> Result<(), String> {
+        if let Err(error) = self.epochs.observe(frame) {
+            self.reject_input(error.clone());
+            self.last_accepted_frame_unix_ns = None;
+            return Err(error);
+        }
+        Ok(())
     }
 
     /// Insert one already decoded raw frame while preserving a hard memory
@@ -290,6 +303,7 @@ impl LivePositionTracker {
             self.fail_closed(LivePositionState::Insufficient, Some(message.clone()));
             return Err(message);
         }
+        self.observe_input_epoch(&frame)?;
         if self.frames.len() == self.max_buffered_frames {
             self.frames.pop_front();
         }
@@ -585,6 +599,7 @@ mod tests {
             ppdu_type: 0,
             flags: 0,
             mesh_timestamp_us: None,
+            physical_layout: None,
             source_binding: None,
             protocol_identity: None,
             iq_pairs: vec![IqPair { i: 20, q: 0 }; 8],
@@ -852,5 +867,24 @@ mod tests {
             fresh_timestamp
         );
         assert!(tracker.has_complete_fresh_window(fresh_timestamp + WINDOW_NS));
+    }
+
+    #[test]
+    fn epoch_on_excluded_frame_clears_buffer_without_freshness_credit() {
+        let mut tracker = LivePositionTracker::new(None);
+        let first = frame(10_000_000_000, 1);
+        tracker.push_frame(first.clone()).unwrap();
+        let mut excluded = first;
+        excluded.subcarrier_count = 64;
+        excluded
+            .iq_pairs
+            .resize(64, super::super::raw_csi_recording::IqPair { i: 1, q: 2 });
+        tracker.observe_input_epoch(&excluded).unwrap();
+        assert_eq!(tracker.buffered_frame_count(), 1);
+        assert_eq!(tracker.last_accepted_frame_unix_ns, Some(10_000_000_000));
+        excluded.clock_epoch_id = Some("changed-host".into());
+        assert!(tracker.observe_input_epoch(&excluded).is_err());
+        assert_eq!(tracker.buffered_frame_count(), 0);
+        assert!(tracker.last_accepted_frame_unix_ns.is_none());
     }
 }

@@ -100,6 +100,7 @@ pub(crate) async fn windows_wifi_task(state: SharedState, tick_ms: u64) {
             gain_db: None,
             csi_config_flags: None,
             sync_age_ms: None,
+            validity_mask: None,
             invalid_prefix_pairs: 0,
             interpolated_prefix_pairs: 0,
             amplitudes: multi_ap_frame.amplitudes.clone(),
@@ -293,7 +294,8 @@ async fn windows_wifi_fallback_tick(state: &SharedState, seq: u32) {
         gain_db: None,
         csi_config_flags: None,
         sync_age_ms: None,
-        invalid_prefix_pairs: 0,
+        validity_mask: None,
+            invalid_prefix_pairs: 0,
         interpolated_prefix_pairs: 0,
         amplitudes: vec![signal_pct],
         phases: vec![0.0],
@@ -1007,6 +1009,7 @@ async fn process_mmwave_datagram(
 
 pub(crate) async fn finalize_active_recording(
     state: &SharedState,
+    expected_id: Option<&str>,
 ) -> Result<(String, u64, RecordingWriterResult), String> {
     let lifecycle = {
         let s = state.read().await;
@@ -1014,7 +1017,7 @@ pub(crate) async fn finalize_active_recording(
     };
     let lifecycle_guard = lifecycle.lock_owned().await;
 
-    let (recording_id, duration_secs, stop_tx, done_rx) = {
+    let (recording_id, duration_secs, stop_tx, done_rx, closed_at) = {
         let mut s = state.write().await;
         if s.recording_phase != RecordingLifecyclePhase::Recording || !s.recording_active {
             return Err("no recording in progress".to_string());
@@ -1024,6 +1027,9 @@ pub(crate) async fn finalize_active_recording(
             .recording_current_id
             .clone()
             .ok_or_else(|| "active recording has no recording ID".to_string())?;
+        if expected_id.is_some_and(|expected|expected!=recording_id) {
+            return Err("active recording identity changed; no producer gate was closed".into());
+        }
         let duration_secs = s
             .recording_start_time
             .map(|started| started.elapsed().as_secs())
@@ -1033,6 +1039,7 @@ pub(crate) async fn finalize_active_recording(
         // same state lock as the UDP loop creates a precise last-frame boundary:
         // no new raw frame can be sent after this point.
         s.recording_active = false;
+        let closed_at = server_clock::now();
         s.recording_phase = RecordingLifecyclePhase::Finalizing;
         let stop_tx = s.recording_stop_tx.take();
         let done_rx = s.recording_done_rx.take();
@@ -1041,7 +1048,7 @@ pub(crate) async fn finalize_active_recording(
                 recording["status"] = serde_json::json!("finalizing");
             }
         }
-        (recording_id, duration_secs, stop_tx, done_rx)
+        (recording_id, duration_secs, stop_tx, done_rx, closed_at)
     };
 
     // The owned task is deliberately detached from the HTTP request future.
@@ -1066,6 +1073,12 @@ pub(crate) async fn finalize_active_recording(
             },
         };
 
+        result.closed_at = Some(closed_at);
+        let raw_path = std::path::Path::new("data/recordings").join(format!("{recording_id}.raw-csi.v1.jsonl"));
+        match position_artifact::sha256_file(&raw_path) {
+            Ok(hash) => result.raw_sha256=Some(hash),
+            Err(error) => append_recording_writer_error(&mut result,error.to_string()),
+        }
         if let Err(error) = finalize_recording_metadata(&recording_id, duration_secs, &result) {
             append_recording_writer_error(&mut result, error);
         }
@@ -1073,6 +1086,7 @@ pub(crate) async fn finalize_active_recording(
         let mut s = finalizer_state.write().await;
         s.recording_current_id = None;
         s.recording_start_time = None;
+        s.recording_started_at = None;
         s.recording_phase = RecordingLifecyclePhase::Idle;
         for recording in s.recordings.iter_mut() {
             if recording.get("id").and_then(|value| value.as_str()) == Some(recording_id.as_str()) {
@@ -1086,6 +1100,7 @@ pub(crate) async fn finalize_active_recording(
                 recording["frame_count"] = serde_json::json!(result.frames_written);
                 recording["rx_summaries"] =
                     serde_json::json!(result.rx_summaries.values().collect::<Vec<_>>());
+                recording["link_summaries"] = serde_json::json!(result.link_summaries.values().collect::<Vec<_>>());
                 recording["dropped_frames"] = serde_json::json!(result.dropped_frames);
             }
         }
@@ -1110,7 +1125,7 @@ pub(crate) async fn settle_recording_on_shutdown(
         match phase {
             RecordingLifecyclePhase::Idle => return Ok(None),
             RecordingLifecyclePhase::Recording => {
-                return finalize_active_recording(state).await.map(Some);
+                return finalize_active_recording(state,None).await.map(Some);
             }
             RecordingLifecyclePhase::Finalizing => {
                 // The owned finalizer holds this mutex through metadata commit
@@ -1201,6 +1216,7 @@ pub(crate) async fn udp_receiver_task(state: SharedState, udp_port: u16) {
         let QueuedUdpDatagram {
             bytes,
             source: src,
+            received_at: frame_received_at,
             server_receive_time,
             mut csi_observation,
             ..
@@ -1669,17 +1685,24 @@ pub(crate) async fn udp_receiver_task(state: SharedState, udp_port: u16) {
                     continue;
                 }
             };
-            let (rebooted, ip_changed) = match s.csi_identity_registry.admit(
+            if protocol_identity.unified_rx.is_some() && position_setup.is_none() {
+                reject_raw_csi_ingress(&mut s, Some(frame.node_id),
+                    "unified RX requires a sealed setup with physical/profile bindings");
+                continue;
+            }
+            let (rebooted, ip_changed, reordered) = match s.csi_identity_registry.admit_with_reordering(
                 frame.node_id,
                 protocol_identity.boot_id,
                 frame.sequence,
                 src,
-                frame_now,
+                frame_received_at,
+                protocol_identity.unified_rx.is_some(),
             ) {
                 csi_identity::Admission::Accepted {
                     rebooted,
                     ip_changed,
-                } => (rebooted, ip_changed),
+                } => (rebooted, ip_changed, false),
+                csi_identity::Admission::Reordered => (false, false, true),
                 csi_identity::Admission::Duplicate => {
                     debug!(
                         "node {} boot {:016x}: duplicate sequence {} ignored",
@@ -1728,6 +1751,16 @@ pub(crate) async fn udp_receiver_task(state: SharedState, udp_port: u16) {
                     "RX{} reboot accepted with new boot {:016x}; only this RX state was reset",
                     frame.node_id, protocol_identity.boot_id
                 );
+            }
+            let rx_measurement_identity = protocol_identity.unified_rx.map(|identity| identity.measurement_identity(protocol_identity.callback_started_us.unwrap_or(0)));
+            if !reordered && s.node_states.get(&frame.node_id).is_some_and(|node| {
+                match (node.rx_measurement_identity, rx_measurement_identity) {
+                    (Some(old), Some(new)) => !old.same_receiver_profile(new),
+                    (None, None) => false, _ => true,
+                }
+            }) {
+                s.node_states.remove(&frame.node_id);
+                info!("RX{} measurement profile changed; temporal RX state reset", frame.node_id);
             }
             let matches_sealed_grid = if let Some(setup) = position_setup.as_deref() {
                 if let Err(error) = setup.validate_raw_csi_source_identity(&raw_frame) {
@@ -1781,6 +1814,25 @@ pub(crate) async fn udp_receiver_task(state: SharedState, udp_port: u16) {
                 }
             };
 
+            // V4 raw capture retains every authorized link/layout before the
+            // primary TX feature-grid gate. Peer data never updates TX models,
+            // RX liveness or a legacy single-source position window.
+            if let Some(unified) = protocol_identity.unified_rx {
+                if s.recording_active && s.recording_started_at.as_ref().is_some_and(|start|
+                    raw_frame.clock_epoch_id.as_ref()==Some(&start.clock_epoch_id)
+                    && raw_frame.host_monotonic_ns.is_some_and(|time|time>=start.host_monotonic_ns))
+                    && s.raw_csi_tx.send(RawCsiIngress::Frame(raw_frame.clone())).is_err() {
+                    warn!("RX{}: active raw recorder has no receiver", frame.node_id);
+                }
+                // Preserve arrival order in raw evidence without rolling live state back.
+                if reordered || unified.source_node_id != 0 {
+                    if let Some(observation) = csi_observation.take() {
+                        observation.finish(csi_diagnostics::CsiDatagramOutcome::AcceptedNew);
+                    }
+                    continue;
+                }
+            }
+
             // A valid controlled transmitter can emit multiple CSI
             // symbol grids. Keep its binding fresh, but never mix an
             // off-grid frame into D5/D6, recording, or live position.
@@ -1794,11 +1846,20 @@ pub(crate) async fn udp_receiver_task(state: SharedState, udp_port: u16) {
                 src,
                 ip_changed,
             );
+            node_state.rx_measurement_identity = rx_measurement_identity;
             let grid_accepted = node_state.observe_validated_grid(
+                frame.sequence,
                 source_binding_observation,
                 frame.grid(),
                 matches_runtime_grid,
             );
+
+            // Epoch changes are barriers even when this frame is off-grid.
+            // Reuse the recorder/live rejection path before the early grid return.
+            if let Err(error) = s.live_position_tracker.observe_input_epoch(&raw_frame) {
+                reject_raw_csi_ingress(&mut s, Some(frame.node_id), error);
+                continue;
+            }
 
             if !grid_accepted {
                 debug!(
@@ -1820,7 +1881,7 @@ pub(crate) async fn udp_receiver_task(state: SharedState, udp_port: u16) {
             s.source = "esp32".to_string();
             s.last_esp32_frame = Some(frame_now);
 
-            if s.recording_active
+            if protocol_identity.unified_rx.is_none() && s.recording_active
                 && s.raw_csi_tx
                     .send(RawCsiIngress::Frame(raw_frame.clone()))
                     .is_err()

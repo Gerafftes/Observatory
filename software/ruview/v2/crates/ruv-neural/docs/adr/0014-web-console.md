@@ -1,5 +1,7 @@
 # ADR-0014 — rUv Neural UI: Web Console for Ruflo Closed-Loop Sensory Neuromodulation
 
+> Historical note (2026-10-28): the web console was removed from this repository. This decision is retained for context; the Rust evidence verifier remains.
+
 ## Status
 
 Accepted — **Demo + Replay + gated Real mode + Research workflow implemented**

@@ -18,6 +18,7 @@ mod classification_evaluation;
 mod coarse_localization;
 #[cfg(test)]
 pub mod csi;
+mod csi_layout;
 mod csi_diagnostics;
 mod csi_identity;
 mod csi_sample_timing;
@@ -57,6 +58,7 @@ mod server_clock;
 mod server_control;
 mod state;
 mod system_routes;
+mod tag14_audit;
 mod tracker_bridge;
 mod training_routes;
 #[cfg(test)]
@@ -149,6 +151,10 @@ struct Args {
     #[arg(long, default_value = "5005")]
     udp_port: u16,
 
+    /// Run RX CSI only; disable mmWave network services and control routes.
+    #[arg(long)]
+    rx_session_only: bool,
+
     /// UDP port for HLK-LD2450 packets from the ESP32-C3 node.
     #[arg(long, default_value_t = mmwave_calibration::DEFAULT_UDP_PORT)]
     mmwave_udp_port: u16,
@@ -176,6 +182,14 @@ struct Args {
     /// Path to UI static files (repo `ui/`; from `v2/` use `../ui` or rely on auto-detect)
     #[arg(long, default_value = "../ui")]
     ui_path: PathBuf,
+
+    /// Runtime data directory for recordings, runs and calibrations (default: next to UI).
+    #[arg(long)]
+    data_dir: Option<PathBuf>,
+
+    /// Existing durable CAD profile directory, independent of runtime/RX data.
+    #[arg(long, value_parser = existing_cad_profile_dir)]
+    cad_profile_dir: Option<PathBuf>,
 
     /// Tick interval in milliseconds (default 100 ms = 10 fps for smooth pose animation)
     #[arg(long, default_value = "100")]
@@ -315,6 +329,12 @@ struct Args {
     /// Evaluate an unlabelled classification replay against separately held truth.
     #[arg(long, value_name = "PREDICTIONS")]
     classification_evaluate: Option<PathBuf>,
+    /// Read-only deterministic audit of a closed unified-RX raw recording.
+    #[arg(long, value_name="RAW_JSONL", requires="raw_csi_audit_seconds", conflicts_with_all=["server_control_daemon","position_setup","position_index","calibrate","classification_evaluate","replay_calibration"])]
+    raw_csi_audit: Option<PathBuf>,
+    /// Fixed phase length: 30 short, 180 baseline, 300 pair or 3600 continuous.
+    #[arg(long, requires="raw_csi_audit")]
+    raw_csi_audit_seconds: Option<u16>,
 
     /// Separate fixed-protocol truth manifest for --classification-evaluate.
     #[arg(long, value_name = "TRUTH_MANIFEST")]
@@ -1296,6 +1316,11 @@ struct RecordingWriterResult {
     dropped_frames: u64,
     error: Option<String>,
     rx_summaries: BTreeMap<u8, raw_csi_recording::RawCsiRxSummary>,
+    link_summaries: BTreeMap<(u8, u8), raw_csi_recording::RawCsiLinkSummary>,
+    epochs: raw_csi_recording::RecordingEpochGuard,
+    unified_capture: bool,
+    closed_at: Option<server_clock::HostTimestamp>,
+    raw_sha256: Option<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -2365,10 +2390,11 @@ fn observe_frame_for_presence(
     phase: d5_presence::CalibrationPhase,
     host_receive_monotonic_ns: u64,
 ) -> (FeatureInfo, ClassificationInfo) {
-    let timing = ns.csi_sample_timing.observe(
+    let timing = ns.csi_sample_timing.observe_sequence(
         frame.sequence,
         frame.device_callback_started_us,
         host_receive_monotonic_ns,
+        frame.protocol_version == Some(raw_csi_recording::CSI_PROTOCOL_UNIFIED_RX),
     );
     // The 20 Hz fallback is only the short warm-up assumption for the first
     // frame; diagnostics remain unset until a real interval is observed.
@@ -2443,6 +2469,7 @@ mod motion_classification_tests {
             gain_db: None,
             csi_config_flags: None,
             sync_age_ms: None,
+            validity_mask: None,
             invalid_prefix_pairs: 0,
             interpolated_prefix_pairs: 0,
             phases: vec![0.0; amplitudes.len()],
@@ -3555,7 +3582,8 @@ fn generate_simulated_frame(tick: u64) -> Esp32Frame {
         gain_db: None,
         csi_config_flags: None,
         sync_age_ms: None,
-        invalid_prefix_pairs: 0,
+        validity_mask: None,
+            invalid_prefix_pairs: 0,
         interpolated_prefix_pairs: 0,
         amplitudes,
         phases,
@@ -4760,6 +4788,9 @@ fn route_raw_frame_to_live_position(
     grid_accepted: bool,
     raw_frame: raw_csi_recording::RawCsiFrame,
 ) -> Result<(), String> {
+    if raw_csi_recording::RawCsiLinkSummary::key(&raw_frame).1 != 0 {
+        return Err("peer CSI requires its own calibrated link model; excluded from TX-only position input".into());
+    }
     if !grid_accepted {
         let error = "raw CSI frame was rejected by the active per-node grid gate".to_string();
         tracker.reject_input(error.clone());
@@ -4911,23 +4942,39 @@ fn append_raw_recording_frame(
 ) -> Result<(), String> {
     use std::io::Write;
 
+    let unified = raw_frame.protocol_identity.and_then(|identity| identity.unified_rx).is_some();
+    let link = raw_csi_recording::RawCsiLinkSummary::key(&raw_frame);
+    let primary_grid = link.1 == 0 && position_setup.is_none_or(|setup| {
+        setup.raw_csi_frame_matches_expected_grid(&raw_frame).unwrap_or(false)
+    });
     if let Some(position_setup) = position_setup {
-        position_setup
-            .validate_raw_csi_frame(&raw_frame)
+        let validation = if unified { position_setup.validate_raw_csi_source_identity(&raw_frame) }
+            else { position_setup.validate_raw_csi_frame(&raw_frame) };
+        validation
             .map_err(|error| format!("sealed position setup rejected frame: {error}"))?;
     }
     let raw_frame = raw_frame
         .with_recording_metadata(session_id.clone(), label.clone(), ground_truth.clone())
         .map_err(|error| format!("invalid frame metadata: {error}"))?;
-    if let Some(summary) = result.rx_summaries.get(&raw_frame.rx_id) {
-        summary.validate_next_frame(&raw_frame)?;
+    result.epochs.validate(&raw_frame)?;
+    if let Some(summary) = result.link_summaries.get(&link) { summary.validate_next(&raw_frame)?; }
+    if primary_grid {
+        if let Some(summary) = result.rx_summaries.get(&raw_frame.rx_id) {
+            summary.validate_next_frame(&raw_frame)?;
+        }
     }
     let line = raw_csi_recording::encode_json_line(&raw_frame)
         .map_err(|error| format!("encode error: {error}"))?;
     writer
         .write_all(line.as_bytes())
         .map_err(|error| format!("write error: {error}"))?;
-    match result.rx_summaries.get_mut(&raw_frame.rx_id) {
+    match result.link_summaries.get_mut(&link) {
+        Some(summary) => summary.observe_written(&raw_frame),
+        None => { result.link_summaries.insert(link, raw_csi_recording::RawCsiLinkSummary::first_written(&raw_frame)); }
+    }
+    result.epochs.observe_written(&raw_frame);
+    result.unified_capture |= unified;
+    if primary_grid { match result.rx_summaries.get_mut(&raw_frame.rx_id) {
         Some(summary) => summary.observe_written_frame(&raw_frame),
         None => {
             result.rx_summaries.insert(
@@ -4935,7 +4982,7 @@ fn append_raw_recording_frame(
                 raw_csi_recording::RawCsiRxSummary::first_written_frame(&raw_frame),
             );
         }
-    }
+    } }
     result.frames_written += 1;
     if result.frames_written % 100 == 0 {
         writer
@@ -5041,12 +5088,25 @@ fn finalize_recording_metadata_in_dir(
         std::fs::read(&metadata_path).map_err(|error| format!("metadata read error: {error}"))?;
     let mut metadata: serde_json::Value = serde_json::from_slice(&metadata_bytes)
         .map_err(|error| format!("metadata decode error: {error}"))?;
-    metadata["ended_at_unix_seconds"] = serde_json::json!(chrono_timestamp());
-    metadata["ended_at_unix_ns"] = serde_json::json!(raw_csi_recording::now_unix_ns()
-        .map_err(|error| format!("metadata end timestamp error: {error}"))?);
+    let closed = result.closed_at.clone().unwrap_or_else(server_clock::now);
+    metadata["ended_at_unix_seconds"] = serde_json::json!(closed.host_unix_ns / 1_000_000_000);
+    metadata["ended_at_unix_ns"] = serde_json::json!(closed.host_unix_ns);
+    metadata["ended_at_monotonic_ns"] = serde_json::json!(closed.host_monotonic_ns);
+    metadata["finalized_at_monotonic_ns"] = serde_json::json!(server_clock::now().host_monotonic_ns);
+    let raw_path = recordings_dir.join(format!("{recording_id}.raw-csi.v1.jsonl"));
+    let raw_sha = if let Some(hash) = &result.raw_sha256 { Some(hash.clone()) }
+        else if raw_path.exists() { Some(position_artifact::sha256_file(&raw_path).map_err(|error| error.to_string())?) }
+        else { None };
+    if result.unified_capture && raw_sha.is_none() { return Err("unified raw recording is missing at close".into()); }
+    metadata["raw_sha256"] = serde_json::json!(raw_sha);
     metadata["duration_secs"] = serde_json::json!(duration_secs);
     metadata["frames_written"] = serde_json::json!(result.frames_written);
     metadata["rx_summaries"] = serde_json::json!(result.rx_summaries.values().collect::<Vec<_>>());
+    metadata["link_summaries"] = serde_json::json!(result.link_summaries.values().collect::<Vec<_>>());
+    if result.unified_capture {
+        metadata["capture_scope"] = serde_json::json!("source_validated_csi_all_links_and_grids");
+        metadata["rx_summary_scope"] = serde_json::json!("primary_tx_selected_grid");
+    }
     metadata["dropped_frames"] = serde_json::json!(result.dropped_frames);
     metadata["incomplete"] = serde_json::json!(result.incomplete());
     metadata["status"] = serde_json::json!(if result.incomplete() {
@@ -5476,6 +5536,15 @@ fn data_dir_for_ui(ui_path: &FilePath) -> PathBuf {
         .unwrap_or_else(|| PathBuf::from("data"))
 }
 
+fn existing_cad_profile_dir(value: &str) -> Result<PathBuf, String> {
+    let path = PathBuf::from(value);
+    if !path.is_absolute() || !path.join("observatory-experiments.sqlite3").is_file() {
+        return Err("--cad-profile-dir requires an absolute directory with an existing observatory-experiments.sqlite3; no fallback to RX data".to_string());
+    }
+    path.canonicalize()
+        .map_err(|error| format!("resolve CAD profile directory: {error}"))
+}
+
 #[cfg(test)]
 mod data_dir_tests {
     use super::*;
@@ -5495,6 +5564,37 @@ mod data_dir_tests {
     #[test]
     fn bare_ui_path_keeps_the_current_directory_fallback() {
         assert_eq!(data_dir_for_ui(FilePath::new("ui")), PathBuf::from("data"));
+    }
+
+    #[test]
+    fn explicit_cad_catalogue_is_absolute_and_independent_of_runtime_and_ui() {
+        let root = tempfile::tempdir().unwrap();
+        let profiles = root.path().join("room");
+        std::fs::create_dir(&profiles).unwrap();
+        std::fs::write(profiles.join("observatory-experiments.sqlite3"), []).unwrap();
+        let runtime = root.path().join("new-rx-run");
+        let args = Args::try_parse_from([
+            "sensing-server",
+            "--data-dir",
+            runtime.to_str().unwrap(),
+            "--cad-profile-dir",
+            profiles.to_str().unwrap(),
+            "--ui-path",
+            "/different/ui-copy",
+        ])
+        .unwrap();
+        assert_eq!(args.data_dir.as_deref(), Some(runtime.as_path()));
+        assert_eq!(args.cad_profile_dir, Some(profiles.canonicalize().unwrap()));
+        assert!(Args::try_parse_from([
+            "sensing-server", "--cad-profile-dir", "relative/room"
+        ])
+        .is_err());
+        assert!(Args::try_parse_from([
+            "sensing-server",
+            "--cad-profile-dir",
+            root.path().join("missing").to_str().unwrap()
+        ])
+        .is_err());
     }
 }
 
@@ -6358,6 +6458,13 @@ async fn main() {
         .init();
 
     let mut args = Args::parse();
+    if let Some(path)=&args.raw_csi_audit {
+        match tag14_audit::run(path,args.raw_csi_audit_seconds.unwrap()) {
+            Ok(report)=>println!("{}",serde_json::to_string_pretty(&report).unwrap()),
+            Err(error)=>{eprintln!("Raw CSI audit failed: {error}");std::process::exit(1);}
+        }
+        return;
+    }
 
     if args.server_control_daemon {
         let Some(spec_path) = args.server_control_spec.take() else {
@@ -6563,7 +6670,10 @@ async fn main() {
     }
 
     args.ui_path = coalesce_ui_path(args.ui_path);
-    let data_dir = data_dir_for_ui(&args.ui_path);
+    let data_dir = args
+        .data_dir
+        .clone()
+        .unwrap_or_else(|| data_dir_for_ui(&args.ui_path));
 
     // Handle --benchmark mode: run vital sign benchmark and exit
     if args.benchmark {
@@ -7298,11 +7408,21 @@ async fn main() {
         runtime_config.dedup_factor
     );
 
-    let experiment_store = match experiment::ExperimentStore::open(&data_dir).await {
+    let store_result = match args.cad_profile_dir.as_deref() {
+        Some(profile_dir) => {
+            experiment::ExperimentStore::open_with_profile_dir(&data_dir, profile_dir).await
+        }
+        None => experiment::ExperimentStore::open(&data_dir).await,
+    };
+    let experiment_store = match store_result {
         Ok(store) => {
             info!(
                 "Observatory experiment catalogue ready at {}",
                 store.db_path().display()
+            );
+            info!(
+                "CAD profile catalogue ready at {}",
+                store.profile_db_path().display()
             );
             Some(Arc::new(store))
         }
@@ -7466,8 +7586,12 @@ async fn main() {
         }
     };
 
-    let mmwave_url_configured = args.mmwave_node_url.is_some();
-    let mmwave_token = mmwave_connection::load_token(&args.mmwave_token_env);
+    let mmwave_url_configured = !args.rx_session_only && args.mmwave_node_url.is_some();
+    let mmwave_token = if args.rx_session_only {
+        None
+    } else {
+        mmwave_connection::load_token(&args.mmwave_token_env)
+    };
     let mmwave_token_configured = mmwave_token.is_some();
     let mmwave_control = args.mmwave_node_url.as_ref().and_then(|base_url| {
         match mmwave_token.clone() {
@@ -7487,7 +7611,8 @@ async fn main() {
         }
     });
 
-    let mmwave_experiment = position_setup.as_deref()
+    let mmwave_experiment = position_setup
+        .as_deref()
         .and_then(mmwave_calibration::ExperimentContext::from_setup);
     let restored_mmwave_profile = if position_setup.is_none() {
         if let Some(store) = &experiment_store {
@@ -7537,7 +7662,9 @@ async fn main() {
             let (origin_x_mm, origin_z_mm, yaw_mdeg, raw_x_inverted) = definition.transform();
             mmwave_calibration::ExpectedNode {
                 node_id: node_id.clone(),
-                mounting_position_m: position_setup.as_ref().and_then(|setup| setup.mmwave_mounting_position_m(&node_id)),
+                mounting_position_m: position_setup
+                    .as_ref()
+                    .and_then(|setup| setup.mmwave_mounting_position_m(&node_id)),
                 transform: mmwave_calibration::CoordinateFrame {
                     local: "x_right_y_forward_mm".to_string(),
                     room: "x_length_z_width_mm".to_string(),
@@ -7647,6 +7774,7 @@ async fn main() {
         recording_phase: RecordingLifecyclePhase::Idle,
         recording_active: false,
         recording_start_time: None,
+        recording_started_at: None,
         recording_current_id: None,
         recording_stop_tx: None,
         recording_done_rx: None,
@@ -7742,25 +7870,29 @@ async fn main() {
     if plan.run_simulator {
         tokio::spawn(simulated_data_task(state.clone(), args.tick_ms));
     }
-    tokio::spawn(mmwave_receiver_task(
-        state.clone(),
-        args.mmwave_udp_bind_addr,
-        args.mmwave_udp_port,
-        args.mmwave_receive_buffer_bytes,
-        args.mmwave_reorder_hold_ms,
-    ));
-    mmwave_discovery::spawn_listener(
-        mmwave_discovery::DEFAULT_DISCOVERY_PORT,
-        args.mmwave_udp_port,
-        mmwave_token.clone(),
-    );
-    spawn_mmwave_node_diagnostics_poller(
-        state.clone(),
-        args.mmwave_udp_bind_addr,
-        args.mmwave_node_url.clone(),
-        mmwave_token,
-    );
-    spawn_mmwave_session_ticker(state.clone());
+    if !args.rx_session_only {
+        tokio::spawn(mmwave_receiver_task(
+            state.clone(),
+            args.mmwave_udp_bind_addr,
+            args.mmwave_udp_port,
+            args.mmwave_receive_buffer_bytes,
+            args.mmwave_reorder_hold_ms,
+        ));
+        mmwave_discovery::spawn_listener(
+            mmwave_discovery::DEFAULT_DISCOVERY_PORT,
+            args.mmwave_udp_port,
+            mmwave_token.clone(),
+        );
+        spawn_mmwave_node_diagnostics_poller(
+            state.clone(),
+            args.mmwave_udp_bind_addr,
+            args.mmwave_node_url.clone(),
+            mmwave_token,
+        );
+        spawn_mmwave_session_ticker(state.clone());
+    } else {
+        info!("RX-only session: mmWave network services and control routes disabled");
+    }
 
     // ADR-166: Parse bind address once, use for all listeners
     let bind_ip: std::net::IpAddr = args
@@ -7895,7 +8027,7 @@ async fn main() {
         .route("/health/version", get(health_version))
         .route("/health/metrics", get(health_metrics))
         // Read-only API observability routes.
-        .merge(routes::api_routes())
+        .merge(routes::api_routes(args.rx_session_only))
         // Static UI files
         .nest_service("/ui", ServeDir::new(&ui_path))
         // ADR-102: make the edge registry handle (Option<Arc<EdgeRegistry>>)
@@ -8420,9 +8552,22 @@ mod sync_snapshot_helper_tests {
         rebooted.sequence = 3;
         rebooted.local_us = 200_000;
         rebooted.epoch_us = 200_000;
+        ns.csi_reception = CsiReceptionCounters {
+            valid_frames: 5,
+            format_exclusions: 3,
+            latest_sequence: Some(104),
+            forward_transitions: 4,
+            unexplained_gaps: 1,
+        };
         ns.apply_sync_packet(rebooted, t0 + std::time::Duration::from_secs(4));
 
         assert_eq!(ns.csi_fps_samples, 0);
+        // Sync regression resets legacy timing, not the admitted CSI boot.
+        assert_eq!(ns.csi_reception.valid_frames, 5);
+        assert_eq!(ns.csi_reception.format_exclusions, 3);
+        assert_eq!(ns.csi_reception.latest_sequence, Some(104));
+        assert_eq!(ns.csi_reception.forward_transitions, 4);
+        assert_eq!(ns.csi_reception.unexplained_gaps, 1);
         assert!(
             ns.fusion_frame_history.is_empty(),
             "a reboot must not bridge pre-reboot frames into the next quartet"

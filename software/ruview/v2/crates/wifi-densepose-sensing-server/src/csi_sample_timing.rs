@@ -33,6 +33,7 @@ struct PendingRateChange {
 
 #[derive(Debug, Default)]
 pub(super) struct CsiSampleRateEstimator {
+    shared_wire_sequence: bool,
     anchor: Option<SampleAnchor>,
     rate_hz: Option<f64>,
     mean_interval_us: Option<f64>,
@@ -51,6 +52,7 @@ pub(super) struct CsiSampleRateEstimator {
 
 #[derive(Debug, Clone, Copy, Default, Deserialize, Serialize)]
 pub(super) struct CsiSampleTimingSnapshot {
+    pub(super) shared_wire_sequence: bool,
     pub(super) rate_hz: Option<f64>,
     pub(super) jitter_us: Option<f64>,
     pub(super) source: Option<TimingSource>,
@@ -78,6 +80,18 @@ impl CsiSampleRateEstimator {
         device_callback_us: Option<u64>,
         host_receive_monotonic_ns: u64,
     ) -> CsiSampleTimingUpdate {
+        self.observe_sequence(sequence, device_callback_us, host_receive_monotonic_ns, false)
+    }
+
+    /// Unified RX numbers all physical sources on one receiver sequence.
+    /// A delta of two can simply mean that a peer frame was interleaved.
+    pub(super) fn observe_sequence(
+        &mut self, sequence: u32, device_callback_us: Option<u64>,
+        host_receive_monotonic_ns: u64, shared_wire_sequence: bool,
+    ) -> CsiSampleTimingUpdate {
+        let scope_changed = self.shared_wire_sequence != shared_wire_sequence && self.anchor.is_some();
+        if scope_changed { self.anchor = None; self.reset_cadence(); }
+        self.shared_wire_sequence = shared_wire_sequence;
         let (source, timestamp_us) = match device_callback_us.filter(|value| *value > 0) {
             Some(timestamp_us) => (TimingSource::DeviceCallback, timestamp_us),
             None if host_receive_monotonic_ns > 0 => {
@@ -94,7 +108,7 @@ impl CsiSampleRateEstimator {
         let Some(previous) = self.anchor else {
             self.anchor = Some(current);
             self.source = Some(source);
-            return self.update(false);
+            return self.update(scope_changed);
         };
 
         if previous.source != Some(source) {
@@ -114,6 +128,7 @@ impl CsiSampleRateEstimator {
             self.reset_at(current);
             return self.update(true);
         }
+        let sequence_delta = if shared_wire_sequence { 1 } else { sequence_delta };
 
         let Some(interval_us) = timestamp_us.checked_sub(previous.timestamp_us) else {
             self.clock_resets = self.clock_resets.saturating_add(1);
@@ -205,6 +220,7 @@ impl CsiSampleRateEstimator {
 
     pub(super) fn snapshot(&self) -> CsiSampleTimingSnapshot {
         CsiSampleTimingSnapshot {
+            shared_wire_sequence: self.shared_wire_sequence,
             rate_hz: self.rate_hz,
             jitter_us: self.jitter_us,
             source: self.source,
@@ -330,4 +346,16 @@ mod tests {
         assert_eq!(update.snapshot.source, Some(TimingSource::HostReceive));
         assert!((update.snapshot.rate_hz.unwrap() - 50.0).abs() < 0.1);
     }
+    #[test]
+    fn receiver_shared_sequence_does_not_turn_peer_interleaving_into_tx_rate_or_loss() {
+        let mut estimator = CsiSampleRateEstimator::default();
+        for index in 0..100 {
+            estimator.observe_sequence(index * 2, Some(1_000_000 + u64::from(index)*25_000), 0, true);
+        }
+        let observed = estimator.snapshot();
+        assert_eq!(observed.rate_hz, Some(40.0));
+        assert_eq!(observed.missing_frames, 0);
+        assert!(observed.shared_wire_sequence);
+    }
+
 }

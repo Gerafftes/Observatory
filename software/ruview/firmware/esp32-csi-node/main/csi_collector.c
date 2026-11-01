@@ -13,6 +13,13 @@
 
 #include "csi_collector.h"
 #include "csi_transport.h"
+#if CONFIG_RX_UNIFIED
+#include "csi_peer.h"
+#include "rx_settings.h"
+#include "rx_diag.h"
+#include "status_led.h"
+#include "csi_physical.h"
+#endif
 #include "nvs_config.h"
 #include "c6_timesync.h"  /* Serializer sync-valid flag on ESP32-C6. */
 #include "c6_sync_espnow.h" /* Serializer sync-valid flag on every RX target. */
@@ -63,6 +70,12 @@ static int8_t s_latest_rssi = INT8_MIN;
 #endif
 
 static const char *TAG = "csi_collector";
+#if !CONFIG_SOC_WIFI_HE_SUPPORT
+static const wifi_csi_config_t s_s3_csi_profile = {
+    .lltf_en=true,.htltf_en=true,.stbc_htltf2_en=true,.ltf_merge_en=true,
+    .channel_filter_en=false,.manu_scale=false,.shift=false,
+};
+#endif
 
 static uint32_t s_sequence = 0;
 static uint32_t s_cb_count = 0;
@@ -138,6 +151,7 @@ static void csi_record_callback_diagnostics(
 #define CSI_FRAME_INTERVAL_US \
     (1000000LL / CONFIG_CSI_CAPTURE_RATE_LIMIT_HZ)
 #define CSI_FRAME_EARLY_TOLERANCE_US 500
+#if !CONFIG_RX_UNIFIED
 static int64_t s_next_frame_deadline_us = 0;
 
 static bool csi_rate_limit_admit(int64_t now_us)
@@ -158,6 +172,7 @@ static bool csi_rate_limit_admit(int64_t now_us)
     }
     return true;
 }
+#endif
 
 uint32_t csi_collector_get_csi_config_flags(void)
 {
@@ -215,7 +230,8 @@ size_t csi_serialize_frame_at(
     size_t buf_len
 )
 {
-    if (info == NULL || buf == NULL || info->buf == NULL) {
+    if (info == NULL || buf == NULL || info->buf == NULL || info->len <= 0
+        || (size_t)info->len > CSI_MAX_IQ_SIZE || (info->len & 1)) {
         return 0;
     }
 
@@ -225,7 +241,7 @@ size_t csi_serialize_frame_at(
 
     size_t iq_end = CSI_HEADER_SIZE + iq_len;
     size_t binding_end = iq_end + CSI_SOURCE_BINDING_SIZE;
-    size_t frame_size = binding_end + CSI_IDENTITY_TRAILER_SIZE;
+    size_t frame_size = binding_end + CSI_IDENTITY_TRAILER_SIZE + CSI_PHYSICAL_TRAILER_SIZE;
     if (frame_size > buf_len) {
         ESP_LOGW(TAG, "Buffer too small: need %u, have %u", (unsigned)frame_size, (unsigned)buf_len);
         return 0;
@@ -336,7 +352,11 @@ size_t csi_serialize_frame_at(
     memcpy(&buf[CSI_HEADER_SIZE], info->buf, iq_len);
     if (info->first_word_invalid && iq_len > 0) {
         size_t invalid_len = iq_len < 4 ? iq_len : 4;
+#if !CONFIG_RX_UNIFIED
         memset(&buf[CSI_HEADER_SIZE], 0, invalid_len);
+#else
+        (void)invalid_len; /* Original IQ is retained; the mask carries invalidity. */
+#endif
         buf[19] |= (1u << 5);
     }
 
@@ -404,6 +424,26 @@ size_t csi_serialize_frame_at(
     memcpy(&identity[36], &sync_age_ms, sizeof(sync_age_ms));
     memset(&identity[40], 0, 8);
 
+#if CONFIG_RX_UNIFIED
+    const rx_profile_t *profile = rx_settings_active_profile();
+    int link = csi_peer_classify(info->mac);
+    if (link < 0) return 0;
+    memset(identity + 40, 0, CSI_IDENTITY_TRAILER_SIZE - 40);
+    memcpy(identity + 40, &profile->generation, 4);
+    identity[44] = profile->mode;
+    identity[45] = link ? profile->peers[link - 1].node_id : 0;
+    identity[46] = profile->peer_count;
+    memcpy(identity + 48, rx_settings_active_hash(), 32);
+    memcpy(identity + 96, info->mac, 6);
+    memcpy(identity + 102, csi_peer_self_mac(), 6);
+    identity[108] = info->rx_ctrl.sig_mode;
+    identity[109] = info->rx_ctrl.cwb;
+    identity[110] = info->rx_ctrl.stbc;
+    binding[5] = CSI_SOURCE_BINDING_FLAGS_MASK;
+    memcpy(binding + 8, csi_peer_source_hash(link), 32);
+    csi_physical_encode(info,&s_s3_csi_profile,identity+CSI_IDENTITY_TRAILER_SIZE);
+#endif
+
     return frame_size;
 }
 
@@ -440,6 +480,8 @@ static void wifi_csi_callback(void *ctx, wifi_csi_info_t *info)
 
     if (info == NULL || info->buf == NULL || info->len <= 0
         || (size_t)info->len > CSI_MAX_IQ_SIZE
+        || (info->len & 1)
+        || (info->first_word_invalid && info->len < 6)
         || info->rx_ctrl.rx_state != 0) {
         goto callback_done;
     }
@@ -447,6 +489,16 @@ static void wifi_csi_callback(void *ctx, wifi_csi_info_t *info)
     /* ADR-060: MAC address filtering — drop frames from non-matching sources.
      * Uses defensively-copied s_filter_mac instead of g_nvs_config (which can
      * be corrupted by wifi_init_sta — same root cause as the node_id clobber). */
+#if CONFIG_RX_UNIFIED
+    if (csi_peer_classify(info->mac) < 0) {
+        outcome = CSI_CALLBACK_FOREIGN_TX;
+        goto callback_done;
+    }
+    if (!csi_peer_admit(info->mac, info->len, callback_started_us)) {
+        outcome = CSI_CALLBACK_RATE_LIMITED;
+        goto callback_done;
+    }
+#else
     if (s_filter_mac_set) {
         if (memcmp(info->mac, s_filter_mac, 6) != 0) {
             outcome = CSI_CALLBACK_FOREIGN_TX;
@@ -461,14 +513,35 @@ static void wifi_csi_callback(void *ctx, wifi_csi_info_t *info)
         outcome = CSI_CALLBACK_RATE_LIMITED;
         goto callback_done;
     }
+#endif
 
     outcome = CSI_CALLBACK_ADMITTED;
     s_cb_count++;
     s_latest_rssi = (int8_t)info->rx_ctrl.rssi;
     handoff_attempted = true;
     handoff_accepted = csi_transport_enqueue_capture(info, callback_started_us);
+#if CONFIG_RX_UNIFIED
+    csi_peer_capture_result(csi_peer_classify(info->mac), handoff_accepted);
+    if (info->len == 256 && info->rx_ctrl.channel == 6 && info->rx_ctrl.sig_mode == 1 && !info->rx_ctrl.cwb
+        && !info->rx_ctrl.stbc && !info->rx_ctrl.secondary_channel && csi_peer_classify(info->mac) == 0)
+        status_led_csi(callback_started_us);
+#endif
 
-callback_done:
+callback_done:;
+#if CONFIG_RX_UNIFIED
+    unsigned format = rx_diag_class(info ? info->len : 0, outcome != CSI_CALLBACK_INVALID);
+    if (info && outcome != CSI_CALLBACK_INVALID && info->len == 256
+        && info->rx_ctrl.channel == 6 && info->rx_ctrl.sig_mode == 1
+        && !info->rx_ctrl.cwb && !info->rx_ctrl.stbc && !info->rx_ctrl.secondary_channel
+        && csi_peer_classify(info->mac) == 0) format |= RX_GRID_CANDIDATE;
+    unsigned features = info ? ((1u << info->rx_ctrl.sig_mode) | (info->rx_ctrl.cwb ? 16u : 0u)
+        | (info->rx_ctrl.stbc ? 32u : 0u) | (info->first_word_invalid ? 64u : 0u)
+        | (info->rx_ctrl.rx_state ? 128u : 0u)) : 0;
+    rx_diag_enter(format, features, outcome == CSI_CALLBACK_INVALID, outcome == CSI_CALLBACK_FOREIGN_TX);
+    if (outcome == CSI_CALLBACK_RATE_LIMITED) rx_diag_count(format, RX_EARLY_DROP);
+    if (outcome == CSI_CALLBACK_FOREIGN_TX) rx_diag_count(format, RX_FOREIGN_DROP);
+    if (handoff_attempted) rx_diag_count(format, handoff_accepted ? RX_QUEUE_OK : RX_QUEUE_DROP);
+#endif
     csi_record_callback_diagnostics(
         outcome,
         handoff_attempted,
@@ -689,7 +762,7 @@ void csi_collector_set_boot_id(uint64_t boot_id)
     s_boot_id = boot_id == 0 ? 1 : boot_id;
 }
 
-void csi_collector_init(void)
+esp_err_t csi_collector_init(void)
 {
     if (!s_node_id_early_set) {
         /* Fallback: no early capture — use current g_nvs_config (may be clobbered). */
@@ -766,10 +839,13 @@ void csi_collector_init(void)
     /* Enable promiscuous mode — required for reliable CSI callbacks.
      * Without this, CSI only fires on frames destined to this station,
      * which may be very infrequent on a quiet network. */
-    ESP_ERROR_CHECK(esp_wifi_set_promiscuous(true));
-    ESP_ERROR_CHECK(esp_wifi_set_promiscuous_rx_cb(wifi_promiscuous_cb));
+    esp_err_t err = esp_wifi_set_promiscuous(true);
+    if (err != ESP_OK) return err;
+    err = esp_wifi_set_promiscuous_rx_cb(wifi_promiscuous_cb);
+    if (err != ESP_OK) return err;
 
-    /* MGMT-only promiscuous filter + active probe injection (RuView#396).
+    /* The headless unified S3 keeps the qualified MGMT+DATA capture path.
+     * Legacy display profiles retain their MGMT-only workaround (RuView#396).
      *
      * DATA frames cause 100-500+ WiFi HW interrupts/sec which crashes Core 0
      * in wDev_ProcessFiq (SPI flash cache race in ESP-IDF WiFi blob).
@@ -777,11 +853,16 @@ void csi_collector_init(void)
      * adds ~10 Hz probe responses from APs → ~20 Hz total, matching the
      * edge processing designed sample rate of 20 Hz. */
     wifi_promiscuous_filter_t filt = {
-        .filter_mask = WIFI_PROMIS_FILTER_MASK_MGMT,
+        .filter_mask = WIFI_PROMIS_FILTER_MASK_MGMT
+#if defined(CONFIG_RX_UNIFIED) && CONFIG_RX_UNIFIED
+            | WIFI_PROMIS_FILTER_MASK_DATA
+#endif
+        ,
     };
-    ESP_ERROR_CHECK(esp_wifi_set_promiscuous_filter(&filt));
+    err = esp_wifi_set_promiscuous_filter(&filt);
+    if (err != ESP_OK) return err;
 
-    ESP_LOGI(TAG, "Promiscuous mode enabled (MGMT-only, RuView#396)");
+    ESP_LOGI(TAG, "Promiscuous mode enabled (filter mask=0x%lx)", (unsigned long)filt.filter_mask);
 
 #if CONFIG_SOC_WIFI_HE_SUPPORT
     /* Wi-Fi 6 targets (e.g. ESP32-C6): wifi_csi_config_t is wifi_csi_acquire_config_t
@@ -807,20 +888,15 @@ void csi_collector_init(void)
 #endif
     csi_config.dump_ack_en = 0U;
 #else
-    wifi_csi_config_t csi_config = {
-        .lltf_en = true,
-        .htltf_en = true,
-        .stbc_htltf2_en = true,
-        .ltf_merge_en = true,
-        .channel_filter_en = false,
-        .manu_scale = false,
-        .shift = false,
-    };
+    wifi_csi_config_t csi_config = s_s3_csi_profile;
 #endif
 
-    ESP_ERROR_CHECK(esp_wifi_set_csi_config(&csi_config));
-    ESP_ERROR_CHECK(esp_wifi_set_csi_rx_cb(wifi_csi_callback, NULL));
-    ESP_ERROR_CHECK(esp_wifi_set_csi(true));
+    err = esp_wifi_set_csi_config(&csi_config);
+    if (err != ESP_OK) return err;
+    err = esp_wifi_set_csi_rx_cb(wifi_csi_callback, NULL);
+    if (err != ESP_OK) return err;
+    err = esp_wifi_set_csi(true);
+    if (err != ESP_OK) return err;
 
     if (s_filter_mac_set) {
         ESP_LOGI(TAG, "MAC filter active; raw filter value is not logged");
@@ -833,6 +909,7 @@ void csi_collector_init(void)
      * receives a guaranteed OFDM unicast floor even when promiscuous capture is
      * starved (display builds / quiet networks). Additive to #396/#893. */
     csi_start_self_ping();
+    return ESP_OK;
 }
 
 /* Accessor for other modules that need the authoritative runtime node_id. */
@@ -911,7 +988,9 @@ void csi_collector_test_reset(void)
     s_sequence = 0;
     s_cb_count = 0;
     s_callback_task = NULL;
+#if !CONFIG_RX_UNIFIED
     s_next_frame_deadline_us = 0;
+#endif
     s_latest_rssi = INT8_MIN;
     memset(&s_ping_stats, 0, sizeof(s_ping_stats));
     s_last_ping_reply_us = 0;

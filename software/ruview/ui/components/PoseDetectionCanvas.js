@@ -130,7 +130,7 @@ export class PoseDetectionCanvas {
         border-radius: 8px;
         overflow: hidden;
         background: #0d1117;
-        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        font-family: var(--font-interface);
       }
 
       .pose-canvas-header {
@@ -363,7 +363,7 @@ export class PoseDetectionCanvas {
         border-radius: 4px;
         font-size: 11px;
         line-height: 1.4;
-        font-family: monospace;
+        font-family: var(--font-interface);
         max-width: 200px;
       }
 

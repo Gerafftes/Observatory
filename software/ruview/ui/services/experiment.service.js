@@ -35,8 +35,9 @@ export class ExperimentService {
   }
 
   async listProfiles() {
-    const payload = await apiService.get(`${EXPERIMENTS_ENDPOINT}/setup-profiles`);
-    return Array.isArray(payload?.profiles) ? payload.profiles : [];
+    const payload = await apiService.get(`${EXPERIMENTS_ENDPOINT}/setup-profiles`, {}, { cache: 'no-store' });
+    if (!Array.isArray(payload?.profiles)) throw new Error('Ungültige Profilantwort der Serverablage.');
+    return payload.profiles;
   }
 
   async createProfile({ label, document }) {

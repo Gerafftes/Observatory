@@ -25,7 +25,10 @@ typedef int esp_err_t;
 #define ESP_FAIL        (-1)
 #define ESP_ERR_NO_MEM      0x101
 #define ESP_ERR_INVALID_ARG 0x102
+#define ESP_ERR_INVALID_STATE 0x103
+#define ESP_ERR_TIMEOUT 0x107
 #define ESP_ERR_NOT_FOUND   0x105
+#define ESP_ERR_NVS_NOT_FOUND 0x1102
 
 /* ---- esp_log.h ---- */
 #define ESP_TEST_LOG_UNUSED(tag, ...) do { \
@@ -61,6 +64,13 @@ void esp_test_set_time_step_us(int64_t step_us);
 void esp_test_advance_time_us(int64_t delta_us);
 
 /** Stub: timer lifecycle (no-ops for fuzz testing). */
+#ifdef RX_WIFI_TEST
+esp_err_t esp_timer_create(const esp_timer_create_args_t *args, esp_timer_handle_t *h);
+esp_err_t esp_timer_start_once(esp_timer_handle_t h, uint64_t period);
+bool esp_timer_is_active(esp_timer_handle_t h);
+esp_err_t esp_timer_stop(esp_timer_handle_t h);
+esp_err_t esp_timer_delete(esp_timer_handle_t h);
+#else
 static inline esp_err_t esp_timer_create(const esp_timer_create_args_t *args, esp_timer_handle_t *h) {
     (void)args; if (h) *h = (void *)1; return ESP_OK;
 }
@@ -69,6 +79,7 @@ static inline esp_err_t esp_timer_start_periodic(esp_timer_handle_t h, uint64_t 
 }
 static inline esp_err_t esp_timer_stop(esp_timer_handle_t h) { (void)h; return ESP_OK; }
 static inline esp_err_t esp_timer_delete(esp_timer_handle_t h) { (void)h; return ESP_OK; }
+#endif
 
 /* ---- esp_wifi_types.h ---- */
 
@@ -91,6 +102,7 @@ typedef struct {
     unsigned second        : 4;   /**< secondary 40 MHz channel offset */
     /* ADR-110 legacy-branch fields (pre-HE chips) */
     unsigned sig_mode      : 2;   /**< 0=non-HT 1=HT 3=VHT */
+    unsigned secondary_channel : 2;
     unsigned cwb           : 1;   /**< 0=20 MHz 1=40 MHz */
     unsigned stbc          : 1;   /**< STBC flag */
     /* Padding to keep alignment predictable. */
@@ -149,7 +161,9 @@ typedef void *TaskHandle_t;
 #ifdef CSI_DIAGNOSTICS_THREAD_SAFE_STUBS
 typedef pthread_mutex_t portMUX_TYPE;
 #define portMUX_INITIALIZER_UNLOCKED PTHREAD_MUTEX_INITIALIZER
-#define portENTER_CRITICAL(lock) ((void)pthread_mutex_lock(lock))
+void esp_test_before_critical_once(void (*hook)(void));
+void esp_test_enter_critical(portMUX_TYPE *lock);
+#define portENTER_CRITICAL(lock) esp_test_enter_critical(lock)
 #define portEXIT_CRITICAL(lock) ((void)pthread_mutex_unlock(lock))
 #else
 typedef int portMUX_TYPE;
@@ -239,6 +253,7 @@ typedef struct {
 
 typedef struct {
     uint8_t primary;
+    uint8_t bssid[6];
 } wifi_ap_record_t;
 
 typedef enum {
@@ -250,18 +265,43 @@ typedef enum {
 static inline esp_err_t esp_wifi_set_ps(wifi_ps_type_t type) { (void)type; return ESP_OK; }
 static inline esp_err_t esp_wifi_set_promiscuous(bool en) { (void)en; return ESP_OK; }
 static inline esp_err_t esp_wifi_set_promiscuous_rx_cb(void *cb) { (void)cb; return ESP_OK; }
-static inline esp_err_t esp_wifi_set_promiscuous_filter(wifi_promiscuous_filter_t *f) { (void)f; return ESP_OK; }
+void esp_test_note_promiscuous_mask(uint32_t mask);
+uint32_t esp_test_promiscuous_mask(void);
+static inline esp_err_t esp_wifi_set_promiscuous_filter(wifi_promiscuous_filter_t *f) {
+    esp_test_note_promiscuous_mask(f->filter_mask); return ESP_OK;
+}
 static inline esp_err_t esp_wifi_set_csi_config(wifi_csi_config_t *c) { (void)c; return ESP_OK; }
 static inline esp_err_t esp_wifi_set_csi_rx_cb(void *cb, void *ctx) { (void)cb; (void)ctx; return ESP_OK; }
+#ifdef RX_OTA_TEST
+esp_err_t esp_wifi_set_csi(bool en);
+#else
 static inline esp_err_t esp_wifi_set_csi(bool en) { (void)en; return ESP_OK; }
+#endif
 static inline esp_err_t esp_wifi_set_channel(uint8_t ch, wifi_second_chan_t sc) { (void)ch; (void)sc; return ESP_OK; }
 static inline esp_err_t esp_wifi_80211_tx(wifi_interface_t ifx, const void *b, int len, bool en) { (void)ifx; (void)b; (void)len; (void)en; return ESP_OK; }
 static inline esp_err_t esp_wifi_sta_get_ap_info(wifi_ap_record_t *ap) { (void)ap; return ESP_FAIL; }
+static inline esp_err_t esp_wifi_get_mac(wifi_interface_t ifx, uint8_t *mac) {
+    (void)ifx; const uint8_t value[6] = {2,0,0,0,3,1}; memcpy(mac,value,6); return ESP_OK;
+}
+#define WIFI_PHY_RATE_6M 0
+static inline esp_err_t esp_wifi_config_80211_tx_rate(wifi_interface_t ifx, int rate) { (void)ifx; (void)rate; return ESP_OK; }
 static inline const char *esp_err_to_name(esp_err_t code) { (void)code; return "STUB"; }
 
 /* ---- NVS stubs ---- */
 typedef uint32_t nvs_handle_t;
 #define NVS_READONLY 0
+#define NVS_READWRITE 1
+#ifdef RX_SETTINGS_TEST
+esp_err_t nvs_open(const char *ns, int mode, nvs_handle_t *h);
+void nvs_close(nvs_handle_t h);
+esp_err_t nvs_get_str(nvs_handle_t h, const char *k, char *v, size_t *l);
+esp_err_t nvs_get_u8(nvs_handle_t h, const char *k, uint8_t *v);
+esp_err_t nvs_get_u16(nvs_handle_t h, const char *k, uint16_t *v);
+esp_err_t nvs_get_u32(nvs_handle_t h, const char *k, uint32_t *v);
+esp_err_t nvs_get_blob(nvs_handle_t h, const char *k, void *v, size_t *l);
+esp_err_t nvs_set_blob(nvs_handle_t h, const char *k, const void *v, size_t l);
+esp_err_t nvs_commit(nvs_handle_t h);
+#else
 static inline esp_err_t nvs_open(const char *ns, int mode, nvs_handle_t *h) { (void)ns; (void)mode; (void)h; return ESP_FAIL; }
 static inline void nvs_close(nvs_handle_t h) { (void)h; }
 static inline esp_err_t nvs_get_str(nvs_handle_t h, const char *k, char *v, size_t *l) { (void)h; (void)k; (void)v; (void)l; return ESP_FAIL; }
@@ -269,6 +309,7 @@ static inline esp_err_t nvs_get_u8(nvs_handle_t h, const char *k, uint8_t *v) { 
 static inline esp_err_t nvs_get_u16(nvs_handle_t h, const char *k, uint16_t *v) { (void)h; (void)k; (void)v; return ESP_FAIL; }
 static inline esp_err_t nvs_get_u32(nvs_handle_t h, const char *k, uint32_t *v) { (void)h; (void)k; (void)v; return ESP_FAIL; }
 static inline esp_err_t nvs_get_blob(nvs_handle_t h, const char *k, void *v, size_t *l) { (void)h; (void)k; (void)v; (void)l; return ESP_FAIL; }
+#endif
 
 /* ---- stream_sender stubs (defined in esp_stubs.c) ---- */
 #ifndef CSI_DIAGNOSTICS_REAL_TRANSPORT

@@ -79,8 +79,7 @@ pub async fn flash_firmware(
     })
 }
 
-/// Verify the uploaded firmware hash. The actual serial verification remains
-/// the responsibility of espflash's built-in flash verification.
+/// Calculate the file hash without claiming a current device comparison.
 pub async fn verify_firmware(
     port: String,
     firmware_path: String,
@@ -89,10 +88,10 @@ pub async fn verify_firmware(
     crate::commands::discovery::validate_serial_port_path(&port)?;
     let expected_hash = calculate_sha256(&firmware_path)?;
     Ok(VerifyResult {
-        verified: true,
+        verified: false,
         expected_hash,
         actual_hash: None,
-        message: "Die Prüfung nutzt die integrierte Verifikation von espflash.".to_string(),
+        message: "Datei-Hash berechnet. Kein aktueller Gerätevergleich, Readback oder Bootnachweis vorhanden.".to_string(),
     })
 }
 
@@ -230,6 +229,23 @@ pub struct ChipInfo {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[tokio::test]
+    async fn file_hash_does_not_claim_device_verification() {
+        use std::io::Write;
+        let path = std::env::temp_dir().join(format!("rx-file-hash-{}.bin", uuid::Uuid::new_v4()));
+        let mut file = std::fs::OpenOptions::new().write(true).create_new(true).open(&path).unwrap();
+        file.write_all(b"synthetic firmware file").unwrap();
+        drop(file);
+        let port = if cfg!(target_os = "windows") { "COM7" }
+            else if cfg!(target_os = "macos") { "/dev/cu.synthetic-test" }
+            else { "/dev/ttyUSB999" };
+        let result = verify_firmware(port.into(), path.to_str().unwrap().into(), None).await.unwrap();
+        std::fs::remove_file(path).unwrap();
+        assert!(!result.verified);
+        assert!(result.actual_hash.is_none());
+        assert_eq!(result.expected_hash, format!("{:x}", Sha256::digest(b"synthetic firmware file")));
+    }
 
     #[test]
     fn test_parse_progress_percentage() {
