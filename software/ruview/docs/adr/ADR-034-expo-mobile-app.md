@@ -1,5 +1,7 @@
 # ADR-034: Expo React Native Mobile Application
 
+> Historical note (2026-10-28): the mobile companion app was removed from this repository. This decision is retained for context.
+
 | Field | Value |
 |-------|-------|
 | **Status** | Accepted |

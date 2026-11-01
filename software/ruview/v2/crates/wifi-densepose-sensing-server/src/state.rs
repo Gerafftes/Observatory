@@ -2,10 +2,39 @@
 
 use super::*;
 
+/// Cumulative diagnostics for admitted, source-validated new CSI frames at the
+/// grid gate. Independent of the legacy accepted-grid sequence anchor.
+#[derive(Default)]
+pub(super) struct CsiReceptionCounters {
+    pub(super) valid_frames: u64,
+    pub(super) format_exclusions: u64,
+    pub(super) latest_sequence: Option<u32>,
+    pub(super) forward_transitions: u64,
+    pub(super) unexplained_gaps: u64,
+}
+
+impl CsiReceptionCounters {
+    fn observe_sequence(&mut self, sequence: u32) {
+        self.valid_frames = self.valid_frames.saturating_add(1);
+        if let Some(previous) = self.latest_sequence {
+            let delta = sequence.wrapping_sub(previous);
+            if !(1..0x8000_0000).contains(&delta) {
+                // Admission rejects duplicates/regressions. Retain the high
+                // water even if a future caller bypasses that boundary.
+                return;
+            }
+            self.forward_transitions = self.forward_transitions.saturating_add(1);
+            self.unexplained_gaps = self.unexplained_gaps.saturating_add(u64::from(delta - 1));
+        }
+        self.latest_sequence = Some(sequence);
+    }
+}
+
 pub(super) struct NodeState {
     /// Stable logical identity is the HashMap key; these fields identify its
     /// current boot and transport without treating the IP address as identity.
     pub(super) boot_id: Option<u64>,
+    pub(super) rx_measurement_identity: Option<raw_csi_recording::RxMeasurementIdentity>,
     pub(super) protocol_version: Option<u8>,
     pub(super) source_address: Option<String>,
     pub(super) ip_change_count: u64,
@@ -47,6 +76,7 @@ pub(super) struct NodeState {
     /// Structurally valid, source-attested CSI frames excluded because they did
     /// not use this receiver's selected fingerprint grid.
     pub(super) skipped_grid_frames: u64,
+    pub(super) csi_reception: CsiReceptionCounters,
     /// Mesh-aligned timestamp for the latest accepted CSI frame, recovered from
     /// ADR-110 sync packets when available. Multistatic fusion uses this instead
     /// of UDP arrival time so host/network jitter does not look like sensor
@@ -301,6 +331,8 @@ impl NodeState {
                 if rebooted {
                     self.reset_mesh_rate(MeshTimeStatus::NodeReboot);
                     self.latest_sequence = None;
+                    // Sync has no boot identity. Only admitted CSI boot replacement
+                    // resets the cumulative reception counters.
                 } else {
                     let dt_sec = now
                         .saturating_duration_since(anchor.observed_at)
@@ -442,6 +474,7 @@ impl NodeState {
     pub(crate) fn new() -> Self {
         Self {
             boot_id: None,
+            rx_measurement_identity: None,
             protocol_version: None,
             source_address: None,
             ip_change_count: 0,
@@ -471,6 +504,7 @@ impl NodeState {
             last_frame_time: None,
             source_binding_observation: None,
             skipped_grid_frames: 0,
+            csi_reception: CsiReceptionCounters::default(),
             latest_frame_mesh_time_us: None,
             edge_vitals: None,
             latest_sync: None,
@@ -579,15 +613,21 @@ impl NodeState {
     /// frame, while admitting only the selected CSI grid to sensing.
     pub(super) fn observe_validated_grid(
         &mut self,
+        sequence: u32,
         observation: SourceBindingObservation,
         grid: CsiGridKey,
         matches_sealed_grid: bool,
     ) -> bool {
+        // Count only after ingress identity/source admission, but before any
+        // grid decision. Off-grid arrivals close sequence positions too.
+        self.csi_reception.observe_sequence(sequence);
         self.observe_source_binding(Some(observation));
         if matches_sealed_grid && self.accept_grid(grid) {
             return true;
         }
         self.skipped_grid_frames = self.skipped_grid_frames.saturating_add(1);
+        self.csi_reception.format_exclusions =
+            self.csi_reception.format_exclusions.saturating_add(1);
         false
     }
 
@@ -691,6 +731,7 @@ mod grid_gate_tests {
 
     fn raw_frame(subcarrier_count: u16, flags: u8) -> raw_csi_recording::RawCsiFrame {
         raw_csi_recording::RawCsiFrame {
+            physical_layout: None,
             schema_version: raw_csi_recording::RAW_CSI_SCHEMA_VERSION,
             host_timestamp_unix_ns: 1,
             host_monotonic_ns: Some(1),
@@ -759,8 +800,13 @@ mod grid_gate_tests {
         let later = now + std::time::Duration::from_millis(50);
         let mut state = NodeState::new();
 
-        assert!(state.observe_validated_grid(complete_binding(now), STABLE_GRID, true));
-        assert!(!state.observe_validated_grid(complete_binding(later), REPLACEMENT_GRID, true,));
+        assert!(state.observe_validated_grid(100, complete_binding(now), STABLE_GRID, true));
+        assert!(!state.observe_validated_grid(
+            101,
+            complete_binding(later),
+            REPLACEMENT_GRID,
+            true,
+        ));
 
         let binding = state.source_binding_observation.as_ref().unwrap();
         assert!(binding.complete);
@@ -774,11 +820,478 @@ mod grid_gate_tests {
         let now = std::time::Instant::now();
         let mut state = NodeState::new();
 
-        assert!(!state.observe_validated_grid(complete_binding(now), REPLACEMENT_GRID, false,));
+        assert!(!state.observe_validated_grid(100, complete_binding(now), REPLACEMENT_GRID, false,));
 
         assert!(state.source_binding_observation.is_some());
         assert_eq!(state.active_grid, None);
         assert_eq!(state.skipped_grid_frames, 1);
+    }
+
+    // Exercise the same gate used by UDP ingress, including its early reject.
+    // Moving reception accounting behind that gate breaks these assertions.
+    fn receive_at_grid_gate(state: &mut NodeState, sequence: u32, on_grid: bool) {
+        let now = std::time::Instant::now();
+        let binding = validated_complete_source_binding(
+            Some(&source_binding(
+                raw_csi_recording::SOURCE_BINDING_REQUIRED_FLAGS,
+                'a',
+            )),
+            now,
+            true,
+        )
+        .unwrap();
+        let accepted = state.observe_validated_grid(
+            sequence,
+            binding,
+            if on_grid {
+                STABLE_GRID
+            } else {
+                REPLACEMENT_GRID
+            },
+            on_grid,
+        );
+        assert_eq!(accepted, on_grid);
+        if accepted {
+            state.observe_accepted_csi_frame(sequence, now);
+        }
+    }
+
+    fn reception_api(state: NodeState) -> serde_json::Value {
+        let nodes = HashMap::from([(1, state)]);
+        public_node_summaries(
+            &nodes,
+            std::time::Instant::now(),
+            d5_presence::CalibrationPhase::Ready,
+            false,
+        )
+        .remove(0)
+    }
+
+    #[test]
+    fn grid_ingress_counts_off_grid_receptions_before_rejection_and_keeps_legacy_gaps() {
+        for missing in [None, Some(102)] {
+            let mut state = NodeState::new();
+            for sequence in 100..=104 {
+                if Some(sequence) != missing {
+                    receive_at_grid_gate(&mut state, sequence, matches!(sequence, 100 | 104));
+                }
+            }
+            let api = reception_api(state);
+            let reception = &api["csi_reception"];
+            let formats = &reception["format_exclusions"];
+            let gaps = &reception["unexplained_sequence_gaps"];
+            assert_eq!(reception["scope"], "cumulative_rx_boot");
+            assert_eq!(reception["latest_sequence"], 104);
+            assert_eq!(formats["valid"], true);
+            assert_eq!(gaps["valid"], true);
+            assert_eq!(gaps["denominator"], 4);
+            if missing.is_none() {
+                assert_eq!(reception["valid_frames"], 5);
+                assert_eq!(formats["count"], 3);
+                assert_eq!(formats["denominator"], 5);
+                assert_eq!(formats["percent"], 60.0);
+                assert_eq!(gaps["count"], 0);
+                assert_eq!(gaps["forward_transitions"], 4);
+                assert_eq!(gaps["percent"], 0.0);
+            } else {
+                assert_eq!(reception["valid_frames"], 4);
+                assert_eq!(formats["count"], 2);
+                assert_eq!(formats["denominator"], 4);
+                assert_eq!(formats["percent"], 50.0);
+                assert_eq!(gaps["count"], 1);
+                assert_eq!(gaps["forward_transitions"], 3);
+                assert_eq!(gaps["percent"], 25.0);
+            }
+            // The legacy grid anchor still sees the jump from 100 to 104.
+            assert_eq!(api["accepted_csi_frames"], 2);
+            assert_eq!(api["inferred_lost_frames"], 3);
+            assert_eq!(api["sequence_observations"], 1);
+            assert_eq!(api["packet_loss_percent"], 75.0);
+            assert_eq!(api["skipped_grid_frames"], formats["count"]);
+        }
+    }
+
+    #[test]
+    fn off_grid_only_and_boundary_frames_use_their_own_counting_span() {
+        let mut off_grid = NodeState::new();
+        for sequence in 100..=104 {
+            receive_at_grid_gate(&mut off_grid, sequence, false);
+        }
+        assert!(off_grid.last_frame_time.is_none());
+        assert!(off_grid.frame_history.is_empty());
+        assert!(off_grid.active_grid.is_none());
+        let api = reception_api(off_grid);
+        assert_eq!(api["status"], "stale");
+        assert_eq!(api["csi_reception"]["valid_frames"], 5);
+        assert_eq!(api["csi_reception"]["format_exclusions"]["percent"], 100.0);
+        assert_eq!(
+            api["csi_reception"]["unexplained_sequence_gaps"]["denominator"],
+            4
+        );
+        assert_eq!(
+            api["csi_reception"]["unexplained_sequence_gaps"]["percent"],
+            0.0
+        );
+        assert!(api["packet_loss_percent"].is_null());
+
+        let mut bounded = NodeState::new();
+        for sequence in 98..=106 {
+            receive_at_grid_gate(&mut bounded, sequence, matches!(sequence, 100 | 104));
+        }
+        let api = reception_api(bounded);
+        assert_eq!(api["csi_reception"]["format_exclusions"]["count"], 7);
+        assert_eq!(api["csi_reception"]["format_exclusions"]["denominator"], 9);
+        assert_eq!(
+            api["csi_reception"]["unexplained_sequence_gaps"]["denominator"],
+            8
+        );
+        assert_eq!(
+            api["csi_reception"]["unexplained_sequence_gaps"]["count"],
+            0
+        );
+        assert_eq!(api["inferred_lost_frames"], 3);
+    }
+
+    #[test]
+    fn empty_and_single_frame_percentages_require_their_respective_denominators() {
+        let api = reception_api(NodeState::new());
+        for name in ["format_exclusions", "unexplained_sequence_gaps"] {
+            let metric = &api["csi_reception"][name];
+            assert_eq!(metric["count"], 0);
+            assert_eq!(metric["denominator"], 0);
+            assert_eq!(metric["valid"], false);
+            assert!(metric["percent"].is_null());
+        }
+        for on_grid in [false, true] {
+            let mut state = NodeState::new();
+            receive_at_grid_gate(&mut state, 100, on_grid);
+            let api = reception_api(state);
+            let formats = &api["csi_reception"]["format_exclusions"];
+            assert_eq!(formats["denominator"], 1);
+            assert_eq!(formats["valid"], true);
+            assert_eq!(formats["percent"], if on_grid { 0.0 } else { 100.0 });
+            let gaps = &api["csi_reception"]["unexplained_sequence_gaps"];
+            assert_eq!(gaps["count"], 0);
+            assert_eq!(gaps["denominator"], 0);
+            assert_eq!(gaps["valid"], false);
+            assert!(gaps["percent"].is_null());
+        }
+    }
+
+    fn reception_sync(sequence: u32, local_us: u64) -> wifi_densepose_hardware::SyncPacket {
+        wifi_densepose_hardware::SyncPacket {
+            node_id: 1,
+            proto_ver: 1,
+            flags: wifi_densepose_hardware::SyncPacketFlags {
+                is_valid: true,
+                ..Default::default()
+            },
+            local_us,
+            epoch_us: local_us,
+            sequence,
+        }
+    }
+
+    #[test]
+    fn sync_reordering_preserves_cumulative_reception_and_legacy_resets() {
+        for (sequence, local_us, legacy_reboot) in [
+            (99, 980_000, true),     // Delayed same-boot packet.
+            (101, 980_000, true),    // Time regression without sequence regression.
+            (99, 1_020_000, true),   // Sequence regression without time regression.
+            (100, 1_000_000, false), // Duplicate sync.
+        ] {
+            let now = std::time::Instant::now();
+            let mut state = NodeState::new();
+            state.observe_transport_identity(2, 7, "192.0.2.1:5005".parse().unwrap(), false);
+            state.apply_sync_packet(reception_sync(100, 1_000_000), now);
+            for sequence in 100..=104 {
+                receive_at_grid_gate(&mut state, sequence, matches!(sequence, 100 | 104));
+            }
+            state.apply_sync_packet(
+                reception_sync(sequence, local_us),
+                now + Duration::from_millis(10),
+            );
+            assert_eq!(state.boot_id, Some(7));
+            assert_eq!(state.csi_reception.valid_frames, 5);
+            assert_eq!(state.csi_reception.format_exclusions, 3);
+            assert_eq!(state.csi_reception.latest_sequence, Some(104));
+            assert_eq!(state.csi_reception.forward_transitions, 4);
+            assert_eq!(state.csi_reception.unexplained_gaps, 0);
+            assert_eq!(
+                state.latest_sequence,
+                if legacy_reboot { None } else { Some(104) }
+            );
+            assert_eq!(state.mesh_time_reset_count, u64::from(legacy_reboot));
+            assert_eq!(state.accepted_csi_frames, 2);
+            assert_eq!(state.inferred_lost_frames, 3);
+            assert_eq!(state.sequence_observations, 1);
+            if legacy_reboot {
+                assert_eq!(state.latest_mesh_time_status, MeshTimeStatus::NodeReboot);
+            }
+            receive_at_grid_gate(&mut state, 105, true);
+            let api = reception_api(state);
+            assert_eq!(api["csi_reception"]["scope"], "cumulative_rx_boot");
+            assert_eq!(api["csi_reception"]["valid_frames"], 6);
+            assert_eq!(api["csi_reception"]["format_exclusions"]["count"], 3);
+            assert_eq!(api["csi_reception"]["format_exclusions"]["denominator"], 6);
+            assert_eq!(
+                api["csi_reception"]["unexplained_sequence_gaps"]["forward_transitions"],
+                5
+            );
+            assert_eq!(
+                api["csi_reception"]["unexplained_sequence_gaps"]["denominator"],
+                5
+            );
+            assert_eq!(
+                api["csi_reception"]["unexplained_sequence_gaps"]["count"],
+                0
+            );
+        }
+    }
+
+    #[test]
+    fn sync_sequence_wrap_preserves_csi_reception_history() {
+        let now = std::time::Instant::now();
+        let mut state = NodeState::new();
+        state.apply_sync_packet(reception_sync(u32::MAX, 1_000_000), now);
+        receive_at_grid_gate(&mut state, u32::MAX - 1, true);
+        receive_at_grid_gate(&mut state, u32::MAX, false);
+        state.apply_sync_packet(
+            reception_sync(0, 1_020_000),
+            now + Duration::from_millis(20),
+        );
+        receive_at_grid_gate(&mut state, 0, false);
+        receive_at_grid_gate(&mut state, 1, true);
+        assert_eq!(state.mesh_time_reset_count, 0);
+        assert_eq!(state.csi_reception.valid_frames, 4);
+        assert_eq!(state.csi_reception.format_exclusions, 2);
+        assert_eq!(state.csi_reception.forward_transitions, 3);
+        assert_eq!(state.csi_reception.unexplained_gaps, 0);
+        assert_eq!(state.csi_reception.latest_sequence, Some(1));
+    }
+
+    #[test]
+    fn sync_cannot_reset_reception_but_admitted_csi_boot_replacement_does() {
+        use csi_identity::Admission;
+        let now = std::time::Instant::now();
+        let source = "192.0.2.1:5005".parse().unwrap();
+        let mut registry = csi_identity::Registry::default();
+        let mut nodes = HashMap::from([(1, NodeState::new()), (2, NodeState::new())]);
+        receive_at_grid_gate(nodes.get_mut(&2).unwrap(), 500, true);
+        nodes
+            .get_mut(&1)
+            .unwrap()
+            .apply_sync_packet(reception_sync(100, 1_000_000), now);
+        for sequence in 100..=104 {
+            assert_eq!(
+                registry.admit(1, 7, sequence, source, now),
+                Admission::Accepted {
+                    rebooted: false,
+                    ip_changed: false,
+                }
+            );
+            let state = nodes.get_mut(&1).unwrap();
+            state.observe_transport_identity(2, 7, source, false);
+            receive_at_grid_gate(state, sequence, matches!(sequence, 100 | 104));
+        }
+        nodes
+            .get_mut(&1)
+            .unwrap()
+            .apply_sync_packet(reception_sync(99, 980_000), now + Duration::from_millis(10));
+        for (boot, sequence, expected) in [
+            (7, 104, Admission::Duplicate),
+            (7, 99, Admission::OutOfOrder),
+            (8, 0, Admission::ConflictingBoot),
+        ] {
+            assert_eq!(
+                registry.admit(1, boot, sequence, source, now + Duration::from_millis(20)),
+                expected
+            );
+            assert_eq!(nodes[&1].csi_reception.valid_frames, 5);
+            assert_eq!(nodes[&1].csi_reception.format_exclusions, 3);
+        }
+        assert_eq!(
+            registry.admit(1, 7, 105, source, now + Duration::from_millis(30)),
+            Admission::Accepted {
+                rebooted: false,
+                ip_changed: false
+            }
+        );
+        receive_at_grid_gate(nodes.get_mut(&1).unwrap(), 105, true);
+        assert_eq!(nodes[&1].csi_reception.valid_frames, 6);
+        let after_restart = now + Duration::from_secs(6);
+        let admission = registry.admit(1, 8, 0, source, after_restart);
+        assert_eq!(
+            admission,
+            Admission::Accepted {
+                rebooted: true,
+                ip_changed: false
+            }
+        );
+        if let Admission::Accepted {
+            rebooted,
+            ip_changed,
+        } = admission
+        {
+            // Same accepted-boot replacement boundary as UDP ingress.
+            if rebooted {
+                nodes.remove(&1);
+            }
+            let state = nodes.entry(1).or_insert_with(NodeState::new);
+            assert_eq!(state.csi_reception.valid_frames, 0);
+            assert_eq!(state.csi_reception.latest_sequence, None);
+            state.observe_transport_identity(2, 8, source, ip_changed);
+            receive_at_grid_gate(state, 0, false);
+        }
+        assert_eq!(
+            registry.admit(1, 7, 106, source, after_restart),
+            Admission::ConflictingBoot
+        );
+        assert_eq!(
+            registry.admit(1, 8, 0, source, after_restart),
+            Admission::Duplicate
+        );
+        assert_eq!(nodes[&1].boot_id, Some(8));
+        assert_eq!(nodes[&1].csi_reception.valid_frames, 1);
+        assert_eq!(nodes[&1].csi_reception.format_exclusions, 1);
+        assert_eq!(nodes[&1].csi_reception.forward_transitions, 0);
+        assert_eq!(nodes[&1].csi_reception.unexplained_gaps, 0);
+        assert_eq!(nodes[&2].csi_reception.valid_frames, 1);
+    }
+
+    #[test]
+    fn reception_accounting_preserves_identity_admission_wrap_and_boot_boundaries() {
+        use csi_identity::Admission;
+        let mut registry = csi_identity::Registry::default();
+        let mut state = NodeState::new();
+        let now = std::time::Instant::now();
+        let source = "192.0.2.1:5005".parse().unwrap();
+        for (boot, sequence, elapsed, expected) in [
+            (
+                1,
+                u32::MAX - 1,
+                0,
+                Admission::Accepted {
+                    rebooted: false,
+                    ip_changed: false,
+                },
+            ),
+            (
+                1,
+                u32::MAX,
+                0,
+                Admission::Accepted {
+                    rebooted: false,
+                    ip_changed: false,
+                },
+            ),
+            (
+                1,
+                0,
+                0,
+                Admission::Accepted {
+                    rebooted: false,
+                    ip_changed: false,
+                },
+            ),
+            (1, 0, 0, Admission::Duplicate),
+            (1, u32::MAX - 2, 0, Admission::OutOfOrder),
+            (2, 50, 0, Admission::ConflictingBoot),
+            (
+                1,
+                2,
+                0,
+                Admission::Accepted {
+                    rebooted: false,
+                    ip_changed: false,
+                },
+            ),
+            (
+                2,
+                100,
+                6,
+                Admission::Accepted {
+                    rebooted: true,
+                    ip_changed: false,
+                },
+            ),
+        ] {
+            let admission = registry.admit(
+                1,
+                boot,
+                sequence,
+                source,
+                now + Duration::from_secs(elapsed),
+            );
+            assert_eq!(admission, expected);
+            if let Admission::Accepted {
+                rebooted,
+                ip_changed,
+            } = admission
+            {
+                if rebooted {
+                    assert_eq!(state.csi_reception.valid_frames, 4);
+                    assert_eq!(state.csi_reception.forward_transitions, 3);
+                    assert_eq!(state.csi_reception.unexplained_gaps, 1);
+                    // UDP ingress replaces only this RX state on boot change.
+                    state = NodeState::new();
+                }
+                state.observe_transport_identity(2, boot, source, ip_changed);
+                receive_at_grid_gate(&mut state, sequence, false);
+            }
+        }
+        let api = reception_api(state);
+        assert_eq!(api["boot_id"], "0000000000000002");
+        assert_eq!(api["csi_reception"]["valid_frames"], 1);
+        assert_eq!(api["csi_reception"]["format_exclusions"]["count"], 1);
+        assert_eq!(
+            api["csi_reception"]["unexplained_sequence_gaps"]["count"],
+            0
+        );
+        assert!(api["csi_reception"]["unexplained_sequence_gaps"]["percent"].is_null());
+        assert_eq!(registry.duplicate_packets, 1);
+        assert_eq!(registry.out_of_order_packets, 1);
+        assert_eq!(registry.conflicting_boots, 1);
+        assert_eq!(registry.admit(5, 1, 0, source, now), Admission::UnknownNode);
+    }
+
+    #[test]
+    fn invalid_or_unattested_frames_receive_no_reception_credit() {
+        let mut state = NodeState::new();
+        receive_at_grid_gate(&mut state, 100, true);
+        let now = std::time::Instant::now();
+        let incomplete = source_binding(0, 'a');
+        let malformed = source_binding(raw_csi_recording::SOURCE_BINDING_REQUIRED_FLAGS, 'x');
+        let complete = source_binding(raw_csi_recording::SOURCE_BINDING_REQUIRED_FLAGS, 'a');
+        for (binding, matches_authority) in [
+            (None, true),
+            (Some(&incomplete), true),
+            (Some(&malformed), true),
+            (Some(&complete), false),
+        ] {
+            assert!(validated_complete_source_binding(binding, now, matches_authority).is_err());
+        }
+        assert!(raw_csi_recording::RawCsiFrame::from_packet(
+            &[0; 20],
+            raw_csi_recording::RawCsiFrameContext::default()
+        )
+        .is_err());
+        receive_at_grid_gate(&mut state, 102, false);
+        let api = reception_api(state);
+        assert_eq!(api["csi_reception"]["valid_frames"], 2);
+        assert_eq!(api["csi_reception"]["format_exclusions"]["count"], 1);
+        assert_eq!(
+            api["csi_reception"]["unexplained_sequence_gaps"]["count"],
+            1
+        );
+        assert_eq!(
+            api["csi_reception"]["unexplained_sequence_gaps"]["denominator"],
+            2
+        );
+        assert_eq!(
+            api["csi_reception"]["unexplained_sequence_gaps"]["percent"],
+            50.0
+        );
     }
 
     #[test]
@@ -1150,6 +1663,7 @@ pub(super) struct AppStateInner {
     pub(super) recording_active: bool,
     /// When the current recording started.
     pub(super) recording_start_time: Option<std::time::Instant>,
+    pub(super) recording_started_at: Option<server_clock::HostTimestamp>,
     /// ID of the current recording (used for filename).
     pub(super) recording_current_id: Option<String>,
     /// Shutdown signal for the recording writer task.

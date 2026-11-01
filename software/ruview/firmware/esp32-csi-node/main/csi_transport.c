@@ -16,6 +16,11 @@
 #include "freertos/queue.h"
 #include "freertos/task.h"
 #include "stream_sender.h"
+#if CONFIG_RX_UNIFIED
+#include "csi_peer.h"
+#include "rx_settings.h"
+#include "rx_diag.h"
+#endif
 
 #define CSI_TRANSPORT_MAX_ATTEMPTS 3u
 #define CSI_TRANSPORT_MAX_AGE_US 100000LL
@@ -52,6 +57,7 @@ typedef struct {
     uint8_t mac[6];
     bool first_word_invalid;
     uint16_t iq_len;
+    int8_t link;
     int8_t iq_data[CSI_MAX_IQ_SIZE];
 } csi_capture_slot_t;
 
@@ -67,9 +73,20 @@ static QueueHandle_t s_queue;
 static TaskHandle_t s_processing_task;
 static bool s_accepting;
 static bool s_stop_requested;
+static bool s_starting, s_stopping;
+static uint32_t s_producers_in_flight;
 static csi_capture_slot_t s_slots[CSI_TRANSPORT_CAPTURE_SLOTS];
 static uint8_t s_serialized_frame[CSI_MAX_FRAME_SIZE];
 static portMUX_TYPE s_lock = portMUX_INITIALIZER_UNLOCKED;
+
+static void producer_leave(bool *entered)
+{
+    if (*entered) {
+        portENTER_CRITICAL(&s_lock);
+        --s_producers_in_flight;
+        portEXIT_CRITICAL(&s_lock);
+    }
+}
 
 static volatile uint32_t s_captures_enqueued;
 static volatile uint32_t s_start_failures;
@@ -109,6 +126,7 @@ static volatile uint32_t s_callback_to_dequeue_last_us;
 #ifdef CSI_DIAGNOSTICS_TEST
 static bool s_test_fail_next_publish;
 static bool s_test_fail_next_serialization;
+static void (*s_test_after_claim)(void);
 #endif
 
 static uint32_t elapsed_us_saturated(int64_t now_us, int64_t then_us)
@@ -178,6 +196,9 @@ static bool evict_oldest_queued_capture(void)
             s_captures_waiting--;
         }
         s_captures_aborted++;
+#if CONFIG_RX_UNIFIED
+        csi_peer_aborted(s_slots[slot_index].link);
+#endif
         s_stale_queued_replacements++;
         release_slot_locked(slot_index);
         evicted = true;
@@ -244,6 +265,9 @@ static bool abort_queued_slot(uint8_t slot_index)
             s_captures_waiting--;
         }
         s_captures_aborted++;
+#if CONFIG_RX_UNIFIED
+        csi_peer_aborted(s_slots[slot_index].link);
+#endif
         release_slot_locked(slot_index);
         no_waiting_captures = s_captures_waiting == 0;
     }
@@ -259,6 +283,13 @@ static csi_send_result_t send_csi_frame(
 {
     csi_send_result_t outcome = {0};
     for (uint32_t attempt = 0; attempt < CSI_TRANSPORT_MAX_ATTEMPTS; ++attempt) {
+#if CONFIG_RX_UNIFIED
+        const rx_profile_t *profile = rx_settings_active_profile();
+        if (rx_profile_trial(profile) && esp_timer_get_time() >= RX_TRIAL_US) {
+            size_t identity_offset = len - CSI_IDENTITY_TRAILER_SIZE - CSI_PHYSICAL_TRAILER_SIZE;
+            if (data[identity_offset + 45] != 0) { outcome.expired = true; break; }
+        }
+#endif
         if (esp_timer_get_time() - callback_started_at_us > CSI_TRANSPORT_MAX_AGE_US) {
             outcome.expired = true;
             break;
@@ -278,10 +309,18 @@ static csi_send_result_t send_csi_frame(
         s_csi_send_calls++;
         portEXIT_CRITICAL(&s_lock);
         bool deadline_expired = false;
+        int64_t deadline_us = callback_started_at_us + CSI_TRANSPORT_MAX_AGE_US;
+#if CONFIG_RX_UNIFIED
+        if (rx_profile_trial(profile) && data[len - CSI_IDENTITY_TRAILER_SIZE - CSI_PHYSICAL_TRAILER_SIZE + 45] != 0
+            && deadline_us > RX_TRIAL_US) deadline_us = RX_TRIAL_US;
+        uint64_t send_us = (uint64_t)esp_timer_get_time();
+        memcpy(s_serialized_frame + len - CSI_IDENTITY_TRAILER_SIZE - CSI_PHYSICAL_TRAILER_SIZE + 88, &send_us, sizeof(send_us));
+        rx_diag_count(rx_diag_packet(data, len), RX_SEND_ATTEMPT);
+#endif
         int result = stream_sender_send_until(
             data,
             len,
-            callback_started_at_us + CSI_TRANSPORT_MAX_AGE_US,
+            deadline_us,
             &deadline_expired
         );
         if (deadline_expired) {
@@ -289,18 +328,27 @@ static csi_send_result_t send_csi_frame(
             break;
         }
         if (result == (int)len) {
+#if CONFIG_RX_UNIFIED
+            rx_diag_count(rx_diag_packet(data, len), RX_SEND_OK);
+#endif
             outcome.delivered = true;
             break;
         }
         portENTER_CRITICAL(&s_lock);
         s_transport_errors++;
         portEXIT_CRITICAL(&s_lock);
+#if CONFIG_RX_UNIFIED
+        rx_diag_count(rx_diag_packet(data, len), RX_SEND_ERROR);
+#endif
     }
     return outcome;
 }
 
 static void send_sync_packet_if_due(void)
 {
+#if CONFIG_RX_UNIFIED
+    return; /* No ESP-NOW synchronization or extra traffic in this release. */
+#else
     uint32_t sequence = csi_collector_get_sequence();
     if (CONFIG_C6_SYNC_EVERY_N_FRAMES == 0
         || sequence == 0
@@ -337,6 +385,7 @@ static void send_sync_packet_if_due(void)
         s_sync_packets_sent++;
         portEXIT_CRITICAL(&s_lock);
     }
+#endif
 }
 
 static void process_slot(uint8_t slot_index)
@@ -346,6 +395,21 @@ static void process_slot(uint8_t slot_index)
     }
 
     csi_capture_slot_t *slot = &s_slots[slot_index];
+#if CONFIG_RX_UNIFIED
+    int64_t now = esp_timer_get_time();
+    if (slot->link > 0 && now >= slot->callback_started_at_us
+        && now - slot->callback_started_at_us <= CSI_TRANSPORT_MAX_AGE_US
+        && !csi_peer_deferred_admit(slot->link, slot->callback_started_at_us, now)) {
+        /* Retain the slot, not a driver pointer; let queued TX captures pass. */
+        portENTER_CRITICAL(&s_lock);
+        slot->state = CSI_SLOT_QUEUED;
+        --s_captures_in_flight; ++s_captures_waiting;
+        portEXIT_CRITICAL(&s_lock);
+        if (xQueueSend(s_queue, &slot_index, 0) != pdTRUE) (void)abort_queued_slot(slot_index);
+        vTaskDelay(1);
+        return;
+    }
+#endif
     wifi_csi_info_t info = {
         .rx_ctrl = slot->rx_ctrl,
         .first_word_invalid = slot->first_word_invalid,
@@ -371,6 +435,16 @@ static void process_slot(uint8_t slot_index)
         );
 
     bool serialization_failed = frame_len == 0;
+#if CONFIG_RX_UNIFIED
+    if (!serialization_failed) {
+        uint8_t *identity = s_serialized_frame + CSI_HEADER_SIZE + slot->iq_len + CSI_SOURCE_BINDING_SIZE;
+        uint64_t dequeued = (uint64_t)esp_timer_get_time();
+        memcpy(identity + 80, &dequeued, sizeof(dequeued));
+        uint32_t sequence;
+        memcpy(&sequence, s_serialized_frame + 12, sizeof(sequence));
+        rx_diag_serialized(rx_diag_packet(s_serialized_frame, frame_len), sequence);
+    }
+#endif
     csi_send_result_t send_result = {0};
     if (!serialization_failed) {
         portENTER_CRITICAL(&s_lock);
@@ -383,6 +457,10 @@ static void process_slot(uint8_t slot_index)
         );
         send_sync_packet_if_due();
     }
+#if CONFIG_RX_UNIFIED
+    if (serialization_failed) rx_diag_count(rx_diag_class(slot->iq_len, true), RX_SERIALIZE_FAIL);
+    else if (!send_result.delivered) rx_diag_count(rx_diag_packet(s_serialized_frame, frame_len), RX_ABANDONED);
+#endif
 
 #if defined(CONFIG_CSI_RAW_PROFILE) && CONFIG_CSI_RAW_PROFILE
     bool edge_accepted = false;
@@ -420,6 +498,9 @@ static void process_slot(uint8_t slot_index)
     if (s_captures_in_flight > 0) {
         s_captures_in_flight--;
     }
+#if CONFIG_RX_UNIFIED
+    csi_peer_finish(slot->link, !serialization_failed, send_result.delivered, send_result.expired);
+#endif
     release_slot_locked(slot_index);
     portEXIT_CRITICAL(&s_lock);
 }
@@ -458,10 +539,19 @@ static void csi_processing_task(void *arg)
 esp_err_t csi_transport_start(void)
 {
     portENTER_CRITICAL(&s_lock);
+    if (s_starting || s_stopping) {
+        portEXIT_CRITICAL(&s_lock);
+        return ESP_ERR_INVALID_STATE;
+    }
     if (s_accepting && s_queue != NULL) {
         portEXIT_CRITICAL(&s_lock);
         return ESP_OK;
     }
+    if (s_processing_task != NULL || s_queue != NULL) {
+        portEXIT_CRITICAL(&s_lock);
+        return ESP_ERR_INVALID_STATE;
+    }
+    s_starting = true;
     portEXIT_CRITICAL(&s_lock);
 
     QueueHandle_t queue = xQueueCreateStatic(
@@ -473,6 +563,7 @@ esp_err_t csi_transport_start(void)
     if (queue == NULL) {
         portENTER_CRITICAL(&s_lock);
         s_start_failures++;
+        s_starting = false;
         portEXIT_CRITICAL(&s_lock);
         return ESP_ERR_NO_MEM;
     }
@@ -508,6 +599,7 @@ esp_err_t csi_transport_start(void)
         portENTER_CRITICAL(&s_lock);
         s_queue = NULL;
         s_start_failures++;
+        s_starting = false;
         portEXIT_CRITICAL(&s_lock);
         return ESP_ERR_NO_MEM;
     }
@@ -515,6 +607,7 @@ esp_err_t csi_transport_start(void)
     portENTER_CRITICAL(&s_lock);
     s_processing_task = task;
     s_accepting = true;
+    s_starting = false;
     portEXIT_CRITICAL(&s_lock);
 #if defined(CONFIG_CSI_TRANSPORT_TASK_CORE)
     const int task_core = CONFIG_CSI_TRANSPORT_TASK_CORE;
@@ -533,10 +626,33 @@ esp_err_t csi_transport_start(void)
 void csi_transport_stop(void)
 {
     portENTER_CRITICAL(&s_lock);
+    if (s_stopping) {
+        portEXIT_CRITICAL(&s_lock);
+        for (;;) {
+            portENTER_CRITICAL(&s_lock); bool stopping = s_stopping; portEXIT_CRITICAL(&s_lock);
+            if (!stopping) return;
+            vTaskDelay(1);
+        }
+    }
+    s_stopping = true;
     s_accepting = false;
+    s_stop_requested = true;
+    portEXIT_CRITICAL(&s_lock);
+
+    /* Retire every producer, including the interval between copying and
+     * publishing. No driver-call synchronization assumption is needed. */
+    for (;;) {
+        portENTER_CRITICAL(&s_lock);
+        bool busy = s_starting || s_producers_in_flight != 0;
+        portEXIT_CRITICAL(&s_lock);
+        if (!busy) break;
+        vTaskDelay(1);
+    }
+    portENTER_CRITICAL(&s_lock);
+    s_accepting = false;
+    s_stop_requested = true;
     TaskHandle_t task = s_processing_task;
     QueueHandle_t queue = s_queue;
-    s_stop_requested = true;
     portEXIT_CRITICAL(&s_lock);
 
     if (task != NULL && queue != NULL) {
@@ -570,6 +686,9 @@ void csi_transport_stop(void)
     for (uint8_t index = 0; index < CSI_TRANSPORT_CAPTURE_SLOTS; ++index) {
         if (s_slots[index].state != CSI_SLOT_FREE) {
             s_captures_aborted++;
+#if CONFIG_RX_UNIFIED
+            csi_peer_aborted(s_slots[index].link);
+#endif
         }
         s_slots[index].state = CSI_SLOT_FREE;
     }
@@ -578,6 +697,7 @@ void csi_transport_stop(void)
     s_pool_in_use = 0;
     s_queue = NULL;
     s_stop_requested = false;
+    s_stopping = false;
     portEXIT_CRITICAL(&s_lock);
 }
 
@@ -588,6 +708,7 @@ bool csi_transport_enqueue_capture(
 {
     if (info == NULL || info->buf == NULL || info->len <= 0
         || (size_t)info->len > CSI_MAX_IQ_SIZE
+        || (info->len & 1)
         || (info->first_word_invalid && info->len < 6)) {
         portENTER_CRITICAL(&s_lock);
         s_invalid_drops++;
@@ -595,11 +716,29 @@ bool csi_transport_enqueue_capture(
         return false;
     }
 
+    bool producing __attribute__((cleanup(producer_leave))) = false;
+    portENTER_CRITICAL(&s_lock);
+    if (!s_accepting || s_stopping || s_queue == NULL) {
+        s_not_ready_drops++;
+        portEXIT_CRITICAL(&s_lock);
+        return false;
+    }
+    ++s_producers_in_flight;
+    producing = true;
+    portEXIT_CRITICAL(&s_lock);
+
+#if CONFIG_RX_UNIFIED
+    int link = csi_peer_classify(info->mac);
+    if (!csi_peer_queue_reserve(link)) return false;
+#endif
     int claimed = claim_slot();
     if (claimed < 0 && evict_oldest_queued_capture()) {
         claimed = claim_slot();
     }
     if (claimed < 0) {
+#if CONFIG_RX_UNIFIED
+        csi_peer_aborted(link);
+#endif
         portENTER_CRITICAL(&s_lock);
         s_pool_exhausted_drops++;
         portEXIT_CRITICAL(&s_lock);
@@ -607,6 +746,12 @@ bool csi_transport_enqueue_capture(
     }
     uint8_t slot_index = (uint8_t)claimed;
     csi_capture_slot_t *slot = &s_slots[slot_index];
+#ifdef CSI_DIAGNOSTICS_TEST
+    if (s_test_after_claim) s_test_after_claim();
+#endif
+#if CONFIG_RX_UNIFIED
+    slot->link = link;
+#endif
     slot->callback_started_at_us = callback_started_at_us;
     slot->rx_ctrl = info->rx_ctrl;
     memcpy(slot->mac, info->mac, sizeof(slot->mac));
@@ -614,6 +759,7 @@ bool csi_transport_enqueue_capture(
     slot->iq_len = (uint16_t)info->len;
     memcpy(slot->iq_data, info->buf, slot->iq_len);
     if (slot->first_word_invalid) {
+#if !CONFIG_RX_UNIFIED
         /* ESP-IDF marks the first four bytes as unusable. Preserve that fact
          * in the wire metadata, while keeping the local edge path free of
          * artificial zero-amplitude samples by forwarding the first valid
@@ -622,6 +768,7 @@ bool csi_transport_enqueue_capture(
         slot->iq_data[1] = slot->iq_data[5];
         slot->iq_data[2] = slot->iq_data[4];
         slot->iq_data[3] = slot->iq_data[5];
+#endif
     }
     slot->enqueued_at_us = esp_timer_get_time();
     if (slot->callback_started_at_us <= 0) {
@@ -647,6 +794,9 @@ bool csi_transport_enqueue_capture(
         if (s_captures_enqueued > 0) s_captures_enqueued--;
         if (s_captures_waiting > 0) s_captures_waiting--;
         s_queue_publish_failures++;
+#if CONFIG_RX_UNIFIED
+        csi_peer_aborted(link);
+#endif
         release_slot_locked(slot_index);
         portEXIT_CRITICAL(&s_lock);
         return false;
@@ -715,7 +865,11 @@ void csi_transport_get_stats(csi_transport_stats_t *stats)
     if (task != NULL) {
         stats->processing_stack_free_min_bytes =
             (uint32_t)uxTaskGetStackHighWaterMark(task)
+#if !CONFIG_RX_UNIFIED
                 * (uint32_t)sizeof(StackType_t);
+#else
+                ; /* ESP-IDF's API returns bytes, unlike upstream FreeRTOS. */
+#endif
         stats->processing_stack_runtime_measured = true;
     }
 }
@@ -728,6 +882,9 @@ void csi_transport_test_reset(void)
     s_processing_task = NULL;
     s_accepting = false;
     s_stop_requested = false;
+    s_starting = false;
+    s_stopping = false;
+    s_producers_in_flight = 0;
     memset(s_slots, 0, sizeof(s_slots));
     s_captures_enqueued = 0;
     s_start_failures = 0;
@@ -765,6 +922,7 @@ void csi_transport_test_reset(void)
     s_callback_to_dequeue_last_us = 0;
     s_test_fail_next_publish = false;
     s_test_fail_next_serialization = false;
+    s_test_after_claim = NULL;
     portEXIT_CRITICAL(&s_lock);
 }
 
@@ -790,5 +948,12 @@ void csi_transport_test_fail_next_serialization(void)
     portENTER_CRITICAL(&s_lock);
     s_test_fail_next_serialization = true;
     portEXIT_CRITICAL(&s_lock);
+}
+
+void csi_transport_test_after_claim(void (*hook)(void)) { s_test_after_claim = hook; }
+bool csi_transport_test_stopping(void)
+{
+    portENTER_CRITICAL(&s_lock); bool stopping = s_stopping; portEXIT_CRITICAL(&s_lock);
+    return stopping;
 }
 #endif

@@ -40,7 +40,7 @@ export class DashboardHUD {
           bottom: 0;
           pointer-events: none;
           z-index: 100;
-          font-family: 'Courier New', 'Consolas', monospace;
+          font-family: var(--font-interface);
           color: #88ccff;
         }
         #viz-hud * {

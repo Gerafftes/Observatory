@@ -6,9 +6,11 @@
 //! with the complete packet header and the capture context.
 
 use std::path::{Path, PathBuf};
+use std::collections::BTreeMap;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 use thiserror::Error;
 use wifi_densepose_sensing_server::path_safety::{safe_id, PathSafetyError};
 
@@ -42,6 +44,8 @@ pub const SOURCE_BINDING_REQUIRED_FLAGS: u8 = SOURCE_BINDING_FLAG_FILTER_CONFIGU
     | SOURCE_BINDING_FLAG_FILTER_IDENTITY_HASHED;
 pub const CSI_IDENTITY_V2_TRAILER_LEN: usize = 24;
 pub const CSI_IDENTITY_V3_TRAILER_LEN: usize = 48;
+pub const CSI_IDENTITY_V4_TRAILER_LEN: usize = 112;
+pub const CSI_PROTOCOL_UNIFIED_RX: u8 = 4;
 pub const CSI_IDENTITY_TRAILER_LEN: usize = CSI_IDENTITY_V3_TRAILER_LEN;
 pub const CSI_IDENTITY_MAGIC: u32 = 0xC511_A061;
 pub const CSI_PROTOCOL_V2: u8 = 2;
@@ -191,6 +195,114 @@ impl SourceBinding {
     }
 }
 
+/// Common RX profile and physical-link identity, present only on protocol v4.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct UnifiedRxIdentity {
+    pub generation: u32,
+    pub mode: u8,
+    /// Zero denotes TX1; 1..4 denote a configured physical peer RX.
+    pub source_node_id: u8,
+    pub peer_count: u8,
+    pub config_sha256: [u8; 32],
+    pub dequeued_us: u64,
+    pub send_attempt_us: u64,
+    pub source_mac: [u8; 6],
+    pub receiver_mac: [u8; 6],
+    pub sig_mode: u8,
+    pub channel_width: u8,
+    pub stbc: u8,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct RxMeasurementIdentity {
+    pub generation: u32,
+    pub mode: u8,
+    pub source_node_id: u8,
+    pub peer_count: u8,
+    pub config_sha256: [u8; 32],
+    pub source_mac: [u8; 6],
+    pub receiver_mac: [u8; 6],
+    pub peer_window_open: bool,
+}
+
+impl RxMeasurementIdentity {
+    pub fn same_receiver_profile(self, other: Self) -> bool {
+        self.generation == other.generation && self.mode == other.mode
+            && self.peer_count == other.peer_count && self.config_sha256 == other.config_sha256
+            && self.receiver_mac == other.receiver_mac && self.peer_window_open == other.peer_window_open
+    }
+}
+
+#[derive(Debug, Default)]
+pub struct RecordingEpochGuard {
+    receivers: BTreeMap<u8, (Option<(u8, u64)>, Option<RxMeasurementIdentity>)>,
+}
+
+impl RecordingEpochGuard {
+    pub fn validate(&self, frame: &RawCsiFrame) -> Result<(), String> {
+        if !(1..=4).contains(&frame.rx_id) { return Err("recording accepts exactly RX1-RX4".into()); }
+        let current = Self::identity(frame);
+        if let Some(previous) = self.receivers.get(&frame.rx_id) {
+            let same_profile = match (previous.1, current.1) {
+                (Some(a), Some(b)) => a.same_receiver_profile(b), (None, None) => true, _ => false,
+            };
+            if previous.0 != current.0 || !same_profile {
+                return Err(format!("RX{} changed boot/profile during recording", frame.rx_id));
+            }
+        }
+        Ok(())
+    }
+    fn identity(frame: &RawCsiFrame) -> (Option<(u8, u64)>, Option<RxMeasurementIdentity>) {
+        let identity = frame.protocol_identity;
+        (identity.map(|i| (i.protocol_version, i.boot_id)), identity.and_then(|i| i.unified_rx)
+            .map(|i| i.measurement_identity(identity.and_then(|i| i.callback_started_us).unwrap_or(0))))
+    }
+    pub fn observe_written(&mut self, frame: &RawCsiFrame) {
+        self.receivers.insert(frame.rx_id, Self::identity(frame));
+    }
+}
+
+impl UnifiedRxIdentity {
+    pub fn measurement_identity(self, callback_us: u64) -> RxMeasurementIdentity {
+        RxMeasurementIdentity {
+            generation: self.generation,
+            mode: self.mode,
+            source_node_id: self.source_node_id,
+            peer_count: self.peer_count,
+            config_sha256: self.config_sha256,
+            source_mac: self.source_mac,
+            receiver_mac: self.receiver_mac,
+            peer_window_open: self.peer_count > 0
+                && (!matches!(self.mode, 1 | 2) || callback_us < 900_000_000),
+        }
+    }
+    fn valid(self, callback_us: u64) -> bool {
+        let peers = match self.mode {
+            0 => 0,
+            1 | 3 => 1,
+            2 | 4 => 3,
+            _ => return false,
+        };
+        let unicast = |mac: [u8; 6]| mac != [0; 6] && mac[0] & 1 == 0;
+        self.generation != 0
+            && self.peer_count == peers
+            && self.source_node_id <= 4
+            && (self.source_node_id == 0 || peers > 0)
+            && self.config_sha256 != [0; 32]
+            && callback_us > 0
+            && self.dequeued_us >= callback_us
+            && self.send_attempt_us >= self.dequeued_us
+            && self.send_attempt_us - callback_us <= 100_000
+            && unicast(self.source_mac)
+            && unicast(self.receiver_mac)
+            && self.source_mac != self.receiver_mac
+            && self.sig_mode <= 3
+            && self.channel_width <= 1
+            && self.stbc <= 3
+    }
+}
+
 /// Versioned receiver identity carried after the TX-source binding trailer.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -214,6 +326,8 @@ pub struct CsiProtocolIdentity {
     pub csi_config_flags: Option<u32>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub sync_age_ms: Option<u32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub unified_rx: Option<UnifiedRxIdentity>,
 }
 
 impl CsiProtocolIdentity {
@@ -235,6 +349,7 @@ impl CsiProtocolIdentity {
         let expected_len = match protocol_version {
             CSI_PROTOCOL_V2 => CSI_IDENTITY_V2_TRAILER_LEN,
             CSI_PROTOCOL_VERSION => CSI_IDENTITY_V3_TRAILER_LEN,
+            CSI_PROTOCOL_UNIFIED_RX => CSI_IDENTITY_V4_TRAILER_LEN,
             _ => {
                 return Err(RawCsiRecordingError::UnsupportedCsiProtocolVersion {
                     actual: protocol_version,
@@ -270,12 +385,14 @@ impl CsiProtocolIdentity {
                 gain_db: None,
                 csi_config_flags: None,
                 sync_age_ms: None,
+                unified_rx: None,
             });
         }
 
         let quality_flags = trailer[28];
         if quality_flags & !CSI_QUALITY_FLAGS_MASK != 0
-            || trailer[40..48].iter().any(|byte| *byte != 0)
+            || (protocol_version == CSI_PROTOCOL_VERSION
+                && trailer[40..48].iter().any(|byte| *byte != 0))
         {
             return Err(RawCsiRecordingError::InvalidCsiIdentitySemantics);
         }
@@ -284,6 +401,29 @@ impl CsiProtocolIdentity {
         if gain_db.is_none() && encoded_gain != i8::MIN {
             return Err(RawCsiRecordingError::InvalidCsiIdentitySemantics);
         }
+        let unified_rx = if protocol_version == CSI_PROTOCOL_UNIFIED_RX {
+            let unified = UnifiedRxIdentity {
+                generation: u32::from_le_bytes(trailer[40..44].try_into().unwrap()),
+                mode: trailer[44],
+                source_node_id: trailer[45],
+                peer_count: trailer[46],
+                config_sha256: trailer[48..80].try_into().unwrap(),
+                dequeued_us: u64::from_le_bytes(trailer[80..88].try_into().unwrap()),
+                send_attempt_us: u64::from_le_bytes(trailer[88..96].try_into().unwrap()),
+                source_mac: trailer[96..102].try_into().unwrap(),
+                receiver_mac: trailer[102..108].try_into().unwrap(),
+                sig_mode: trailer[108],
+                channel_width: trailer[109],
+                stbc: trailer[110],
+            };
+            let callback_us = u64::from_le_bytes(trailer[16..24].try_into().unwrap());
+            if trailer[47] != 0 || trailer[111] != 0 || !unified.valid(callback_us) {
+                return Err(RawCsiRecordingError::InvalidCsiIdentitySemantics);
+            }
+            Some(unified)
+        } else {
+            None
+        };
         Ok(Self {
             protocol_version,
             role,
@@ -304,6 +444,7 @@ impl CsiProtocolIdentity {
             sync_age_ms: Some(u32::from_le_bytes(
                 trailer[36..40].try_into().expect("fixed-size slice"),
             )),
+            unified_rx,
         })
     }
 
@@ -311,6 +452,7 @@ impl CsiProtocolIdentity {
         let trailer_len = match self.protocol_version {
             CSI_PROTOCOL_V2 => CSI_IDENTITY_V2_TRAILER_LEN,
             CSI_PROTOCOL_VERSION => CSI_IDENTITY_V3_TRAILER_LEN,
+            CSI_PROTOCOL_UNIFIED_RX => CSI_IDENTITY_V4_TRAILER_LEN,
             _ => {
                 return Err(RawCsiRecordingError::UnsupportedCsiProtocolVersion {
                     actual: self.protocol_version,
@@ -323,7 +465,7 @@ impl CsiProtocolIdentity {
         trailer[5] = self.role;
         trailer[6..8].copy_from_slice(&(trailer_len as u16).to_le_bytes());
         trailer[8..16].copy_from_slice(&self.boot_id.to_le_bytes());
-        if self.protocol_version == CSI_PROTOCOL_VERSION {
+        if self.protocol_version >= CSI_PROTOCOL_VERSION {
             trailer[16..24].copy_from_slice(&self.callback_started_us.unwrap_or(0).to_le_bytes());
             trailer[24..28]
                 .copy_from_slice(&self.driver_rx_timestamp_us.unwrap_or(0).to_le_bytes());
@@ -334,6 +476,25 @@ impl CsiProtocolIdentity {
             trailer[31] = self.gain_db.unwrap_or(i8::MIN) as u8;
             trailer[32..36].copy_from_slice(&self.csi_config_flags.unwrap_or(0).to_le_bytes());
             trailer[36..40].copy_from_slice(&self.sync_age_ms.unwrap_or(u32::MAX).to_le_bytes());
+        }
+        if self.protocol_version == CSI_PROTOCOL_UNIFIED_RX {
+            let u = self
+                .unified_rx
+                .ok_or(RawCsiRecordingError::InvalidCsiIdentitySemantics)?;
+            trailer[40..44].copy_from_slice(&u.generation.to_le_bytes());
+            trailer[44] = u.mode;
+            trailer[45] = u.source_node_id;
+            trailer[46] = u.peer_count;
+            trailer[48..80].copy_from_slice(&u.config_sha256);
+            trailer[80..88].copy_from_slice(&u.dequeued_us.to_le_bytes());
+            trailer[88..96].copy_from_slice(&u.send_attempt_us.to_le_bytes());
+            trailer[96..102].copy_from_slice(&u.source_mac);
+            trailer[102..108].copy_from_slice(&u.receiver_mac);
+            trailer[108] = u.sig_mode;
+            trailer[109] = u.channel_width;
+            trailer[110] = u.stbc;
+        } else if self.unified_rx.is_some() {
+            return Err(RawCsiRecordingError::InvalidCsiIdentitySemantics);
         }
         Self::from_trailer(&trailer)?;
         Ok(trailer)
@@ -381,6 +542,8 @@ impl Default for RawCsiFrameContext {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct RawCsiFrame {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub physical_layout: Option<crate::csi_layout::Evidence>,
     pub schema_version: u16,
     pub host_timestamp_unix_ns: u64,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -436,7 +599,8 @@ impl RawCsiGridIdentity {
             antenna_count: frame.antenna_count,
             subcarrier_count: frame.subcarrier_count,
             ppdu_type: frame.ppdu_type,
-            layout_flags: frame.flags & !TRANSIENT_SYNC_FLAG,
+            layout_flags: frame.flags & !(TRANSIENT_SYNC_FLAG | if frame.physical_layout.is_some()
+                && frame.protocol_identity.is_some_and(|id|id.protocol_version==CSI_PROTOCOL_UNIFIED_RX) {32} else {0}),
         }
     }
 }
@@ -495,8 +659,66 @@ impl RawCsiRxSummary {
     }
 }
 
+/// Source-separated raw evidence. Different observed layouts are retained;
+/// these counts do not attest that a physical feature/model accepted them.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct RawCsiLinkSummary {
+    pub rx_id: u8,
+    pub source_node_id: u8,
+    pub generation: Option<u32>,
+    pub config_sha256: Option<String>,
+    pub source_sha256: Option<String>,
+    pub frames_written: u64,
+    pub first_host_timestamp_unix_ns: u64,
+    pub last_host_timestamp_unix_ns: u64,
+    pub grids: Vec<RawCsiGridCount>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct RawCsiGridCount {
+    pub grid: RawCsiGridIdentity,
+    pub frames_written: u64,
+}
+
+impl RawCsiLinkSummary {
+    pub fn key(frame: &RawCsiFrame) -> (u8, u8) {
+        (frame.rx_id, frame.protocol_identity.and_then(|i| i.unified_rx).map_or(0, |i| i.source_node_id))
+    }
+    pub fn first_written(frame: &RawCsiFrame) -> Self {
+        Self { rx_id: frame.rx_id, source_node_id: Self::key(frame).1, frames_written: 1,
+            generation: frame.protocol_identity.and_then(|i| i.unified_rx).map(|i| i.generation),
+            config_sha256: frame.protocol_identity.and_then(|i| i.unified_rx)
+                .map(|i| i.config_sha256.iter().map(|v| format!("{v:02x}")).collect()),
+            source_sha256: frame.source_binding.as_ref().map(|b| b.tx_filter_sha256.clone()),
+            first_host_timestamp_unix_ns: frame.host_timestamp_unix_ns,
+            last_host_timestamp_unix_ns: frame.host_timestamp_unix_ns,
+            grids: vec![RawCsiGridCount { grid: RawCsiGridIdentity::from_frame(frame), frames_written: 1 }] }
+    }
+    pub fn validate_next(&self, frame: &RawCsiFrame) -> Result<(), String> {
+        if Self::key(frame) != (self.rx_id, self.source_node_id)
+            || frame.source_binding.as_ref().map(|b| &b.tx_filter_sha256) != self.source_sha256.as_ref()
+            || frame.host_timestamp_unix_ns < self.last_host_timestamp_unix_ns {
+            return Err("raw link/source identity or host time changed".into());
+        }
+        if self.grids.len() == 16 && !self.grids.iter().any(|g| g.grid == RawCsiGridIdentity::from_frame(frame)) {
+            return Err("raw link exceeded the bounded 16-layout diagnostic table".into());
+        }
+        Ok(())
+    }
+    pub fn observe_written(&mut self, frame: &RawCsiFrame) {
+        let grid = RawCsiGridIdentity::from_frame(frame);
+        if let Some(count) = self.grids.iter_mut().find(|g| g.grid == grid) { count.frames_written += 1; }
+        else { self.grids.push(RawCsiGridCount { grid, frames_written: 1 }); }
+        self.frames_written += 1; self.last_host_timestamp_unix_ns = frame.host_timestamp_unix_ns;
+    }
+}
+
 #[derive(Debug, Error)]
 pub enum RawCsiRecordingError {
+    #[error("invalid CSI physical evidence: {0}")]
+    PhysicalLayout(String),
     #[error("invalid recording ID {id:?}: {source}")]
     InvalidRecordingId {
         id: String,
@@ -527,13 +749,15 @@ pub enum RawCsiRecordingError {
         "ESP32 CSI packet has {actual} bytes; dimensions require exactly \
          {legacy_expected} legacy bytes, {bound_expected} bytes with TX-source binding, \
          {versioned_v2_expected} bytes with protocol-v2 identity, or \
-         {versioned_v3_expected} bytes with protocol-v3 timing/quality identity"
+         {versioned_v3_expected} bytes with protocol-v3 timing/quality identity, or \
+         {versioned_v4_expected} bytes with unified protocol-v4 identity"
     )]
     PacketLengthMismatch {
         legacy_expected: usize,
         bound_expected: usize,
         versioned_v2_expected: usize,
         versioned_v3_expected: usize,
+        versioned_v4_expected: usize,
         actual: usize,
     },
     #[error("unexpected TX-source binding magic 0x{actual:08x}")]
@@ -552,7 +776,7 @@ pub enum RawCsiRecordingError {
     InvalidSourceBindingSemantics { detail: &'static str },
     #[error("unexpected CSI identity magic 0x{actual:08x}")]
     WrongCsiIdentityMagic { actual: u32 },
-    #[error("unsupported CSI protocol version {actual}; supported versions are 2 and 3")]
+    #[error("unsupported CSI protocol version {actual}; supported versions are 2, 3 and 4")]
     UnsupportedCsiProtocolVersion { actual: u8 },
     #[error("unsupported CSI identity role {actual}; expected RX role 1")]
     UnsupportedCsiIdentityRole { actual: u8 },
@@ -657,16 +881,23 @@ impl RawCsiFrame {
         let versioned_v3_len = bound_len
             .checked_add(CSI_IDENTITY_V3_TRAILER_LEN)
             .ok_or(RawCsiRecordingError::DimensionOverflow)?;
+        let versioned_v4_len = bound_len
+            .checked_add(CSI_IDENTITY_V4_TRAILER_LEN)
+            .ok_or(RawCsiRecordingError::DimensionOverflow)?;
         if packet.len() != legacy_len
             && packet.len() != bound_len
             && packet.len() != versioned_v2_len
             && packet.len() != versioned_v3_len
+            && packet.len() != versioned_v4_len
+            && ![versioned_v2_len,versioned_v3_len,versioned_v4_len].iter()
+                .any(|size|packet.len()==size+crate::csi_layout::WIRE_LEN)
         {
             return Err(RawCsiRecordingError::PacketLengthMismatch {
                 legacy_expected: legacy_len,
                 bound_expected: bound_len,
                 versioned_v2_expected: versioned_v2_len,
                 versioned_v3_expected: versioned_v3_len,
+                versioned_v4_expected: versioned_v4_len,
                 actual: packet.len(),
             });
         }
@@ -674,9 +905,7 @@ impl RawCsiFrame {
         let source_binding = (packet.len() >= bound_len)
             .then(|| SourceBinding::from_trailer(&packet[legacy_len..bound_len]))
             .transpose()?;
-        let protocol_identity = (packet.len() > bound_len)
-            .then(|| CsiProtocolIdentity::from_trailer(&packet[bound_len..]))
-            .transpose()?;
+        let (protocol_identity,physical_layout) = csi_protocol_metadata(packet)?;
         let q_first = protocol_identity
             .as_ref()
             .is_some_and(|identity| identity.protocol_version >= CSI_PROTOCOL_VERSION);
@@ -710,6 +939,7 @@ impl RawCsiFrame {
             mesh_timestamp_us: context.mesh_timestamp_us,
             source_binding,
             protocol_identity,
+            physical_layout,
             iq_pairs,
         };
         frame.validate()?;
@@ -793,6 +1023,37 @@ impl RawCsiFrame {
         }
         if let Some(identity) = self.protocol_identity {
             identity.to_trailer()?;
+            if let Some(unified) = identity.unified_rx {
+                let digest: [u8; 32] = Sha256::digest(unified.source_mac).into();
+                if !(1..=4).contains(&self.rx_id)
+                    || unified.source_node_id == self.rx_id
+                    || self.flags & 1 != unified.channel_width
+                    || (self.flags & 4 != 0) != (unified.stbc != 0)
+                    || self.ppdu_type != if unified.sig_mode == 2 { 0xff } else { 0 }
+                    || (self.flags & (1 << 5) != 0)
+                        != identity
+                            .quality_flags
+                            .is_some_and(|flags| flags & CSI_QUALITY_FIRST_WORD_INVALID != 0)
+                    || (matches!(unified.mode, 1 | 2)
+                        && unified.source_node_id != 0
+                        && unified.send_attempt_us >= 900_000_000)
+                    || !self.source_binding.as_ref().is_some_and(|binding| {
+                        binding.flags == SOURCE_BINDING_REQUIRED_FLAGS
+                            && binding.tx_filter_sha256 == encode_sha256_hex(&digest)
+                    })
+                {
+                    return Err(RawCsiRecordingError::InvalidCsiIdentitySemantics);
+                }
+            }
+        }
+        if let Some(layout)=self.physical_layout {
+            if self.protocol_identity.is_none() {return Err(RawCsiRecordingError::PhysicalLayout("physical evidence needs receiver identity".into()));}
+            layout.validate_frame(self).map_err(|error|RawCsiRecordingError::PhysicalLayout(error.into()))?;
+            if let Some(unified)=self.protocol_identity.and_then(|identity|identity.unified_rx) {
+                if (layout.sig_mode,layout.bandwidth,layout.stbc)!=(unified.sig_mode,unified.channel_width,unified.stbc) {
+                    return Err(RawCsiRecordingError::PhysicalLayout("physical and profile metadata contradict".into()));
+                }
+            }
         }
         Ok(())
     }
@@ -815,6 +1076,8 @@ impl RawCsiFrame {
             .map(|identity| {
                 if identity.protocol_version == CSI_PROTOCOL_V2 {
                     CSI_IDENTITY_V2_TRAILER_LEN
+                } else if identity.protocol_version == CSI_PROTOCOL_UNIFIED_RX {
+                    CSI_IDENTITY_V4_TRAILER_LEN
                 } else {
                     CSI_IDENTITY_V3_TRAILER_LEN
                 }
@@ -854,15 +1117,16 @@ impl RawCsiFrame {
         if let Some(identity) = self.protocol_identity {
             packet.extend_from_slice(&identity.to_trailer()?);
         }
+        if let Some(layout)=self.physical_layout {packet.extend_from_slice(&layout.encode());}
         Ok(packet)
     }
 }
 
 /// Parse the additive version-2/v3 receiver identity without deriving identity from
 /// the UDP source address. Legacy and source-binding-only packets return None.
-pub fn csi_protocol_identity(
+pub fn csi_protocol_metadata(
     packet: &[u8],
-) -> Result<Option<CsiProtocolIdentity>, RawCsiRecordingError> {
+) -> Result<(Option<CsiProtocolIdentity>, Option<crate::csi_layout::Evidence>), RawCsiRecordingError> {
     if packet.len() < ESP32_CSI_HEADER_LEN {
         return Err(RawCsiRecordingError::PacketTooShort {
             actual: packet.len(),
@@ -879,14 +1143,26 @@ pub fn csi_protocol_identity(
         .checked_add(payload_len)
         .and_then(|offset| offset.checked_add(TX_SOURCE_BINDING_TRAILER_LEN))
         .ok_or(RawCsiRecordingError::DimensionOverflow)?;
-    if packet.len() == identity_start {
-        return Ok(None);
+    if packet.len()<=identity_start {return Ok((None,None));}
+    if packet.get(identity_start..identity_start+4)!=Some(CSI_IDENTITY_MAGIC.to_le_bytes().as_slice()) {
+        return Ok((None,None));
     }
-    let identity_len = packet.len().saturating_sub(identity_start);
-    if identity_len != CSI_IDENTITY_V2_TRAILER_LEN && identity_len != CSI_IDENTITY_V3_TRAILER_LEN {
-        return Ok(None);
+    let version=*packet.get(identity_start+4).ok_or(RawCsiRecordingError::InvalidCsiIdentitySemantics)?;
+    let size=match version {CSI_PROTOCOL_V2=>CSI_IDENTITY_V2_TRAILER_LEN,CSI_PROTOCOL_VERSION=>CSI_IDENTITY_V3_TRAILER_LEN,
+        CSI_PROTOCOL_UNIFIED_RX=>CSI_IDENTITY_V4_TRAILER_LEN,_=>return Err(RawCsiRecordingError::UnsupportedCsiProtocolVersion{actual:version})};
+    let suffix=&packet[identity_start..];
+    if suffix.len()!=size && suffix.len()!=size+crate::csi_layout::WIRE_LEN {
+        return Err(RawCsiRecordingError::InvalidCsiIdentitySemantics);
     }
-    CsiProtocolIdentity::from_trailer(&packet[identity_start..]).map(Some)
+    let identity=CsiProtocolIdentity::from_trailer(&suffix[..size])?;
+    let physical=if suffix.len()>size {
+        Some(crate::csi_layout::Evidence::decode(&suffix[size..]).map_err(|error|RawCsiRecordingError::PhysicalLayout(error.into()))?)
+    } else {None};
+    Ok((Some(identity),physical))
+}
+
+pub fn csi_protocol_identity(packet:&[u8])->Result<Option<CsiProtocolIdentity>,RawCsiRecordingError> {
+    csi_protocol_metadata(packet).map(|metadata|metadata.0)
 }
 
 /// Return the current host wall-clock time in Unix nanoseconds.
@@ -930,7 +1206,7 @@ pub fn decode_json_line(line: &str) -> Result<RawCsiFrame, RawCsiRecordingError>
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use super::*;
 
     fn test_packet() -> Vec<u8> {
@@ -1005,6 +1281,7 @@ mod tests {
                 gain_db: None,
                 csi_config_flags: None,
                 sync_age_ms: None,
+                unified_rx: None,
             }
             .to_trailer()
             .unwrap(),
@@ -1027,6 +1304,7 @@ mod tests {
                 gain_db: None,
                 csi_config_flags: Some(0b1011),
                 sync_age_ms: Some(u32::MAX),
+                unified_rx: None,
             }
             .to_trailer()
             .unwrap(),
@@ -1136,6 +1414,7 @@ mod tests {
                 gain_db: None,
                 csi_config_flags: Some(0b1011),
                 sync_age_ms: Some(u32::MAX),
+                unified_rx: None,
             })
         );
         assert_eq!(
@@ -1443,4 +1722,109 @@ mod tests {
         backward.host_timestamp_unix_ns = 1_999;
         assert!(summary.validate_next_frame(&backward).is_err());
     }
+    // Emitted by the actual C callback/pool/serializer/sender host test with
+    // the existing SHA-256 known-answer MAC vector, not a Rust-built packet.
+    pub(crate) fn unified_c_golden() -> Vec<u8> {
+        let hex = concat!(
+            "010011c5010180008509000000000000d8a40020000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d",
+            "1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f",
+            "505152535455565758595a5b5c5d5e5f606162636465666768696a6b6c6d6e6f707172737475767778797a7b7c7d7e7f8081",
+            "82838485868788898a8b8c8d8e8f909192939495969798999a9b9c9d9e9fa0a1a2a3a4a5a6a7a8a9aaabacadaeafb0b1b2b3",
+            "b4b5b6b7b8b9babbbcbdbebfc0c1c2c3c4c5c6c7c8c9cacbcccdcecfd0d1d2d3d4d5d6d7d8d9dadbdcdddedfe0e1e2e3e4e5",
+            "e6e7e8e9eaebecedeeeff0f1f2f3f4f5f6f7f8f9fafbfcfdfeff60a011c50107280048f4634d1002f9f3c7570cb43e00dd86",
+            "9b22c79538e9b4adc7e402de1189cfe161a011c504017000080706050403020140420f0000000000d2040000170000800b00",
+            "0000ffffffff0700000000000000a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a728460f00",
+            "0000000028460f00000000000011223344550200000003010100000063a011c501092000010000000f000101000100000900",
+            "040500000000ab2c1b4a",
+        );
+        (0..hex.len())
+            .step_by(2)
+            .map(|i| u8::from_str_radix(&hex[i..i + 2], 16).unwrap())
+            .collect()
+    }
+
+    #[test]
+    fn unified_c_golden_is_lossless_through_record_json_and_replay_packet() {
+        let packet = unified_c_golden();
+        let frame = RawCsiFrame::from_packet(&packet, RawCsiFrameContext::default()).unwrap();
+        let identity = frame.protocol_identity.unwrap();
+        assert_eq!(identity.protocol_version, CSI_PROTOCOL_UNIFIED_RX);
+        let unified = identity.unified_rx.unwrap();
+        assert_eq!(
+            (
+                unified.generation,
+                unified.mode,
+                unified.source_node_id,
+                unified.peer_count
+            ),
+            (7, 0, 0, 0)
+        );
+        assert_eq!(frame.iq_pairs[0], IqPair { i: 1, q: 0 });
+        assert_eq!(frame.to_packet().unwrap(), packet);
+        let decoded: RawCsiFrame =
+            serde_json::from_str(&serde_json::to_string(&frame).unwrap()).unwrap();
+        assert_eq!(decoded.to_packet().unwrap(), packet);
+        assert!(super::super::protocol::parse_esp32_frame(&packet).is_some());
+        assert!(super::super::csi::parse_esp32_frame(&packet).is_some());
+    }
+
+    #[test]
+    fn unified_rejects_unknown_versions_bad_profile_timing_mac_and_reserved_bytes() {
+        let golden = unified_c_golden();
+        let start = ESP32_CSI_HEADER_LEN+256+TX_SOURCE_BINDING_TRAILER_LEN;
+        for (offset, value) in [
+            (4, 5),
+            (40, 0),
+            (44, 5),
+            (46, 1),
+            (47, 1),
+            (80, 0),
+            (96, 3),
+            (109, 1),
+            (111, 1),
+        ] {
+            let mut packet = golden.clone();
+            if offset == 40 {
+                packet[start + 40..start + 44].fill(0);
+            } else if offset == 80 {
+                packet[start + 80..start + 88].fill(0);
+            } else {
+                packet[start + offset] = value;
+            }
+            assert!(
+                RawCsiFrame::from_packet(&packet, RawCsiFrameContext::default()).is_err(),
+                "offset {offset}"
+            );
+        }
+        let mut unknown = golden;
+        unknown[start + 4] = 5;
+        assert!(super::super::protocol::parse_esp32_frame(&unknown).is_none());
+        assert!(super::super::csi::parse_esp32_frame(&unknown).is_none());
+    }
+
+    #[test]
+    fn unified_window_identity_separates_generation_and_trial_expiry_not_queue_time() {
+        let frame =
+            RawCsiFrame::from_packet(&unified_c_golden(), RawCsiFrameContext::default()).unwrap();
+        let mut a = frame.protocol_identity.unwrap().unified_rx.unwrap();
+        a.mode = 1;
+        a.peer_count = 1;
+        let key = a.measurement_identity(899_999_999);
+        assert_ne!(key, a.measurement_identity(900_000_000));
+        a.send_attempt_us += 100;
+        a.dequeued_us += 100;
+        assert_eq!(key, a.measurement_identity(899_999_999));
+        a.generation += 1;
+        assert_ne!(key, a.measurement_identity(899_999_999));
+    }
+    #[test]
+    fn future_identity_with_new_length_is_not_silently_legacy() {
+        let mut packet=unified_c_golden();
+        let start=ESP32_CSI_HEADER_LEN+256+TX_SOURCE_BINDING_TRAILER_LEN;
+        packet[start+4]=5; packet.extend_from_slice(&[0;16]);
+        packet[start+6..start+8].copy_from_slice(&128u16.to_le_bytes());
+        assert!(csi_protocol_identity(&packet).is_err());
+        assert!(super::super::protocol::parse_esp32_frame(&packet).is_none());
+    }
+
 }

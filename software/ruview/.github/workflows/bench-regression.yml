@@ -155,17 +155,10 @@ jobs:
       # (NOT a bare `cargo bench -p`) because the crates' lib targets use the
       # libtest harness, which rejects criterion's CLI flags (--warm-up-time
       # etc.) and aborts the run. Quick-mode: 1s warm-up, 2s measure, 10 samples.
-      - name: nvsim pipeline_throughput (quick)
-        working-directory: v2
-        run: |
-          mkdir -p ../bench-out
-          cargo bench -p nvsim --no-default-features --bench pipeline_throughput -- \
-            --warm-up-time 1 --measurement-time 2 --sample-size 10 \
-            | tee ../bench-out/nvsim_pipeline_throughput.txt
-
       - name: ruvector sketch_bench (quick)
         working-directory: v2
         run: |
+          mkdir -p ../bench-out
           cargo bench -p wifi-densepose-ruvector --no-default-features --bench sketch_bench -- \
             --warm-up-time 1 --measurement-time 2 --sample-size 10 \
             | tee ../bench-out/ruvector_sketch_bench.txt

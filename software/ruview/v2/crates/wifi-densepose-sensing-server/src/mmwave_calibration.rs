@@ -6918,6 +6918,7 @@ mod tests {
         label: &str,
     ) -> RawCsiFrame {
         RawCsiFrame {
+            physical_layout: None,
             schema_version: RAW_CSI_SCHEMA_VERSION,
             host_timestamp_unix_ns: timestamp_ns,
             host_monotonic_ns: Some(timestamp_ns),

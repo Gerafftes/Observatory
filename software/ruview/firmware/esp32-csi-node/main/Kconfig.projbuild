@@ -1,5 +1,13 @@
 menu "CSI Node Configuration"
 
+    config RX_UNIFIED
+        bool "Unified Observatory RX1-RX4 measurement image"
+        depends on IDF_TARGET_ESP32S3
+        default n
+        help
+            One runtime-configured RX image. No edge DSP, WASM, radar probing,
+            C6 synchronization or auxiliary RF traffic is started.
+
     config CSI_NODE_ID
         int "Node ID (0-255)"
         default 1

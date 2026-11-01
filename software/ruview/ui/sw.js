@@ -1,12 +1,15 @@
 // RuView Service Worker - Offline caching for the dashboard shell
 // Strategy: Network-first with cache fallback so local UI updates are visible.
 
-const CACHE_NAME = 'ruview-v11-device-identities';
+const CACHE_NAME = 'ruview-v13-fonts';
 const scopeUrl = self.registration.scope;
 const SHELL_ASSETS = [
   '',
   'index.html',
   'style.css',
+  'fonts.css',
+  'fonts/JetBrainsMono-Variable.woff2',
+  'fonts/DepartureMono-Regular.woff2',
   'app.js',
   'device-identity.js',
   'config/api.config.js',
@@ -31,6 +34,7 @@ const SHELL_ASSETS = [
   'services/control-helper.service.js',
   'services/ws-auth.js',
   'utils/auth-controls.js',
+  'utils/csi-reception.js',
   'services/pose.service.js',
   'services/stream.service.js',
   'utils/backend-detector.js',
@@ -86,6 +90,12 @@ self.addEventListener('fetch', (event) => {
 
   // Skip cross-origin requests
   if (url.origin !== self.location.origin) return;
+
+  // A saved CAD revision must come from the current database, including errors.
+  if (url.pathname.startsWith('/api/v1/experiments/setup-profiles')) {
+    event.respondWith(fetch(request, { cache: 'no-store' }));
+    return;
+  }
 
   // API calls: network-first with cache fallback
   if (url.pathname.startsWith('/api/') || url.pathname.startsWith('/health/')) {

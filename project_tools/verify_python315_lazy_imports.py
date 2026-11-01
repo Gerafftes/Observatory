@@ -4,7 +4,6 @@
 from __future__ import annotations
 
 lazy import ast
-lazy import re
 lazy import sys
 lazy from collections import Counter
 lazy from pathlib import Path
@@ -21,8 +20,6 @@ EXCLUDED_PARTS = {
     "private",
     "vendor",
 }
-NON_PYTHON_REFERENCE = Path("software/ruview/references/script_1.py")
-IMPORT_LINE = re.compile(rb"(?m)^\s*(?:lazy\s+)?(?:from|import)\s+")
 
 
 def python_sources(root: Path = PROJECT_ROOT) -> list[Path]:
@@ -70,9 +67,6 @@ def verify(root: Path = PROJECT_ROOT) -> tuple[int, Counter[str], list[str]]:
         try:
             tree = ast.parse(source, filename=str(relative))
         except SyntaxError as error:
-            if relative == NON_PYTHON_REFERENCE and not IMPORT_LINE.search(source):
-                counts["non_python_reference"] += 1
-                continue
             violations.append(
                 f"{relative}:{error.lineno}: cannot parse with Python 3.15: {error.msg}"
             )

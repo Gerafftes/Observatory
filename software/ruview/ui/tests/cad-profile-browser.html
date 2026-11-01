@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="de">
+<meta charset="utf-8">
+<title>CAD-Persistenztest · isolierte SQLite-Testkopie</title>
+<link rel="stylesheet" href="../style.css">
+<body style="margin:24px">
+<p>Isolierter CAD-Persistenztest · SQLite-Testkopie · keine Hardware · kein Runtime-Wechsel</p>
+<button id="leave" type="button">CAD schließen</button>
+<button id="reopen" type="button">CAD erneut öffnen</button>
+<main id="cad"></main>
+<script type="module">
+  import { ObservatoryControlCenter } from '../components/ObservatoryControlCenter.js';
+  const host = document.querySelector('#cad');
+  const center = new ObservatoryControlCenter(host);
+  center.mount();
+  document.querySelector('#leave').onclick = () => { host.hidden = true; };
+  document.querySelector('#reopen').onclick = async () => {
+    host.hidden = false;
+    await center.reopen();
+  };
+  // This fixture offers only the CAD actions; it never instantiates device controls.
+</script>
+</body>
+</html>

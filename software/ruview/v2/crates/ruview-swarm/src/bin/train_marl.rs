@@ -119,7 +119,7 @@ fn parse_args() -> Args {
                      --learn-pattern P    mappo|ippo|curiosity|meta (default mappo)\n  \
                      --checkpoint-dir D   checkpoint output dir (default ./marl-checkpoints)\n  \
                      --checkpoint-every N save every N episodes (default 100)\n  \
-                     --telemetry FILE     write JSONL telemetry for viz/swarm_viz.html\n  \
+                     --telemetry FILE     write JSONL telemetry for offline analysis\n  \
                      --telemetry-episode N which episode's steps to record spatially (default 0)"
                 );
                 std::process::exit(0);
@@ -465,7 +465,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     if let Some(rec) = telem.as_mut() {
         rec.flush()?;
         if let Some(path) = &args.telemetry {
-            println!("telemetry written: {path} — open viz/swarm_viz.html and load it");
+            println!("telemetry written: {path}");
         }
     }
 

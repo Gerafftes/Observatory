@@ -147,6 +147,7 @@ async fn experiments_status(State(state): State<SharedState>) -> Json<serde_json
             "status": "READY",
             "schema_version": experiment::SCHEMA_VERSION,
             "database_path": store.db_path().display().to_string(),
+            "profile_database_path": store.profile_db_path().display().to_string(),
             "run_count": run_count,
             "supported_fixture_ids": [experiment::SUPPORTED_FIXTURE_ID],
             "control_center_locked": false,
@@ -302,6 +303,7 @@ async fn setup_profiles_list(State(state): State<SharedState>) -> Response {
     match store.list_profiles().await {
         Ok(profiles) => Json(serde_json::json!({
             "profiles": profiles,
+            "profile_database_path": store.profile_db_path().display().to_string(),
             "schema_version": experiment::PROFILE_SCHEMA_VERSION
         }))
         .into_response(),

@@ -1,5 +1,7 @@
 # ADR-089: nvsim — NV-Diamond Magnetometer Pipeline Simulator
 
+> Historical note (2026-10-28): the nvsim simulator and server were removed from this repository. This decision is retained for context.
+
 | Field          | Value                                                                                   |
 |----------------|-----------------------------------------------------------------------------------------|
 | **Status**     | Accepted — Passes 1–5 implemented and merged via the `feat/nvsim-pipeline-simulator` branch; Pass 6 (proof bundle + criterion bench) pending in the next iteration |

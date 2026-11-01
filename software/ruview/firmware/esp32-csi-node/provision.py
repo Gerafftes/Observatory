@@ -1,4 +1,4 @@
-#!/usr/bin/env python3.15
+#!/usr/bin/env python3
 """
 ESP32 CSI node provisioning (ESP32-S3, ESP32-C6, other targets).
 
@@ -14,41 +14,30 @@ Requirements:
     pip install 'esptool>=5.0' nvs-partition-gen
     (or use the nvs_partition_gen.py bundled with ESP-IDF)
 
-ADDITIVE-BY-DEFAULT (issue #391, #574 phase 1):
-    Earlier versions of this script REPLACED the entire `csi_cfg` NVS namespace
-    on the device every invocation, wiping any key you didn't pass on the CLI.
-    That cost customers hours of unnecessary friction.
+Existing unified RX devices are configured with --device-url, --device-id and
+--config-patch. The authenticated device supplies the stored generation; the
+firmware validates the whole request and commits one own NVS value. No host port
+cache, restart, OTA or full NVS image participates in this path.
 
-    The script now MERGES new CLI flags with the per-port state previously
-    written from this machine (stored under your user config dir; see
-    `--state-dir` to override or `--state` to inspect). On every invocation:
-
-        1. Read the prior per-port state file (or treat as empty if absent).
-        2. Overlay the new CLI flags on top.
-        3. Generate + flash NVS from the merged state.
-        4. Write the merged state back to the state file.
-
-    Net effect: partial reconfigure works the way users expect. Pass `--reset`
-    to wipe both the state file AND the device NVS for first-time provisioning
-    of a recycled board.
-
-    Caveat: state lives on the controlling machine. Provisioning the same
-    device from a second machine starts from an empty state — pass the keys
-    you want to keep on that invocation, or pre-seed the state file. A future
-    follow-up will add USB-CDC NVS dump for true device-authoritative merging
-    (tracked in #574).
+Full USB NVS writes are restricted to explicitly selected --initial-provision
+for new devices. That legacy path replaces the NVS partition and cannot preserve
+unknown on-device keys. Its per-port cache is staging history, not device truth.
+Use --dry-run to generate an artifact without writing any device.
 """
 
-lazy import argparse
-lazy import csv
-lazy import hashlib
-lazy import io
-lazy import json
-lazy import os
-lazy import struct
-lazy import subprocess
-lazy import sys
-lazy import tempfile
+import argparse
+import csv
+import hashlib
+import io
+import json
+import os
+import struct
+import subprocess
+import sys
+import tempfile
+import urllib.error
+import urllib.parse
+import urllib.request
 
 
 # NVS partition table offset — default for ESP-IDF 4MB flash with standard
@@ -84,6 +73,8 @@ CONFIG_VALUE_CHECKS = [
     ("swarm_hb", lambda value: value is not None),
     ("swarm_ingest", lambda value: value is not None),
     ("ota_psk", lambda value: value is not None),
+    ("wasm_verify", lambda value: value is not None),
+    ("wasm_pubkey", lambda value: value is not None),
 ]
 
 
@@ -197,6 +188,7 @@ MERGEABLE_ATTRS = [
     "channel", "filter_mac",
     "hop_channels", "hop_dwell",
     "seed_url", "seed_token", "zone", "swarm_hb", "swarm_ingest",
+    "wasm_verify", "wasm_pubkey",
 ]
 
 
@@ -302,6 +294,10 @@ def build_nvs_csv(args):
         writer.writerow(["target_port", "data", "u16", str(args.target_port)])
     if args.node_id is not None:
         writer.writerow(["node_id", "data", "u8", str(args.node_id)])
+    if getattr(args, "wasm_verify", None) is not None:
+        writer.writerow(["wasm_verify", "data", "u8", str(int(args.wasm_verify))])
+    if getattr(args, "wasm_pubkey", None) is not None:
+        writer.writerow(["wasm_pubkey", "data", "hex2bin", args.wasm_pubkey])
     # TDM mesh settings
     if args.tdm_slot is not None:
         writer.writerow(["tdm_slot", "data", "u8", str(args.tdm_slot)])
@@ -419,6 +415,89 @@ def flash_nvs(port, baud, nvs_bin, chip):
         os.unlink(bin_path)
 
 
+class NoRedirect(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None
+
+
+def strict_json_pairs(pairs):
+    result = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValueError("Duplicate JSON key")
+        result[key] = value
+    return result
+
+
+def device_configure(base_url, device_id, patch, token, *, dry_run=False):
+    """Update the device's own atomic RX settings, without a port cache or reset."""
+    url = urllib.parse.urlsplit(base_url)
+    if (url.scheme not in ("http", "https") or not url.hostname or url.username
+            or url.password or url.path not in ("", "/") or url.query or url.fragment):
+        raise ValueError("Device URL must be an HTTP(S) origin without credentials or a path")
+    if (len(device_id) != 64 or any(c not in "0123456789abcdef" for c in device_id)):
+        raise ValueError("Expected device ID must be the 64 lowercase hex characters from capabilities")
+    if not token or "\n" in token or "\r" in token:
+        raise ValueError("A provisioned bearer token is required")
+    if not isinstance(patch, dict) or not patch:
+        raise ValueError("Config patch must be a nonempty JSON object")
+    allowed = {"expected_generation", "node_id", "led_gpio", "target_ip", "target_port",
+               "csi_channel", "ssid", "password", "tx_mac", "mode", "peers", "rate_hz"}
+    if patch.keys() - allowed:
+        raise ValueError("Config patch contains unsupported fields")
+
+    def request(path, body=None):
+        data = None if body is None else json.dumps(body, allow_nan=False).encode("utf-8")
+        req = urllib.request.Request(base_url.rstrip("/") + path, data=data,
+                                     headers={"Authorization": "Bearer " + token,
+                                              "X-RX-Device-ID": device_id,
+                                              "Content-Type": "application/json"})
+        try:
+            with urllib.request.build_opener(urllib.request.ProxyHandler({}),NoRedirect()).open(req, timeout=10) as response:
+                raw = response.read(65537)
+        except (OSError, urllib.error.URLError) as error:
+            if body is not None:
+                raise RuntimeError("Config POST did not complete unambiguously; inspect stored /config before any further write. No retry was made.") from error
+            raise RuntimeError("Authenticated device query failed") from error
+        try:
+            if len(raw) > 65536:
+                raise ValueError("Device response exceeds 64 KiB")
+            result = json.loads(raw, object_pairs_hook=strict_json_pairs)
+            if not isinstance(result, dict):
+                raise ValueError("Device response must be a JSON object")
+            return result
+        except ValueError as error:
+            if body is not None:
+                raise RuntimeError("Config POST response is ambiguous; query stored /config before any further write. No retry was made.") from error
+            raise
+
+    capabilities = request("/capabilities")
+    if (capabilities.get("schema") != "observatory.rx-capabilities.v1"
+            or capabilities.get("wire_version") != 4
+            or capabilities.get("device_id") != device_id):
+        raise ValueError("Device identity or unified RX capability mismatch")
+    state = request("/config")
+    if state.get("schema") != "observatory.rx-config.v1":
+        raise ValueError("Unsupported device config schema")
+    generation = state.get("stored", {}).get("generation")
+    if type(generation) is not int or not 1 <= generation < 2**32 - 1:
+        raise ValueError("Stored generation is invalid or exhausted")
+    if "expected_generation" in patch and (type(patch["expected_generation"]) is not int or patch["expected_generation"] != generation):
+        raise ValueError("Config patch generation differs from the actual device")
+    body = dict(patch, expected_generation=generation)
+    if dry_run:
+        return {"device_id": device_id, "stored_generation": generation,
+                "fields": sorted(patch), "written": False}
+    if capabilities.get("measurement_active") is not False:
+        raise ValueError("Device measurement lease is active or unknown")
+    result = request("/config", body)
+    if (result.get("schema") != "observatory.rx-config.v1"
+            or result.get("stored", {}).get("generation") != generation + 1
+            or result.get("active") != state.get("active")):
+        raise RuntimeError("Config result is uncertain; query stored/active state. No repeat or restart was made.")
+    return result
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Provision CSI node NVS (WiFi + aggregator); works on S3, C6, etc.",
@@ -429,7 +508,14 @@ def main():
             "(default chip is auto for esptool v5+)."
         ),
     )
-    parser.add_argument("--port", required=True, help="Serial port (e.g. COM7, /dev/ttyUSB0)")
+    parser.add_argument("--port", help="Serial port for separately authorized initial USB provisioning")
+    parser.add_argument("--initial-provision", action="store_true",
+                        help="Explicit initial-device full NVS write; never use to update an existing device")
+    parser.add_argument("--device-url", help="Existing unified RX HTTP origin, e.g. http://192.0.2.10:8032")
+    parser.add_argument("--device-id", help="Expected physical device SHA-256 from authenticated capabilities")
+    parser.add_argument("--config-patch", help="Private JSON config patch for the existing device")
+    parser.add_argument("--ota-token-env", default="BLL_RX_OTA_PSK",
+                        help="Environment variable containing the existing bearer token")
     parser.add_argument(
         "--chip",
         default="auto",
@@ -451,8 +537,12 @@ def main():
     parser.add_argument("--fall-thresh", type=int, help="Fall detection threshold in milli-units "
                         "(value/1000 = rad/s²). Default: 15000 → 15.0 rad/s². "
                         "Raise to reduce false positives in high-traffic areas.")
-    parser.add_argument("--vital-win", type=int, help="Phase history window in frames (default: 300)")
-    parser.add_argument("--vital-int", type=int, help="Vitals packet interval in ms (default: 1000)")
+    parser.add_argument("--vital-win", "--vital-window", type=int, help="Phase history window in frames (default: 300)")
+    parser.add_argument("--vital-int", "--vital-interval", type=int, help="Vitals packet interval in ms (default: 1000)")
+    wasm_group = parser.add_mutually_exclusive_group()
+    wasm_group.add_argument("--wasm-verify", dest="wasm_verify", action="store_true", default=None)
+    wasm_group.add_argument("--no-wasm-verify", dest="wasm_verify", action="store_false")
+    parser.add_argument("--wasm-pubkey", help="Legacy profile Ed25519 public key (64 hex characters)")
     parser.add_argument("--subk-count", type=int, help="Top-K subcarrier count (default: 32)")
     # ADR-060: Channel override and MAC filter
     parser.add_argument("--channel", type=int, help="CSI channel (1-14 for 2.4GHz, 36-177 for 5GHz). "
@@ -503,6 +593,30 @@ def main():
                         "Useful for debugging which keys are about to land on the device.")
 
     args = parser.parse_args()
+    if args.wasm_pubkey is not None:
+        if len(args.wasm_pubkey) != 64 or any(c not in "0123456789abcdefABCDEF" for c in args.wasm_pubkey):
+            parser.error("--wasm-pubkey must be exactly 64 hexadecimal characters")
+        args.wasm_pubkey = args.wasm_pubkey.lower()
+
+    if args.device_url:
+        if (args.port or args.initial_provision or args.reset or args.state
+                or not args.device_id or not args.config_patch or has_config_value(args)):
+            parser.error("Use --device-url + --device-id + --config-patch, without serial/legacy config flags")
+        try:
+            with open(args.config_patch, encoding="utf-8") as patch_file:
+                patch = json.load(patch_file, object_pairs_hook=strict_json_pairs)
+            result = device_configure(args.device_url, args.device_id, patch,
+                                      os.environ.get(args.ota_token_env, ""), dry_run=args.dry_run)
+        except (OSError, ValueError, RuntimeError) as error:
+            parser.error(str(error))
+        print(json.dumps(result, indent=2, sort_keys=True))
+        return
+    if args.device_id or args.config_patch:
+        parser.error("--device-id and --config-patch require --device-url")
+    if not args.port:
+        parser.error("Initial provisioning requires --port; existing devices use --device-url")
+    if not (args.state or args.dry_run or args.initial_provision):
+        parser.error("Full NVS writes require explicit --initial-provision. Existing devices must use authenticated --device-url configuration")
 
     # --- Per-port state load + merge (additive-by-default, #391 / #574) ---
     if args.reset:

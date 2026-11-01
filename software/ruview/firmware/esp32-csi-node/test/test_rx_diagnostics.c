@@ -8,6 +8,7 @@
 
 #include <errno.h>
 #include <pthread.h>
+#include <sched.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -610,6 +611,51 @@ static void test_concurrent_handoffs_preserve_ownership(void)
     check_transport_balance(&stats);
 }
 
+static concurrent_gate_t copying_gate = {
+    .lock = PTHREAD_MUTEX_INITIALIZER, .condition = PTHREAD_COND_INITIALIZER,
+};
+static bool stop_finished;
+static void pause_claimed_capture(void)
+{
+    pthread_mutex_lock(&copying_gate.lock);
+    copying_gate.ready=1; pthread_cond_broadcast(&copying_gate.condition);
+    while (!copying_gate.start) pthread_cond_wait(&copying_gate.condition,&copying_gate.lock);
+    pthread_mutex_unlock(&copying_gate.lock);
+}
+static void *stop_concurrently(void *unused)
+{
+    (void)unused; csi_transport_stop();
+    __atomic_store_n(&stop_finished,true,__ATOMIC_RELEASE); return NULL;
+}
+static void test_stop_waits_for_copy_and_blocks_restart(void)
+{
+    prepare_transport_test(TEST_FRAME_SIZE);
+    copying_gate.ready=0; copying_gate.start=false; stop_finished=false;
+    concurrent_gate_t producer_gate={.lock=PTHREAD_MUTEX_INITIALIZER,
+        .condition=PTHREAD_COND_INITIALIZER,.start=true};
+    concurrent_capture_t capture={.gate=&producer_gate,.iq={1,2,3,4}};
+    capture.info=test_info(FILTER_MAC,capture.iq,sizeof(capture.iq));
+    csi_transport_test_after_claim(pause_claimed_capture);
+    pthread_t producer, stopper;
+    CHECK(pthread_create(&producer,NULL,enqueue_concurrently,&capture)==0,"producer starts");
+    pthread_mutex_lock(&copying_gate.lock);
+    while (!copying_gate.ready) pthread_cond_wait(&copying_gate.condition,&copying_gate.lock);
+    pthread_mutex_unlock(&copying_gate.lock);
+    CHECK(pthread_create(&stopper,NULL,stop_concurrently,NULL)==0,"stopper starts");
+    while (!csi_transport_test_stopping()) sched_yield();
+    CHECK(!__atomic_load_n(&stop_finished,__ATOMIC_ACQUIRE),"stop cannot retire a copying producer");
+    CHECK(csi_transport_start()==ESP_ERR_INVALID_STATE,"new worker cannot overlap stop");
+    pthread_mutex_lock(&copying_gate.lock); copying_gate.start=true;
+    pthread_cond_broadcast(&copying_gate.condition); pthread_mutex_unlock(&copying_gate.lock);
+    CHECK(pthread_join(producer,NULL)==0 && pthread_join(stopper,NULL)==0,"copy and stop complete");
+    csi_transport_test_after_claim(NULL);
+    csi_transport_stats_t stats; csi_transport_get_stats(&stats);
+    CHECK(capture.accepted && stats.captures_aborted==1 && stats.pool_in_use==0,"old copy has exactly one terminal outcome");
+    check_transport_balance(&stats);
+    CHECK(csi_transport_start()==ESP_OK,"start succeeds after complete stop");
+    csi_transport_stop(); check_transport_balance(&stats);
+}
+
 static void test_expiry_backoff_and_send_failure_paths(void)
 {
     int8_t iq[TEST_IQ_LEN] = {1, 2, 3, 4};
@@ -709,6 +755,7 @@ int main(void)
     test_local_backpressure_does_not_block_raw_send();
     test_abort_and_restart_processing();
     test_concurrent_handoffs_preserve_ownership();
+    test_stop_waits_for_copy_and_blocks_restart();
     test_expiry_backoff_and_send_failure_paths();
     test_runtime_stack_measurement_fields();
 

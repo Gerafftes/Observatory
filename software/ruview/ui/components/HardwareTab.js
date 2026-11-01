@@ -3,6 +3,9 @@
 import { API_CONFIG } from '../config/api.config.js';
 import { apiService } from '../services/api.service.js';
 import { deviceColor, receiverIdentity } from '../device-identity.js';
+import {
+  CSI_RATE_HELP, FORMAT_EXCLUSIONS_HELP, SEQUENCE_GAPS_HELP, formatCsiReceptionMetric,
+} from '../utils/csi-reception.js';
 import { LocalControlPanel } from './LocalControlPanel.js';
 
 const NODE_REFRESH_INTERVAL_MS = 5000;
@@ -100,12 +103,21 @@ export class HardwareTab {
 
     const details = document.createElement('div');
     details.className = 'hardware-node-details';
-    details.textContent = [
-      `RSSI ${this.formatMetric(node.rssi_dbm, ' dBm', 1)}`,
-      `Frames ${this.formatMetric(node.frame_rate_hz, ' Hz', 1)}`,
-      `Verlust ${this.formatMetric(node.packet_loss_percent, '%', 1)}`,
-      `Zuletzt ${this.formatMetric(node.last_seen_ms, ' ms', 0)}`,
-    ].join(' · ');
+    const active = node.status === 'active';
+    const metrics = [
+      { text: `RSSI ${this.formatMetric(active ? node.rssi_dbm : null, ' dBm', 1)}` },
+      { text: `Frames ${active ? this.formatMetric(node.frame_rate_hz, ' Hz', 1) : '0.0 Hz (kein aktueller Empfang)'}`, help: CSI_RATE_HELP },
+      { text: `Formatausschlüsse ${formatCsiReceptionMetric(node, 'format_exclusions')}`, help: FORMAT_EXCLUSIONS_HELP },
+      { text: `Ungeklärte Sequenzlücken ${formatCsiReceptionMetric(node, 'unexplained_sequence_gaps')}`, help: SEQUENCE_GAPS_HELP },
+      { text: `Zuletzt ${this.formatMetric(node.last_seen_ms, ' ms', 0)}` },
+    ];
+    metrics.forEach(({ text, help }, index) => {
+      if (index > 0) details.append(' · ');
+      const metric = document.createElement('span');
+      metric.textContent = text;
+      if (help) metric.title = help;
+      details.appendChild(metric);
+    });
 
     row.append(title, details);
     return row;

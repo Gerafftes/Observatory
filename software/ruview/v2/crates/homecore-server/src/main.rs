@@ -42,10 +42,8 @@ use tower_http::trace::TraceLayer;
 mod gateway;
 use gateway::{GatewayConfig, GatewayState};
 
-/// Compile-time default location of the HOMECORE-UI assets (ADR-131).
-/// Works in dev/CI; the appliance overrides with `--ui-dir` /
-/// `HOMECORE_UI_DIR`.
-const DEFAULT_UI_DIR: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/ui");
+/// No dashboard is bundled; operators may provide their own assets explicitly.
+const DEFAULT_UI_DIR: &str = "";
 
 #[derive(Parser, Debug, Clone)]
 #[command(name = "homecore-server", version)]
@@ -54,8 +52,8 @@ struct Cli {
     #[arg(long, env = "HOMECORE_BIND", default_value = "0.0.0.0:8123")]
     bind: SocketAddr,
 
-    /// Directory of the HOMECORE-UI dashboard assets, served at
-    /// `/homecore` (ADR-131). Empty string disables the UI mount.
+    /// Optional directory of dashboard assets served at `/homecore`.
+    /// Empty string disables the UI mount (the default).
     #[arg(long, env = "HOMECORE_UI_DIR", default_value = DEFAULT_UI_DIR)]
     ui_dir: String,
 
@@ -219,7 +217,7 @@ async fn main() -> Result<()> {
             timeout: std::time::Duration::from_millis(cli.gateway_timeout_ms),
         },
     );
-    // Merge the HA-compat API + UI mount with the BFF gateway, THEN apply the
+    // Merge the HA-compat API + optional UI mount with the BFF gateway, THEN apply the
     // audited CORS allowlist + request tracing to the WHOLE surface. The
     // gateway routes (`/api/homecore/*`, `/api/cal/*`) are merged in outside
     // `router()`'s own layers, so without this outer layer they would have NO
@@ -236,7 +234,7 @@ async fn main() -> Result<()> {
         cli.calibration_url
     );
     if !cli.ui_dir.trim().is_empty() {
-        info!("HOMECORE-UI (ADR-131) served at http://{}/homecore/ from {}", cli.bind, cli.ui_dir);
+        info!("External UI served at http://{}/homecore/ from {}", cli.bind, cli.ui_dir);
     } else {
         info!("HOMECORE-UI mount disabled (--ui-dir empty)");
     }
@@ -247,7 +245,7 @@ async fn main() -> Result<()> {
 }
 
 /// Assemble the full HTTP surface: the HA-compat REST + WS router
-/// (ADR-130) plus the HOMECORE-UI static mount at `/homecore` (ADR-131).
+/// (ADR-130) plus an optional external static mount at `/homecore`.
 /// Split out from `main` so it is exercised by the integration tests.
 fn build_app(api_state: SharedState, ui_dir: &str) -> Router {
     let app = router(api_state);
@@ -255,8 +253,7 @@ fn build_app(api_state: SharedState, ui_dir: &str) -> Router {
         return app;
     }
     // ServeDir serves index.html for the directory root, so /homecore/
-    // returns the dashboard and /homecore/js/... /homecore/css/... map
-    // straight onto the asset tree the relative <link>/<script> tags use.
+    // returns the supplied index and relative assets map onto that tree.
     app.nest_service("/homecore", ServeDir::new(ui_dir))
 }
 
@@ -413,36 +410,21 @@ mod ui_tests {
     }
 
     #[tokio::test]
-    async fn ui_index_is_served_at_homecore() {
-        let app = build_app(test_state(), DEFAULT_UI_DIR);
+    async fn external_ui_can_be_served_when_configured() {
+        let unique = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos();
+        let dir = std::env::temp_dir().join(format!("homecore-ui-{}-{unique}", std::process::id()));
+        std::fs::create_dir(&dir).unwrap();
+        std::fs::write(dir.join("index.html"), "external dashboard").unwrap();
+        let app = build_app(test_state(), dir.to_str().unwrap());
         let (status, body) = get(app, "/homecore/").await;
-        assert_eq!(status, StatusCode::OK, "GET /homecore/ should serve index.html");
-        assert!(body.contains("HOMECORE"), "index.html should mention HOMECORE");
-        assert!(body.contains("./js/app.js"), "index.html should bootstrap app.js");
-    }
-
-    #[tokio::test]
-    async fn ui_design_tokens_are_served() {
-        let app = build_app(test_state(), DEFAULT_UI_DIR);
-        let (status, body) = get(app, "/homecore/css/tokens.css").await;
+        std::fs::remove_dir_all(dir).unwrap();
         assert_eq!(status, StatusCode::OK);
-        // §3.1 invariant: the exact production palette must be present.
-        assert!(body.contains("#4ecdc4"), "--cyan token must be present");
-        assert!(body.contains("--purple"), "--purple token must be present");
+        assert_eq!(body, "external dashboard");
     }
 
     #[tokio::test]
-    async fn ui_panels_are_served() {
-        let app = build_app(test_state(), DEFAULT_UI_DIR);
-        for p in ["dashboard", "rooms", "calibration", "fleet", "seed-detail",
-                  "entities", "cogs", "events", "audit", "settings"] {
-            let (status, _) = get(app.clone(), &format!("/homecore/js/panels/{p}.js")).await;
-            assert_eq!(status, StatusCode::OK, "panel {p}.js should be served");
-        }
-    }
-
-    #[tokio::test]
-    async fn api_still_works_alongside_ui_mount() {
+    async fn api_still_works_without_a_bundled_ui() {
         let app = build_app(test_state(), DEFAULT_UI_DIR);
         // `GET /api/` is auth-gated (HC-API-AUTH-01); send a bearer.
         let resp = app
@@ -458,18 +440,18 @@ mod ui_tests {
         let status = resp.status();
         let bytes = axum::body::to_bytes(resp.into_body(), 1 << 20).await.unwrap();
         let body = String::from_utf8_lossy(&bytes);
-        assert_eq!(status, StatusCode::OK, "the HA-compat API must coexist with the UI mount");
+        assert_eq!(status, StatusCode::OK, "the HA-compat API must remain available");
         assert!(body.contains("API running"));
     }
 
     #[tokio::test]
-    async fn ui_mount_can_be_disabled() {
-        let app = build_app(test_state(), "");
+    async fn ui_mount_is_disabled_by_default() {
+        let app = build_app(test_state(), DEFAULT_UI_DIR);
         let (status, _) = get(app, "/homecore/").await;
         assert_eq!(status, StatusCode::NOT_FOUND, "empty --ui-dir disables the mount");
     }
 
-    /// Build the SAME merged + layered surface `main()` serves: API + UI mount
+    /// Build the SAME merged + layered surface `main()` serves: API + optional UI mount
     /// + BFF gateway, with the audited CORS allowlist + tracing applied to the
     /// whole thing. Used to prove the gateway routes are CORS-covered.
     fn full_app(state: SharedState) -> Router {

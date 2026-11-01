@@ -4,6 +4,8 @@ use super::*;
 
 pub(crate) fn routes() -> Router<SharedState> {
     Router::new()
+        .route("/api/v1/system/clock", get(host_clock))
+        .route("/api/v1/system/build", get(host_build))
         .route("/api/v1/nodes", get(nodes_endpoint))
         .route("/api/v1/nodes/:id/sync", get(node_sync_endpoint))
         .route("/api/v1/mesh", get(mesh_endpoint))
@@ -22,6 +24,19 @@ pub(crate) fn routes() -> Router<SharedState> {
             get(config_get_dedup_factor).post(config_set_dedup_factor),
         )
         .route("/api/v1/config/ground-truth", post(config_set_ground_truth))
+}
+
+async fn host_clock() -> Json<server_clock::HostTimestamp> { Json(server_clock::now()) }
+
+async fn host_build() -> Json<serde_json::Value> {
+    static HASH:std::sync::OnceLock<Result<String,String>>=std::sync::OnceLock::new();
+    let hash=HASH.get_or_init(|| std::env::current_exe().map_err(|error|error.to_string())
+        .and_then(|path|position_artifact::sha256_file(&path).map_err(|error|error.to_string())));
+    match hash {
+        Ok(hash)=>Json(serde_json::json!({"schema":"observatory.host-build.v1","process_id":std::process::id(),
+            "executable_sha256":hash,"version":env!("CARGO_PKG_VERSION"),"csi_protocol_versions":[2,3,4]})),
+        Err(_)=>Json(serde_json::json!({"error":"current executable identity unavailable"})),
+    }
 }
 
 async fn vital_signs_endpoint(State(state): State<SharedState>) -> Json<serde_json::Value> {
@@ -529,6 +544,10 @@ pub(crate) fn public_node_summaries(
             let sequence_total = ns
                 .sequence_observations
                 .saturating_add(ns.inferred_lost_frames);
+            let reception = &ns.csi_reception;
+            let gap_denominator = reception
+                .forward_transitions
+                .saturating_add(reception.unexplained_gaps);
             serde_json::json!({
                 "node_id": id,
                 "display_name": format!("RX{id}"),
@@ -548,9 +567,34 @@ pub(crate) fn public_node_summaries(
                 "accepted_csi_frames": ns.accepted_csi_frames,
                 "inferred_lost_frames": ns.inferred_lost_frames,
                 "sequence_observations": ns.sequence_observations,
+                // Legacy raster-sequence metric: gaps between accepted grid
+                // frames may include received format exclusions. Keep its
+                // meaning for existing evaluators; it is not WLAN/TX loss.
                 "packet_loss_percent": (sequence_total > 0).then_some(
                     (ns.inferred_lost_frames as f64 / sequence_total as f64) * 100.0,
                 ),
+                "csi_reception": {
+                    "scope": "cumulative_rx_boot",
+                    "valid_frames": reception.valid_frames,
+                    "latest_sequence": reception.latest_sequence,
+                    "format_exclusions": {
+                        "count": reception.format_exclusions,
+                        "denominator": reception.valid_frames,
+                        "valid": reception.valid_frames > 0,
+                        "percent": (reception.valid_frames > 0).then(||
+                            reception.format_exclusions as f64 / reception.valid_frames as f64 * 100.0
+                        ),
+                    },
+                    "unexplained_sequence_gaps": {
+                        "count": reception.unexplained_gaps,
+                        "forward_transitions": reception.forward_transitions,
+                        "denominator": gap_denominator,
+                        "valid": gap_denominator > 0,
+                        "percent": (gap_denominator > 0).then(||
+                            reception.unexplained_gaps as f64 / gap_denominator as f64 * 100.0
+                        ),
+                    },
+                },
                 "sync": ns.sync_snapshot(),
                 "time_quality": {
                     "host_arrival_monotonic_ns": ns.latest_host_monotonic_ns,
@@ -636,7 +680,8 @@ mod node_freshness_tests {
             now,
         );
         assert!(node.sync_snapshot().unwrap().is_valid);
-        node.latest_sync_at = Some(now - state::MESH_SYNC_MAX_AGE - std::time::Duration::from_secs(1));
+        node.latest_sync_at =
+            Some(now - state::MESH_SYNC_MAX_AGE - std::time::Duration::from_secs(1));
         let stale = node.sync_snapshot().unwrap();
         assert!(!stale.is_valid);
         assert_eq!(stale.offset_us, -8);

@@ -1,0 +1,24 @@
+@font-face {
+  font-family: "JetBrains Mono";
+  src: url("fonts/JetBrainsMono-Variable.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 100 800;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Departure Mono";
+  src: url("fonts/DepartureMono-Regular.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+}
+
+:root {
+  --font-interface: "JetBrains Mono", monospace;
+  --font-display: "Departure Mono", "JetBrains Mono", monospace;
+}
+
+button, input, select, textarea {
+  font-family: var(--font-interface);
+}

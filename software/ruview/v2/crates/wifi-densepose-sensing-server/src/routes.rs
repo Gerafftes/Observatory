@@ -9,11 +9,15 @@ use super::{
 };
 
 /// Browser-facing routes extracted from the binary's top-level router.
-pub(crate) fn api_routes() -> Router<SharedState> {
+pub(crate) fn api_routes(rx_session_only: bool) -> Router<SharedState> {
     Router::new()
         .merge(api_observability_routes())
         .merge(calibration_routes::routes())
-        .merge(mmwave_routes::routes())
+        .merge(if rx_session_only {
+            Router::new()
+        } else {
+            mmwave_routes::routes()
+        })
         .merge(model_routes::routes())
         .merge(observatory_routes::routes())
         .merge(recording_routes::routes())

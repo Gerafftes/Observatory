@@ -1,5 +1,7 @@
 # ADR-092: nvsim Dashboard — Vite + Dual-Transport (WASM + REST/WS) Implementation
 
+> Historical note (2026-10-28): the nvsim dashboard and its simulator were removed from this repository. This decision is retained for context.
+
 | Field | Value |
 |---|---|
 | **Status** | **Implemented (2026-04-27)** — live at https://ruvnet.github.io/RuView/nvsim/. PR #436 open against main. 8/12 §11 gates ✅, 4/12 ⚠ (require external infrastructure). |

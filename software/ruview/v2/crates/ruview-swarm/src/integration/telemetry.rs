@@ -1,6 +1,6 @@
-//! JSONL telemetry recorder for the swarm training/sim visualizer.
+//! JSONL telemetry recorder for swarm training and simulation.
 //!
-//! Emits newline-delimited JSON records consumed by `viz/swarm_viz.html`:
+//! Emits newline-delimited JSON records for offline analysis:
 //!   - one `meta` record (mission profile, area, ground-truth victims)
 //!   - many `step` records (per-tick drone positions, coverage, detections)
 //!   - optional `episode` records (per-episode training metrics)

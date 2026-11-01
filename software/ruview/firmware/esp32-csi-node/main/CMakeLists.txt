@@ -1,3 +1,7 @@
+if(CONFIG_RX_UNIFIED OR OBSERVATORY_RX_RELEASE)
+include("${CMAKE_CURRENT_LIST_DIR}/rx_sources.cmake")
+set(SRCS ${RX_SOURCES})
+else()
 set(SRCS
     "main.c" "node_identity.c" "csi_collector.c" "csi_transport.c"
     "stream_sender.c" "nvs_config.c"
@@ -19,6 +23,7 @@ set(SRCS
     # ADR-110 B1/B2 unblock — soft-AP HE/TWT (C6-only when enabled)
     "c6_softap_he.c"
 )
+endif()
 
 # ESP-IDF v6+: headers must resolve via explicit REQUIRES (no implicit deps).
 set(REQUIRES
@@ -40,7 +45,12 @@ set(REQUIRES
     lwip
     mbedtls
     espressif__libsodium
+    json
+    espressif__led_strip
 )
+if(CONFIG_RX_UNIFIED OR OBSERVATORY_RX_RELEASE)
+    set(REQUIRES ${RX_REQUIRES})
+endif()
 
 # ADR-110: C6-only components — pulled in when building for esp32c6.
 # Note: CONFIG_* symbols are not available in main CMakeLists.txt evaluation —

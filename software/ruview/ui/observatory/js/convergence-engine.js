@@ -165,7 +165,7 @@ export class ConvergenceEngine {
       this._lastClassification = label;
       const ctx = this._classCtx;
       ctx.clearRect(0, 0, 256, 48);
-      ctx.font = '600 24px "Courier New", monospace';
+      ctx.font = '600 24px "JetBrains Mono", monospace';
       ctx.textAlign = 'center';
 
       if (motionLevel === 'active') ctx.fillStyle = '#ff8800';

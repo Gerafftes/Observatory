@@ -1,5 +1,7 @@
 # ADR-093: nvsim Dashboard Gap Analysis (post-deploy review)
 
+> Historical note (2026-10-28): the nvsim dashboard was removed from this repository. This review is retained for context.
+
 | Field | Value |
 |---|---|
 | **Status** | **Implemented (2026-04-27)** — iterations A through N shipped to PR #436. 21 of 21 catalogued gaps closed. P2.7 (`clients.claim()` in SW) and P2.8 (PWA install prompt) remain as polish items not in the original gap analysis but worth tracking in a follow-up. |

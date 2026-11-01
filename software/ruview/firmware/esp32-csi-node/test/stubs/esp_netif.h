@@ -13,6 +13,11 @@
 #include "esp_err.h"
 
 typedef struct esp_netif_obj esp_netif_t;
+#ifdef RX_WIFI_TEST
+esp_err_t esp_netif_init(void);
+esp_netif_t *esp_netif_create_default_wifi_sta(void);
+void esp_netif_destroy_default_wifi(esp_netif_t *);
+#endif
 
 typedef struct {
     uint32_t addr;

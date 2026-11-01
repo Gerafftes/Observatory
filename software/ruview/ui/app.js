@@ -324,6 +324,8 @@ class WiFiDensePoseApp {
           this.components.sensing.init().catch(error => {
             console.error('Failed to initialize sensing tab:', error);
           });
+        } else {
+          void this.components.sensing?.controlCenter?.reopen();
         }
         break;
 

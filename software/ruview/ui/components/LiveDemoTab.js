@@ -297,7 +297,7 @@ export class LiveDemoTab {
         display: flex;
         flex-direction: column;
         height: 100%;
-        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+        font-family: var(--font-interface);
         background: #0a0f1a;
         color: #e0e0e0;
       }
@@ -527,7 +527,7 @@ export class LiveDemoTab {
         border: 1px solid rgba(255, 255, 255, 0.1);
         border-radius: 4px;
         padding: 8px;
-        font-family: monospace;
+        font-family: var(--font-interface);
         font-size: 11px;
         resize: vertical;
         background: #0a0f1a;
