@@ -1,0 +1,1 @@
+These measurements show that all four receivers can collect usable data, and the receiver-to-receiver test passed too. The project is still unfinished. Next, I’ll check the radar sensors, collect walking data, and test positioning models. After that come live tracking, a second room, and eventually two-person experiments.

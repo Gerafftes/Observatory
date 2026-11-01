@@ -1,0 +1,11 @@
+{
+  "name": "observatory-section-5-media",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "render": "node render.mjs"
+  },
+  "dependencies": {
+    "sharp": "0.35.5"
+  }
+}

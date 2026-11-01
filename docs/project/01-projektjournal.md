@@ -1,3 +1,4 @@
+<!-- Publication copy: local paths and hardware identifiers were pseudonymized; private original retained. -->
 # 01 Projektjournal
 
 Dieses Journal sammelt den Verlauf des Projekts in Berichtssprache. Es soll später helfen, Einleitung, Methodik, Diskussion und Fazit zu schreiben.
@@ -131,7 +132,7 @@ Zuerst wurde ein Minimal-Sketch ohne WiFi getestet. Dieser lief stabil. Danach w
 Der Minimal-Sketch gab wiederholt `alive` aus. Der SoftAP-Start funktionierte mit anderem Kabel:
 
 - AP IP: `192.168.4.1`
-- AP MAC: `AE:27:6E:A8:D2:64`
+- AP MAC: `02:00:00:00:00:04`
 
 **Erfolg**
 
@@ -641,7 +642,7 @@ Ausführliche Diagnose und Bildnachweis: [experiment-reports/2026-07-18_fester-r
 
 **Ausgangslage**
 
-Nach der Diagnose vom 18. Juli wurden alle vier RX auf den kontrollierten TX mit der MAC-Adresse `AE:27:6E:A8:D2:64` gefiltert. Vor weiteren Personenversuchen sollte zuerst geprüft werden, ob der leere Raum mit dem bereinigten Paketstrom und der D4-Bewegungsmetrik ruhig bleibt.
+Nach der Diagnose vom 18. Juli wurden alle vier RX auf den kontrollierten TX mit der MAC-Adresse `02:00:00:00:00:04` gefiltert. Vor weiteren Personenversuchen sollte zuerst geprüft werden, ob der leere Raum mit dem bereinigten Paketstrom und der D4-Bewegungsmetrik ruhig bleibt.
 
 **Durchführung / Änderung**
 

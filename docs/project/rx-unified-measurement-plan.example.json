@@ -1,0 +1,20 @@
+{
+  "schema": "observatory.rx-measurement-plan.v1",
+  "phase": "baseline",
+  "server_url": "http://127.0.0.1:8080",
+  "server_pid": 1,
+  "server_sha256": "REPLACE_WITH_ACTUAL_EXECUTABLE_SHA256",
+  "firmware_image_sha256": "REPLACE_WITH_RELEASE_IMAGE_SHA256",
+  "firmware_source_sha256": "REPLACE_WITH_RELEASE_SOURCE_SHA256",
+  "recordings_dir": "PRIVATE_EVIDENCE/NEW_PRIVATE_RUN/data/recordings",
+  "recording_id": "new-baseline-unique-id",
+  "csi_host_ip": "192.0.2.100",
+  "udp_port": 5005,
+  "pcap_interface": "REPLACE_WITH_EXISTING_INTERFACE",
+  "nodes": [
+    {"node_id": 1, "url": "http://192.0.2.11:8032", "device_id": "REPLACE_WITH_RX1_DEVICE_SHA256", "generation": 1, "config_sha256": "REPLACE_WITH_RX1_ACTIVE_CONFIG_SHA256", "mode_id": 0, "peer_ids": [], "rate_hz": 50, "token_env": "BLL_RX1_OTA_PSK"},
+    {"node_id": 2, "url": "http://192.0.2.12:8032", "device_id": "REPLACE_WITH_RX2_DEVICE_SHA256", "generation": 1, "config_sha256": "REPLACE_WITH_RX2_ACTIVE_CONFIG_SHA256", "mode_id": 0, "peer_ids": [], "rate_hz": 50, "token_env": "BLL_RX2_OTA_PSK"},
+    {"node_id": 3, "url": "http://192.0.2.13:8032", "device_id": "REPLACE_WITH_RX3_DEVICE_SHA256", "generation": 1, "config_sha256": "REPLACE_WITH_RX3_ACTIVE_CONFIG_SHA256", "mode_id": 0, "peer_ids": [], "rate_hz": 50, "token_env": "BLL_RX3_OTA_PSK"},
+    {"node_id": 4, "url": "http://192.0.2.14:8032", "device_id": "REPLACE_WITH_RX4_DEVICE_SHA256", "generation": 1, "config_sha256": "REPLACE_WITH_RX4_ACTIVE_CONFIG_SHA256", "mode_id": 0, "peer_ids": [], "rate_hz": 50, "token_env": "BLL_RX4_OTA_PSK"}
+  ]
+}

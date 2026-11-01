@@ -1,0 +1,27 @@
+# Koordinatorreview: Bereitschaft für den RX-Hardwarelauf
+
+**Der Dateisystem-Bindungsfehler ist unabhängig bestätigt behoben. Der Messlauf ist noch nicht ausführungsbereit: die bisher ausgelieferten Hostprogramme und der Realadapter enthalten weiterhin ihre absichtlichen Livesperren. Die eigene ausführbare Livekopie muss vorbereitet und geprüft werden; unmittelbar danach muss der echte Platzguard bestehen.**
+
+Stand: 16. Oktober 2026, Europe/Berlin. Nur lokale Datei-/Softwareprüfung, keine Geräte-, Host-, Netz- oder Firmwareaktivierung. Kein Agent gestartet oder angeschrieben, keine Bereinigung und kein Neubau durch den Koordinator.
+
+## Positiv abgeschlossen
+
+Maßgeblich ist die [neue Bindungslieferung](../../private/v31-dateisystembindung-20261016T133451Z/REPORT.private.md). Der vorhandene Prüfer hat das komplette neue Paket mit **127 Einträgen** erneut nach Inhalt, Dateisatz und Linktopologie bestanden. Die explizite Erwartungsbindung hat SHA-256 `79d97d7ccb15c1965d037283cd3e6bb510d29d4599b0e717d8fa985cdc9c9f8e` und gilt für 28 Originalreferenzen der beiden gespeicherten synthetischen Fälle. Die ursprünglichen Ist-Scans werden nicht verändert. Die Anpassung erneuert ausschließlich die alte erwartete Gerätenummer; zusätzliche Volume-/Modus-/Besitzer-/Flag-/Linkprüfungen bleiben vor und nach dem Lesen wirksam. Historische Originalmanifeste bleiben erhalten.
+
+Der Koordinator hat den **finalen neuen v3.1-Verifikationspfad einschließlich v3-Basis erneut tatsächlich ausgeführt**, mit OS-Netz-/Geräte-/Cachelesesperren und Schreibrecht ausschließlich im frischen kleinen Ergebnisordner: **PASS**, 1.351 v3.1-Lieferdateien und 56 Quellen. Der Basis-Kindprozess hat die 14 vollen kanonischen Originalreferenzen streng gelesen; die äußere Verifikation selbst meldet zutreffend keine eigenen zusätzlichen Originalscans. [Eigene neue Verifikationsreceipts](../../private/v31-hardwarebereitschaft-review-20261016-20261016T141900Z/verification.private.json).
+
+Die versiegelten gespeicherten Nachweise umfassen zusätzlich 21 erfolgreiche Bindungstests, drei echte CLI-Ausgabegegenproben sowie den kleinen und vollständigen nativen 480-/960-s-Dateipfad mit je 17 bytegleichen Ergebnisdateien. Der vollständige synthetische Fall erhält 473/953 gemeinsame qualifizierte Fenster. Diese Tests/Auswertungen wurden im Review nicht als nochmals ausgeführt ausgegeben. Keine reale Funk- oder Positionsabnahme daraus ableiten.
+
+## Verbleibende konkrete Startbedingungen
+
+1. **Ausführbare eigene Livekopie:** In der geprüften Hostquelle `private/rx-budget-vorklammern-offline-20261015T184011Z/host/crates/wifi-densepose-sensing-server/src/main.rs` steht weiterhin der unbedingte `black_box(true)`-Ausstieg mit Code 78. Im finalen `adapter/real_adapter.py` steht `LIVE_LOCKED = True`. Die neue Bindungslieferung ändert das bewusst nicht. Originale nicht entsperren. Eigene eng begrenzte Laufkopie/-hostprogramme herstellen, betroffene Hostprogramme nach nachgewiesener Notwendigkeit neu bauen und die tatsächlichen ausführbaren Pfade unabhängig prüfen. Den kompletten unveränderten Geräte-/Host-/Quellen-/Config-/Pfad-/Budget-/Auth-/Speicherschutz beibehalten. Keine neue CSI-Firmwarekorrektur aus diesem Review erforderlich. Die Bindung für alte Offlinefälle darf nicht als Ersatz frischer Liveverträge verwendet werden.
+2. **Platz nach der Vorbereitung:** Zu Beginn dieses Reviews waren 66,895035 GiB frei. Beim tatsächlich ausgeführten lokalen `storage_plan.check_targets` fiel der freie Platz auf **65,789886 GiB**; zur unveränderten Grenze **66,051743 GiB = 70.922.518.528 Byte** fehlten **0,261856 GiB**, und der echte Guard stoppte korrekt. Keine Ursache der systemweiten Schwankungen behauptet. Die eigene erneute Verifikation erzeugte nur kleine Receipts, keine neue volle Auswertung oder große Kopie. Ein günstiger früherer Freiplatzwert ist keine spätere Startdeckung; nach Livevorbereitung und unmittelbar vor Zugriff den aktuellen Guard erneut ausführen. Keine Reserve senken, keine zusätzlichen Löschungen aus alten Freigaben ableiten.
+3. **Passende getrennte Freigaben und frischer Preflight:** Geräteunterbrechung und genau zwei RX1-/RX4-App-Schreibzugriffe sowie Hostunterbrechung/-aktivierung und erlaubte Lese-/Captureaktionen ausdrücklich für den konkreten Lauf freigeben. Frische Geräte-/Host-/Geometriebindungen bleiben Pflicht. Der jetzige Vorschlag bleibt `LOCKED_NOT_AUTHORIZED`; alte Installations- oder Cachefreigaben ersetzen das nicht.
+
+## Nächster Schritt
+
+Jetzt die **bereits eingeplante begrenzte Livevorbereitung** vollständig und prüfbar machen, einschließlich danach gemessener Speicherdeckung. Keine weitere allgemeine Bindungs- oder CSI-Analyse aus diesem positiven Abschluss ableiten. Anschließend separat freigegebener gebündelter Hardwarelauf: RX1/RX4 nacheinander installieren, 480 s Basis und 960 s Paarvergleich innerhalb 6.000 s Gesamtbudget einschließlich 600 s Ende. TX1/RX2/RX3 unverändert. Firmwarekandidaten und sonstige Schutzmechanismen bleiben die bereits gebundenen Varianten.
+
+Benötigte Hardware: TX1 und vier RX an festen Positionen mit normaler Stromversorgung, Mac am Netzteil im bestehenden Projekt-WLAN. Keine COM-/Mac-USB-Datenkabel und keine Radare für diesen RX-Funkvergleich. Ein Anschließen allein autorisiert keine Gerätezugriffe. Keine frische Erreichbarkeit oder Laufzustände durch diesen Review behauptet.
+
+Die drei vollständigen Livekriterien des 14. Oktober bleiben offen, weiterhin **2/5**. **Schwierigkeit der begrenzten Livevorbereitung: 3/5; Hardwaregesamtlauf: 4/5.**

@@ -1,3 +1,4 @@
+<!-- Publication copy: local paths and hardware identifiers were pseudonymized; private original retained. -->
 # D4/E0-Mischlauf — 2026-07-26
 
 > **Nachträglicher Gültigkeitshinweis:** Der Raum wurde während der Aufnahme zweimal kurz betreten. Der Lauf ist deshalb keine reine Leerraum-Baseline und darf nicht zur Festlegung von Schwellen oder zur Berechnung einer Leerraum-Fehlerrate verwendet werden. Die Messung bleibt als dokumentierter Mischlauf erhalten.
@@ -8,7 +9,7 @@ Geplant war ein Leerraumtest nach der D4-Änderung und dem TX-MAC-Filter auf all
 
 ## Aufbau
 
-- 1 kontrollierter TX, Absender-MAC `AE:27:6E:A8:D2:64`
+- 1 kontrollierter TX, Absender-MAC `02:00:00:00:00:04`
 - 4 RX mit aktivem Filter auf diese TX-MAC
 - fester Raumaufbau mit korrigierter TX-/RX-Geometrie
 - RuView-Sensing-Server mit D4-Bewegungsmetrik

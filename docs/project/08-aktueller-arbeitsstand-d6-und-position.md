@@ -1,3 +1,4 @@
+<!-- Publication copy: local paths and hardware identifiers were pseudonymized; private original retained. -->
 # 08 Aktueller Arbeitsstand: D6 und Positionsbestimmung
 
 Stand: 2026-08-14
@@ -1202,7 +1203,7 @@ Detailnachweis:
 - Nutzerauftrag: das bekannte, WLAN-konfigurierte Image auf den ESP für den
   mmWave-Sensor erneut laden
 - angeschlossenes Board war ein anderes ESP32-C3 als der zuvor geprüfte Knoten:
-  MAC `ac:a7:04:c2:71:f4`, Revision v0.4, 4 MB Flash
+  MAC `02:00:00:00:00:03`, Revision v0.4, 4 MB Flash
 - die zunächst nur beschriebene App-Partition bootete nicht, weil die
   Partitionstabelle und OTA-Metadaten dieses Boards leer waren (`0xff`); der
   Bootloader meldete deshalb `invalid header`
@@ -1281,15 +1282,15 @@ Detailnachweis:
 ### 2026-08-21 — Vergleichs-ESP ohne LD2450 besteht den WLAN-Test
 
 - zweiter ESP32-C3 ohne angeschlossenen LD2450 per USB geprüft, MAC
-  `ac:a7:04:c0:a0:8c`
+  `02:00:00:00:00:02`
 - derselbe bekannte Firmwarestand `esp32-mmwave-node` v0.1.0 bootet sauber
 - WLAN-Anmeldung erfolgreich: `connected with csi-test`, BSSID
-  `ae:27:6e:a8:d2:64`, WPA2-PSK, Kanal 6, RSSI `-79 dBm`
+  `02:00:00:00:00:04`, WPA2-PSK, Kanal 6, RSSI `-79 dBm`
 - ESP erhält `192.168.4.2`; HTTP-Status-/Modus-/OTA-Server startet auf Port
   `8032`
 - damit sind TX-SoftAP, SSID/PSK und der WLAN-/Firmwarepfad grundsätzlich
   funktionsfähig, auch ohne mmWave-Sensor
-- der Fehler des ursprünglichen Boards `ac:a7:04:c2:71:f4` liegt damit
+- der Fehler des ursprünglichen Boards `02:00:00:00:00:03` liegt damit
   wahrscheinlich an diesem ESP selbst oder an dessen gespeicherter
   WLAN-Konfiguration/NVS; der LD2450 ist nicht die Ursache des beobachteten
   Authentifizierungsfehlers
@@ -1299,14 +1300,14 @@ Detailnachweis:
 ### 2026-08-27 — Neuer Breadboard-ESP geflasht und WLAN bestanden
 
 - Nutzer hat den ESP für den Breadboard-Aufbau mit angeschlossenem LD2450 per
-  USB verbunden; Board-MAC `70:af:09:0d:a8:a8`
+  USB verbunden; Board-MAC `02:00:00:00:00:01`
 - das bekannte vollständige Paket wurde erneut geschrieben und für Bootloader,
   Partitionstabelle, OTA-Daten und App jeweils mit `Hash of data verified`
   bestätigt; NVS wurde nicht gelöscht
 - Bootnachweis: ESP-IDF v5.4.3, `esp32-mmwave-node` v0.1.0, Start von
   `MMWAVE1` im Kalibrierungsmodus
 - WLAN-Anmeldung erfolgreich: `connected with csi-test`, BSSID
-  `ae:27:6e:a8:d2:64`, WPA2-PSK, Kanal 6, RSSI `-77 dBm`
+  `02:00:00:00:00:04`, WPA2-PSK, Kanal 6, RSSI `-77 dBm`
 - ESP erhielt `192.168.4.2` und startete den HTTP-Status-/Modus-/OTA-Server
   auf Port `8032`
 - die Sensor-UART-Werte konnten in diesem Durchlauf noch nicht über HTTP
