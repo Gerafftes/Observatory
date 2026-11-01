@@ -76,7 +76,7 @@ gibt es derzeit nicht.
 - [Benutzeroberfläche](#benutzeroberfläche)
 - [Wie es funktioniert](#wie-es-funktioniert)
 - [Hardware](#hardware)
-- [Repository und private Daten](#repository-und-private-daten)
+- [Projektstruktur](#projektstruktur)
 - [Dokumentation](#dokumentation)
 - [Lizenz und Credits](#lizenz-und-credits)
 
@@ -196,7 +196,7 @@ Weitere Zustände erkennst du an Farbe und Blinkfolge:
 
 <a href="project-media/hardware/rx-status-led-patterns.png"><img src="project-media/hardware/rx-status-led-patterns.png" alt="RX-LED-Farben und Blinkmuster für Normalbetrieb, Start, WLAN/IP, fehlende TX1-CSI, Initialisierungsfehler, Transportfehler, OTA und interne Fehler" width="560"></a>
 
-## Repository und private Daten
+## Projektstruktur
 
 Das Repository bündelt den bearbeitbaren Projektstand:
 
@@ -207,16 +207,9 @@ Das Repository bündelt den bearbeitbaren Projektstand:
 | `docs/` und `experiment-reports/` | Methodik, Ergebnisberichte und dokumentierte Grenzen |
 | `project-media/` und `measurement-templates/` | Öffentliche Abbildungen und Vorlagen |
 
-Rohmessungen, Geräte-/NVS- und Flashsicherungen, Zugangsdaten, lokale
-Konfigurationen, Agentensitzungen und die Umzugsnachweise bleiben in der privaten
-SSD-Ablage. Sie werden zum Bauen und für die Simulation nicht benötigt.
-Historische Berichte können private Nachweise benennen; diese Verweise stellen
-keine öffentlich verfügbaren Downloads dar. In Veröffentlichungskopien sind
-lokale Pfade und Hardwareidentitäten pseudonymisiert.
-
-Der [Software-Einstieg](software/README.md) beschreibt Voraussetzungen und
-Prüfbefehle. [Veröffentlichungsregeln](docs/PUBLICATION.md) erklären die Trennung
-zwischen öffentlichen Quellen und privaten Betriebsdaten.
+Die Ergebnisberichte enthalten zusammengefasste Befunde. Rohaufzeichnungen und
+gerätespezifische Konfiguration sind nicht Teil der Quellverteilung. Bau- und
+Prüfbefehle stehen im [Software-Einstieg](software/README.md).
 
 ## Dokumentation
 

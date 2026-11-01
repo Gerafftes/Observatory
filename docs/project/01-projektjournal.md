@@ -1,4 +1,3 @@
-<!-- Publication copy: local paths and hardware identifiers were pseudonymized; private original retained. -->
 # 01 Projektjournal
 
 Dieses Journal sammelt den Verlauf des Projekts in Berichtssprache. Es soll später helfen, Einleitung, Methodik, Diskussion und Fazit zu schreiben.

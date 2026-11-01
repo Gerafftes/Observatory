@@ -1,4 +1,3 @@
-<!-- Publication copy: local paths and hardware identifiers were pseudonymized; private original retained. -->
 # Peer-Zeitordnung: Offline-Reproduktion und Kandidat
 
 Der vorzeitige Sitzungsabbruch ist am tatsächlich installierten
@@ -27,34 +26,9 @@ Mesh-Verschachtelungen in beiden Richtungen, die verzögerte Zulassung,
 Budgetuhr beendet die Sitzung weiterhin. Die eigentlichen Budgetregeln in
 `rx_budget.c` wurden nicht geändert.
 
-Die gesamte C-Suite mit ASan/UBSan sowie 69 Python-Tests bestanden. Eine enge
-Jev-Quellflussprüfung unterstützte die serialisierte Budgetzeit und den Erhalt
-der Capturezeit. Die Alters-/Rücksprungsfrage blieb dort unentschieden und
-wurde anhand der unveränderten Budgetquelle und tatsächlich ausgeführten
-Grenz-/Rücksprungtests selbst geprüft. Jev zertifiziert weder Tests noch
-Hardware oder Freigaben.
-
-Zwei unabhängige Builds mit dem sauberen gebundenen ESP-IDF 5.4 und dem
-gepinnten Compiler lieferten bytegleiche **909520 B** große Apps:
-
-- App-SHA256: `20550def4f3649620bcd39d397a62c4ccf39d064baa4c1b89677648a8691bdb2`
-- Image-Digest: `e2372e5cdf59771d487e5e765adfd9345c1f7dd6607ad70313475a1544dfb8c0`
-- Quellmanifest: `62e058d852e75e47a321e0efd5daa861733ae3c5979884835a9bc34089b581b7`
-- Partitionsdatei unverändert: `67222c257c0477501fd4002275638dc4262b34eb68235b8289fb1337054d322b`
-
-Gegenüber dem installierten Kandidaten änderten sich im Produktionsmanifest
-nur `main/csi_peer.c` und dessen Header. Protokoll, Masken, Raten, Peerquoten,
-900-s-Grenze, NVS-Schema, Bootloader und Partitionslayout bleiben erhalten.
-Dies ist eine Offline-Freigabebasis, noch kein Live-Peer- oder Tag14-PASS.
-
-Die privaten Belege liegen unter
-`PRIVATE_EVIDENCE/rx-unified-peer-clock-fix-20261027-run01/`:
-Vorher-/Nachherquellen und Patch, negativer Test des installierten Codes,
-C-/Python-Protokolle, Quellflussprüfung, `OFFLINE-VERIFIED.private.json` sowie
-`release-candidate-v3/` mit beiden Builds, Manifesten und Ressourcenbericht.
-Die neue gerätegebundene Installationsvorbereitung unter
-`rx-unified-live-20261027-run01/amendment-02/` erhält vorhandene Profile
-(RX1/RX4 Generation 3, RX2/RX3 Generation 1), verlangt frische doppelte
-Vollsicherungen und behält sämtliche Schutz-/Rückleseprüfungen. Die bestehende
-Schreibfreigabe für den alten Hash ist verbraucht; die Ergänzung für den neuen
-Hash wurde gesondert angefragt. Das gemeinsame Ende bleibt 23:10 Uhr.
+Die C-Suite mit ASan/UBSan und 69 Python-Tests bestanden. Zwei unabhängig
+gebaute Firmwaredateien waren bytegleich. Protokoll, Masken, Raten, Peerquoten,
+900-s-Grenze, NVS-Schema und Partitionslayout wurden bei dieser Korrektur
+beibehalten. Offline-Regressionen ersetzen keine Live-Peer-Qualifikation;
+die getrennten Messberichte vom [27.](rx-unified-tag14-result-20261027.md) und
+[29. Oktober](rx-unified-tag14-result-20261029.md) dokumentieren die Livebefunde.
