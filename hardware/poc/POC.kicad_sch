@@ -1,0 +1,60 @@
+(kicad_sch
+	(version 20260306)
+	(generator "eeschema")
+	(generator_version "10.0")
+	(uuid "0dbc0e27-9f57-4d38-9848-8c1c4bc52556")
+	(paper "A4")
+	(lib_symbols)
+	(sheet
+		(at 41.91 41.275)
+		(size 51.435 38.1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(stroke
+			(width 0.1524)
+			(type solid)
+		)
+		(fill
+			(color 0 0 0 0)
+		)
+		(uuid "72df40b7-b457-4cda-9c89-4e47da4b3ba2")
+		(property "Sheetname" "POCSchule"
+			(at 41.91 40.5634 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left bottom)
+			)
+		)
+		(property "Sheetfile" "POCSchule.kicad_sch"
+			(at 41.91 79.9596 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
+			)
+		)
+		(instances
+			(project "POC"
+				(path "/0dbc0e27-9f57-4d38-9848-8c1c4bc52556"
+					(page "2")
+				)
+			)
+		)
+	)
+	(sheet_instances
+		(path "/"
+			(page "1")
+		)
+	)
+	(embedded_fonts no)
+)

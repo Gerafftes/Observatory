@@ -1,4 +1,5 @@
 lazy import sys
+lazy import pathlib
 
 sys.path.insert(
     0,
@@ -8,7 +9,7 @@ sys.path.insert(
 lazy import pcbnew
 
 
-PCB_PATH = "/Users/Johann/Development/BLL KiCad/mmwave-PCB/PCB-02/PCB-03/PCB-03.kicad_pcb"
+PCB_PATH = str(pathlib.Path(__file__).resolve().parents[1] / "hardware" / "pcb-03" / "PCB-03.kicad_pcb")
 
 
 def add_zone(board, layer, net_code, points):

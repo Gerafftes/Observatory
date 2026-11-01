@@ -26,6 +26,8 @@ PCB-01/PCB-02.
 
 PCB-02 bleibt als vorherige Revision dokumentiert.
 
+Die vollständigen KiCad-Projektquellen liegen unter `hardware/`: [PCB-01](pcb-01/), [PCB-02](pcb-02/), [PCB-03](pcb-03/) und [POC-Schaltpläne](poc/). Der [KiCad-Einstieg](KICAD.md) nennt die Projektdateien und benötigten Bibliotheken.
+
 > [!IMPORTANT]
 > Für den aktuellen Aufbau ist ausdrücklich **PCB-03** zu verwenden. PCB-01 und PCB-02 bleiben als frühere Revisionen dokumentiert.
 
