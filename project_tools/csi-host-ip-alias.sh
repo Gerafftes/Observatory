@@ -6,7 +6,7 @@ readonly LABEL="com.ruview.csi-host-ip-alias"
 readonly TARGET_IP="192.168.4.50"
 readonly GATEWAY_IP="192.168.4.1"
 readonly EXPECTED_NETMASK="255.255.255.0"
-readonly EXPECTED_TX_BSSID="ae:27:6e:a8:d2:64"
+readonly EXPECTED_TX_BSSID="${OBSERVATORY_TX_BSSID:-}"
 readonly INSTALL_DIR="/Library/Application Support/RuView"
 readonly INSTALL_PATH="$INSTALL_DIR/csi-host-ip-alias.sh"
 readonly PLIST_PATH="/Library/LaunchDaemons/$LABEL.plist"
@@ -426,6 +426,7 @@ make_plist() {
   /usr/bin/plutil -create xml1 "$temporary" || return 1
   /usr/bin/plutil -insert Label -string "$LABEL" "$temporary" || return 1
   /usr/bin/plutil -insert ProgramArguments -json "[\"$INSTALL_PATH\",\"daemon\"]" "$temporary" || return 1
+  /usr/bin/plutil -insert EnvironmentVariables -json "{\"OBSERVATORY_TX_BSSID\":\"$EXPECTED_TX_BSSID\"}" "$temporary" || return 1
   /usr/bin/plutil -insert RunAtLoad -bool true "$temporary" || return 1
   /usr/bin/plutil -insert KeepAlive -bool true "$temporary" || return 1
   /usr/bin/plutil -insert ProcessType -string Background "$temporary" || return 1
@@ -513,23 +514,30 @@ status_main() {
 
 self_test() {
   local packet arp failures=0
+  local expected_test_mac="02:00:00:00:00:01"
   packet=$'op = BOOTREPLY\nyiaddr = 192.168.4.2\ndhcp_message_type (uint8): ACK 0x5\nsubnet_mask (ip): 255.255.255.0\nrouter (ip_mult): {192.168.4.1}\nserver_identifier (ip): 192.168.4.1'
   [[ "$(packet_value "$packet" op)" == BOOTREPLY ]] || (( failures++ ))
   [[ "$(packet_value "$packet" dhcp_message_type)" == ACK ]] || (( failures++ ))
   [[ "$(packet_value "$packet" subnet_mask)" == "$EXPECTED_NETMASK" ]] || (( failures++ ))
   [[ "$(packet_value "$packet" router)" == "$GATEWAY_IP" ]] || (( failures++ ))
   [[ "$(packet_value "$packet" server_identifier)" == "$GATEWAY_IP" ]] || (( failures++ ))
-  arp='? (192.168.4.1) at AE:27:6E:A8:D2:64 on en0 ifscope [ethernet]'
-  [[ "$(arp_mac "$arp")" == "$EXPECTED_TX_BSSID" ]] || (( failures++ ))
+  arp='? (192.168.4.1) at 02:00:00:00:00:01 on en0 ifscope [ethernet]'
+  [[ "$(arp_mac "$arp")" == "$expected_test_mac" ]] || (( failures++ ))
   valid_interface en0 || (( failures++ ))
   ! valid_interface 'en0;bad' || (( failures++ ))
-  valid_mac "$EXPECTED_TX_BSSID" || (( failures++ ))
+  valid_mac "$expected_test_mac" || (( failures++ ))
+  ! valid_mac "" || (( failures++ ))
   ! valid_mac bad || (( failures++ ))
   (( failures == 0 )) || { print -u2 -- "Self-test failed: $failures checks"; return 1; }
   print -- "Self-test passed: DHCP, ARP, interface, and MAC parsing"
 }
 
 main() {
+  case "${1:-help}" in
+    install|daemon|enable)
+      valid_mac "$EXPECTED_TX_BSSID" || { print -u2 -- "Set OBSERVATORY_TX_BSSID to your own TX identity first."; return 64; }
+      ;;
+  esac
   case "${1:-help}" in
     install) install_service ;;
     daemon) daemon_main ;;

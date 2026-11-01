@@ -188,7 +188,7 @@ frühere Revisionen dokumentiert; für den aktuellen Aufbau ist **PCB-03** zu ve
 Im Normalbetrieb: RX1 blau, RX2 grün, RX3 rot, RX4 violett.
 Weitere Zustände erkennst du an Farbe und Blinkfolge:
 
-<a href="devlogs/RX_Farbmuster.png"><img src="devlogs/RX_Farbmuster.png" alt="RX-LED-Farben und Blinkmuster für Normalbetrieb, Start, WLAN/IP, fehlende TX1-CSI, Initialisierungsfehler, Transportfehler, OTA und interne Fehler" width="560"></a>
+<a href="project-media/hardware/rx-status-led-patterns.png"><img src="project-media/hardware/rx-status-led-patterns.png" alt="RX-LED-Farben und Blinkmuster für Normalbetrieb, Start, WLAN/IP, fehlende TX1-CSI, Initialisierungsfehler, Transportfehler, OTA und interne Fehler" width="560"></a>
 
 ## Dokumentation
 

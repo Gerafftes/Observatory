@@ -3,6 +3,7 @@
 # Usage: ./deploy-scheduler.sh [PROJECT_ID]
 
 set -euo pipefail
+: "${BRAIN_API_KEY:?Set your own BRAIN_API_KEY locally}"
 
 PROJECT_ID="${1:-ruv-dev}"
 REGION="us-central1"
@@ -33,7 +34,7 @@ deploy_job() {
     --uri="${SERVICE_URL}/v1/pipeline/optimize" \
     --http-method=POST \
     --message-body="$body" \
-    --headers="Content-Type=application/json,Authorization=Bearer ruvector-swarm" \
+    --headers="Content-Type=application/json,Authorization=Bearer ${BRAIN_API_KEY}" \
     --oidc-service-account-email="$SA_EMAIL" \
     --max-retry-attempts=3 \
     --min-backoff="5s" \

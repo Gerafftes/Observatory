@@ -68,16 +68,16 @@ for (let ch = 1; ch <= 13; ch++) CHANNEL_FREQ[ch] = 2412 + (ch - 1) * 5;
 const NODE1_CHANNELS = [1, 6, 11];
 const NODE2_CHANNELS = [3, 5, 9];
 
-// Neighbor APs as illuminators with estimated positions
+// Synthetic AP names and example illuminator positions; configure your own setup.
 const ILLUMINATORS = [
-  { ssid: 'ruv.net',       channel: 5,  signal: 100, pos: [1.5, 3.5], freq: 2432e6 },
-  { ssid: 'Cohen-Guest',   channel: 5,  signal: 100, pos: [2.0, 3.8], freq: 2432e6 },
-  { ssid: 'COGECO-21B20',  channel: 11, signal: 100, pos: [4.0, 2.0], freq: 2462e6 },
-  { ssid: 'HP M255',       channel: 5,  signal: 94,  pos: [0.5, 1.5], freq: 2432e6 },
-  { ssid: 'conclusion',    channel: 3,  signal: 44,  pos: [3.5, 3.0], freq: 2422e6 },
-  { ssid: 'NETGEAR72',     channel: 9,  signal: 42,  pos: [4.5, 1.0], freq: 2452e6 },
-  { ssid: 'COGECO-4321',   channel: 11, signal: 30,  pos: [4.0, 3.5], freq: 2462e6 },
-  { ssid: 'Innanen',       channel: 6,  signal: 19,  pos: [1.0, 4.0], freq: 2437e6 },
+  { ssid: 'Example-AP-09',       channel: 5,  signal: 100, pos: [1.5, 3.5], freq: 2432e6 },
+  { ssid: 'Example-AP-06',   channel: 5,  signal: 100, pos: [2.0, 3.8], freq: 2432e6 },
+  { ssid: 'Example-AP-04',  channel: 11, signal: 100, pos: [4.0, 2.0], freq: 2462e6 },
+  { ssid: 'Example-AP-10',       channel: 5,  signal: 94,  pos: [0.5, 1.5], freq: 2432e6 },
+  { ssid: 'Example-AP-11',    channel: 3,  signal: 44,  pos: [3.5, 3.0], freq: 2422e6 },
+  { ssid: 'Example-AP-07',     channel: 9,  signal: 42,  pos: [4.5, 1.0], freq: 2452e6 },
+  { ssid: 'Example-AP-05',   channel: 11, signal: 30,  pos: [4.0, 3.5], freq: 2462e6 },
+  { ssid: 'Example-AP-08',       channel: 6,  signal: 19,  pos: [1.0, 4.0], freq: 2437e6 },
 ];
 
 const NODE_POS = {
