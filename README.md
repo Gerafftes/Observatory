@@ -1,26 +1,40 @@
-<h1 align="center">Observatory</h1>
+<a id="readme-top"></a>
 
-<p align="center">
-  Erforsche, was WLAN über Bewegung im Raum verrät – ohne Kamera.
-  Observatory hilft dir, Funksignale mit ESP32-Boards aufzuzeichnen und
-  auszuwerten. Ziel ist die fortlaufende Ortung einer Person.
-</p>
+<div align="center">
+  <h1>Observatory</h1>
+  <p>Erforsche, was WLAN über Bewegung im Raum verrät — ohne Kamera.<br>Zeichne Funksignale mit ESP32-Boards auf und untersuche sie; Ziel ist die fortlaufende Ortung einer Person.</p>
+  <p><a href="software/README.md"><strong>Dokumentation erkunden »</strong></a></p>
+  <p>
+    <a href="https://youtu.be/k27eQqz_vok">Projektvideo</a> ·
+    <a href="https://stardance.hackclub.com/projects/25673">Stardance</a> ·
+    <a href="https://github.com/Gerafftes/Observatory/issues/new">Fehler melden</a> ·
+    <a href="https://github.com/Gerafftes/Observatory/issues">Idee vorschlagen</a> ·
+    <a href="README.en.md">English</a>
+  </p>
+</div>
 
-<p align="center">
-  <a href="https://stardance.hackclub.com/projects/25673">Stardance</a> ·
-  <a href="#schnelleinstieg">Schnellstart</a> ·
-  <a href="#was-observatory-kann">Möglichkeiten</a> ·
-  <a href="experiment-reports/README.md">Ergebnisse</a> ·
-  <a href="hardware/README.md">Hardware</a> ·
-  <a href="docs/research/rf-sensing-sources.md">Quellen</a> ·
-  <a href="README.en.md">English</a>
-</p>
+[![Stars][stars-shield]][stars-url]
+[![Issues][issues-shield]][issues-url]
+[![License][license-shield]][license-url]
+[![Experimental][status-shield]](#aktueller-validierungsstand)
 
-<p align="center">
-  <a href="https://stardance.hackclub.com/projects/25673"><img src="https://img.shields.io/badge/Hack%20Club-Stardance-ec3750?style=flat-square&amp;logo=hackclub&amp;logoColor=white" alt="Hack Club Stardance"></a>
-  <a href="#aktueller-validierungsstand"><img src="https://img.shields.io/badge/status-experimental-orange" alt="Experimental status"></a>
-  <a href="LICENSE.md"><img src="https://img.shields.io/badge/License-PolyForm%20Noncommercial%201.0.0-blue.svg" alt="PolyForm Noncommercial 1.0.0 license"></a>
-</p>
+<details>
+  <summary>Inhaltsverzeichnis</summary>
+  <ol>
+    <li><a href="#über-das-projekt">Über das Projekt</a></li>
+    <li><a href="#erste-schritte">Erste Schritte</a></li>
+    <li><a href="#verwendung">Verwendung</a></li>
+    <li><a href="#roadmap">Roadmap</a></li>
+    <li><a href="#mitwirken">Mitwirken</a></li>
+    <li><a href="#lizenz">Lizenz</a></li>
+    <li><a href="#kontakt">Kontakt</a></li>
+    <li><a href="#danksagungen">Danksagungen</a></li>
+  </ol>
+</details>
+
+## Über das Projekt
+
+Observatory verbindet Raw-CSI-Erfassung, eine Experiment-Oberfläche und dokumentierte Versuche. Damit lässt sich nachvollziehen, was tatsächlich gemessen wurde und welche Forschungsfragen offenbleiben. Zuverlässige fortlaufende WiFi-Ortung ist noch in Entwicklung; eine öffentliche Live-Demo gibt es nicht. Das verlinkte Video ist eine Aufzeichnung.
 
 <table>
   <tr>
@@ -35,20 +49,6 @@
     </td>
   </tr>
 </table>
-
-## Projekt ansehen
-
-**[Projekt auf Stardance ansehen](https://stardance.hackclub.com/projects/25673)** · **[Projektvideo (Aufzeichnung)](https://youtu.be/k27eQqz_vok)** · **[Oberfläche ohne Sensoren ausprobieren](#schnelleinstieg)**
-
-Du möchtest verstehen, wie sich Menschen über WLAN-Signale erkennen lassen?
-Observatory verbindet Rohdatenerfassung, eine Experiment-Oberfläche und
-dokumentierte Versuche. So kannst du nachvollziehen, was die Daten tatsächlich
-zeigen und wo die Methode an Grenzen stößt.
-
-**Bereits belegt:** Erfassung mit vier Empfängern, ein Funkvergleich zwischen
-RX1 und RX4 sowie 60 Minuten stabiler TX-only-Erfassung. Zuverlässige
-fortlaufende WiFi-Ortung ist noch in Entwicklung. Eine öffentliche Live-Demo
-gibt es derzeit nicht.
 
 > **You are being sensed.**
 >
@@ -68,45 +68,9 @@ gibt es derzeit nicht.
 *Nach dem Intro der Serie
 [*Person of Interest*](https://en.wikipedia.org/wiki/Person_of_Interest_(TV_series)).*
 
-## Inhaltsverzeichnis
+<a id="was-observatory-kann"></a>
 
-- [Schnelleinstieg](#schnelleinstieg)
-- [Was Observatory kann](#was-observatory-kann)
-- [Aktueller Validierungsstand](#aktueller-validierungsstand)
-- [Benutzeroberfläche](#benutzeroberfläche)
-- [Wie es funktioniert](#wie-es-funktioniert)
-- [Hardware](#hardware)
-- [Projektstruktur](#projektstruktur)
-- [Dokumentation](#dokumentation)
-- [Lizenz und Credits](#lizenz-und-credits)
-
-## Schnelleinstieg
-
-Starte mit der Simulation, um die Oberfläche ohne Sensoren kennenzulernen.
-Dafür brauchst du Git, Python 3 und eine Rust-/Cargo-Umgebung; Details zum Quellstand
-stehen im [Software-Einstieg](software/README.md).
-
-```bash
-git clone https://github.com/Gerafftes/Observatory.git
-cd Observatory/software/ruview/v2
-WDP_RUFIELD_SIGNING_SEED="$(python3 -c 'import secrets; print(secrets.token_hex(32))')" \
-cargo run --locked -p wifi-densepose-sensing-server --no-default-features -- \
-  --source simulate --rx-session-only --bind-addr 127.0.0.1 --http-port 3002 --ws-port 3001
-```
-
-Öffne anschließend `http://127.0.0.1:3002/ui/index.html#sensing`.
-Der Befehl erzeugt einen flüchtigen lokalen Demo-Signaturschlüssel; er wird nicht
-gespeichert. Für echte Messungen muss ein eigener dauerhafter Schlüssel privat
-konfiguriert werden.
-
-1. **Erkunden:** Setup und Messablauf in der [Cockpit-Anleitung](software/experiment-cockpit.md) kennenlernen.
-2. **Einordnen:** [Versuchsergebnisse und Grenzen](experiment-reports/README.md) lesen.
-3. **Vorbereiten:** Für eigene Messungen [Hardware und Revisionen](hardware/README.md) prüfen.
-
-> [!NOTE]
-> Die Simulation zeigt UI und Workflow mit künstlichen Daten (`SOFTWARE-ONLY / UNVALIDATED`). Reale Messungen benötigen den lokalen Hardwareaufbau und eine eigene Kalibrierung.
-
-## Was Observatory kann
+### Funktionen
 
 - **Signale untersuchen:** Raw-CSI von vier ESP32-S3-Empfängern erfassen;
   Quelle, Datenrate, Zeitfenster und Lücken prüfen.
@@ -124,7 +88,7 @@ Der bisherige D6-Ansatz liefert diskrete Punkte oder Zonen mit `unknown` oder
 `ambiguous` bei unsicherer Evidenz. Freie Ortung, Mehrpersonenbetrieb und die
 Übertragung auf einen zweiten Aufbau bleiben zu prüfen.
 
-## Aktueller Validierungsstand
+### Aktueller Validierungsstand
 
 **Dokumentation: 1. November 2026; Messstand: 29. Oktober 2026.** Die Angaben fassen gespeicherte Befunde zusammen.
 
@@ -138,8 +102,7 @@ Der bisherige D6-Ansatz liefert diskrete Punkte oder Zonen mit `unknown` oder
 
 Der 60-Minuten-Lauf wurde zweimal identisch neu ausgewertet; sein Zeitnachweis
 wurde aus Originalbelegen rekonstruiert. Der Fehler des damaligen Online-Abschlusses
-bleibt dokumentiert. Ausführliche Dauerlaufbelege liegen privat außerhalb des
-Repositorys. Der [Tag-14-Ergebnisbericht](docs/project/rx-unified-tag14-result-20261029.md) dokumentiert die Vier-RX-Basis und den Paartest; private Rohdaten sind nicht enthalten.
+bleibt dokumentiert. Der [Tag-14-Ergebnisbericht](docs/project/rx-unified-tag14-result-20261029.md) dokumentiert die Vier-RX-Basis und den Paartest; private Rohdaten sind nicht enthalten.
 
 Frühere D5-abs-Versuche beseitigten Leerraum-Fehlpräsenz, verloren aber den
 Still-Recall vollständig und scheiterten insgesamt. Atem-/Herzfrequenzindikatoren
@@ -148,7 +111,55 @@ bleiben experimentell und sind nicht physiologisch validiert.
 > [!IMPORTANT]
 > Bestandene Erfassungs- und Softwareprüfungen belegen weder verlustfreie Funkübertragung noch zuverlässige Ortung. Sequenzlücken bleiben dokumentiert; Radarpositionen und simulierte Anzeigen sind keine WiFi-Ortungsnachweise.
 
-## Benutzeroberfläche
+### Technologien
+
+[![Rust][rust-shield]][rust-url]
+[![JavaScript][javascript-shield]][javascript-url]
+[![Python][python-shield]][python-url]
+[![ESP-IDF][esp-shield]][esp-url]
+[![KiCad][kicad-shield]][kicad-url]
+
+Der Host nutzt Rust mit Tokio/Axum, die Browseroberfläche JavaScript und die Sensorknoten ESP32/ESP-IDF. Python stellt Messwerkzeuge bereit; die bearbeitbare Elektronik liegt in KiCad vor.
+
+<p align="right">(<a href="#readme-top">nach oben</a>)</p>
+
+## Erste Schritte
+
+<a id="schnelleinstieg"></a>
+
+### Voraussetzungen
+
+Für die Simulation brauchst du **Git**, eine aktuelle **Rust-/Cargo-Umgebung** (geprüft mit Rust 1.96) und **Python 3** zum Erzeugen eines lokalen Demo-Signaturschlüssels. Sensorboards sind dafür nicht erforderlich.
+
+Für die Browser-Tests wird Node.js benötigt. Die [Hardwarebearbeitung](hardware/KICAD.md) setzt KiCad 10 und seine Standardbibliotheken voraus; Firmwarebuilds benötigen zusätzlich die ESP-IDF-Umgebung der jeweiligen Firmware-Anleitung.
+
+### Installation
+
+```bash
+git clone https://github.com/Gerafftes/Observatory.git
+cd Observatory/software/ruview/v2
+WDP_RUFIELD_SIGNING_SEED="$(python3 -c 'import secrets; print(secrets.token_hex(32))')" \
+cargo run --locked -p wifi-densepose-sensing-server --no-default-features -- \
+  --source simulate --rx-session-only --bind-addr 127.0.0.1 --http-port 3002 --ws-port 3001
+```
+
+Öffne anschließend `http://127.0.0.1:3002/ui/index.html#sensing`.
+Der Befehl erzeugt einen flüchtigen lokalen Demo-Signaturschlüssel; er wird nicht
+gespeichert. Für echte Messungen muss ein eigener dauerhafter Schlüssel privat
+konfiguriert werden.
+
+<p align="right">(<a href="#readme-top">nach oben</a>)</p>
+
+## Verwendung
+
+1. **Erkunden:** Setup und Messablauf in der [Cockpit-Anleitung](software/experiment-cockpit.md) kennenlernen.
+2. **Einordnen:** [Versuchsergebnisse und Grenzen](experiment-reports/README.md) lesen.
+3. **Vorbereiten:** Für eigene Messungen [Hardware und Revisionen](hardware/README.md) prüfen.
+
+> [!NOTE]
+> Die Simulation zeigt UI und Workflow mit künstlichen Daten (`SOFTWARE-ONLY / UNVALIDATED`). Reale Messungen benötigen den lokalen Hardwareaufbau und eine eigene Kalibrierung.
+
+### Benutzeroberfläche
 
 Im Experiment-Cockpit kannst du Setup-Profile, Kalibrierung, Blindaufnahmen und
 Auswertung verwalten. Die [Cockpit-Anleitung](software/experiment-cockpit.md)
@@ -158,7 +169,7 @@ führt durch den Ablauf und den mmWave-Kalibrierungsassistenten.
 
 *Historische UI-Aufnahme mit simuliertem Softwarezustand ohne angeschlossene Sensoren. Die aktuelle Oberfläche kann im Detail abweichen.*
 
-## Wie es funktioniert
+### Wie es funktioniert
 
 Ein ESP32-S3 sendet WLAN-Pakete; vier Empfänger messen Channel State Information
 (CSI), also den Einfluss des Raums auf den Funkkanal. Bewegung, Abschattung und
@@ -175,7 +186,7 @@ die vorhandenen Datenpfade und den bisherigen D6-Ansatz.
 </p>
 <p align="center"><sub>Das Diagramm zeigt einen mmWave-Referenzpfad. WiFi-CSI und die gemeinsame Zwei-Radar-Kalibrierung sind hier nicht dargestellt.</sub></p>
 
-## Hardware
+### Hardware
 
 Für den WiFi-Aufbau brauchst du fünf ESP32-S3-Boards: TX1 und RX1 bis RX4.
 Zwei HLK-LD2450 mit ESP32-C3 sind als Kalibrierungs- und Referenzknoten vorgesehen.
@@ -196,7 +207,7 @@ Weitere Zustände erkennst du an Farbe und Blinkfolge:
 
 <a href="project-media/hardware/rx-status-led-patterns.png"><img src="project-media/hardware/rx-status-led-patterns.png" alt="RX-LED-Farben und Blinkmuster für Normalbetrieb, Start, WLAN/IP, fehlende TX1-CSI, Initialisierungsfehler, Transportfehler, OTA und interne Fehler" width="560"></a>
 
-## Projektstruktur
+### Projektstruktur
 
 Das Repository bündelt den bearbeitbaren Projektstand:
 
@@ -211,7 +222,7 @@ Die Ergebnisberichte enthalten zusammengefasste Befunde. Rohaufzeichnungen und
 gerätespezifische Konfiguration sind nicht Teil der Quellverteilung. Bau- und
 Prüfbefehle stehen im [Software-Einstieg](software/README.md).
 
-## Dokumentation
+### Dokumentation
 
 | Dein nächster Schritt | Einstieg |
 |---|---|
@@ -220,12 +231,68 @@ Prüfbefehle stehen im [Software-Einstieg](software/README.md).
 | Eigene Messungen vorbereiten | [Messprotokoll](docs/project/03-messprotokoll.md) · [Messblatt](measurement-templates/messblatt.md) |
 | Entwicklung und Quellen nachvollziehen | [Projektjournal](docs/project/01-projektjournal.md) · [Forschungsquellen](docs/research/rf-sensing-sources.md) |
 
-## Lizenz und Credits
+<p align="right">(<a href="#readme-top">nach oben</a>)</p>
 
-Observatory-eigene Inhalte stehen unter [PolyForm Noncommercial 1.0.0](LICENSE.md).
-Die Software basiert auf [ruvnet/RuView](https://github.com/ruvnet/RuView);
-Drittkomponenten behalten ihre jeweiligen Lizenz- und Notice-Dateien.
+## Roadmap
 
+- [x] Vier-RX-Erfassung und nachvollziehbare Experiment-Oberfläche
+- [x] Technischer RX1↔RX4-Paartest mit qualifizierten Daten in beiden Richtungen
+- [x] 60 Minuten TX-only-Erfassung, nach dokumentierter Offline-Neubewertung akzeptiert
+- [x] Bearbeitbare KiCad-Quellen für PCB-01, PCB-02, PCB-03 und POC
+- [ ] Gemeinsame Raum-/Zeitqualifikation beider mmWave-Referenzknoten
+- [ ] Laufkalibrierung und unabhängige Blindprüfung fortlaufender WiFi-Ortung
+- [ ] Übertragung auf einen weiteren Raum und Prüfung des Mehrpersonenbetriebs
+
+<p align="right">(<a href="#readme-top">nach oben</a>)</p>
+
+## Mitwirken
+
+Fehlerberichte, reproduzierbare Gegenbeispiele, Dokumentationsverbesserungen und Pull Requests sind willkommen. Beschreibe den Aufbau und trenne Simulation von realen Messungen. Nutze synthetische Testdaten; Zugangsdaten oder identifizierbare Rohaufnahmen gehören nicht in Issues oder Patches.
+
+Besprich größere Änderungen zunächst in einem [Issue][issues-url] und reiche danach einen begrenzten Pull Request mit passenden Prüfungen ein. Lokale Testbefehle stehen im [Software-Einstieg](software/README.md). Hardwarebefunde werden getrennt von Softwaretests dokumentiert.
+
+<p align="right">(<a href="#readme-top">nach oben</a>)</p>
+
+## Lizenz
+
+<a id="lizenz-und-credits"></a>
+
+Observatory-eigene Inhalte stehen unter [PolyForm Noncommercial 1.0.0](LICENSE.md). Für Drittkomponenten gelten weiterhin deren jeweilige Lizenz- und Notice-Dateien; die Root-Lizenz ersetzt diese Bedingungen nicht.
+
+<p align="right">(<a href="#readme-top">nach oben</a>)</p>
+
+## Kontakt
+
+[GitHub: @Gerafftes](https://github.com/Gerafftes)
+
+Projekt: [Gerafftes/Observatory](https://github.com/Gerafftes/Observatory) · [Stardance](https://stardance.hackclub.com/projects/25673)
+
+<p align="right">(<a href="#readme-top">nach oben</a>)</p>
+
+## Danksagungen
+
+- [ruvnet/RuView](https://github.com/ruvnet/RuView): Basis der Sensing-Software.
 - [Espressif](https://www.espressif.com/en/products/socs/esp32): ESP32-Plattformen.
 - [aiekick auf MakerWorld](https://makerworld.com/de/models/1456361-esp32-s3-wroom-case#profileId-1517915): ESP32-S3-WROOM-Gehäuse unter MakerWorld Standard Digital File License.
 - [*Person of Interest*](https://warnertv.de/serie/sendungen/person-of-interest): Inspiration für den Prolog.
+- [Best-README-Template](https://github.com/othneildrew/Best-README-Template): Vorlage für die README-Struktur.
+
+<p align="right">(<a href="#readme-top">nach oben</a>)</p>
+
+[stars-shield]: https://img.shields.io/github/stars/Gerafftes/Observatory.svg?style=for-the-badge
+[stars-url]: https://github.com/Gerafftes/Observatory/stargazers
+[issues-shield]: https://img.shields.io/github/issues/Gerafftes/Observatory.svg?style=for-the-badge
+[issues-url]: https://github.com/Gerafftes/Observatory/issues
+[license-shield]: https://img.shields.io/badge/License-PolyForm%20Noncommercial%201.0.0-blue?style=for-the-badge
+[license-url]: LICENSE.md
+[status-shield]: https://img.shields.io/badge/status-experimental-orange?style=for-the-badge
+[rust-shield]: https://img.shields.io/badge/Rust-000000?style=for-the-badge&logo=rust&logoColor=white
+[rust-url]: https://www.rust-lang.org/
+[javascript-shield]: https://img.shields.io/badge/JavaScript-F7DF1E?style=for-the-badge&logo=javascript&logoColor=black
+[javascript-url]: software/ruview/ui/
+[python-shield]: https://img.shields.io/badge/Python-3776AB?style=for-the-badge&logo=python&logoColor=white
+[python-url]: https://www.python.org/
+[esp-shield]: https://img.shields.io/badge/ESP--IDF-E7352C?style=for-the-badge&logo=espressif&logoColor=white
+[esp-url]: https://github.com/espressif/esp-idf
+[kicad-shield]: https://img.shields.io/badge/KiCad-314CB0?style=for-the-badge&logo=kicad&logoColor=white
+[kicad-url]: hardware/KICAD.md
