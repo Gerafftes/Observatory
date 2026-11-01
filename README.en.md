@@ -38,7 +38,7 @@
 
 ## View the project
 
-**[View the project on Stardance](https://stardance.hackclub.com/projects/25673)** · **[Try the interface without sensors](#quick-start)**
+**[View the project on Stardance](https://stardance.hackclub.com/projects/25673)** · **[Project video (recorded)](https://youtu.be/k27eQqz_vok)** · **[Try the interface without sensors](#quick-start)**
 
 Want to understand how WiFi signals could reveal someone's presence?
 Observatory brings together Raw CSI capture, an experiment interface, and
@@ -75,23 +75,27 @@ is still in development. There is currently no public live demo.
 - [User interface](#user-interface)
 - [How it works](#how-it-works)
 - [Hardware](#hardware)
+- [Repository and private data](#repository-and-private-data)
 - [Documentation](#documentation)
 - [License and credits](#license-and-credits)
 
 ## Quick start
 
-Start with simulation to explore the interface without sensors. You need Git
+Start with simulation to explore the interface without sensors. You need Git, Python 3,
 and a Rust/Cargo environment; the [software guide](software/README.md)
 provides source details.
 
 ```bash
 git clone https://github.com/Gerafftes/Observatory.git
 cd Observatory/software/ruview/v2
-cargo run -p wifi-densepose-sensing-server --no-default-features -- \
-  --source simulate --http-port 3002 --ws-port 3001
+WDP_RUFIELD_SIGNING_SEED="$(python3 -c 'import secrets; print(secrets.token_hex(32))')" \
+cargo run --locked -p wifi-densepose-sensing-server --no-default-features -- \
+  --source simulate --rx-session-only --bind-addr 127.0.0.1 --http-port 3002 --ws-port 3001
 ```
 
 Then open `http://127.0.0.1:3002/ui/index.html#sensing`.
+The command creates a temporary local demo signing key without saving it.
+Real measurements require a separately configured persistent private key.
 
 1. **Explore:** follow the [cockpit guide](software/experiment-cockpit.en.md) through setup and measurement workflows.
 2. **Assess:** read the [experiment results and limits](experiment-reports/README.en.md).
@@ -120,7 +124,7 @@ tracking, and transfer to a second setup remain to be evaluated.
 
 ## Current validation status
 
-**As of October 29, 2026.** These statements summarize saved evidence.
+**Documentation: November 1, 2026; measurements: October 29, 2026.** These statements summarize saved evidence.
 
 | Area | Result | Limit |
 |---|---|---|
@@ -133,7 +137,7 @@ tracking, and transfer to a second setup remain to be evaluated.
 The 60-minute run was reassessed twice with identical results; timing was
 reconstructed from original evidence. The original online closeout failure
 remains documented. Detailed endurance evidence is private, outside this
-repository; newer development reports have not yet been published.
+repository. The [Tag 14 result report](docs/project/rx-unified-tag14-result-20261029.md) documents the four-RX baseline and pair test; private raw data is not included.
 
 Earlier D5-abs trials eliminated empty-room false presence but lost all still
 recall, failing overall. Breathing/heart-rate indicators remain experimental
@@ -150,7 +154,7 @@ walks through the workflow and mmWave calibration assistant.
 
 <a href="software/experiment-cockpit.en.md"><img src="project-media/ui/experiment-cockpit-setup.png" alt="Experiment cockpit with setup profile, status overview, and simulated hardware state" width="760"></a>
 
-*The image shows a simulated software state without connected sensors.*
+*Historical UI capture with simulated software state and no connected sensors. Details may differ from the current interface.*
 
 ## How it works
 
@@ -176,12 +180,41 @@ The WiFi setup requires five ESP32-S3 boards: TX1 and RX1 through RX4.
 Two HLK-LD2450 sensors with ESP32-C3 boards are intended as calibration and
 reference nodes. The images above show the earlier breadboard setup and PCB-03 preview.
 
+- [Open all KiCad projects: PCB-01, PCB-02, PCB-03, and POC](hardware/KICAD.md)
 - [PCB-03: current revision, KiCad sources, and manufacturing files](hardware/pcb-03/)
 - [Breadboard: CAD, fastening hardware, and components](hardware/breadboard/README.en.md)
 - [MMWAVE1/2: firmware and integration](software/ruview/firmware/esp32-mmwave-node/README.md)
 
 PCB-01 and PCB-02 remain documented as earlier revisions in the
 [hardware overview](hardware/README.en.md); use **PCB-03** for the current setup.
+
+### RX status LED
+
+Normal operation uses blue for RX1, green for RX2, red for RX3, and purple for
+RX4. The overview also covers startup, connection, transport, and error states:
+
+<a href="project-media/hardware/rx-status-led-patterns.png"><img src="project-media/hardware/rx-status-led-patterns.png" alt="RX LED colors and blink patterns" width="560"></a>
+
+## Repository and private data
+
+The repository groups the editable project sources:
+
+| Area | Contents |
+|---|---|
+| `software/ruview/` | Host, browser interface, firmware, tests, and required upstream sources |
+| `hardware/` | KiCad projects with local footprints, CAD, and manufacturing files |
+| `docs/` and `experiment-reports/` | Methods, result reports, and documented limits |
+| `project-media/` and `measurement-templates/` | Public illustrations and templates |
+
+Raw recordings, device/NVS and flash backups, credentials, local configurations,
+agent sessions, and migration evidence remain in private SSD storage. Builds and
+simulation do not require them. Historical reports may identify private evidence;
+these references are not public downloads. Publication copies pseudonymize local
+paths and hardware identities.
+
+The [software guide](software/README.md) documents prerequisites and checks.
+[Publication rules](docs/PUBLICATION.md) explain the boundary between public
+sources and private operational data.
 
 ## Documentation
 

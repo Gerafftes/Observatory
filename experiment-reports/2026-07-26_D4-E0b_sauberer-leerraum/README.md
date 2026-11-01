@@ -1,3 +1,4 @@
+<!-- Publication copy: local paths and hardware identifiers were pseudonymized; private original retained. -->
 # D4/E0b: sauberer Leerraumtest — 2026-07-26
 
 ## Gültigkeit
@@ -10,7 +11,7 @@ Geprüft werden ausschließlich die per-RX- und globale Klassifikation mit D4 un
 
 ## Aufbau und Daten
 
-- 1 kontrollierter TX, Absender-MAC `AE:27:6E:A8:D2:64`
+- 1 kontrollierter TX, Absender-MAC `02:00:00:00:00:04`
 - RX1 bis RX4 mit aktivem TX-MAC-Filter
 - fester Raumaufbau und korrigierte Gerätegeometrie
 - 10 Sekunden Vorlauf, danach 60 Sekunden leerer Raum

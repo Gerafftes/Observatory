@@ -1,0 +1,373 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src 'none'; img-src data:; font-src 'none'; base-uri 'none'; form-action 'none'; object-src 'none'">
+  <title>Observatory · Deadline-Tracker</title>
+  <style>
+    :root { --paper:#f4f5f0; --white:#fff; --ink:#252d29; --muted:#647069; --line:#dce2da; --green:#35634a; --soft:#e9f0e7; --red:#a54435; --red-soft:#faeee9; --mono:ui-monospace,"SFMono-Regular",Consolas,monospace; }
+    * { box-sizing:border-box; }
+    body { margin:0; background:var(--paper); color:var(--ink); font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; line-height:1.5; }
+    button,input { font:inherit; }
+    button { cursor:pointer; }
+    button:active { transform:translateY(1px); }
+    :focus-visible { outline:3px solid var(--green); outline-offset:4px; }
+    .wrap { max-width:1160px; margin:auto; padding:30px 28px 42px; }
+    header { display:flex; justify-content:space-between; align-items:center; gap:16px; margin-bottom:42px; }
+    .brand { font-size:13px; letter-spacing:.15em; font-weight:750; display:flex; gap:12px; align-items:center; }
+    .mark { width:24px; height:24px; border:1.5px solid var(--green); border-radius:50%; position:relative; }
+    .mark:before,.mark:after { content:""; position:absolute; inset:5px; border:1px solid var(--green); border-radius:50%; }
+    .mark:after { inset:10px; background:var(--green); }
+    .tools { display:flex; align-items:center; gap:8px; }
+    .quiet { padding:8px 12px; border:1px solid var(--line); border-radius:9px; background:transparent; color:var(--ink); font-size:13px; }
+    .eyebrow { font-size:11px; font-weight:700; letter-spacing:.12em; text-transform:uppercase; color:var(--muted); margin:0 0 8px; }
+    h1 { font-size:clamp(26px,4vw,38px); letter-spacing:-.045em; line-height:1.15; margin:0 0 12px; font-weight:680; }
+    .intro { color:var(--muted); margin:0; font-size:15px; }
+    .top { display:flex; justify-content:space-between; gap:20px; align-items:flex-end; margin-bottom:28px; }
+    .goals { display:flex; gap:4px; padding:4px; border:1px solid var(--line); border-radius:12px; flex-shrink:0; }
+    .goals button { border:0; border-radius:8px; padding:9px 13px; font-size:12px; background:transparent; color:var(--muted); }
+    .goals button[aria-pressed="true"] { background:var(--ink); color:white; }
+    .hero { display:grid; grid-template-columns:minmax(0,1fr) 230px; border:1px solid var(--line); border-radius:22px; overflow:hidden; background:var(--white); margin-bottom:30px; }
+    .overview { padding:30px 32px; }
+    .status-line { display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:8px; }
+    .status { display:inline-flex; align-items:center; gap:8px; color:var(--green); font-size:14px; font-weight:650; }
+    .dot { width:8px; height:8px; background:currentColor; border-radius:50%; flex-shrink:0; }
+    .status[data-tone="late"] { color:var(--red); }
+    #status-detail { margin:0 0 25px; color:var(--muted); font-size:14px; min-height:21px; }
+    .progress-heading { display:flex; justify-content:space-between; align-items:baseline; flex-wrap:wrap; gap:8px; margin-bottom:12px; font-size:13px; }
+    #percent { font-family:var(--mono); font-size:32px; letter-spacing:-.07em; line-height:1; }
+    .bar { height:12px; background:#edf0ea; border-radius:4px; position:relative; }
+    .fill { position:absolute; inset:0; background:var(--green); transform:scaleX(0); transform-origin:left; border-radius:4px; }
+    .planned-marker { position:absolute; top:-4px; width:2px; height:20px; background:var(--ink); }
+    .bar-labels { display:flex; justify-content:space-between; gap:12px; margin-top:12px; font-size:12px; color:var(--muted); }
+    .deadline { padding:28px; border-left:1px solid var(--line); background:var(--soft); display:flex; flex-direction:column; justify-content:center; }
+    #days-left { font-family:var(--mono); font-size:64px; line-height:1; letter-spacing:-.09em; margin:6px 0; }
+    #days-label { font-size:14px; margin:0 0 15px; }
+    #deadline-label { font-size:12px; color:var(--muted); }
+    .workspace { display:grid; grid-template-columns:minmax(0,1.35fr) minmax(300px,1fr); gap:32px; align-items:start; }
+    .section-title { display:flex; justify-content:space-between; align-items:center; gap:14px; margin-bottom:16px; }
+    h2 { font-size:17px; letter-spacing:-.025em; margin:0; font-weight:650; }
+    .small { font-size:12px; color:var(--muted); }
+    .weekdays,.calendar { display:grid; grid-template-columns:repeat(7,minmax(0,1fr)); gap:6px; }
+    .weekdays { margin-bottom:8px; text-align:center; color:var(--muted); font-size:11px; }
+    .day { min-width:0; min-height:96px; padding:10px 9px 9px; text-align:left; background:var(--white); border:1px solid var(--line); border-radius:11px; color:var(--ink); position:relative; }
+    .day[aria-pressed="true"] { border-color:var(--green); box-shadow:inset 0 0 0 1px var(--green); }
+    .day.is-today .date-num { text-decoration:underline; text-underline-offset:5px; }
+    .day.is-done { background:var(--soft); }
+    .day.is-late { background:var(--red-soft); border-color:#e5c4bc; }
+    .day.is-late[aria-pressed="true"] { border-color:var(--green); }
+    .date-num { font-family:var(--mono); font-size:17px; font-weight:600; }
+    .day-title { display:block; font-size:10px; line-height:1.3; margin:8px 0 6px; overflow-wrap:anywhere; }
+    .day-count { display:block; font-family:var(--mono); font-size:10px; color:var(--muted); }
+    .day-check { position:absolute; right:7px; top:9px; font-size:12px; color:var(--green); }
+    .legend { display:flex; gap:17px; flex-wrap:wrap; margin-top:14px; font-size:11px; color:var(--muted); }
+    .legend span { display:flex; gap:6px; align-items:center; }
+    .swatch { width:9px; height:9px; border-radius:3px; border:1px solid var(--line); background:white; }
+    .swatch.complete { background:var(--soft); border-color:#b6cbb7; }
+    .swatch.late { background:var(--red-soft); border-color:#d1a399; }
+    .compare { margin-top:26px; display:flex; align-items:end; flex-wrap:wrap; gap:10px; }
+    .compare label { display:block; font-size:11px; color:var(--muted); margin-bottom:5px; }
+    input[type="date"] { border:1px solid var(--line); border-radius:8px; padding:7px 9px; min-height:38px; background:var(--white); color:var(--ink); font-size:12px; }
+    .tasks-panel { background:var(--white); border:1px solid var(--line); border-radius:18px; padding:23px; }
+    .task-heading { display:flex; justify-content:space-between; gap:12px; align-items:start; margin-bottom:18px; }
+    .task-heading h2 { margin-top:4px; font-size:22px; }
+    .count-badge { flex-shrink:0; font-family:var(--mono); background:var(--soft); color:var(--green); padding:5px 8px; border-radius:7px; font-size:12px; }
+    .next { background:var(--soft); padding:12px 13px; border-radius:10px; font-size:13px; margin:0 0 16px; }
+    .next b { color:var(--green); }
+    .task { display:flex; align-items:start; gap:11px; padding:14px 0; border-top:1px solid #edf0ea; cursor:pointer; }
+    .task input { width:18px; height:18px; margin:2px 0 0; flex-shrink:0; accent-color:var(--green); }
+    .task-text { font-size:13px; display:block; }
+    .task:has(input:checked) .task-text { text-decoration:line-through; color:var(--muted); }
+    .task-note { display:block; margin-top:3px; color:var(--muted); font-size:11px; line-height:1.45; }
+    .optional { display:inline-block; font-size:10px; background:#f0f1ed; padding:1px 5px; border-radius:4px; margin-right:5px; }
+    .day-meta { border-top:1px solid var(--line); padding-top:13px; margin-top:4px; font-size:11px; color:var(--muted); }
+    #message { margin:18px 0 0; padding:12px 15px; border:1px solid #dec8aa; border-radius:10px; background:#fcf4e5; font-size:13px; }
+    #message[hidden] { display:none; }
+    details { margin-top:29px; color:var(--muted); font-size:12px; max-width:740px; }
+    summary { cursor:pointer; color:var(--ink); }
+    details p { margin:10px 0 0; }
+    footer { display:flex; justify-content:space-between; gap:15px; flex-wrap:wrap; border-top:1px solid var(--line); padding-top:17px; margin-top:28px; color:var(--muted); font-size:11px; }
+    a { color:var(--green); text-underline-offset:3px; }
+    @media (hover:hover) and (pointer:fine) { .quiet:hover,.day:hover { border-color:var(--green); } }
+    @media (max-width:850px) { .top { display:block; } .goals { width:max-content; margin-top:20px; } .workspace { grid-template-columns:1fr; } .day { min-height:102px; } header { margin-bottom:30px; } }
+    @media (max-width:520px) { .wrap { padding:20px 16px 28px; } .brand { font-size:11px; gap:7px; } .quiet { padding:7px 8px; font-size:11px; } .tools { gap:5px; } .hero { grid-template-columns:minmax(0,1fr) 104px; border-radius:16px; } .overview { padding:21px 17px; } .deadline { padding:15px 12px; } #days-left { font-size:42px; } #days-label { font-size:11px; } #deadline-label { font-size:10px; } .deadline .eyebrow { font-size:9px; letter-spacing:.04em; } #percent { font-size:26px; } .status-line .small { display:none; } #status-detail { font-size:12px; } .bar-labels { font-size:10px; } .calendar,.weekdays { gap:4px; } .day { min-height:81px; padding:8px 5px; border-radius:8px; } .date-num { font-size:15px; } .day-title { font-size:9px; margin-top:7px; } .day-count { font-size:9px; } .day-check { right:4px; top:5px; font-size:10px; } .tasks-panel { padding:19px; } }
+    @media print { .tools,.compare { display:none; } body { background:white; } .wrap { max-width:none; } .workspace { grid-template-columns:1.2fr 1fr; } }
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="brand"><span class="mark" aria-hidden="true"></span>OBSERVATORY</div>
+    <div class="tools"><button class="quiet" id="import-button">Stand laden</button><button class="quiet" id="export-button">Stand sichern</button><input id="import-file" type="file" accept=".json,application/json" hidden aria-label="Gesicherten Fortschritt laden"></div>
+  </header>
+  <main>
+    <div class="top">
+      <div><p class="eyebrow">12.–27. Oktober 2026</p><h1>Tracking bis zur Deadline.</h1><p class="intro" id="goal-description">Eine Person. Vier RX. Ein TX. Freie Bewegung.</p></div>
+      <div class="goals" role="group" aria-label="Deadline auswählen"><button data-goal="single" aria-pressed="true">25.10. · Einzelperson</button><button data-goal="all" aria-pressed="false">27.10. · Zwei Personen</button></div>
+    </div>
+    <section class="hero" aria-label="Fortschritt und Termin">
+      <div class="overview">
+        <div class="status-line"><span class="status" id="status" data-tone="ok"><span class="dot" aria-hidden="true"></span><span id="status-title">Im Plan</span></span><span class="small">Manuell gepflegt</span></div>
+        <p id="status-detail" aria-live="polite"></p>
+        <div class="progress-heading"><span>Dein Planfortschritt</span><strong id="percent">0 %</strong></div>
+        <div class="bar" id="progress-bar" role="progressbar" aria-label="Erledigte Planaufgaben, nach Tagen gewichtet" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><div class="fill" id="progress-fill"></div><div class="planned-marker" id="planned-marker" aria-hidden="true"></div></div>
+        <div class="bar-labels"><span id="completed-label"></span><span id="planned-label"></span></div>
+      </div>
+      <aside class="deadline"><p class="eyebrow">Deine Deadline</p><strong id="days-left">13</strong><p id="days-label">Tage verbleiben</p><span id="deadline-label">25. Oktober 2026</span></aside>
+    </section>
+    <div class="workspace">
+      <section aria-labelledby="calendar-heading">
+        <div class="section-title"><h2 id="calendar-heading">Dein Weg zum Ziel</h2><span class="small">Tag auswählen</span></div>
+        <div class="weekdays" aria-hidden="true"><span>Mo</span><span>Di</span><span>Mi</span><span>Do</span><span>Fr</span><span>Sa</span><span>So</span></div>
+        <div class="calendar" id="calendar"></div>
+        <div class="legend"><span><i class="swatch complete" aria-hidden="true"></i>Erledigt</span><span><i class="swatch late" aria-hidden="true"></i>Überfällig</span><span><i class="swatch" aria-hidden="true"></i>Noch offen</span></div>
+        <div class="compare"><div><label for="comparison-date">Vergleichsdatum · Europe/Berlin</label><input id="comparison-date" type="date" required></div><button id="today-button" class="quiet">Heute</button><button id="next-button" class="quiet">Nächste Aufgabe</button></div>
+      </section>
+      <section class="tasks-panel" aria-labelledby="day-title">
+        <div class="task-heading"><div><p class="eyebrow" id="selected-date"></p><h2 id="day-title"></h2></div><span class="count-badge" id="day-count"></span></div>
+        <p class="next" id="next-action"></p><div id="tasks"></div><p class="day-meta" id="day-meta"></p>
+      </section>
+    </div>
+    <p id="message" role="status" hidden></p>
+    <details open><summary>Stand 29. Oktober · Tag 14 abgeschlossen · 5/5</summary><p><strong>Q900, Short30, Basis180, Peerpilot60 und Paar300 bestanden.</strong> Basis: 173/173 gemeinsame gültige Fenster. Paar: 293/293, mit 2.581 qualifizierten Frames RX4→RX1 und 2.578 RX1→RX4. Je zwei identische native Audits für Basis und Paar; PCAP-, Layout-/Masken-, Zeit- und Fehlerbilanz bestätigt. Die Endabweichung von Paar300 beträgt 24,69 ms bei maximal 50 ms.</p><p>TX-only-/Default-Rückkehr sowie 21,63 s und nochmals 21,76 s Standardbetrieb bestätigt; keine aktiven Leases oder Recorder. Der Koordinator hat 124 gebundene Belegdateien ohne Hashabweichung geprüft. Die 24 Paar-Sequenzlücken und die negative erste Basis bleiben dokumentiert; kein Nachweis verlustfreier Funkübertragung. Audit-Rechenbudget ausdrücklich auf 90 s gesamt freigegeben, davon 64,87 s verbraucht.</p><p><strong>Separat offen:</strong> 60-Minuten-Stabilitätslauf für den Firmware-Freeze, Radar-G2, Kalibrierung, Positionsnutzen und Tracking-Abnahme. Diese Aufgaben werden nicht mit Tag 14 abgehakt. <a href="rx-unified-tag14-result-20261029.md">Abschlussbericht</a> · <a href="tracking-zeitplan-20261025.md#abschluss-vom-29-oktober-tag-14-ist-55">Aktueller Zeitplan</a>.</p></details>
+    <details open><summary>Stand 25. Oktober · Tag 15 weiterhin 0/3 · Radarvorbereitung belegt</summary><p>Das gespeicherte Eck-Raumprofil ist ausgewählt. Das alte feste P1–P9-Raster ist keine aktuelle Vorgabe; seine vorbereiteten Dateien sind nur historische Artefakte. Die vorhandene Links-/Rechts-Spiegelung ist identifiziert; tatsächliche Sensorzuordnung, Pose, Spiegelung und Bodenpunkte müssen noch unabhängig geprüft werden. Die Dateiauswertung bestand in der Selbstprüfung 14 synthetische Szenarien und eine deterministische Wiederholung.</p><p><strong>Keine reale Radaraufnahme:</strong> Der beim Abgleich vorgefundene RX-Host bietet keinen unabhängigen aktiven Radar-Rohdatenexport. Der vorbereitete Hostwechsel ist nach dem gespeicherten Review wegen drei P1-Rückkehr-/Cleanupbefunden nicht startbereit. Die laufende Korrektur wird hier nicht vorzeitig abgenommen. Einzelprüfungen, gemeinsame Raum-/Zeitzuordnung und G2-Genauigkeit/Coverage bleiben offen; <strong>0/3</strong>. Kein zusätzliches Häkchen und kein Eingriff in laufende Agenten. <a href="tracking-zeitplan-20261025.md#vorbereitungen-vom-25-oktober-tag-15-bleibt-03">Vorbereitungen, offene Reviewbefunde und nächster Schritt</a>.</p></details>
+    <details><summary>25./26. Oktober · Docker und Homebrew</summary><p>Nach der Tracking-Abnahme soll die Software auch auf einem anderen Rechner einfach installierbar sein. Docker ist fest eingeplant; eine Homebrew-Installation für macOS folgt als gewünschte Ergänzung.</p><ul><li><strong>25. Oktober:</strong> Docker-Paket des eingefrorenen Stands vorbereiten: Backend/UI, CSI-UDP-Ports, persistente Konfiguration und Kalibrierung sowie kurze Startanleitung. Schwierigkeit 3/5.</li><li><strong>26. Oktober:</strong> Frische Installation auf einem zweiten Rechner, Vergleich mit dem nativen Stand und Liveprüfung mit TX1 und vier RX. Anschließend Homebrew-Paket mit einfachem Installieren, Starten und Aktualisieren prüfen. Schwierigkeit jeweils 3/5.</li></ul><p>Die Prüfungen benötigen zusätzliche Zeit neben der Zwei-Personen-Integration. Tracking bleibt vorrangig; bei Zeitmangel wird zuerst Homebrew, nötigenfalls die Zweitrechner-Prüfung hinter den 27. verschoben. Diese nachgelagerten Installationsziele verändern die Tracking-Pflichtquote und vorhandene Häkchen nicht. Details und Abnahmekriterien stehen am Ende des <a href="tracking-zeitplan-20261025.md">Zeitplans</a>.</p></details>
+    <details><summary>Wie wird „im Plan“ berechnet?</summary><p>Überfällig sind offene Pflichtaufgaben vor dem Vergleichsdatum. Offene Aufgaben von heute zählen noch nicht als Rückstand. „Voraus“ erscheint, wenn alle Aufgaben bis einschließlich heute fertig sind und du bereits spätere Pflichtaufgaben erledigt hast. Vorgezogene Aufgaben verdecken keine überfälligen Aufgaben.</p><p>Für den Prozentwert zählt jeder geplante Tag gleich viel; seine Pflichtaufgaben teilen sich dieses Gewicht. Die schwarze Marke zeigt das Soll bis gestern. RX↔RX-Entwicklung, RX1↔RX4-Test und Nutzenentscheidung zählen zur Pflichtquote. „RX↔RX-Entscheidung umsetzen“ heißt: bei belegtem Nutzen alle vier RX einbinden und prüfen, sonst die belegte Nichtübernahme dokumentieren. Fehlende Daten erfüllen diese Aufgabe nicht. Der Wert beschreibt deinen Aufgabenplan, keine gemessene Ortungsqualität und keine Garantie für den Liefertermin.</p><p>Die Ansicht zum 25. Oktober enthält die Einzelpersonen-Aufgaben. Die Ansicht zum 27. Oktober ergänzt die vorbereitenden und abschließenden Zwei-Personen-Aufgaben. Das Vergleichsdatum berechnet den heutigen Aufgabenstand neu; es ist kein historischer Verlauf. Vorhandene manuelle Häkchen bleiben beim Laden eines gespeicherten Stands erhalten; neue Aufgaben starten offen. Alte Stände übernehmen einmalig die drei am 29. Oktober belegten Tag-14-Abnahmen; spätere manuelle Änderungen bleiben erhalten.</p></details>
+  </main>
+  <footer><span id="save-status">Geprüfter Startstand · 29.10.2026</span><span>Eigenständige Datei · keine API- oder Geräteverbindung · <a href="tracking-zeitplan-20261025.md">Zeitplan</a></span></footer>
+  <noscript><p>Zum Abhaken und Berechnen des Fortschritts bitte JavaScript aktivieren. Die Datei benötigt keine Internetverbindung.</p></noscript>
+</div>
+<script id="progress-core">
+'use strict';
+// Tag 14 measurement gates reviewed complete on 29 October; endurance and tracking remain separate.
+const PLAN = [
+  { date:'2026-10-12', title:'Klärung und Vorbereitung', short:'Klärung', difficulty:4, effort:'60–90 min', tasks:[
+    { id:'rx2-state', label:'RX2-Zustand bestätigen', done:true, note:'Am 12.10. unabhängig geprüft: bisherige Firmware, stabile Boot-ID, ota_1 / VALID und acht unveränderte Konfigurationswerte. Fünf Häkchen hier bestätigen Klärung/Vorbereitung; Rasterqualität und Tracking sind nicht abgenommen.' },
+    { id:'loss-review', label:'Verlustanzeige prüfen', done:true, note:'Review am 12.10. mit Sync-Finding abgeschlossen. Fix inzwischen am 13.10. offline geprüft; Hostkandidat noch nicht aktiviert.' },
+    { id:'data-contract', label:'Tracking-Datenvertrag spezifizieren', done:true, note:'Koordinaten, Zeitbasis und Radarreferenz sind spezifiziert. Implementierung und empirische Prüfung bleiben offen.' },
+    { id:'followups', label:'Radar- und Positionsaufträge vorbereiten', done:true, note:'Beide Folgeaufträge sind vorhanden.' },
+    { id:'peer-feasibility', label:'RX↔RX-Machbarkeit bewerten', done:true, note:'Analyse abgeschlossen; Paarprofil inzwischen offline implementiert und gebaut. Echter Paartest und Positionsnutzen bleiben offen.' }
+  ]},
+  { date:'2026-10-13', title:'Gerätebasis sichern', short:'Geräte', difficulty:4, effort:'90–120 min', tasks:[
+    { id:'rx2-running', label:'RX2-Laufzeit und Konfiguration belegen', done:true, note:'Im gemeinsamen Vier-RX-Lauf vor/nach 30 Minuten C auf ota_0 / VALID, gleicher Boot und acht Configfelder unverändert. Endprüfung 13.10. ca. 21:29 Uhr; keine Aussage zur späteren Erreichbarkeit.' },
+    { id:'rx2-transport', label:'RX2-CSI-Transport 120 Sekunden prüfen', done:true, note:'Im neuen Vier-RX-Lauf 52.138 passende 128er-CSI, 28,965/s und 1.793/1.793 eigene Auswahlfenster. Fremdformate bleiben bilanziert. Historische FAILs unverändert; gemeinsame G1-Qualität scheitert weiter an RX1/RX3/RX4.' },
+    { id:'rx2-grid-fix', label:'RX2-Formatwahl gezielt offline korrigieren', done:true, note:'HT20-Kandidat C mit NULL-Schutz geprüft und am 13.10. installiert/VALID. Passende Rate rund 16,56-fach höher. Physische Maskenbindung und vollständige Rasterabnahme bleiben offen.' },
+    { id:'loss-fix', label:'Sync-Zählerfehler korrigieren und testen', done:true, note:'Offlinefix geprüft: verspäteter Sync erhält Empfangsbilanz, echte CSI-Bootwechsel bleiben erhalten. 524 Rust-/59 UI-Tests bestanden; neue Sync-/Bootfälle unabhängig wiederholt. Hostkandidat gebaut, nicht aktiviert.' },
+    { id:'identities', label:'Aktuelle Geräteidentitäten binden', done:true, note:'Vier frische MAC-/Antwort-/Image-/Boot-/Configbindungen samt Endprüfung unabhängig bestätigt. Alle VALID, acht Werte pro RX typgenau gleich; bei RX1/RX3/RX4 gegen frische Startreferenz. Gilt für Laufende 13.10. ca. 21:29 Uhr.' }, { id:'joint-diagnostic', label:'Gemeinsamen Diagnoselauf auswerten', done:true, note:'Vollständiger Vier-RX-Lauf und Auswertung geprüft: 22 GETs, ein Capture, 0 Kernel-Drops. Diagnose abgeschlossen mit Finding: nur 97/1.793 gemeinsame Fenster = 5,41 %. G1 nicht bestanden; RX1/RX3/RX4 unter fünf passenden 128er-Frames/s.' },
+    { id:'peer-implementation', label:'RX1↔RX4-Profil offline implementieren', done:true, note:'Konkreter deaktivierter Firmware-/Hostpfad mit begrenzten Quellen, versionierter Linkidentität, 40/10 Gesamtquote und 6/2 Poolplätzen implementiert, getestet und gebaut. Peer-Nativchecks und Legacykontrolle wiederholt; drei S3-Kandidaten vorhanden. Keine Installation, echte Funkrichtung oder Positionsnutzen belegt.' }
+  ]},
+  { date:'2026-10-14', title:'G1 · Datenbasis', short:'Daten', difficulty:4, effort:'90–120 min', tasks:[
+    { id:'data-rules', label:'Layout, Masken und Zeitvertrag prüfen', done:true, note:'Am 29.10. abgenommen: gleiche Firmwaregeneration, getrennte TX-128-/Peer-64-Layouts und gültige Masken; Basis173/173, Paar293/293. Zeitgrenzen unverändert, Paar-Endabweichung24,69ms und Uhrunsicherheit2,22ms. Keine Raumleistungs- oder D6-Abnahme.' }, { id:'g1', label:'G1-CSI: Vier RX über 30 Minuten qualifizieren', done:true, note:'Am 14.10. unabhängig bestanden: 1.786/1.793 = 99,61 % gemeinsam; alte strenge Regel 1.780/1.793 = 99,27 %. RX1/RX3/RX4 C1, RX2 C, alle ota_0 / VALID und acht Werte erhalten. Eigene passende Raten 17,072/19,660/18,296/19,142 CSI/s; Endbeleg 20:34:10. Neues Laufbudget unverändert fortgeführt, Freigaben beendet. Historischer CSI-Teil erledigt; am29.10. auch die drei übrigen Tag14-Messgates abgenommen. Dauerstabilität, Raum-/Positionsleistung und Tracking bleiben getrennt. Keine neue Gerätefreigabe.' },
+    { id:'data-accounting', label:'Fehler und Datenlücken vollständig bilanzieren', done:true, note:'Am 29.10. abgenommen: Geräte-/Host-/PCAP-Bilanz, zwei identische native Auswertungen je Basis/Paar und vollständiger Rückkehr-/Prozessschluss. Paar24Sequenzlücken separat; kein RF-Verlustnachweis. 64,87s von ausdrücklich freigegebenen90sAuditbudget; negative erste Basis erhalten.' },
+    { id:'peer-trial', label:'RX1↔RX4-Versuch vorbereiten', done:true, note:'Vorbereitung erledigt; am29.10. auch frische Paarboots, Bereitschaft und Peerpilot60 vor dem bestandenen Paar300 bestätigt. Keine erneute Gerätefreigabe aus alten Ansprüchen ableiten.' },
+    { id:'peer-pair-test', label:'RX1↔RX4 tatsächlich testen', done:true, note:'Am 29.10. bestanden: frische Paarboots und Pilot60, dann Paar300 mit RX4→RX1 2.581 und RX1→RX4 2.578 qualifizierten Frames, je293/293Fenster. TX-onlyGeneration11 auf RX1/RX4, Generation1 auf RX2/RX3; Abschluss erneut21,76s bestätigt. Tag14 5/5; Positionsnutzen und Vier-RX-Mesh bleiben offen.' }
+  ]},
+  { date:'2026-10-15', title:'G2 · Radarreferenz', short:'Radar', difficulty:4, effort:'tagsüber offline · abends 90–120 min', tasks:[
+    { id:'radar-individual', label:'Beide Radare einzeln prüfen', note:"Stand 25.10.: Gespeichertes Eck-Raumprofil vorbereitet; bestehende Roh-X-Spiegelung identifiziert. Kein festes P1–P9-Raster mehr als Vorgabe. Tatsächliche Sensorzuordnung, Pose/Spiegelung und reale Einzelprüfungen fehlen. Den aktualisierten Prüfablauf vor Messbeginn binden; alte Rastertests belegen nur den historischen Softwarepfad. Keine reale Radarabnahme." }, { id:'radar-joint', label:'Gemeinsame Raum- und Zeitzuordnung prüfen', note:"Stand 25.10.: Getrennte Quellen-/Boot-/Zeitverträge und gemeinsame Dateiauswertung mit 14 synthetischen Szenarien plus deterministischer Wiederholung selbstgeprüft. Keine reale gemeinsame Aufnahme. Der beobachtete RX-Host aktiviert keinen unabhängigen Radar-Rohdatenexport; sicherer Hostwechsel erst nach RX-Ende und bestandenem Rückkehrreview." },
+    { id:'g2', label:'Referenzfehler und Coverage abnehmen', note:"Stand 25.10.: G2-Auswertung und synthetische Gegenfälle vorbereitet; Median ≤0,30m, p90 ≤0,50m, Coverage ≥90% weiter ungeprüft. Gespeicherter Hostwechselreview FAIL mit drei P1-Befunden: Eingabedrift blockiert Cleanup, Rückkehrvertrag nicht vor Hoststop geprüft, Kindregistrierung nach Popen nicht unterbrechungssicher. Korrektur läuft separat, noch nicht abgenommen. Reale G2-Prüfung maximal110min inkl.15min Schlussreserve; Tag15 bleibt0/3." }
+  ]},
+  { date:'2026-10-16', title:'Echte Wege aufnehmen', short:'Wege', difficulty:4, effort:'90–120 min', tasks:[
+    { id:'empty-room', label:'Frische Leerraumreferenz aufnehmen' }, { id:'continuous-data', label:'WiFi durch langsames Gehen kalibrieren', note:"Geplanter WiFi-Ablauf: nach frischer Leerraumreferenz langsam den nutzbaren Raum ablaufen; vier RX erfassen CSI, die zuvor geprüften Radare liefern zeitlich passende Positionsreferenzen. Keine feste P1–P9-/Neun-Zonen-Kalibrierung. Ganze getrennte Sitzungen für Training und Validierung, keine überlappenden Fenster zwischen beiden. Vorbereitung/Implementierung und echter Positionsnachweis bleiben offen; dies ersetzt weder Radar-G2 noch Blindabnahme." },
+    { id:'varied-paths', label:'Ränder, Stopps und Körperorientierungen abdecken', note:'TX-Basis und geprüftes RX1↔RX4-Profil mit eigenen passenden Referenzen/Sitzungen erfassen.' }, { id:'multi-first-data', label:'Erste Zwei-Personen-Sitzung aufnehmen', goal:'multi' }
+  ]},
+  { date:'2026-10-17', title:'Kontinuierliche Modelle', short:'Modelle', difficulty:5, effort:'60–90 min', tasks:[
+    { id:'model-compare', label:'Höchstens zwei einfache Modelle vergleichen' }, { id:'coordinate-output', label:'x/z-Ausgabe, Unsicherheit und Latenz prüfen' }, { id:'assistant-offline', label:'Kalibrierungsassistent mit Fixtures prüfen', done:true, note:'Am 24.10.2026 alle 36 vorhandenen Tests in mmwave-calibration-assistant.test.mjs erneut bestanden, unter Netzwerk-/I/O-Kit-/Schreibsperre. Geprüft sind u.a. Sensorauswahl, synthetischer Server-UI-Vertrag, Trainings-/Blindgates, variable Zonen, Wiederholung, serialisierte Statusantworten und Fehlermeldungen. Nur Offline-Assistentenprüfung erledigt; keine reale Radar-, kontinuierliche Modell- oder Trackingabnahme.' },
+    { id:'peer-benefit-data', label:'RX1↔RX4 gegen die TX-Basis vergleichen', note:'Getrennte Sitzungen, geprüfte Radarreferenz, gleiches ausgewiesenes Ressourcenbudget; Positionsfehler, Coverage und Latenz bewerten.' }
+  ]},
+  { date:'2026-10-18', title:'Früher Blindversuch', short:'Blindtest', difficulty:5, effort:'60–90 min', tasks:[
+    { id:'first-blind', label:'Neue Wege und unbekannte Zwischenpositionen testen' }, { id:'error-map', label:'Fehlerkarte und Coverage auswerten' }, { id:'chosen-fix', label:'Eine begründete Verbesserung auswählen' },
+    { id:'peer-benefit-decision', label:'RX↔RX-Nutzenentscheidung belegen', note:'Vorab eingefrorenes Positionskriterium unabhängig prüfen. Positiv: Ausbau auf vier RX. Belegt negativ: Nichtübernahme. Fehlende Daten bleiben offen.' },
+    { id:'multi-feasibility', label:'Zwei-Personen-Machbarkeit bewerten', goal:'multi' }
+  ]},
+  { date:'2026-10-19', title:'G3 · Freies Live-Tracking', short:'Live', difficulty:5, effort:'90–120 min', tasks:[
+    { id:'wifi-only-live', label:'Freie Bewegung mit reinem WiFi-Eingang verfolgen' }, { id:'live-parity', label:'Offline-/Live-Gleichheit und Datenalter prüfen' },
+    { id:'g3', label:'Einzelpersonen-Leistung bewerten', note:'Ziel: Median ≤ 1 m, p90 ≤ 1,5 m; Coverage ≥ 90 %.' }, { id:'multi-decision', label:'Über den Zwei-Personen-Pfad entscheiden', goal:'multi' }
+  ]},
+  { date:'2026-10-20', title:'Gezielt verbessern', short:'Verbessern', difficulty:4, effort:'90–120 min', tasks:[
+    { id:'targeted-fix', label:'Nachgewiesenen Modell- oder Datenengpass beheben' }, { id:'short-calibration', label:'Kurze Kalibrierung und Wiederaufnahme prüfen' },
+    { id:'peer-rollout', label:'RX↔RX-Entscheidung umsetzen', note:'Bei belegtem Nutzen auf RX1–RX4 erweitern, Linkmatrix und Quellen-/Budget-/Positionsregression prüfen; neue passende Kalibrierung und Daten. Sonst nur mit belegtem negativem Vergleich die Nichtübernahme abschließen.' },
+    { id:'multi-more-data', label:'Zusätzliche Zwei-Personen-Daten aufnehmen', goal:'multi' }
+  ]},
+  { date:'2026-10-21', title:'Verfahren einfrieren', short:'Einfrieren', difficulty:4, effort:'90–120 min', tasks:[
+    { id:'freeze-method', label:'Topologie, Verfahren und Modell für Raum 1 einfrieren', note:'Nach positivem Peer-Ausbau nur dazu passende neue Referenzen, Sitzungen und Modellartefakte verwenden.' }, { id:'second-blind', label:'Neue unabhängige Blindserie auswerten' }, { id:'multi-offline', label:'Unabhängigen Zwei-Personen-Offlinenachweis liefern', goal:'multi' }
+  ]},
+  { date:'2026-10-22', title:'G4 · Zweiter Raum', short:'Raum 2', difficulty:4, effort:'90–120 min', tasks:[
+    { id:'second-room-setup', label:'Aufbau an einem zweiten Ort zeitlich prüfen' }, { id:'second-room-cal', label:'Neue Geometrie und Kalibrierung anlegen' }, { id:'g4', label:'Unbekannte Wege im zweiten Raum bestehen' }, { id:'multi-go', label:'Zwei-Personen-Go/No-Go festhalten', goal:'multi' }
+  ]},
+  { date:'2026-10-23', title:'Blocker schließen · Kandidat bedingt', short:'Blocker', difficulty:5, effort:'60–120 min', tasks:[
+    { id:'blocker-review', label:'Verbleibende Blocker prüfen oder beheben', note:"23.10.: RX1-Neustartursache und RX3/RX4-Mindestheapbefunde offen. Zwei Reviewkorrekturen und RX2/RX3-Builds geliefert; daraus folgt keine vollständige Geräte-/Trackingfreigabe." }, { id:'regression', label:'Betroffene Qualitätsprüfungen bestehen' }, { id:'freeze-candidate', label:'Einzelpersonen-Kandidaten einfrieren', note:"Erst nach stabiler Gerätebasis, passenden Radar-/Bewegungsdaten und unabhängigem kontinuierlichem WiFi-Nachweis einfrieren. Derzeit keine belegte Einzelpersonen-Lieferversion." }
+  ]},
+  { date:'2026-10-24', title:'G5 · Finale Abnahme', short:'Abnahme', difficulty:4, effort:'90–120 min', tasks:[
+    { id:'final-blind', label:'Abschließende Blindabnahme bestehen' }, { id:'endurance', label:'Mindestens 60 Minuten Gesamtlauf bestehen' }, { id:'restart-ux', label:'Neustart und Bedienablauf prüfen' }, { id:'g5', label:'Versionsgebundenen Abnahmebericht abschließen', note:"Termin24.10. bleibt Ziel und hängt von Tag14, Radarreferenz, kontinuierlichem Modell und unabhängiger Blindabnahme ab. Fehlende Gates nicht als bestanden markieren." }
+  ]},
+  { date:'2026-10-25', title:'Einzelperson übergeben', short:'Ziel 1', difficulty:2, effort:'30–60 min', tasks:[
+    { id:'single-release', label:'Startfähigen Stand und Blindbericht übergeben' }, { id:'single-demo', label:'Kurze Live-Demonstration durchführen' }, { id:'quick-start', label:'Aufbauanleitung und bekannte Grenzen liefern' }
+  ]},
+  { date:'2026-10-26', title:'Zwei Personen integrieren', short:'Integration', difficulty:5, effort:'90–120 min', tasks:[
+    { id:'multi-candidate', label:'Zwei-Personen-Kandidaten live integrieren', goal:'multi' }, { id:'multi-crossings', label:'Kreuzung, Eintritt und Austritt prüfen', goal:'multi' }, { id:'single-preserved', label:'Einzelpersonen-Lieferstand erhalten', goal:'multi' }
+  ]},
+  { date:'2026-10-27', title:'Zwei Personen abnehmen', short:'Ziel 2', difficulty:5, effort:'90–120 min', tasks:[
+    { id:'multi-blind', label:'Unabhängige Zwei-Personen-Abnahme durchführen', goal:'multi' }, { id:'multi-metrics', label:'Positionen, Anzahl, Coverage und ID-Wechsel bewerten', goal:'multi' }, { id:'multi-release', label:'Ergebnis und verbleibende Grenzen übergeben', goal:'multi' }
+  ]}
+];
+const SCHEDULE_ID = 'observatory-october-2026-v1';
+const TASK_IDS = new Set(PLAN.flatMap(day => day.tasks.map(task => task.id)));
+const REVIEW_REVISION = 1;
+const REVIEWED_TASK_IDS = ['data-rules', 'data-accounting', 'peer-pair-test'];
+function initialChecks() { return Object.fromEntries(PLAN.flatMap(day => day.tasks.map(task => [task.id, task.done === true]))); }
+function dateValue(key) {
+  if (typeof key !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(key)) throw new Error('Ungültiges Datum.');
+  const value = Date.parse(key + 'T00:00:00Z');
+  if (!Number.isFinite(value) || new Date(value).toISOString().slice(0,10) !== key) throw new Error('Ungültiges Datum.');
+  return value;
+}
+function dayDifference(from, to) { return (dateValue(to) - dateValue(from)) / 86400000; }
+function tasksFor(day, goal) { return day.tasks.filter(task => goal === 'all' || task.goal !== 'multi'); }
+function daysFor(goal) { return PLAN.filter(day => day.date <= (goal === 'all' ? '2026-10-27' : '2026-10-25')); }
+function calculateProgress(checked, goal, date) {
+  dateValue(date);
+  const days = daysFor(goal);
+  let earned = 0, planned = 0, completed = 0, total = 0, overdue = 0, todayOpen = 0, futureDone = 0;
+  for (const day of days) {
+    const required = tasksFor(day, goal).filter(task => !task.optional);
+    const done = required.filter(task => checked[task.id] === true).length;
+    earned += required.length ? done / required.length : 1;
+    total += required.length;
+    completed += done;
+    if (day.date < date) { planned++; overdue += required.length - done; }
+    if (day.date === date) todayOpen += required.length - done;
+    if (day.date > date) futureDone += done;
+  }
+  const state = completed === total ? 'complete' : overdue > 0 ? 'late' : todayOpen === 0 && futureDone > 0 ? 'ahead' : 'on-track';
+  return { days, completed, total, overdue, todayOpen, futureDone, state, actual:earned / days.length, planned:planned / days.length, daysLeft:dayDifference(date, days.at(-1).date) };
+}
+function validateSnapshot(value) {
+  if (!value || value.schemaVersion !== 1 || value.scheduleId !== SCHEDULE_ID || !value.checked || Array.isArray(value.checked) || typeof value.checked !== 'object') throw new Error('Diese Datei enthält keinen passenden Observatory-Fortschritt.');
+  for (const [id, done] of Object.entries(value.checked)) if (!TASK_IDS.has(id) || typeof done !== 'boolean') throw new Error('Die Datei enthält ungültige Aufgabenwerte.');
+  return Object.fromEntries([...TASK_IDS].map(id => [id, value.checked[id] === true]));
+}
+function restoreChecks(value) {
+  const checked = validateSnapshot(value);
+  const revision = value.reviewRevision ?? 0;
+  if (!Number.isInteger(revision) || revision < 0 || revision > REVIEW_REVISION) throw new Error('Unbekannter Abnahmestand.');
+  if (revision < REVIEW_REVISION) for (const id of REVIEWED_TASK_IDS) checked[id] = true;
+  return checked;
+}
+globalThis.ProgressTracker = { PLAN, SCHEDULE_ID, TASK_IDS, REVIEW_REVISION, initialChecks, restoreChecks, dateValue, dayDifference, tasksFor, daysFor, calculateProgress, validateSnapshot };
+</script>
+<script id="progress-ui">
+(() => {
+  'use strict';
+  const { PLAN, SCHEDULE_ID, REVIEW_REVISION, initialChecks, restoreChecks, dateValue, tasksFor, daysFor, calculateProgress } = ProgressTracker;
+  const STORAGE_KEY = 'observatory.deadline-tracker.2026.v1';
+  const $ = id => document.getElementById(id);
+  const berlinToday = () => new Intl.DateTimeFormat('sv-SE', { timeZone:'Europe/Berlin', year:'numeric', month:'2-digit', day:'2-digit' }).format(new Date());
+  const formatDate = (date, options) => new Intl.DateTimeFormat('de-DE', { timeZone:'UTC', ...options }).format(new Date(dateValue(date)));
+  let checked = initialChecks(), goal = 'single', selected = '2026-10-12', storageReady = true, migrated = false;
+  const showMessage = text => { $('message').textContent = text; $('message').hidden = !text; };
+  try {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (saved) { const value = JSON.parse(saved); checked = restoreChecks(value); migrated = (value.reviewRevision ?? 0) < REVIEW_REVISION; $('save-status').textContent = 'Fortschritt aus diesem Browser geladen'; }
+  } catch {
+    storageReady = false;
+    showMessage('Der lokale Speicher ist nicht verfügbar oder der gespeicherte Stand ist ungültig. Änderungen gelten zunächst nur in diesem Tab. Bitte „Stand sichern“ verwenden.');
+    $('save-status').textContent = 'Nur in diesem Tab · bitte Stand sichern';
+  }
+  $('comparison-date').value = berlinToday();
+  function snapshot() { return { schemaVersion:1, scheduleId:SCHEDULE_ID, savedAt:new Date().toISOString(), reviewRevision:REVIEW_REVISION, checked }; }
+  function save() {
+    if (!storageReady) return;
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(snapshot())); $('save-status').textContent = 'Lokal gespeichert · ' + new Intl.DateTimeFormat('de-DE', { hour:'2-digit', minute:'2-digit', timeZone:'Europe/Berlin' }).format(new Date()); }
+    catch { storageReady = false; showMessage('Speichern im Browser fehlgeschlagen. Mit „Stand sichern“ bleiben deine Änderungen als Datei erhalten.'); $('save-status').textContent = 'Nur in diesem Tab · bitte Stand sichern'; }
+  }
+  function chooseNext() {
+    const days = daysFor(goal), date = $('comparison-date').value;
+    selected = (days.find(day => tasksFor(day, goal).some(task => !task.optional && !checked[task.id])) || days.at(-1)).date;
+    if (days.some(day => day.date === date) && !days.some(day => day.date < date && tasksFor(day, goal).some(task => !task.optional && !checked[task.id]))) selected = date;
+  }
+  function render() {
+    const date = $('comparison-date').value, model = calculateProgress(checked, goal, date);
+    if (!model.days.some(day => day.date === selected)) selected = model.days.at(-1).date;
+    const titles = { complete:'Zielaufgaben erledigt', late:'Im Rückstand', ahead:'Du bist voraus', 'on-track':'Im Plan' };
+    $('status-title').textContent = titles[model.state];
+    $('status').dataset.tone = model.state === 'late' ? 'late' : 'ok';
+    $('status-detail').textContent = model.state === 'complete' ? 'Alle Pflichtaufgaben dieser Ansicht sind abgehakt.' : model.overdue ? `${model.overdue} Pflichtaufgabe${model.overdue === 1 ? '' : 'n'} überfällig. Zuerst den ältesten offenen Tag abschließen.` : model.state === 'ahead' ? `${model.futureDone} spätere Pflichtaufgabe${model.futureDone === 1 ? '' : 'n'} bereits erledigt.` : model.todayOpen ? `${model.todayOpen} Pflichtaufgabe${model.todayOpen === 1 ? '' : 'n'} für heute offen. Heute zählt noch nicht als Rückstand.` : date < PLAN[0].date ? 'Der Zeitplan startet am 12. Oktober.' : 'Bis heute ist alles erledigt. Weiter mit dem nächsten offenen Tag.';
+    const percent = Math.round(model.actual * 100);
+    $('percent').textContent = percent + ' %';
+    $('progress-fill').style.transform = `scaleX(${model.actual})`;
+    $('progress-bar').setAttribute('aria-valuenow', String(percent));
+    $('planned-marker').style.left = `calc(${model.planned * 100}% - 1px)`;
+    $('completed-label').textContent = `${model.completed} / ${model.total} Pflichtaufgaben`;
+    $('planned-label').textContent = `Soll bis gestern: ${Math.round(model.planned * 100)} %`;
+    $('days-left').textContent = Math.abs(model.daysLeft);
+    $('days-label').textContent = model.daysLeft < 0 ? 'Tage seit der Deadline' : model.daysLeft === 0 ? 'Deadline ist heute' : model.daysLeft === 1 ? 'Tag verbleibt' : 'Tage verbleiben';
+    $('deadline-label').textContent = formatDate(model.days.at(-1).date, { day:'numeric', month:'long', year:'numeric' });
+    $('goal-description').textContent = goal === 'single' ? 'Eine Person. Vier RX. Ein TX. Freie Bewegung. RX↔RX entwickeln und prüfen.' : 'Zwei Personen getrennt verfolgen. Einzelpersonen- und RX↔RX-Basis erhalten.';
+    document.querySelectorAll('[data-goal]').forEach(button => button.setAttribute('aria-pressed', String(button.dataset.goal === goal)));
+    const calendar = $('calendar'); calendar.replaceChildren();
+    for (const day of model.days) {
+      const required = tasksFor(day, goal).filter(task => !task.optional), done = required.filter(task => checked[task.id]).length;
+      const complete = done === required.length, late = day.date < date && !complete;
+      const button = document.createElement('button'); button.type = 'button'; button.className = 'day';
+      button.classList.toggle('is-today', day.date === date); button.classList.toggle('is-done', complete); button.classList.toggle('is-late', late);
+      button.setAttribute('aria-pressed', String(day.date === selected));
+      button.setAttribute('aria-label', `${formatDate(day.date, { weekday:'long', day:'numeric', month:'long' })}: ${day.title}, ${done} von ${required.length} erledigt${late ? ', überfällig' : ''}`);
+      button.innerHTML = `<span class="date-num">${day.date.slice(-2)}</span>${complete ? '<span class="day-check" aria-hidden="true">✓</span>' : ''}<span class="day-title"></span><span class="day-count">${done}/${required.length}${late ? ' !' : ''}</span>`;
+      button.querySelector('.day-title').textContent = day.short;
+      button.addEventListener('click', () => { selected = day.date; render(); $('day-title').scrollIntoView({ block:'nearest' }); });
+      calendar.append(button);
+    }
+    const day = PLAN.find(item => item.date === selected), tasks = tasksFor(day, goal), required = tasks.filter(task => !task.optional);
+    $('selected-date').textContent = formatDate(day.date, { weekday:'long', day:'numeric', month:'long' });
+    $('day-title').textContent = day.title;
+    $('day-count').textContent = `${required.filter(task => checked[task.id]).length}/${required.length}`;
+    const next = required.find(task => !checked[task.id]);
+    $('next-action').replaceChildren();
+    const lead = document.createElement('b'); lead.textContent = next ? 'Als Nächstes: ' : 'Tagesziel erledigt. ';
+    $('next-action').append(lead, document.createTextNode(next ? next.label : 'Du kannst den nächsten Tag auswählen.'));
+    $('tasks').replaceChildren();
+    for (const task of tasks) {
+      const label = document.createElement('label'); label.className = 'task';
+      const input = document.createElement('input'); input.type = 'checkbox'; input.checked = checked[task.id] === true; input.id = 'task-' + task.id;
+      const body = document.createElement('span'), text = document.createElement('span'); text.className = 'task-text'; text.textContent = task.label;
+      if (task.optional) { const tag = document.createElement('span'); tag.className = 'optional'; tag.textContent = 'Optional'; body.append(tag); }
+      body.append(text);
+      if (task.note) { const note = document.createElement('span'); note.className = 'task-note'; note.textContent = task.note; body.append(note); }
+      input.addEventListener('change', () => { checked[task.id] = input.checked; save(); render(); document.getElementById(input.id)?.focus({ preventScroll:true }); });
+      label.append(input, body); $('tasks').append(label);
+    }
+    $('day-meta').textContent = `Geplant: ${day.effort} deiner Zeit · Schwierigkeit ${day.difficulty}/5. Nur bestätigte Ergebnisse abhaken.`;
+  }
+  document.querySelectorAll('[data-goal]').forEach(button => button.addEventListener('click', () => { goal = button.dataset.goal; render(); }));
+  $('comparison-date').addEventListener('change', () => { try { dateValue($('comparison-date').value); render(); } catch { $('comparison-date').value = berlinToday(); render(); showMessage('Bitte ein gültiges Vergleichsdatum auswählen.'); } });
+  $('today-button').addEventListener('click', () => { $('comparison-date').value = berlinToday(); chooseNext(); render(); });
+  $('next-button').addEventListener('click', () => { selected = (daysFor(goal).find(day => tasksFor(day, goal).some(task => !task.optional && !checked[task.id])) || daysFor(goal).at(-1)).date; render(); });
+  $('export-button').addEventListener('click', () => {
+    const url = URL.createObjectURL(new Blob([JSON.stringify(snapshot(), null, 2)], { type:'application/json' }));
+    const link = document.createElement('a'); link.href = url; link.download = 'observatory-fortschritt-' + berlinToday() + '.json'; link.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  });
+  $('import-button').addEventListener('click', () => $('import-file').click());
+  $('import-file').addEventListener('change', async event => {
+    const file = event.target.files[0]; if (!file) return;
+    try {
+      if (file.size > 100000) throw new Error('Die Fortschrittsdatei ist zu groß.');
+      const restored = restoreChecks(JSON.parse(await file.text()));
+      if (!window.confirm('Den aktuellen Fortschritt durch den Stand aus dieser Datei ersetzen?')) return;
+      checked = restored; storageReady = true; showMessage('Fortschritt aus der Datei geladen.'); save(); chooseNext(); render();
+    } catch (error) { showMessage(error instanceof SyntaxError ? 'Die Datei enthält kein gültiges JSON. Dein Stand bleibt erhalten.' : error.message); }
+    finally { event.target.value = ''; }
+  });
+  window.addEventListener('storage', event => {
+    if (event.key !== STORAGE_KEY || !event.newValue) return;
+    try { checked = restoreChecks(JSON.parse(event.newValue)); render(); $('save-status').textContent = 'Stand aus einem anderen Tab übernommen'; }
+    catch { showMessage('Änderung aus einem anderen Tab konnte nicht gelesen werden. Dein angezeigter Stand bleibt erhalten.'); }
+  });
+  if (migrated) save();
+  chooseNext(); render();
+})();
+</script>
+</body>
+</html>

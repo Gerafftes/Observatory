@@ -31,21 +31,27 @@ at their pinned commits:
 | `v2/crates/ruview-swarm` | `267aba5be2288aa6cbe574492062b04fa8c8a6ce` |
 | `v2/crates/worldgraph` | `fdade422069d3162634292710d78cb9963c0f48d` |
 
-The snapshot also contains the current Observatory working-tree changes in:
+Observatory adaptations include the experiment cockpit and calibration UI,
+RX source binding and recorder/audit paths, RX unified/peer measurement support,
+TX safety and maintenance tools, and local regression tests. See
+[RuView adaptations](../docs/project/06-ruview-anpassungen.md) and the
+[current result report](../docs/project/rx-unified-tag14-result-20261029.md).
 
-- `ui/components/MmwaveCalibrationAssistant.js`
-- `ui/components/ObservatoryControlCenter.js`
-- `ui/components/RoomGeometryEditor.js`
-- `ui/components/SensingTab.js`
-- `ui/index.html`
-- `ui/style.css`
-- `ui/tests/`
-- `ui/utils/i18n.js`
-- `v2/crates/wifi-densepose-sensing-server/src/experiment.rs`
+This is a source distribution. Local agent settings and memories, generated
+machine-specific SDK configuration, learning-session data, and an unrelated
+extracted third-party CLI research dump are omitted. Their private originals
+remain in local storage. Required runtime sources and third-party license/notice
+files remain included. Normal development dependencies are obtained through the
+package managers; no second RuView checkout or submodule initialization is needed.
 
-Git histories, build directories, dependency caches, recordings, logs,
-credentials and device-specific provisioning exports are intentionally not
-part of the snapshot.
+## Prerequisites
+
+- Git and a current stable Rust/Cargo toolchain (locally checked with Rust 1.96).
+- Node.js for the browser's dependency-free `node --test` suite.
+- Python 3.15 for the existing tooling that uses lazy-import syntax.
+- KiCad 10 and its standard libraries for [editable hardware](../hardware/KICAD.md).
+- Firmware builds additionally need the ESP-IDF version and target setup stated
+  in the corresponding firmware guide; simulation does not need ESP-IDF or boards.
 
 ## Build and run
 
@@ -53,14 +59,38 @@ From the Observatory repository root:
 
 ```bash
 cd software/ruview/v2
-cargo check -p wifi-densepose-sensing-server --no-default-features
-cargo run -p wifi-densepose-sensing-server --no-default-features -- \
-  --source simulate \
+cargo check --locked -p wifi-densepose-sensing-server --no-default-features
+WDP_RUFIELD_SIGNING_SEED="$(python3 -c 'import secrets; print(secrets.token_hex(32))')" \
+cargo run --locked -p wifi-densepose-sensing-server --no-default-features -- \
+  --source simulate --rx-session-only --bind-addr 127.0.0.1 \
   --http-port 3002 \
   --ws-port 3001
 ```
 
-Then open `http://127.0.0.1:3002/ui/index.html#sensing`.
+Then open `http://127.0.0.1:3002/ui/index.html#sensing`. Simulation binds to loopback and disables mmWave network/control paths.
+The generated signing seed exists only in the demo process environment. A real
+measurement setup needs its own persistent private signing key; never put that
+key in an example file or a commit.
+A first build may need Internet access to download ordinary dependencies.
+
+From the repository root, run the publication and browser checks:
+
+```bash
+sh project_tools/verify_observatory_source.sh
+python3 project_tools/check_publication.py --secrets
+node --test software/ruview/ui/tests/*.test.mjs
+```
+
+The secret check requires Gitleaks 8.30.1 or newer. It scans locally, includes
+archive contents up to depth two, and reports only paths and rule names. Reviewed
+synthetic fixtures are bound to their complete file hashes; a changed file must
+be reviewed again. This checks the proposed tree; a separate history scan is
+required before publishing a new commit range. See [publication rules](../docs/PUBLICATION.md).
+
+`project_tools/csi-host-ip-alias.sh` is an optional macOS operational helper,
+not part of simulation. Its privileged modes require your own TX identity in
+`OBSERVATORY_TX_BSSID`. Installing it is a separate network operation; the
+hardware-free `self-test` never needs that identity.
 
 Simulation and software tests do not prove real CSI, mmWave operation or
 position accuracy. Hardware results remain subject to the setup, preflight,

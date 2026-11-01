@@ -38,7 +38,7 @@
 
 ## Projekt ansehen
 
-**[Projekt auf Stardance ansehen](https://stardance.hackclub.com/projects/25673)** · **[Oberfläche ohne Sensoren ausprobieren](#schnelleinstieg)**
+**[Projekt auf Stardance ansehen](https://stardance.hackclub.com/projects/25673)** · **[Projektvideo (Aufzeichnung)](https://youtu.be/k27eQqz_vok)** · **[Oberfläche ohne Sensoren ausprobieren](#schnelleinstieg)**
 
 Du möchtest verstehen, wie sich Menschen über WLAN-Signale erkennen lassen?
 Observatory verbindet Rohdatenerfassung, eine Experiment-Oberfläche und
@@ -76,23 +76,28 @@ gibt es derzeit nicht.
 - [Benutzeroberfläche](#benutzeroberfläche)
 - [Wie es funktioniert](#wie-es-funktioniert)
 - [Hardware](#hardware)
+- [Repository und private Daten](#repository-und-private-daten)
 - [Dokumentation](#dokumentation)
 - [Lizenz und Credits](#lizenz-und-credits)
 
 ## Schnelleinstieg
 
 Starte mit der Simulation, um die Oberfläche ohne Sensoren kennenzulernen.
-Dafür brauchst du Git und eine Rust-/Cargo-Umgebung; Details zum Quellstand
+Dafür brauchst du Git, Python 3 und eine Rust-/Cargo-Umgebung; Details zum Quellstand
 stehen im [Software-Einstieg](software/README.md).
 
 ```bash
 git clone https://github.com/Gerafftes/Observatory.git
 cd Observatory/software/ruview/v2
-cargo run -p wifi-densepose-sensing-server --no-default-features -- \
-  --source simulate --http-port 3002 --ws-port 3001
+WDP_RUFIELD_SIGNING_SEED="$(python3 -c 'import secrets; print(secrets.token_hex(32))')" \
+cargo run --locked -p wifi-densepose-sensing-server --no-default-features -- \
+  --source simulate --rx-session-only --bind-addr 127.0.0.1 --http-port 3002 --ws-port 3001
 ```
 
 Öffne anschließend `http://127.0.0.1:3002/ui/index.html#sensing`.
+Der Befehl erzeugt einen flüchtigen lokalen Demo-Signaturschlüssel; er wird nicht
+gespeichert. Für echte Messungen muss ein eigener dauerhafter Schlüssel privat
+konfiguriert werden.
 
 1. **Erkunden:** Setup und Messablauf in der [Cockpit-Anleitung](software/experiment-cockpit.md) kennenlernen.
 2. **Einordnen:** [Versuchsergebnisse und Grenzen](experiment-reports/README.md) lesen.
@@ -121,7 +126,7 @@ Der bisherige D6-Ansatz liefert diskrete Punkte oder Zonen mit `unknown` oder
 
 ## Aktueller Validierungsstand
 
-**Stand: 29. Oktober 2026.** Die Angaben fassen gespeicherte Befunde zusammen.
+**Dokumentation: 1. November 2026; Messstand: 29. Oktober 2026.** Die Angaben fassen gespeicherte Befunde zusammen.
 
 | Bereich | Ergebnis | Grenze |
 |---|---|---|
@@ -134,7 +139,7 @@ Der bisherige D6-Ansatz liefert diskrete Punkte oder Zonen mit `unknown` oder
 Der 60-Minuten-Lauf wurde zweimal identisch neu ausgewertet; sein Zeitnachweis
 wurde aus Originalbelegen rekonstruiert. Der Fehler des damaligen Online-Abschlusses
 bleibt dokumentiert. Ausführliche Dauerlaufbelege liegen privat außerhalb des
-Repositorys; neuere Entwicklungsberichte sind noch nicht veröffentlicht.
+Repositorys. Der [Tag-14-Ergebnisbericht](docs/project/rx-unified-tag14-result-20261029.md) dokumentiert die Vier-RX-Basis und den Paartest; private Rohdaten sind nicht enthalten.
 
 Frühere D5-abs-Versuche beseitigten Leerraum-Fehlpräsenz, verloren aber den
 Still-Recall vollständig und scheiterten insgesamt. Atem-/Herzfrequenzindikatoren
@@ -151,7 +156,7 @@ führt durch den Ablauf und den mmWave-Kalibrierungsassistenten.
 
 <a href="software/experiment-cockpit.md"><img src="project-media/ui/experiment-cockpit-setup.png" alt="Experiment-Cockpit mit Setup-Profil, Statusübersicht und simuliertem Hardwarezustand" width="760"></a>
 
-*Die Abbildung zeigt einen simulierten Softwarezustand ohne angeschlossene Sensoren.*
+*Historische UI-Aufnahme mit simuliertem Softwarezustand ohne angeschlossene Sensoren. Die aktuelle Oberfläche kann im Detail abweichen.*
 
 ## Wie es funktioniert
 
@@ -176,6 +181,7 @@ Für den WiFi-Aufbau brauchst du fünf ESP32-S3-Boards: TX1 und RX1 bis RX4.
 Zwei HLK-LD2450 mit ESP32-C3 sind als Kalibrierungs- und Referenzknoten vorgesehen.
 Oben siehst du den früheren Breadboard-Aufbau und die PCB-03-Vorschau.
 
+- [Alle KiCad-Projekte öffnen: PCB-01, PCB-02, PCB-03 und POC](hardware/KICAD.md)
 - [PCB-03: aktuelle Revision, KiCad-Quellen und Fertigungsdaten](hardware/pcb-03/)
 - [Breadboard: CAD, Befestigungsteile und Bauteile](hardware/breadboard/README.md)
 - [MMWAVE1/2: Firmware und Anbindung](software/ruview/firmware/esp32-mmwave-node/README.md)
@@ -189,6 +195,28 @@ Im Normalbetrieb: RX1 blau, RX2 grün, RX3 rot, RX4 violett.
 Weitere Zustände erkennst du an Farbe und Blinkfolge:
 
 <a href="project-media/hardware/rx-status-led-patterns.png"><img src="project-media/hardware/rx-status-led-patterns.png" alt="RX-LED-Farben und Blinkmuster für Normalbetrieb, Start, WLAN/IP, fehlende TX1-CSI, Initialisierungsfehler, Transportfehler, OTA und interne Fehler" width="560"></a>
+
+## Repository und private Daten
+
+Das Repository bündelt den bearbeitbaren Projektstand:
+
+| Bereich | Inhalt |
+|---|---|
+| `software/ruview/` | Host, Browseroberfläche, Firmware, Tests und benötigte Fremdquellen |
+| `hardware/` | KiCad-Projekte einschließlich lokaler Footprints, CAD und Fertigungsdaten |
+| `docs/` und `experiment-reports/` | Methodik, Ergebnisberichte und dokumentierte Grenzen |
+| `project-media/` und `measurement-templates/` | Öffentliche Abbildungen und Vorlagen |
+
+Rohmessungen, Geräte-/NVS- und Flashsicherungen, Zugangsdaten, lokale
+Konfigurationen, Agentensitzungen und die Umzugsnachweise bleiben in der privaten
+SSD-Ablage. Sie werden zum Bauen und für die Simulation nicht benötigt.
+Historische Berichte können private Nachweise benennen; diese Verweise stellen
+keine öffentlich verfügbaren Downloads dar. In Veröffentlichungskopien sind
+lokale Pfade und Hardwareidentitäten pseudonymisiert.
+
+Der [Software-Einstieg](software/README.md) beschreibt Voraussetzungen und
+Prüfbefehle. [Veröffentlichungsregeln](docs/PUBLICATION.md) erklären die Trennung
+zwischen öffentlichen Quellen und privaten Betriebsdaten.
 
 ## Dokumentation
 

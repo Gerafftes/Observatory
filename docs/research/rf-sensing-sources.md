@@ -1,6 +1,6 @@
 # Quellen zu Wi-Fi-Sensing und Personenerfassung
 
-34 Quellen zu CSI, Radar, Pose, Ortung und Vitalparametern. Stand: 5. Oktober 2026.
+35 Quellen zu CSI, Radar, Pose, Ortung und Vitalparametern. Stand: 12. Oktober 2026. G05 wurde an diesem Datum ergänzt und anhand des Codes eingeordnet; die übrigen Einträge behalten ihren bisherigen Prüfstand vom 5. Oktober.
 
 [Videos](#videos) · [Quellen nach Thema](#quellen-nach-thema) · [Hintergrundquellen](#hintergrundquellen) · [Prüfstand](#prüfstand)
 
@@ -27,6 +27,7 @@ Kurzbeschreibungen aus den gelesenen YouTube-Transkripten.
 | G01 | [thejanu-dileepa / wifi-human-detector-esp32](https://github.com/thejanu-dileepa/wifi-human-detector-esp32) | Anwesenheit, CSI-Streaming und experimentelle Vitalparameter; PC-Klassifikator laut README mit RSSI-Fenstern. |
 | G03 | [ruvnet / RuView](https://github.com/ruvnet/RuView) | Umfangreiches Projekt für Wi-Fi-Sensing, räumliche Erfassung und Vitalparameter. |
 | G04 | [ashus3868 / Wi-Fi-Motion-Detector-ESP32](https://github.com/ashus3868/Wi-Fi-Motion-Detector-ESP32) | Begleitprojekt zu V03/T01; die dort gezeigte Umsetzung verwendet RSSI. |
+| G05 | [andrisgauracs / wifi-sensing-kit](https://github.com/andrisgauracs/wifi-sensing-kit) | Drei ESP32-S3, RuView v0.8.8, Bewegungslernen mit Webcamlabels, zusätzliche Board-zu-Board-Funkstrecken und grobe Raumklassifikation. Geprüfter Commit: `7fb77fc0c0adb98bcf0a102d68fa8718b2f98625`. Nützlich für Datensammlung, Linkvergleich und einfache Modelle; kein Nachweis kontinuierlicher oder Mehrpersonen-Ortung. [Auswertung und Übernahmeplan](wifi-sensing-kit-auswertung-20261012.md). |
 | T01 | [ESP32-Bewegungsmelder — Tutorial](https://www.innovationyourself.com/wi-fi-motion-detector-with-csi/) | RSSI-Grenzwert und LED; Titel nennt CSI. |
 | P10 | [From CSI to Coordinates (2025)](https://www.mdpi.com/1999-5903/17/9/395) | Vier ESP32 und AP; Random Forest für 43 Rasterpositionen. Beste Konfiguration: drei Empfänger, 82,12 % Klassifikationsgenauigkeit. Ein Raum; Daten auf Anfrage. |
 | D03 | ESP-NOW v5.4.1: [GitHub-Quelle](https://github.com/espressif/esp-idf/blob/v5.4.1/docs/en/api-reference/network/esp_now.rst) · [API-Dokumentation](https://docs.espressif.com/projects/esp-idf/en/v5.4.1/esp32/api-reference/network/esp_now.html) | Offizielle Transportgrundlage: Frames, Kanäle und Callbacks. Sendebestätigung gilt auf MAC-Ebene; CSI-Erfassung benötigt eigene Dokumentation. |
@@ -76,3 +77,7 @@ Diese acht Quellen liefern überwiegend Kontext oder Überblicke. Für Implement
 | V02 | [Bilawal Sidhu: WiFi Can See You](https://www.youtube.com/watch?v=0OdR8rRMz3I) | Überblick und Wegweiser zu Originalquellen. |
 | V06 | [Bilawal Sidhu: AI Can See Without Cameras](https://www.youtube.com/watch?v=olaQ3-m271M) | Überblick über Radar und Biometrie; Aussagen anhand der Primärbelege prüfen. |
 | V05 | [Hampton Law: Wi-Fi und Polizei](https://www.youtube.com/watch?v=LngDW3t36nc) | US-Rechtskommentar; kaum Details zur Signalverarbeitung oder technischen Validierung. |
+
+## Prüfstand
+
+G05 wurde am 12. Oktober 2026 anhand von README, Methodenbeschreibung, Firmwarepatch, Parser, Merkmalen, Modell-/Auswertecode und geführter Aufnahmeoberfläche bewertet. Es wurden keine Fremdprogramme ausgeführt und keine Geräte angesprochen. Die vom Autor genannten Klassifikationsergebnisse wurden nicht mit eigenen Messdaten reproduziert. Die [detaillierte Auswertung](wifi-sensing-kit-auswertung-20261012.md) trennt Quellbefund, Übertragbarkeit und spätere Messanforderungen; die Einordnung in den Liefertermin steht im [Gesamtplan](../project/tracking-zeitplan-20261025.md).

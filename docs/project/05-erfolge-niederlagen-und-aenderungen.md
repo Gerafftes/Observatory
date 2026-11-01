@@ -1,3 +1,4 @@
+<!-- Publication copy: local paths and hardware identifiers were pseudonymized; private original retained. -->
 # 05 Erfolge, Niederlagen und Änderungen
 
 Diese Datei sammelt bewusst auch negative Ergebnisse. Für den späteren Bericht sind sie wichtig, weil sie Grenzen des Systems begründen.
@@ -7,7 +8,7 @@ Diese Datei sammelt bewusst auch negative Ergebnisse. Für den späteren Bericht
 | Datum | Erfolg | Bedeutung für die Arbeit |
 |---|---|---|
 | 2026-06-26 | TX-Firmware erfolgreich auf ESP32-S3 geflasht; Hash-Verifikation erfolgreich | Der kontrollierte Sender für Versuch A ist grundsätzlich vorbereitet |
-| 2026-06-26 | TX-SoftAP startet mit anderem USB-Kabel erfolgreich; AP IP `192.168.4.1`, AP MAC `AE:27:6E:A8:D2:64` | Der kontrollierte Sender für Versuch A ist betriebsbereit |
+| 2026-06-26 | TX-SoftAP startet mit anderem USB-Kabel erfolgreich; AP IP `192.168.4.1`, AP MAC `02:00:00:00:00:04` | Der kontrollierte Sender für Versuch A ist betriebsbereit |
 | 2026-06-26 | Lokale RuView-`.venv` mit `esptool 5.3.0` und `esp-idf-nvs-partition-gen 0.2.0` eingerichtet | RX-Firmware kann geflasht und NVS-Provisioning vorbereitet werden |
 | 2026-06-26 | RuView-Sensing-Server erfolgreich mit Cargo gebaut | Der PC/Mac kann nun als CSI-Empfangs- und Auswertungsserver für RX1 dienen |
 | 2026-06-26 | Erster gültiger ESP32-CSI-Frame im RuView-Server erkannt: `node=1`, `subs=64`, `seq=0` | RX1 sendet nicht nur UDP-Pakete, sondern mindestens ein Paket wurde korrekt als CSI-Frame geparst |

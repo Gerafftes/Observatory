@@ -1,0 +1,13 @@
+# Koordinatorbefund: fehlender Host-CWD im Kurzpilot
+
+Der neue Lauf `rx-shortpilot-20261016T200240Z` ist nach 55,286 Sekunden **vor OTA und Messung abgebrochen**. Der Koordinator hat tatsächlichen Trace, Runnerfehler, Wrapper-/Binder-/Launchquellen und sämtliche **152 geschlossenen Originaldateien nach SHA-256** frisch geprüft. Keine Hashabweichung. Kein Agentenstart oder Hardwarezugriff durch diesen Review.
+
+**Bestätigte Ursache:** Der reale Binder erzeugte keinen `hosts/default`-CWD; der Runner erzeugte nur `session`. `NativeOS.launch` scheiterte deshalb beim tatsächlichen `subprocess.Popen(cwd=...)`. Zwei Hostversuche einschließlich des erlaubten Abbruchpfads, 20 RX-GETs, null OTA, null Capture und null Recordersteuerungen sind gespeichert. Der finale Defaultzustand ist unbestätigt. Gespeicherte Gerätebeobachtungen sind keine aktuelle Endbestätigung.
+
+**Bestätigte Prüflücke:** Die isolierte Main-Probe erzeugte ihren CWD selbst. Ihr positiver Nachweis des Signierer-/Binär-/HTTP-Pfads bleibt im damaligen Umfang richtig, belegt aber nicht den fehlenden Produktionsvorbereitungsschritt. Die vorherige allgemeine Aussage „Hardwarelauf vorbereitet“ reicht damit für den nächsten Versuch nicht aus. Vor einem neuen Versuch ist die tatsächliche Dateivorbereitung integriert zu korrigieren und mit anfangs fehlenden CWDs zu prüfen.
+
+**Weiterer konkreter Übergabebefund:** Der alte Gesamtverifier vergleicht einen historischen Arbeitsbaum mit inzwischen regulär fortgeschriebenem Plan/Tracker und stoppt deshalb. Die gezielte Prüfung meldet 2.893 passende Produktionsbindungen, keine Lieferabweichungen und ausschließlich die beiden historischen Planungsdateien als Änderungen. Der neue Verifier muss diese Rollen ausdrücklich unterscheiden und echte Startinputs weiter strikt prüfen; keine allgemeine Dokumentausnahme oder Prüferumgehung.
+
+Die ungenutzte Rückkehr ist laut gespeicherten Tool-/Schedulerbelegen pausiert; kein neuer Termin im Rahmen dieses Reviews angelegt. Der alte Lauf bleibt beendet. Weder Peerverhalten noch Funkqualität oder Tagesabnahme wurden geprüft. Die technischen Kurzprofil-/Zeit-/Kandidatenbelege bleiben erhalten, der tatsächliche Start ist bis zur Vorbereitungskorrektur erneut blockiert.
+
+Nächster Schritt: gezielter vollständiger Offline-Korrekturauftrag ([Ergebnis/Abschluss](kurzpilot-startvorbereitung-koordinatorreview-20261016.md)). Keine Firmware-/Hostneubauten, Hardwarezugriffe oder Installation daraus ableiten. Nach positivem unabhängigem Review kann ein neuer eigenständig autorisierter Hardwarelauf folgen; keine verbrauchten Freigaben weiterverwenden.
