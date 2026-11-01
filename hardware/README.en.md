@@ -25,6 +25,8 @@ preserves the PCB-01/PCB-02 outer dimensions and mounting-hole positions.
 
 PCB-02 remains documented as the previous revision.
 
+The complete KiCad project sources are under `hardware/`: [PCB-01](pcb-01/), [PCB-02](pcb-02/), [PCB-03](pcb-03/), and [POC schematics](poc/). The [KiCad entry guide](KICAD.md) lists the project files and required libraries.
+
 > [!IMPORTANT]
 > **PCB-03 is the required revision for the current setup.** PCB-01 and PCB-02 remain documented as previous revisions.
 
