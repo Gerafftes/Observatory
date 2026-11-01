@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Batch upvote under-voted high-quality memories on pi.ruv.io brain."""
 
+import os
 import json
 import sys
 import time
@@ -8,7 +9,7 @@ import urllib.request
 import urllib.error
 
 BASE = "https://pi.ruv.io/v1"
-AUTH = "Bearer ruvector-swarm"
+AUTH = "Bearer " + os.environ["BRAIN_API_KEY"]
 BATCH_SIZE = 100
 TARGET_VOTES = 1500  # vote on all under-voted memories
 

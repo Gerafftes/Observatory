@@ -1,3 +1,4 @@
+# TEMPLATE: render BRAIN_API_KEY locally; never commit rendered credentials.
 # Cloud Scheduler jobs for brain optimization and data pipeline
 # Deploy: gcloud scheduler jobs create http <job-name> --config=scheduler-jobs.yaml
 
@@ -14,7 +15,7 @@ jobs:
         {"actions": ["train"]}
       headers:
         Content-Type: "application/json"
-        Authorization: "Bearer ruvector-swarm"
+        Authorization: "Bearer ${BRAIN_API_KEY}"
       oidc_token:
         service_account_email: "ruvbrain-scheduler@ruv-dev.iam.gserviceaccount.com"
     retry_config:
@@ -34,7 +35,7 @@ jobs:
         {"actions": ["drift_check"]}
       headers:
         Content-Type: "application/json"
-        Authorization: "Bearer ruvector-swarm"
+        Authorization: "Bearer ${BRAIN_API_KEY}"
       oidc_token:
         service_account_email: "ruvbrain-scheduler@ruv-dev.iam.gserviceaccount.com"
     retry_config:
@@ -52,7 +53,7 @@ jobs:
         {"actions": ["transfer_all"]}
       headers:
         Content-Type: "application/json"
-        Authorization: "Bearer ruvector-swarm"
+        Authorization: "Bearer ${BRAIN_API_KEY}"
       oidc_token:
         service_account_email: "ruvbrain-scheduler@ruv-dev.iam.gserviceaccount.com"
 
@@ -68,7 +69,7 @@ jobs:
         {"actions": ["rebuild_graph"]}
       headers:
         Content-Type: "application/json"
-        Authorization: "Bearer ruvector-swarm"
+        Authorization: "Bearer ${BRAIN_API_KEY}"
       oidc_token:
         service_account_email: "ruvbrain-scheduler@ruv-dev.iam.gserviceaccount.com"
 
@@ -84,7 +85,7 @@ jobs:
         {"actions": ["attractor_analysis"]}
       headers:
         Content-Type: "application/json"
-        Authorization: "Bearer ruvector-swarm"
+        Authorization: "Bearer ${BRAIN_API_KEY}"
       oidc_token:
         service_account_email: "ruvbrain-scheduler@ruv-dev.iam.gserviceaccount.com"
 
@@ -100,7 +101,7 @@ jobs:
         {"actions": ["train", "drift_check", "transfer_all", "rebuild_graph", "cleanup", "attractor_analysis"]}
       headers:
         Content-Type: "application/json"
-        Authorization: "Bearer ruvector-swarm"
+        Authorization: "Bearer ${BRAIN_API_KEY}"
       oidc_token:
         service_account_email: "ruvbrain-scheduler@ruv-dev.iam.gserviceaccount.com"
 
@@ -116,6 +117,6 @@ jobs:
         {"actions": ["cleanup"]}
       headers:
         Content-Type: "application/json"
-        Authorization: "Bearer ruvector-swarm"
+        Authorization: "Bearer ${BRAIN_API_KEY}"
       oidc_token:
         service_account_email: "ruvbrain-scheduler@ruv-dev.iam.gserviceaccount.com"

@@ -219,7 +219,6 @@ software/ruview/vendor/ruvector/ui/ruvocal/.env.ci
 /docs/project/tx1-udp-enomem-handoff-20261009.md
 /docs/project/tx1-udp-enomem-offline-20261008.md
 /docs/project/tx1-udp-enomem-simulation-research-20261008.md
-/docs/research/rf-sensing-sources.md
 /experiment-reports/mmwave2-wifi-20260926.md
 /experiment-reports/rx-optimierung/CALLBACK-ENTKOPPLUNG-VERGLEICHSSTAND-2026-09-22.md
 /experiment-reports/rx-optimierung/DIAGNOSE-VERGLEICHSSTAND-2026-09-22.md
@@ -235,3 +234,32 @@ software/ruview/vendor/ruvector/ui/ruvocal/.env.ci
 /software/ruview/firmware/esp32-csi-node/test/test_rx_diagnostics
 /software/ruview/firmware/esp32-csi-node/test/test_rx_raw_profile
 /software/ruview/firmware/esp32-csi-node/test/test_vitals
+
+# Publication boundary: local state is never public, even in vendored trees.
+**/.claude/
+**/.claude-flow/
+**/.ruvector/
+**/.swarm/
+**/.hive-mind/
+**/.codex/
+**/.agents/
+**/*.private.*
+**/*.pcap
+**/*.pcapng
+**/*.pem
+**/*.key
+/software/ruview/vendor/sublinear-time-solver/data/emergence/session_memory.json
+/software/ruview/vendor/ruvector/docs/research/claude-code-rvsource/
+**/.ruv/
+**/brain_corpus.jsonl
+**/merged_corpus.jsonl
+
+# Runtime configuration/recordings never belong to the source distribution.
+/software/ruview/data/
+/software/ruview/v2/data/
+/historical-screenshots/2026-06-26_15-43-09_ruview-observatory-demo-ui.png
+/historical-screenshots/2026-06-26_16-03-42_sensing-server-start-websocket.png
+/historical-screenshots/2026-06-26_16-07-18_tcpdump-udp-monitor-start.png
+/historical-screenshots/2026-06-26_16-08-13_udp-60byte-traffic.png
+/historical-screenshots/2026-06-26_18-13-10_first-valid-csi-frame-api-monitor.png
+/historical-screenshots/2026-06-27_23-55-54_four-rx-multistatic-fallbacks.png

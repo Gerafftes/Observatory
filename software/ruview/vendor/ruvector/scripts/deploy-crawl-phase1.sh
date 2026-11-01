@@ -11,7 +11,7 @@ set -euo pipefail
 PROJECT="${1:-ruv-dev}"
 REGION="us-central1"
 BRAIN_URL="https://pi.ruv.io"
-BEARER_TOKEN="brain-crawl-phase1-scheduler"
+BEARER_TOKEN="${BEARER_TOKEN:?Set BEARER_TOKEN locally; never commit it}"
 
 echo "=== Common Crawl Phase 1 Deployment ==="
 echo "Project: ${PROJECT}"

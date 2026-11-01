@@ -67,16 +67,16 @@ for (let ch = 1; ch <= 13; ch++) CHANNEL_FREQ[ch] = 2412 + (ch - 1) * 5;
 const NODE1_CHANNELS = [1, 6, 11];
 const NODE2_CHANNELS = [3, 5, 9];
 
-// Known devices from WiFi scan (these are the devices we can fingerprint)
+// Synthetic device names; replace locally for an authorized WiFi scan.
 const KNOWN_DEVICES = [
-  { id: 'ruv-net',      ssid: 'ruv.net',                    channel: 5,  signal: 100, type: 'router' },
-  { id: 'cohen-guest',  ssid: 'Cohen-Guest',                channel: 5,  signal: 100, type: 'router' },
-  { id: 'cogeco-21b20', ssid: 'COGECO-21B20',               channel: 11, signal: 100, type: 'router' },
-  { id: 'hp-printer',   ssid: 'DIRECT-fa-HP M255 LaserJet', channel: 5,  signal: 94,  type: 'printer' },
-  { id: 'conclusion',   ssid: 'conclusion mesh',            channel: 3,  signal: 44,  type: 'mesh-node' },
-  { id: 'netgear72',    ssid: 'NETGEAR72',                  channel: 9,  signal: 42,  type: 'router' },
-  { id: 'cogeco-4321',  ssid: 'COGECO-4321',                channel: 11, signal: 30,  type: 'router' },
-  { id: 'innanen',      ssid: 'Innanen',                    channel: 6,  signal: 19,  type: 'router' },
+  { id: 'Example-AP-12',      ssid: 'Example-AP-09',                    channel: 5,  signal: 100, type: 'router' },
+  { id: 'Example-AP-13',  ssid: 'Example-AP-06',                channel: 5,  signal: 100, type: 'router' },
+  { id: 'Example-AP-14', ssid: 'Example-AP-04',               channel: 11, signal: 100, type: 'router' },
+  { id: 'Example-AP-15',   ssid: 'Example-AP-01', channel: 5,  signal: 94,  type: 'printer' },
+  { id: 'Example-AP-11',   ssid: 'Example-AP-03',            channel: 3,  signal: 44,  type: 'mesh-node' },
+  { id: 'Example-AP-16',    ssid: 'Example-AP-07',                  channel: 9,  signal: 42,  type: 'router' },
+  { id: 'Example-AP-17',  ssid: 'Example-AP-05',                channel: 11, signal: 30,  type: 'router' },
+  { id: 'Example-AP-18',      ssid: 'Example-AP-08',                    channel: 6,  signal: 19,  type: 'router' },
 ];
 
 // Activity states
