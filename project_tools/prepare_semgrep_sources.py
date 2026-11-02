@@ -20,8 +20,15 @@ lazy from pathlib import Path
 ROOTS = ("software/ruview", "project_tools", "tools")
 EXCLUDED = {"vendor", "node_modules", "target", "managed_components", "build",
             "private", ".codex", ".agents"}
-C_TOKENS = re.compile(r'//[^\n]*|/\*.*?\*/|"(?:\\.|[^"\\])*"|\'(?:\\.|[^\'\\])*\'|[A-Za-z_]\w*|\s+|.', re.S)
+C_TOKENS = re.compile(r'//(?:\\\r?\n|[^\n])*|/\*.*?\*/|"(?:\\.|[^"\\])*"|\'(?:\\.|[^\'\\])*\'|[A-Za-z_]\w*|\s+|.', re.S)
 WASM_MACROS = {"m3ApiRawFunction", "m3ApiReturnType", "m3ApiGetArg", "m3ApiReturn"}
+C_CLEANUP = re.compile(
+    r'[A-Za-z_]\w*[ \t]+(?P<variable>[A-Za-z_]\w*)(?P<gap>[ \t]+)'
+    r'(?P<attribute>__attribute__\(\(cleanup\([A-Za-z_]\w*\)\)\))')
+C_OPTIONAL_MASK = re.compile(
+    r'#if[ \t]+defined\((?P<flag>[A-Za-z_]\w*)\)[ \t]*&&[ \t]*(?P=flag)[ \t]*\r?\n'
+    r'[ \t]*\|[ \t]*[A-Za-z_]\w*[ \t]*\r?\n'
+    r'[ \t]*(?P<closing>#endif)[ \t]*(?=\r?$)', re.M)
 
 
 def python_view(source: str) -> str:
@@ -47,13 +54,20 @@ def python_view(source: str) -> str:
 
 
 def c_view(source: str) -> tuple[str, list[dict]]:
-    """Expand only literal format macros and wasm3's four raw-API macros.
+    """Adapt the explicit format, placement, cleanup and optional-mask forms.
 
-    wasm3 v0.5.0 source/wasm3.h:323-331 defines these expansions. All other
-    tokens, including both sides of preprocessor conditions, are retained.
+    wasm3 v0.5.0 source/wasm3.h:323-331 defines the raw-API expansions.
+    No application expression is removed or preprocessor branch selected.
     """
     tokens = list(C_TOKENS.finditer(source))
     edits = []
+
+    def add_edit(start, end, text, **metadata):
+        line_start = source.rfind("\n", 0, start) + 1
+        edits.append({"start": start, "end": end, "text": text,
+                      "line": source.count("\n", 0, start) + 1,
+                      "column": start - line_start + 1, **metadata})
+
     index = 0
     while index < len(tokens):
         token = tokens[index]
@@ -61,10 +75,43 @@ def c_view(source: str) -> tuple[str, list[dict]]:
         end = token.end()
         replacement = None
         fmt = re.fullmatch(r"PRI([diuoxX])(8|16|32|64)", name)
+        cleanup = C_CLEANUP.match(source, token.start()) if name.isidentifier() else None
+        optional_mask = C_OPTIONAL_MASK.match(source, token.start()) if name == "#" else None
+        if cleanup:
+            start, end = cleanup.start("variable"), cleanup.end()
+            variable, gap, attribute = cleanup.group("variable", "gap", "attribute")
+            column = start - source.rfind("\n", 0, start)
+            add_edit(start, end, attribute + gap + variable, origins=[
+                {"start": 0, "end": len(attribute),
+                 "column": column + cleanup.start("attribute") - start},
+                {"start": len(attribute) + len(gap), "end": end - start, "column": column},
+            ])
+            while index < len(tokens) and tokens[index].start() < end:
+                index += 1
+            continue
+        elif optional_mask:
+            preceding = [item.group() for item in tokens[:index] if not item.group().isspace()][-4:]
+            line_start = source.rfind("\n", 0, token.start()) + 1
+            # Only a designated initializer's single optional '| IDENT' operand.
+            # Keep the operand; mask its directives without choosing a build profile.
+            if (len(preceding) == 4 and preceding[0] == "." and preceding[2] == "="
+                    and preceding[1].isidentifier() and preceding[3].isidentifier()
+                    and not source[line_start:token.start()].strip()):
+                opening_end = source.index("\n", token.start())
+                if source[opening_end - 1] == "\r":
+                    opening_end -= 1
+                add_edit(token.start(), opening_end, " " * (opening_end - token.start()))
+                closing = optional_mask.start("closing")
+                add_edit(closing, optional_mask.end(), " " * (optional_mask.end() - closing))
+                while index < len(tokens) and tokens[index].start() < optional_mask.end():
+                    index += 1
+                continue
         if fmt:
             replacement = '"' + ("ll" if fmt[2] == "64" else "") + fmt[1] + '"'
         elif name == "IPSTR":
             replacement = '"%d.%d.%d.%d"'
+        elif name in {"IRAM_ATTR", "DRAM_ATTR"}:
+            replacement = '__attribute__((section(".' + name[:4].lower() + '1")))'
         elif name in WASM_MACROS:
             opening = index + 1
             while opening < len(tokens) and tokens[opening].group().isspace():
@@ -93,10 +140,7 @@ def c_view(source: str) -> tuple[str, list[dict]]:
                 replacement = f"{{ *raw_return = ({argument}); return m3Err_none; }}"
             end, index = last.end(), closing - 1
         if replacement is not None:
-            line = source.count("\n", 0, token.start()) + 1
-            line_start = source.rfind("\n", 0, token.start()) + 1
-            edits.append({"start": token.start(), "end": end, "text": replacement,
-                          "line": line, "column": token.start() - line_start + 1})
+            add_edit(token.start(), end, replacement)
         index += 1
     result = source
     for edit in reversed(edits):
@@ -148,6 +192,10 @@ def original_column(column: int, line: int, edits: list[dict]) -> int:
         start = edit["column"] + delta
         if column < start:
             break
+        for origin in edit.get("origins", []):
+            offset = column - start
+            if origin["start"] <= offset <= origin["end"]:
+                return origin["column"] + offset - origin["start"]
         if column < start + len(edit["text"]):
             return edit["column"]
         delta += len(edit["text"]) - (edit["end"] - edit["start"])
@@ -164,10 +212,33 @@ def remap_sarif(sarif: Path, mapping: Path) -> None:
             path = location.get("artifactLocation", {}).get("uri", "")
             for key in ("region", "contextRegion"):
                 region = location.get(key, {})
+                scan_start = (region.get("startLine", 0), region.get("startColumn", 1))
+                scan_end = (region.get("endLine", scan_start[0]), region.get("endColumn", float("inf")))
                 for bound in ("start", "end"):
                     if bound + "Column" in region and path in edits_by_path:
                         region[bound + "Column"] = original_column(
                             region[bound + "Column"], region.get(bound + "Line", region.get("startLine")), edits_by_path[path])
+                # A selection spanning reordered tokens must enclose their full
+                # original declaration, rather than map to reversed endpoints.
+                deltas = {}
+                for edit in edits_by_path.get(path, []):
+                    line = edit["line"]
+                    start = edit["column"] + deltas.get(line, 0)
+                    origins = edit.get("origins", [])
+                    overlaps = any(
+                            scan_start < (line, start + origin["end"])
+                            and (line, start + origin["start"]) < scan_end
+                            for origin in origins)
+                    contained = any(
+                            (line, start + origin["start"]) <= scan_start
+                            and scan_end <= (line, start + origin["end"])
+                            for origin in origins)
+                    if overlaps and not contained:
+                        if scan_start[0] == line and "startColumn" in region:
+                            region["startColumn"] = min(region["startColumn"], edit["column"])
+                        if scan_end[0] == line and "endColumn" in region:
+                            region["endColumn"] = max(region["endColumn"], edit["column"] + edit["end"] - edit["start"])
+                    deltas[line] = deltas.get(line, 0) + len(edit["text"]) - (edit["end"] - edit["start"])
                 if "snippet" in region and path in edits_by_path:
                     original = (Path(__file__).resolve().parents[1] / path).read_text().splitlines(keepends=True)
                     first = region["startLine"] - 1

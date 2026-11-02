@@ -222,3 +222,20 @@ Setup-Siegel und eine vollständig neue Messserie.
 
 Verbindlicher Wiedereinstieg und offene Schritte:
 [`08-aktueller-arbeitsstand-d6-und-position.md`](08-aktueller-arbeitsstand-d6-und-position.md)
+
+## 2026-11-02: Lokale Abnahme der Semgrep-Parserabdeckung
+
+Die drei Parserfehler aus [GitHub-Lauf 41432726799](https://github.com/Gerafftes/Observatory/actions/runs/41432726799)
+wurden auf dem veröffentlichten Stand `ce61cff0513a718c06f1c683bda82723472b5b48`
+reproduziert und ausschließlich in der statischen Scan-Kopie behoben.
+Die Aufbereitung behandelt nun die optionale Bitmaske, GCC-Cleanup-Attribute
+und ESP-IDF-Speicherattribute; Firmware-Dateien bleiben bytegleich.
+Die Workflow-Zusammenfassung ergänzt Fehlertyp, Zeile und Spalte ohne Quelltextausschnitte.
+
+Lokale Abnahme: 11 Tests mit Python 3.15 bestanden; Semgrep 1.180.0 mit
+`--strict`, `p/security-audit` und `p/secrets` wechselt von Exitcode 3 auf 0.
+Es bleiben dieselben 2.224 untersuchten Dateipfade und dieselben 44 Treffer
+mit identischen Regeln und Originalfundstellen nach SARIF-Rückabbildung.
+Die bestehenden Ausschlüsse bleiben erhalten; die 44 Treffer wurden hier nicht bewertet.
+Die unabhängige Codeprüfung ist nach Absicherung übergreifender Cleanup-Markierungen
+abgeschlossen. Veröffentlichung und erneuter GitHub-Lauf stehen noch aus.

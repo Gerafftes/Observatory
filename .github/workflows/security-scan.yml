@@ -129,7 +129,9 @@ jobs:
             jq -r '
               (.errors // []) as $errors |
               "Semgrep coverage errors: \($errors | length)",
-              ($errors[] | "code=\(.code) path=\(.path // "unknown")")
+              ($errors[] |
+                (.type | if type == "array" then .[0] else . end) as $kind |
+                "code=\(.code) type=\($kind // "unknown") path=\(.path // "unknown") line=\(.spans[0].start.line // "unknown") column=\(.spans[0].start.col // "unknown")")
             ' "$RUNNER_TEMP/semgrep.json" | tee -a "$GITHUB_STEP_SUMMARY"
           else
             echo "Semgrep produced no diagnostic JSON; inspect the scan step." >> "$GITHUB_STEP_SUMMARY"

@@ -71,6 +71,110 @@ class ParserViewTests(unittest.TestCase):
         source = 'UNKNOWN_MACRO(type, input);'
         self.assertEqual(c_view(source), (source, []))
 
+    def test_memory_placement_macros_keep_function_and_data_visible(self):
+        source = ('static DRAM_ATTR struct { unsigned value; } state;\n'
+                  'static void IRAM_ATTR failed(void) { strcpy(a, b); }\n'
+                  'const char *label = "IRAM_ATTR DRAM_ATTR";\n'
+                  '// continued comment \\\nIRAM_ATTR DRAM_ATTR\n')
+        converted, edits = c_view(source)
+        self.assertIn('static __attribute__((section(".dram1"))) struct', converted)
+        self.assertIn('static void __attribute__((section(".iram1"))) failed(void) { strcpy(a, b); }', converted)
+        self.assertTrue(converted.endswith(source[source.index('const char'):]))
+        self.assertEqual(len(edits), 2)
+        self.assertEqual(source.count('\n'), converted.count('\n'))
+        original_line, converted_line = source.splitlines()[1], converted.splitlines()[1]
+        self.assertEqual(original_column(converted_line.index('strcpy') + 1, 2, edits),
+                         original_line.index('strcpy') + 1)
+
+    def test_cleanup_attribute_reordering_preserves_identifier_columns(self):
+        source = ('void f(void) {\n'
+                  '    bool producing __attribute__((cleanup(producer_leave))) = acquire();\n'
+                  '    strcpy(a, b);\n}\n')
+        converted, edits = c_view(source)
+        self.assertIn('bool __attribute__((cleanup(producer_leave))) producing = acquire();', converted)
+        self.assertEqual(len(edits), 1)
+        self.assertEqual(source.count('\n'), converted.count('\n'))
+        before, after = source.splitlines()[1], converted.splitlines()[1]
+        for name in ('producing', 'producer_leave', 'acquire'):
+            for offset in (0, len(name)):
+                self.assertEqual(original_column(after.index(name) + offset + 1, 2, edits),
+                                 before.index(name) + offset + 1)
+        self.assertEqual(c_view('// ' + source.splitlines()[1] + '\n')[1], [])
+        self.assertEqual(c_view('const char *s = "bool value __attribute__((cleanup(done)))";')[1], [])
+
+    def test_optional_bitmask_retains_operand_and_other_preprocessor_branches(self):
+        source = ('.mask = BASE\n#if defined(FEATURE) && FEATURE\n'
+                  '    | EXTRA\n#endif\n,\n'
+                  '#if OTHER\nstrcpy(a, b);\n#else\nstrcpy(c, d);\n#endif\n')
+        for newline in ('\n', '\r\n'):
+            with self.subTest(newline=newline):
+                original = source.replace('\n', newline)
+                converted, edits = c_view(original)
+                expected = original.replace('#if defined(FEATURE) && FEATURE', ' ' * 31, 1)
+                expected = expected.replace('#endif', ' ' * 6, 1)
+                self.assertEqual(converted, expected)
+                self.assertEqual(len(edits), 2)
+                self.assertEqual(len(converted), len(original))
+                self.assertEqual(original_column(7, 3, edits), 7)
+                self.assertEqual(original_column(4, 7, edits), 4)
+
+    def test_sarif_ranges_enclose_reordered_cleanup_tokens(self):
+        attribute = '__attribute__((cleanup(producer_leave)))'
+        original = f'    bool producing  {attribute} = acquire();'
+        source = '// prefix\n' + original + '\n// suffix\n'
+        converted, edits = c_view(source)
+        converted = converted.splitlines()[1]
+        variable = original.index('producing') + 1
+        attribute_end = original.index(' = acquire') + 1
+        moved_attribute = converted.index('__attribute__') + 1
+        moved_variable = converted.index('producing') + 1
+        callback = converted.index('producer_leave') + 1
+        cases = [
+            ({'startLine': 2, 'startColumn': moved_attribute, 'endColumn': moved_variable + 9}, variable, attribute_end),
+            ({'startLine': 2, 'startColumn': moved_variable, 'endColumn': moved_variable + 9}, variable, variable + 9),
+            ({'startLine': 2, 'startColumn': callback, 'endColumn': callback + 14}, original.index('producer_leave') + 1, original.index('producer_leave') + 15),
+            ({'startLine': 2, 'startColumn': 1, 'endColumn': moved_variable + 2}, 1, attribute_end),
+            ({'startLine': 2, 'startColumn': moved_attribute, 'endColumn': moved_variable}, variable, attribute_end),
+            ({'startLine': 2, 'startColumn': 1, 'endColumn': moved_variable}, 1, attribute_end),
+            ({'startLine': 2, 'startColumn': moved_attribute, 'endColumn': moved_attribute + len(attribute)}, original.index('__attribute__') + 1, attribute_end),
+            ({'startLine': 2, 'startColumn': moved_attribute, 'endColumn': moved_attribute + len(attribute) + 1}, variable, attribute_end),
+            ({'startLine': 2, 'startColumn': moved_attribute, 'endLine': 3, 'endColumn': 4}, variable, 4),
+            ({'startLine': 1, 'startColumn': 1, 'endLine': 2, 'endColumn': moved_variable + 2}, 1, attribute_end),
+        ]
+        with tempfile.TemporaryDirectory() as temporary:
+            sarif, mapping = Path(temporary) / 'test.sarif', Path(temporary) / 'mapping.json'
+            fixture = Path(temporary) / 'fixture.c'
+            fixture.write_text(source)
+            locations = [{'physicalLocation': {'artifactLocation': {'uri': str(fixture)},
+                          'region': region, 'contextRegion': region}} for region, _, _ in cases]
+            cases[0][0]['snippet'] = {'text': 'scanner view'}
+            sarif.write_text(json.dumps({'runs': [{'results': [{'locations': locations}]}]}))
+            mapping.write_text(json.dumps({str(fixture): edits}))
+            remap_sarif(sarif, mapping)
+            actual = json.loads(sarif.read_text())['runs'][0]['results'][0]['locations']
+            for location, (_, start, end) in zip(actual, cases, strict=True):
+                for key in ('region', 'contextRegion'):
+                    with self.subTest(region=location['physicalLocation'][key]):
+                        region = location['physicalLocation'][key]
+                        self.assertEqual(region['startColumn'], start)
+                        self.assertEqual(region['endColumn'], end)
+            self.assertEqual(actual[0]['physicalLocation']['region']['snippet']['text'],
+                             original[variable - 1:attribute_end - 1])
+
+    def test_unsupported_conditionals_and_fake_directives_remain_unchanged(self):
+        conditional = '#if defined(FEATURE) && FEATURE\n    | EXTRA\n#endif'
+        for source in (
+                conditional,  # No preceding designated initializer.
+                '.mask = BASE\n' + conditional.replace('| EXTRA', '| get_mask()'),
+                '.mask = BASE\n' + conditional.replace('&& FEATURE', '&& OTHER'),
+                '.mask = BASE\n' + conditional.replace('#endif', '#else\n | OTHER\n#endif'),
+                '.mask = BASE\n' + conditional.replace('| EXTRA', '| EXTRA\n | OTHER'),
+                '/*\n.mask = BASE\n' + conditional + '\n*/',
+                '// continued \\\n.mask = BASE\\\n' + conditional.replace('\n', '\\\n') + '\n',
+        ):
+            with self.subTest(source=source):
+                self.assertEqual(c_view(source), (source, []))
+
     def test_sarif_and_code_flow_columns_resolve_to_the_original_file(self):
         root = Path(__file__).resolve().parents[2]
         name = 'software/ruview/firmware/esp32-mmwave-node/main/measurement_stream.c'
