@@ -1699,6 +1699,9 @@ export class ObservatoryControlCenter {
       mmwave: { ...sensors[0] },
       mmwave_sensors: sensors,
       points: EXPECTED_POINTS.map((id) => ({ id, coordinates_m: read(`point.${id}`) })),
+      ...(Object.hasOwn(this.profileDraft, 'acceptance_points')
+        ? { acceptance_points: this.profileDraft.acceptance_points }
+        : {}),
       radio: existingRadio,
       environment: existingEnvironment,
       mmwave_status: 'NOT_CONNECTED',

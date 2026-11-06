@@ -1773,6 +1773,34 @@ fn normalize_profile_document(document: &Value) -> Result<Value, String> {
         }
     }
 
+    if let Some(points) = object.get("acceptance_points") {
+        let points = points
+            .as_array()
+            .ok_or_else(|| "acceptance_points must be an array".to_string())?;
+        let mut ids = std::collections::HashSet::new();
+        for (index, point) in points.iter().enumerate() {
+            let id = point
+                .get("id")
+                .and_then(Value::as_str)
+                .filter(|id| {
+                    id.strip_prefix('A').is_some_and(|digits| {
+                        digits.len() >= 2 && digits.bytes().all(|digit| digit.is_ascii_digit())
+                    })
+                })
+                .ok_or_else(|| format!("acceptance_points[{index}].id must be like A01"))?;
+            if !ids.insert(id) {
+                return Err(format!("acceptance_points contains duplicate id {id}"));
+            }
+            let coordinates = finite_triplet(
+                point.get("coordinates_m"),
+                &format!("acceptance_points[{index}].coordinates_m"),
+            )?;
+            if !within_room_bounds(coordinates, dimensions) {
+                return Err(format!("{id} must be inside room_dimensions_m"));
+            }
+        }
+    }
+
     let mut normalized = document.clone();
     if let Some(object) = normalized.as_object_mut() {
         let mut canonical_sensors = match object.remove("mmwave_sensors") {
@@ -2380,6 +2408,54 @@ mod tests {
                 {"id": "P09", "coordinates_m": [3.01, 0.0, 2.58]}
             ]
         })
+    }
+
+    #[test]
+    fn setup_profile_preserves_optional_acceptance_points() {
+        let mut document = valid_profile();
+        let legacy = normalize_profile_document(&document).expect("normalize legacy profile");
+        assert!(legacy.get("acceptance_points").is_none());
+
+        document["acceptance_points"] = json!([
+            {"id": "A01", "coordinates_m": [1.25, 0.0, 2.0]},
+            {"id": "A02", "coordinates_m": [4.02, 2.59, 3.44]}
+        ]);
+        let normalized =
+            normalize_profile_document(&document).expect("normalize acceptance points");
+        assert_eq!(normalized["acceptance_points"], document["acceptance_points"]);
+        assert_eq!(normalized["points"], document["points"]);
+        assert_eq!(
+            profile_context_sha256(&normalized).unwrap(),
+            profile_context_sha256(&legacy).unwrap()
+        );
+    }
+
+    #[test]
+    fn setup_profile_rejects_invalid_acceptance_points() {
+        let mut document = valid_profile();
+        for position in [
+            json!([-0.01, 0, 1]),
+            json!([0, 2.60, 1]),
+            json!([0, 0, 3.45]),
+            json!([0, 0]),
+            json!(["1", 0, 1]),
+        ] {
+            document["acceptance_points"] = json!([{"id": "A01", "coordinates_m": position}]);
+            let error = normalize_profile_document(&document).unwrap_err();
+            assert!(
+                error.contains("A01") || error.contains("acceptance_points[0]"),
+                "{error}"
+            );
+        }
+        let valid_point = json!({"id": "A01", "coordinates_m": [1.25, 0.0, 2.0]});
+        for points in [
+            Value::Null,
+            json!([{"id": "RX1", "coordinates_m": [1, 0, 1]}]),
+            json!([valid_point, valid_point]),
+        ] {
+            document["acceptance_points"] = points;
+            assert!(normalize_profile_document(&document).is_err());
+        }
     }
 
     #[tokio::test]

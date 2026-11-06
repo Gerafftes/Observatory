@@ -619,6 +619,45 @@ test('Shift selection keeps an anchor and adds a second marker for distance edit
   assert.equal(editor.selectedId, 'RX1');
 });
 
+test('RX3 then Shift+RX1 keeps RX3 fixed until the roles are swapped', () => {
+  const profile = defaultSetupProfileDocument();
+  const container = {
+    innerHTML: '',
+    querySelector: (selector) => selector === '[data-cad-distance-input]' ? { value: '1.00' } : null,
+  };
+  const editor = new RoomGeometryEditor(container, { document: profile });
+  const clickMarker = (id, shiftKey) => editor._handleClick({
+    shiftKey,
+    target: { closest: (selector) => selector === '[data-geometry-handle]' ? { dataset: { geometryId: id } } : null },
+  });
+
+  clickMarker('RX3', false);
+  clickMarker('RX1', true);
+  editor._setSelectedDistance();
+
+  const receiver = (id) => editor.document.receivers.find((entry) => entry.id === id).position_m;
+  assert.deepEqual(receiver('RX3'), profile.receivers[2].position_m);
+  assert.notDeepEqual(receiver('RX1'), profile.receivers[0].position_m);
+  assert.equal(planDistance(receiver('RX3'), receiver('RX1')), 1);
+  assert.match(container.innerHTML, /Bleibt fest · RX3/);
+  assert.match(container.innerHTML, /Wird verschoben · RX1/);
+  assert.match(container.innerHTML, /Rollen tauschen/);
+
+  const beforeSwap = structuredClone(editor.document);
+  editor._handleClick({ target: {
+    closest: (selector) => selector === '[data-cad-action]' ? { dataset: { cadAction: 'swap-distance-roles' } } : null,
+  } });
+  assert.deepEqual(editor.selectedIds, ['RX1', 'RX3']);
+  assert.deepEqual(editor.document, beforeSwap);
+  assert.match(container.innerHTML, /Bleibt fest · RX1/);
+  assert.match(container.innerHTML, /Wird verschoben · RX3/);
+  editor.distanceDraft = '0.75';
+  editor._setSelectedDistance();
+  assert.deepEqual(receiver('RX1'), beforeSwap.receivers[0].position_m);
+  assert.notDeepEqual(receiver('RX3'), beforeSwap.receivers[2].position_m);
+  assert.equal(planDistance(receiver('RX1'), receiver('RX3')), 0.75);
+});
+
 test('Shift selection accepts a wall as the second reference', () => {
   const editor = new RoomGeometryEditor(null, { document: defaultSetupProfileDocument() });
 
@@ -791,7 +830,7 @@ test('CAD inspector names the Z wall pair by its room-width meaning', () => {
   assert.match(container.innerHTML, /Ändert Raumbreite B/);
 });
 
-test('setting the selected opposite walls updates the editor room dimension', () => {
+test('opposite walls keep the zero wall fixed and update only their dimension in both selection orders', () => {
   const profile = defaultSetupProfileDocument();
   const container = {
     innerHTML: '',
@@ -799,23 +838,48 @@ test('setting the selected opposite walls updates the editor room dimension', ()
       return selector === '[data-cad-distance-input]' ? { value: '5.00' } : null;
     },
   };
-  const editor = new RoomGeometryEditor(container, {
-    document: profile,
-    selectedIds: ['WALL_X0', 'WALL_XMAX'],
-  });
+  for (const [axis, direction, zeroWallLabel] of [[0, 'X', 'Wand links (X = 0)'], [2, 'Z', 'Wand oben (Z = 0)']]) {
+    const walls = [`WALL_${direction}0`, `WALL_${direction}MAX`];
+    for (const selectedIds of [walls, [...walls].reverse()]) {
+      const editor = new RoomGeometryEditor(container, { document: profile, selectedIds });
+      editor.render();
+      assert.ok(container.innerHTML.includes(`Bleibt fest · ${zeroWallLabel}`));
+      assert.doesNotMatch(container.innerHTML, /Rollen tauschen/);
+      editor._setSelectedDistance();
 
-  editor._setSelectedDistance();
-
-  assert.equal(editor.document.room_dimensions_m[0], 5.00);
-  assert.equal(editor.document.room_dimensions_m[2], profile.room_dimensions_m[2]);
+      const expected = structuredClone(profile);
+      expected.room_dimensions_m[axis] = 5;
+      assert.deepEqual(editor.document, expected);
+    }
+  }
 });
 
 test('wall distance rejects adjacent walls and a shrink that would invalidate a marker', () => {
   const profile = defaultSetupProfileDocument();
   const adjacent = setWallDistance(profile, 'WALL_X0', 'WALL_Z0', 2.00);
   assert.match(adjacent.error, /gegenüberliegende Wände/);
+  const container = { innerHTML: '' };
+  const editor = new RoomGeometryEditor(container, { document: profile, selectedIds: ['WALL_X0', 'WALL_Z0'] });
+  editor.render();
+  assert.match(container.innerHTML, /Für einen Raumabstand müssen die linke\/rechte oder obere\/untere Wand gemeinsam gewählt werden/);
+  assert.doesNotMatch(container.innerHTML, /data-cad-distance-input/);
 
   const shrink = setWallDistance(profile, 'WALL_X0', 'WALL_XMAX', 2.00);
   assert.match(shrink.error, /Geometrie ungültig/);
   assert.deepEqual(shrink.document.room_dimensions_m, profile.room_dimensions_m);
+});
+
+test('acceptance-point validation requires unique IDs and numeric coordinates inside every room axis', () => {
+  const profile = defaultSetupProfileDocument();
+  const valid = { id: 'A01', coordinates_m: [1.25, 0, 1.75] };
+  for (const acceptance_points of [
+    null, {}, [null], [valid, valid], [{ ...valid, id: 'RX1' }],
+    ...[[-0.01, 0, 1], [0, 2.60, 1], [0, 0, 3.45], [0, null, 1], [0, 0], ['1', 0, 1]]
+      .map((coordinates_m) => [{ ...valid, coordinates_m }]),
+  ]) {
+    assert.equal(validateGeometryDraft({ ...profile, acceptance_points }).valid, false);
+  }
+  const withPoint = { ...profile, acceptance_points: [valid] };
+  assert.equal(validateGeometryDraft(withPoint).valid, true);
+  assert.match(setMarkerWallDistance(withPoint, 'A01', 'WALL_X0', -0.01).error, /außerhalb des Raums/);
 });
