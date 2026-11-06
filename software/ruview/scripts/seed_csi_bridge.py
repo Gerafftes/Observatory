@@ -23,6 +23,10 @@ Usage:
     # Trigger store compaction
     python scripts/seed_csi_bridge.py --token TOKEN --compact
 
+For private SEED trust, pass --seed-ca-file with a trusted PEM certificate
+bundle. The host or IP in --seed-url must match the server certificate.
+Use the direct HTTPS API URL since the client rejects redirects.
+
 The bridge also accepts legacy ADR-018 CSI frames (magic 0xC5110001/0xC5110002)
 and extracts a simplified 8-dim feature vector from the raw data.
 """
@@ -39,6 +43,7 @@ lazy import struct
 lazy import sys
 lazy import time
 lazy import urllib.error
+lazy import urllib.parse
 lazy import urllib.request
 lazy import math
 lazy import ssl
@@ -207,16 +212,45 @@ def _make_vector_id(node_id: int, timestamp_us: int, seq_counter: int) -> int:
     return struct.unpack("<I", digest[:4])[0]
 
 
+class NoRedirect(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        # The caller's configured SEED endpoint is the credential boundary.
+        return None
+
+
 class SeedClient:
     """HTTPS client for Cognitum Seed REST API."""
 
-    def __init__(self, base_url: str, token: str):
-        self.base_url = base_url.rstrip("/")
+    def __init__(self, base_url: str, token: str, ca_file: str | None = None):
+        try:
+            parsed = urllib.parse.urlsplit(base_url)
+            port = parsed.port
+        except ValueError:
+            raise ValueError("Invalid SEED HTTPS URL") from None
+
+        if (
+            parsed.scheme != "https"
+            or not parsed.hostname
+            or port == 0
+            or parsed.username is not None
+            or parsed.password is not None
+            or parsed.query
+            or parsed.fragment
+            or any(char.isspace() or ord(char) < 32 or ord(char) == 127 for char in base_url)
+            or "%" in parsed.netloc
+            or "\\" in parsed.netloc
+        ):
+            raise ValueError("SEED URL must be HTTPS without user information, query or fragment")
+
+        if ca_file == "":
+            raise ValueError("SEED CA file must not be empty")
+
+        self.base_url = parsed.geturl().rstrip("/")
         self.token = token
-        # Skip TLS verification for self-signed cert
-        self.ctx = ssl.create_default_context()
-        self.ctx.check_hostname = False
-        self.ctx.verify_mode = ssl.CERT_NONE
+        tls = ssl.create_default_context(cafile=ca_file)
+        self.opener = urllib.request.build_opener(
+            urllib.request.HTTPSHandler(context=tls), NoRedirect(),
+        )
 
     def _request(self, method: str, path: str, body: dict | None = None,
                  timeout: int = 10, auth: bool = True) -> dict:
@@ -232,7 +266,7 @@ class SeedClient:
         if auth:
             headers["Authorization"] = f"Bearer {self.token}"
         req = urllib.request.Request(url, data=data, headers=headers, method=method)
-        with urllib.request.urlopen(req, context=self.ctx, timeout=timeout) as resp:
+        with self.opener.open(req, timeout=timeout) as resp:
             raw = resp.read()
             try:
                 return json.loads(raw)
@@ -364,9 +398,8 @@ def _run_validation(seed: SeedClient, features: list[float],
         pass  # PIR not available, already handled gracefully
 
 
-def run_bridge(args):
+def run_bridge(args, seed: SeedClient):
     """Main bridge loop: UDP -> batch -> HTTPS ingest."""
-    seed = SeedClient(args.seed_url, args.token)
 
     # Verify connectivity
     try:
@@ -517,9 +550,8 @@ def run_bridge(args):
             pass
 
 
-def run_stats(args):
+def run_stats(seed: SeedClient):
     """Query Seed and print comprehensive stats."""
-    seed = SeedClient(args.seed_url, args.token)
 
     # Status
     print("=== Seed Status ===")
@@ -574,9 +606,8 @@ def run_stats(args):
         print(f"  Error: {e}")
 
 
-def run_compact(args):
+def run_compact(seed: SeedClient):
     """Trigger store compaction on the Seed."""
-    seed = SeedClient(args.seed_url, args.token)
     print("Triggering store compaction...")
     try:
         result = seed.compact()
@@ -594,6 +625,10 @@ def main():
         "--seed-url",
         default="https://169.254.42.1:8443",
         help="Cognitum Seed HTTPS URL (default: https://169.254.42.1:8443)",
+    )
+    parser.add_argument(
+        "--seed-ca-file",
+        help="Trusted PEM certificate bundle for SEED (default: system trust store)",
     )
     parser.add_argument(
         "--token",
@@ -655,15 +690,20 @@ def main():
     if not args.token:
         parser.error("--token is required (or set SEED_TOKEN environment variable)")
 
+    try:
+        seed = SeedClient(args.seed_url, args.token, ca_file=args.seed_ca_file)
+    except (ValueError, OSError) as exc:
+        parser.error(f"Invalid SEED TLS configuration: {exc}")
+
     if args.verbose:
         logging.getLogger().setLevel(logging.DEBUG)
 
     if args.stats:
-        run_stats(args)
+        run_stats(seed)
     elif args.compact:
-        run_compact(args)
+        run_compact(seed)
     else:
-        run_bridge(args)
+        run_bridge(args, seed)
 
 
 if __name__ == "__main__":

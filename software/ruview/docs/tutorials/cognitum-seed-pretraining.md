@@ -341,6 +341,12 @@ python scripts/seed_csi_bridge.py \
   --batch-size 10
 ```
 
+The bridge verifies the HTTPS certificate and server identity. For a private CA
+or a self-signed server certificate, obtain its PEM through a trusted channel and
+add `--seed-ca-file /path/to/seed-ca.pem`. Use a hostname or IP address listed in
+the certificate's subject alternative names. The PEM replaces system trust for
+the bridge, `--stats`, and `--compact`.
+
 Expected output:
 
 ```
@@ -355,6 +361,7 @@ Expected output:
 | Flag | Default | Description |
 |------|---------|-------------|
 | `--seed-url` | `https://169.254.42.1:8443` | Seed HTTPS endpoint (USB link-local) |
+| `--seed-ca-file` | system trust | PEM file to use as the HTTPS trust store |
 | `--token` | `$SEED_TOKEN` env var | Bearer token from pairing step |
 | `--udp-port` | `5006` | UDP port to listen for ESP32 packets |
 | `--batch-size` | `10` | Number of vectors per ingest call |
