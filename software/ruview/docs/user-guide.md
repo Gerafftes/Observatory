@@ -479,6 +479,11 @@ python scripts/seed_csi_bridge.py --token "$SEED_TOKEN" --stats
 python scripts/seed_csi_bridge.py --token "$SEED_TOKEN" --compact
 ```
 
+For a private CA or a self-signed Seed certificate, obtain its PEM through a
+trusted channel and add `--seed-ca-file /path/to/seed-ca.pem` to each bridge
+command. The PEM replaces the system trust store. Use a `--seed-url` whose
+hostname or IP address is listed in the certificate's subject alternative names.
+
 **Feature vector dimensions (magic `0xC5110003`, 48 bytes, 1 Hz):**
 
 | Dim | Feature | Range | Source |
