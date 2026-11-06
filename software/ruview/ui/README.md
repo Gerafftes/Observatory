@@ -179,6 +179,11 @@ that is an operating-system permission boundary. Start the sensing server once
 (or register `ruview-control` as a user service) and subsequent control stays
 in the browser.
 
+The helper gets its launch profile at startup. For a manual server relaunch,
+stop the previous helper first so the new server can start a helper for its own
+profile. Update both binaries together before using browser control. Use
+`--server-control-port 0` to disable the helper.
+
 ### With Python HTTP server (legacy)
 ```bash
 # Start FastAPI backend on port 8000

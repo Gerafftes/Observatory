@@ -45,15 +45,6 @@ pub struct LaunchSpec {
     pub http_port: u16,
 }
 
-#[derive(Debug, Serialize)]
-struct HelperAdoptionRequest {
-    server_bin: String,
-    server_args: Vec<String>,
-    http_port: u16,
-    ui_port: u16,
-    pid: u32,
-}
-
 #[derive(Debug, Clone)]
 pub struct DaemonConfig {
     pub control_port: u16,
@@ -108,6 +99,11 @@ pub fn ensure_daemon(control_port: u16, http_port: u16) -> Result<(), String> {
     if control_port == 0 {
         return Err("Server-Control-Port darf nicht 0 sein".to_string());
     }
+    if control_port_is_listening(control_port) {
+        // A helper already tracks its own child. Its startup profile cannot
+        // be replaced by a server connecting over HTTP.
+        return Ok(());
+    }
 
     let server_bin = std::env::current_exe().map_err(|error| {
         format!("Pfad der sensing-server-Binary konnte nicht ermittelt werden: {error}")
@@ -118,12 +114,6 @@ pub fn ensure_daemon(control_port: u16, http_port: u16) -> Result<(), String> {
         server_args,
         http_port,
     };
-    if control_port_is_listening(control_port) {
-        if let Err(error) = adopt_existing_helper(control_port, &spec) {
-            warn!(%error, control_port, "Laufender Browser-Control-Helper konnte nicht aktualisiert werden");
-        }
-        return Ok(());
-    }
     let unique_suffix = SystemTime::now()
         .duration_since(SystemTime::UNIX_EPOCH)
         .map(|duration| duration.as_nanos())
@@ -135,16 +125,19 @@ pub fn ensure_daemon(control_port: u16, http_port: u16) -> Result<(), String> {
     let spec_json = serde_json::to_vec(&spec).map_err(|error| {
         format!("Server-Control-Profil konnte nicht serialisiert werden: {error}")
     })?;
-    let mut spec_file = fs::OpenOptions::new()
-        .write(true)
-        .create_new(true)
-        .open(&spec_path)
-        .map_err(|error| {
-            format!(
-                "Server-Control-Profil konnte nicht angelegt werden ({}): {error}",
-                spec_path.display()
-            )
-        })?;
+    let mut options = fs::OpenOptions::new();
+    options.write(true).create_new(true);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::OpenOptionsExt;
+        options.mode(0o600);
+    }
+    let mut spec_file = options.open(&spec_path).map_err(|error| {
+        format!(
+            "Server-Control-Profil konnte nicht angelegt werden ({}): {error}",
+            spec_path.display()
+        )
+    })?;
     std::io::Write::write_all(&mut spec_file, &spec_json).map_err(|error| {
         format!(
             "Server-Control-Profil konnte nicht geschrieben werden ({}): {error}",
@@ -220,22 +213,6 @@ pub fn ensure_daemon(control_port: u16, http_port: u16) -> Result<(), String> {
         external = external_helper.is_some(),
         "Browser server control helper started for sensing-server"
     );
-    Ok(())
-}
-
-fn adopt_existing_helper(control_port: u16, spec: &LaunchSpec) -> Result<(), String> {
-    let url = format!("http://127.0.0.1:{control_port}/adopt");
-    let request = HelperAdoptionRequest {
-        server_bin: spec.server_bin.to_string_lossy().into_owned(),
-        server_args: spec.server_args.clone(),
-        http_port: spec.http_port,
-        ui_port: spec.http_port,
-        pid: std::process::id(),
-    };
-    ureq::post(&url)
-        .timeout(Duration::from_millis(500))
-        .send_json(request)
-        .map_err(|error| format!("{url} antwortete nicht auf die Helper-Übernahme: {error}"))?;
     Ok(())
 }
 
