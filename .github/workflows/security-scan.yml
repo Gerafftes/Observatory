@@ -144,7 +144,7 @@ jobs:
           category: semgrep
 
   iac-scan:
-    name: KICS (first-party and vendor infrastructure)
+    name: KICS (Observatory infrastructure)
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
@@ -168,10 +168,54 @@ jobs:
           enable_comments: false
           enable_jobs_summary: false
           disable_full_descriptions: true
-          exclude_paths: '.git,private,artifacts,devlogs,.toolchains,.codex,.agents,scan-results,**/target/**,**/node_modules/**,**/managed_components/**,**/build/**,**/build-*/**,**/private/**,**/data/raw/**,**/data/recordings/**'
+          # Keep the root workflows in this category. RuView's nested
+          # workflow copies and vendor infrastructure have a separate report.
+          exclude_paths: '.git,private,artifacts,devlogs,.toolchains,.codex,.agents,scan-results,**/target/**,**/node_modules/**,**/managed_components/**,**/build/**,**/build-*/**,**/private/**,**/data/raw/**,**/data/recordings/**,software/ruview/vendor,software/ruview/.github/workflows,software/ruview/v2/crates/worldgraph/.github/workflows,software/ruview/v2/crates/ruview-swarm/.github/workflows'
       - name: Upload KICS findings
         if: always() && !cancelled()
         uses: github/codeql-action/upload-sarif@24c54180a607b1449ed407dd24f251e4e9147c8d # v4
         with:
           sarif_file: scan-results/kics/results.sarif
           category: kics
+
+  iac-reference-scan:
+    name: KICS (vendor and inactive workflow report)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - name: Check out published sources
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+          submodules: false
+      - name: Scan reference infrastructure without executing it
+        uses: Checkmarx/kics-github-action@05aa5eb70eede1355220f4ca5238d96b397e30a6 # v2.1.20
+        with:
+          path: 'software/ruview/vendor,software/ruview/.github/workflows,software/ruview/v2/crates/worldgraph/.github/workflows,software/ruview/v2/crates/ruview-swarm/.github/workflows'
+          output_path: scan-results/kics-reference
+          output_formats: json
+          ignore_on_exit: results
+          enable_annotations: false
+          enable_comments: false
+          enable_jobs_summary: false
+          disable_full_descriptions: true
+          exclude_paths: '.git,private,artifacts,devlogs,.toolchains,.codex,.agents,scan-results,**/target/**,**/node_modules/**,**/managed_components/**,**/build/**,**/build-*/**,**/private/**,**/data/raw/**,**/data/recordings/**'
+      - name: Prepare reference report without source snippets
+        run: |
+          jq -e '{
+            total_counter,
+            severity_counters,
+            queries: ((.queries // []) | map({
+              query_id, query_name, severity,
+              files: (.files | map({file_name, line}))
+            }))
+          } | select(.total_counter | type == "number")' \
+            scan-results/kics-reference/results.json > scan-results/kics-reference/report.json
+      - name: Upload KICS reference report
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: kics-reference-report
+          path: scan-results/kics-reference/report.json
+          if-no-files-found: error
