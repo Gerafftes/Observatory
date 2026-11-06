@@ -190,15 +190,6 @@ struct ActionResponse {
     message: String,
 }
 
-#[derive(Debug, Deserialize)]
-struct AdoptRequest {
-    server_bin: PathBuf,
-    server_args: Vec<String>,
-    http_port: u16,
-    ui_port: u16,
-    pid: u32,
-}
-
 #[derive(Debug, Serialize)]
 struct HelperInfo {
     helper_version: &'static str,
@@ -266,7 +257,6 @@ fn router(state: AppState) -> Router {
         .route("/start", post(start))
         .route("/stop", post(stop))
         .route("/restart", post(restart))
-        .route("/adopt", post(adopt))
         .route("/api/v1/helper/info", get(helper_info))
         .route("/api/v1/nodes/discover", get(discover_nodes))
         .route("/api/v1/serial/ports", get(list_serial_ports))
@@ -397,55 +387,6 @@ async fn helper_info(State(state): State<AppState>) -> Json<HelperInfo> {
             "settings",
         ],
     })
-}
-
-async fn adopt(
-    State(state): State<AppState>,
-    headers: HeaderMap,
-    Json(request): Json<AdoptRequest>,
-) -> Result<Json<ActionResponse>, ApiError> {
-    ensure_mutation_origin(&state, &headers).await?;
-    if request.pid == 0 || request.ui_port == 0 {
-        return Err(ApiError::bad_request(
-            "PID und UI-Port für die Helper-Übernahme müssen gültig sein",
-        ));
-    }
-    #[cfg(unix)]
-    if !process_exists(request.pid) {
-        return Err(ApiError::bad_request(format!(
-            "Sensing-Server-PID {} ist nicht aktiv",
-            request.pid
-        )));
-    }
-
-    let spec = validate_launch_spec(LaunchSpec {
-        server_bin: request.server_bin,
-        server_args: request.server_args,
-        http_port: request.http_port,
-    })?;
-    let mut controller = begin_action(&state.controller, "adopt").await?;
-    refresh_process(&mut controller);
-    if let Some(existing_pid) = controller.pid {
-        if existing_pid != request.pid {
-            controller.busy = false;
-            return Err(ApiError::conflict(format!(
-                "Der Helper überwacht bereits Sensing-Server-PID {existing_pid}"
-            )));
-        }
-    }
-    controller.spec = spec;
-    controller.ui_port = request.ui_port;
-    controller.pid = Some(request.pid);
-    controller.child = None;
-    remove_launch_log(&mut controller);
-    controller.last_error = None;
-    let response = action_response(
-        &controller,
-        "adopted",
-        "Der laufende Sensing-Server wurde vom Helper übernommen.",
-    );
-    controller.busy = false;
-    Ok(Json(response))
 }
 
 async fn start(
@@ -1514,6 +1455,87 @@ async fn save_settings(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn http_cannot_replace_the_local_launch_profile() {
+        use axum::{body::Body, http::Request, response::Response, ServiceExt};
+
+        async fn dispatch(
+            mut app: impl ServiceExt<
+                Request<Body>,
+                Response = Response,
+                Error = std::convert::Infallible,
+            >,
+            request: Request<Body>,
+        ) -> Response {
+            app.call(request).await.unwrap()
+        }
+
+        let pid = std::process::id();
+        let server_bin = std::env::current_exe().unwrap();
+        let controller = Arc::new(Mutex::new(ControllerState {
+            spec: LaunchSpec {
+                server_bin: server_bin.clone(),
+                server_args: vec!["--source".into(), "esp32".into()],
+                http_port: DEFAULT_UI_PORT,
+            },
+            ui_port: DEFAULT_UI_PORT,
+            control_port: DEFAULT_CONTROL_PORT,
+            pid: Some(pid),
+            child: None,
+            launch_log_path: None,
+            busy: false,
+            last_action: None,
+            last_error: None,
+        }));
+        let app = router(AppState {
+            controller: controller.clone(),
+            flash_jobs: Arc::new(Mutex::new(HashMap::new())),
+            config_path: PathBuf::new(),
+            control_port: DEFAULT_CONTROL_PORT,
+        });
+
+        for (binary, request_pid) in [
+            (PathBuf::from("/bin/sh"), pid),
+            (server_bin.clone(), u32::MAX),
+        ] {
+            let request = Request::post("/adopt")
+                .header(header::CONTENT_TYPE, "application/json")
+                .body(Body::from(
+                    serde_json::json!({
+                        "server_bin": binary,
+                        "server_args": ["--benchmark"],
+                        "http_port": 9000,
+                        "ui_port": 9001,
+                        "pid": request_pid,
+                    })
+                    .to_string(),
+                ))
+                .unwrap();
+            assert_eq!(
+                dispatch(app.clone(), request).await.status(),
+                StatusCode::NOT_FOUND
+            );
+        }
+
+        // An already managed process still answers the normal start request.
+        let request = Request::post("/start").body(Body::empty()).unwrap();
+        let response = dispatch(app, request).await;
+        assert_eq!(response.status(), StatusCode::OK);
+        let body = axum::body::to_bytes(response.into_body(), 4096)
+            .await
+            .unwrap();
+        let body: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        assert_eq!(body["status"], "already_running");
+        assert_eq!(body["pid"], pid);
+
+        let controller = controller.lock().await;
+        assert_eq!(controller.spec.server_bin, server_bin);
+        assert_eq!(controller.spec.server_args, ["--source", "esp32"]);
+        assert_eq!(controller.spec.http_port, DEFAULT_UI_PORT);
+        assert_eq!(controller.ui_port, DEFAULT_UI_PORT);
+    }
 
     #[test]
     fn action_failure_releases_busy_state() {
