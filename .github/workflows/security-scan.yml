@@ -212,10 +212,10 @@ jobs:
               files: (.files | map({file_name, line}))
             }))
           } | select(.total_counter | type == "number")' \
-            scan-results/kics-reference/results.json > scan-results/kics-reference/report.json
+            scan-results/kics-reference/results.json > "$RUNNER_TEMP/kics-reference-report.json"
       - name: Upload KICS reference report
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: kics-reference-report
-          path: scan-results/kics-reference/report.json
+          path: ${{ runner.temp }}/kics-reference-report.json
           if-no-files-found: error
