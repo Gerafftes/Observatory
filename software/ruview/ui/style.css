@@ -678,7 +678,11 @@
 .occ-cad-marker-tx .occ-cad-marker-core,
 .occ-cad-marker-rx .occ-cad-marker-core { fill: var(--device-color, #68737a); }
 .occ-cad-marker-mmwave .occ-cad-marker-core { fill: var(--device-color); }
+.occ-cad-marker-acceptance { --device-color: #1d5d4f; }
+.occ-cad-marker-acceptance .occ-cad-marker-core { fill: var(--device-color); }
 .occ-cad-marker-calibration .occ-cad-marker-core { fill: #fff; stroke: var(--occ-ink); stroke-width: 1.5; }
+/* The fallback shares the device centre. Its label stays available as the handle. */
+.occ-cad-marker-calibration.is-fallback circle { pointer-events: none; }
 .occ-cad-marker-calibration.is-fallback text { opacity: .65; }
 .occ-cad-marker text { fill: var(--occ-ink); font: 650 10px var(--font-family-mono); paint-order: stroke; stroke: #f4f4f0; stroke-width: 4px; stroke-linejoin: round; }
 .occ-cad-marker:not(.occ-cad-marker-calibration) text { fill: var(--device-color, var(--occ-ink)); }
