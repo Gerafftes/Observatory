@@ -21,16 +21,22 @@ Integrates your local sensor data (camera + WiFi CSI point cloud) with geographi
 | [EOX S2 Cloudless](https://s2maps.eu/) | Satellite tiles | 10m | CC-BY-4.0 |
 | [SRTM GL1](https://portal.opentopography.org/) | Elevation/DEM | 30m | Public domain |
 | [Overpass API](https://overpass-api.de/) | OSM buildings/roads | Vector | ODbL |
-| [ip-api.com](http://ip-api.com/) | IP geolocation | ~1km | Free |
+| [IPWhois](https://ipwhois.io/documentation) | IP geolocation over HTTPS | IP-derived | Free endpoint |
 | [Open Meteo](https://open-meteo.com/) | Weather | Point | CC-BY-4.0 |
 
 ## Modules
+
+IP geolocation verifies HTTPS certificates and rejects redirects. It requires
+a successful response with valid latitude and longitude. Existing location
+cache files without the HTTPS source marker are refreshed once. If that lookup
+fails, the error is returned. New cache files retain the `lat`, `lon`, and
+`alt` fields and add a `source` field.
 
 | Module | LOC | Purpose |
 |--------|-----|---------|
 | `types.rs` | 140 | GeoPoint, GeoBBox, TileCoord, ElevationGrid, OsmFeature |
 | `coord.rs` | 80 | WGS84/ENU transforms, tile math, haversine distance |
-| `locate.rs` | 45 | IP geolocation with caching |
+| `locate.rs` | 158 | Validated HTTPS IP geolocation with source-marked caching |
 | `cache.rs` | 55 | Disk cache (`~/.local/share/ruview/geo-cache/`) |
 | `tiles.rs` | 80 | Sentinel-2/ESRI/OSM tile fetcher |
 | `terrain.rs` | 100 | SRTM HGT parser, elevation lookup |

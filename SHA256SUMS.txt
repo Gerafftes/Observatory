@@ -2784,14 +2784,14 @@ cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30  software/ruvie
 271bc2f6ad4c5885e0e54e13ab70b1db2d91758ac6fa78ed320598360006460e  software/ruview/v2/crates/worldgraph/LICENSE-MIT
 76a52bd8be07ac7bcd654cb48cbeb79baabb277c69556eaa25805e81a9ea3de3  software/ruview/v2/crates/worldgraph/README.md
 9bfb2a45fed4638aef8d8e45c91a593708094fd0ce85b21243c236b127b61111  software/ruview/v2/crates/worldgraph/wifi-densepose-geo/Cargo.toml
-9fd975902aabcae1f765fad03f2db4e412ef97eb0b388268fc3199ef77deb4fe  software/ruview/v2/crates/worldgraph/wifi-densepose-geo/README.md
+a3da8e21a554982f8d38bff29b1efb91c17a1e46389c1d6b25c1d6022b3d93b4  software/ruview/v2/crates/worldgraph/wifi-densepose-geo/README.md
 395924d869a2cd2cd5f9ed3a277cf3166f949323307c698c6426cbdc492197b9  software/ruview/v2/crates/worldgraph/wifi-densepose-geo/examples/validate.rs
 0d4993459c21b2e7571e3cd2940f17c7f3361edf070d965e3b01ca8f53eef399  software/ruview/v2/crates/worldgraph/wifi-densepose-geo/src/brain.rs
 b8fadba0b18c210e9a29b631aad44b607b39967f4308fae20089890cfd747202  software/ruview/v2/crates/worldgraph/wifi-densepose-geo/src/cache.rs
 6bcd45622b43dace638b99db9ff41696af192c94d20489979688fee49034ead8  software/ruview/v2/crates/worldgraph/wifi-densepose-geo/src/coord.rs
 fd33b4ff0d918be6f96d46836023199c33a7775216a1c060bc0c2aa9542f9bcb  software/ruview/v2/crates/worldgraph/wifi-densepose-geo/src/fuse.rs
 bfa7feb801741ee72205369a9ea2bbbdd648c6f025de4639a60fb8b6757f87cc  software/ruview/v2/crates/worldgraph/wifi-densepose-geo/src/lib.rs
-5d0596973d6f0d7940c30ab1097f0caa7f80dcb7f76664d0b1800083483550f4  software/ruview/v2/crates/worldgraph/wifi-densepose-geo/src/locate.rs
+bb928fbc70a24651a87d2a8281128b47d74dca582b24f849e67fd7c38ca1afe1  software/ruview/v2/crates/worldgraph/wifi-densepose-geo/src/locate.rs
 ff96c9782b2218e4b56359c0dcb2ffa3336469bfec305ca402f9f6d927bdeba1  software/ruview/v2/crates/worldgraph/wifi-densepose-geo/src/osm.rs
 9cd8afb84f74232f451a0c3c21c4958dfbf1dd9d1f1a1533674a1e482a204654  software/ruview/v2/crates/worldgraph/wifi-densepose-geo/src/register.rs
 fd5534c1586bc0b7aba4ac7b1640012500a3c7d264e1216dd4528f27afa5b30a  software/ruview/v2/crates/worldgraph/wifi-densepose-geo/src/temporal.rs
