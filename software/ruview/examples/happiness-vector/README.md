@@ -109,22 +109,28 @@ python examples/ruview_live.py \
 
 ### 4. Query the Seed
 
+The query tool requires HTTPS with a verified server certificate and matching
+hostname or IP address. For a private CA or a self-signed certificate, obtain
+its PEM through a trusted channel and add `--seed-ca-file /path/to/seed-ca.pem`
+before the subcommand. This PEM replaces system trust for the query tool.
+Redirects are rejected. The same checks apply when no token is supplied.
+
 ```bash
 # Status
 python examples/happiness-vector/seed_query.py \
-  --seed http://10.1.10.236 --token YOUR_TOKEN status
+  --seed https://10.1.10.236:8443 --token YOUR_TOKEN status
 
 # Live monitor vectors flowing in
 python examples/happiness-vector/seed_query.py \
-  --seed http://10.1.10.236 --token YOUR_TOKEN monitor
+  --seed https://10.1.10.236:8443 --token YOUR_TOKEN monitor
 
 # Happiness report
 python examples/happiness-vector/seed_query.py \
-  --seed http://10.1.10.236 --token YOUR_TOKEN report
+  --seed https://10.1.10.236:8443 --token YOUR_TOKEN report
 
 # Witness chain audit
 python examples/happiness-vector/seed_query.py \
-  --seed http://10.1.10.236 --token YOUR_TOKEN witness
+  --seed https://10.1.10.236:8443 --token YOUR_TOKEN witness
 ```
 
 ## Multi-Node Swarm

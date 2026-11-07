@@ -6,34 +6,72 @@ Query the Seed's vector store for happiness patterns across ESP32 swarm nodes.
 Demonstrates kNN search, drift monitoring, and witness chain verification.
 
 Usage:
-    python seed_query.py --seed http://10.1.10.236 --token <bearer_token>
-    python seed_query.py --seed http://169.254.42.1   # USB link-local (no token needed)
+    python seed_query.py --seed https://10.1.10.236:8443 --token TOKEN status
+    python seed_query.py --seed-ca-file /path/to/seed-ca.pem status
 
 Requirements:
-    Python 3.7+ (stdlib only, no dependencies)
+    Python 3.15+ (stdlib only, no dependencies)
+
+The HTTPS URL must match the server certificate. For private trust, obtain
+the CA or self-signed certificate PEM through a trusted channel and pass
+--seed-ca-file. The PEM replaces system trust. Redirects are rejected.
 """
 
 lazy import argparse
 lazy import json
 lazy import sys
 lazy import time
+lazy import ssl
+lazy import urllib.parse
 lazy import urllib.request
 lazy import urllib.error
 
 
-def api(base, path, token=None, method="GET", data=None):
+class NoRedirect(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        # Keep credentials at the operator's configured SEED endpoint.
+        return None
+
+
+def api(base, path, token=None, method="GET", data=None, ca_file=None):
     """Make an API request to the Seed."""
-    url = f"{base}{path}"
-    headers = {"Content-Type": "application/json"}
-    if token:
-        headers["Authorization"] = f"Bearer {token}"
-    body = json.dumps(data).encode() if data else None
-    req = urllib.request.Request(url, data=body, headers=headers, method=method)
     try:
-        with urllib.request.urlopen(req, timeout=5) as resp:
+        parsed = urllib.parse.urlsplit(base)
+        port = parsed.port
+        if (
+            parsed.scheme != "https"
+            or not parsed.hostname
+            or port == 0
+            or parsed.netloc.endswith(":")
+            or parsed.username is not None
+            or parsed.password is not None
+            or "?" in base
+            or "#" in base
+            or any(char.isspace() or ord(char) < 32 or ord(char) == 127 for char in base)
+            or "%" in parsed.netloc
+            or "\\" in parsed.netloc
+        ):
+            raise ValueError("SEED URL must be HTTPS without user information, query or fragment")
+        if not path.startswith("/") or path.startswith("//"):
+            raise ValueError("SEED API path must start with a single slash")
+        if ca_file == "":
+            raise ValueError("SEED CA file must not be empty")
+
+        tls = ssl.create_default_context(cafile=ca_file)
+        opener = urllib.request.build_opener(
+            urllib.request.HTTPSHandler(context=tls), NoRedirect(),
+        )
+        url = f"{parsed.geturl().rstrip('/')}{path}"
+        headers = {"Content-Type": "application/json"}
+        if token:
+            headers["Authorization"] = f"Bearer {token}"
+        body = json.dumps(data).encode() if data else None
+        req = urllib.request.Request(url, data=body, headers=headers, method=method)
+        with opener.open(req, timeout=5) as resp:
             return json.loads(resp.read().decode())
     except urllib.error.HTTPError as e:
-        return {"error": f"HTTP {e.code}", "detail": e.read().decode()[:200]}
+        with e:
+            return {"error": f"HTTP {e.code}", "detail": e.read().decode()[:200]}
     except Exception as e:
         return {"error": str(e)}
 
@@ -47,7 +85,7 @@ def print_header(title):
 def cmd_status(args):
     """Show Seed and swarm status."""
     print_header("Seed Status")
-    s = api(args.seed, "/api/v1/status", args.token)
+    s = api(args.seed, "/api/v1/status", args.token, ca_file=args.seed_ca_file)
     if "error" in s:
         print(f"  Error: {s['error']}")
         return
@@ -59,7 +97,8 @@ def cmd_status(args):
     print(f"  Witness:    {s['witness_chain_length']} entries")
 
     print_header("Drift Detection")
-    d = api(args.seed, "/api/v1/sensor/drift/status", args.token)
+    d = api(args.seed, "/api/v1/sensor/drift/status", args.token,
+            ca_file=args.seed_ca_file)
     if "error" not in d:
         print(f"  Drifting:   {d.get('drifting', False)}")
         print(f"  Score:      {d.get('current_drift_score', 0):.4f}")
@@ -85,7 +124,8 @@ def cmd_search(args):
     print()
 
     result = api(args.seed, "/api/v1/store/search", args.token,
-                 method="POST", data={"vector": query, "k": args.k})
+                 method="POST", data={"vector": query, "k": args.k},
+                 ca_file=args.seed_ca_file)
 
     if "error" in result:
         print(f"  Error: {result['error']}")
@@ -110,13 +150,15 @@ def cmd_witness(args):
     """Show the witness chain for audit trail."""
     print_header("Witness Chain (Audit Trail)")
 
-    epoch = api(args.seed, "/api/v1/custody/epoch", args.token)
+    epoch = api(args.seed, "/api/v1/custody/epoch", args.token,
+                ca_file=args.seed_ca_file)
     if "error" not in epoch:
         print(f"  Current epoch:  {epoch.get('epoch', '?')}")
         head = epoch.get("witness_head", "?")
         print(f"  Chain head:     {head[:16]}..." if len(head) > 16 else f"  Chain head:     {head}")
 
-    chain = api(args.seed, "/api/v1/cognitive/status", args.token)
+    chain = api(args.seed, "/api/v1/cognitive/status", args.token,
+                ca_file=args.seed_ca_file)
     if "error" not in chain:
         cv = chain.get("chain_valid", {})
         print(f"  Chain valid:    {cv.get('valid', '?')}")
@@ -135,7 +177,8 @@ def cmd_monitor(args):
 
     try:
         while True:
-            s = api(args.seed, "/api/v1/status", args.token)
+            s = api(args.seed, "/api/v1/status", args.token,
+                    ca_file=args.seed_ca_file)
             if "error" in s:
                 print(f"  [{time.strftime('%H:%M:%S')}] Error: {s['error']}")
                 time.sleep(args.interval)
@@ -146,7 +189,8 @@ def cmd_monitor(args):
             new_v = vectors - prev_vectors if prev_vectors > 0 else 0
             new_e = epoch - prev_epoch if prev_epoch > 0 else 0
 
-            d = api(args.seed, "/api/v1/sensor/drift/status", args.token)
+            d = api(args.seed, "/api/v1/sensor/drift/status", args.token,
+                    ca_file=args.seed_ca_file)
             drift = d.get("current_drift_score", 0) if "error" not in d else 0
             drifting = d.get("drifting", False) if "error" not in d else False
 
@@ -166,7 +210,7 @@ def cmd_happiness_report(args):
     """Generate a happiness report from stored vectors."""
     print_header("Happiness Report")
 
-    s = api(args.seed, "/api/v1/status", args.token)
+    s = api(args.seed, "/api/v1/status", args.token, ca_file=args.seed_ca_file)
     if "error" in s:
         print(f"  Error: {s['error']}")
         return
@@ -181,7 +225,8 @@ def cmd_happiness_report(args):
 
     print("  Happiest moments (closest to ideal happy):")
     happy = api(args.seed, "/api/v1/store/search", args.token,
-                method="POST", data={"vector": happy_ref, "k": 3})
+                method="POST", data={"vector": happy_ref, "k": 3},
+                ca_file=args.seed_ca_file)
     for n in happy.get("neighbors", happy.get("results", [])):
         dist = n.get("distance", n.get("dist", 0))
         vec = n.get("vector", n.get("values", []))
@@ -191,7 +236,8 @@ def cmd_happiness_report(args):
     print()
     print("  Most stressed moments (closest to stressed reference):")
     sad = api(args.seed, "/api/v1/store/search", args.token,
-              method="POST", data={"vector": sad_ref, "k": 3})
+              method="POST", data={"vector": sad_ref, "k": 3},
+              ca_file=args.seed_ca_file)
     for n in sad.get("neighbors", sad.get("results", [])):
         dist = n.get("distance", n.get("dist", 0))
         vec = n.get("vector", n.get("values", []))
@@ -200,7 +246,8 @@ def cmd_happiness_report(args):
 
     # Drift status
     print()
-    d = api(args.seed, "/api/v1/sensor/drift/status", args.token)
+    d = api(args.seed, "/api/v1/sensor/drift/status", args.token,
+            ca_file=args.seed_ca_file)
     if "error" not in d:
         if d.get("drifting"):
             print(f"  WARNING: Mood drift detected (score={d['current_drift_score']:.4f})")
@@ -215,15 +262,17 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  %(prog)s status --seed http://169.254.42.1
-  %(prog)s search --seed http://10.1.10.236 --token TOKEN --mood happy
-  %(prog)s monitor --seed http://10.1.10.236 --token TOKEN
-  %(prog)s report --seed http://10.1.10.236 --token TOKEN
-  %(prog)s witness --seed http://10.1.10.236 --token TOKEN
+  %(prog)s --seed https://169.254.42.1:8443 status
+  %(prog)s --seed https://10.1.10.236:8443 --token TOKEN search --mood happy
+  %(prog)s --seed-ca-file /path/to/seed-ca.pem monitor
+  %(prog)s --seed-ca-file /path/to/seed-ca.pem report
+  %(prog)s --seed-ca-file /path/to/seed-ca.pem witness
 """
     )
-    parser.add_argument("--seed", default="http://169.254.42.1",
-                        help="Seed base URL (default: USB link-local)")
+    parser.add_argument("--seed", default="https://169.254.42.1:8443",
+                        help="Seed HTTPS base URL (default: USB link-local on port 8443)")
+    parser.add_argument("--seed-ca-file", default=None,
+                        help="Trusted PEM certificate bundle (default: system trust store)")
     parser.add_argument("--token", default=None,
                         help="Bearer token for WiFi access (not needed for USB)")
 
