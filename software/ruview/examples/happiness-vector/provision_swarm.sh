@@ -56,5 +56,5 @@ done
 
 echo "========================================"
 echo "  Provisioning complete."
-echo "  Monitor with: python seed_query.py monitor --seed $SEED_URL --token $SEED_TOKEN"
+echo "  Monitor with: python seed_query.py --seed https://SEED_HOST:8443 --seed-ca-file /path/to/seed-ca.pem --token TOKEN monitor"
 echo "========================================"
