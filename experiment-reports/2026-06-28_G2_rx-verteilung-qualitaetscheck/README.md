@@ -69,3 +69,5 @@ Die bessere RX-Verteilung verbessert die reine Datenerfassung und liefert sehr v
 2. leeren Raum als Baseline/Kalibrierung nutzen,
 3. Web-Pose/Personenzahl vorerst nicht als Messwert verwenden,
 4. für den Bericht primär CSV-/Feature-Auswertung und nicht die springende Pose-Ansicht verwenden.
+
+Die unveränderte [ursprüngliche Screenshotkopie](../../software/ruview/skizzen/screenshots/2026-06-28_01-39-16_g2-jumping-heatmap-multiple-poses.png) bleibt zusätzlich zum Paketbild erhalten. Beide Ablagen zeigen denselben historischen Softwarezustand; daraus folgt kein neuer Positionsnachweis.

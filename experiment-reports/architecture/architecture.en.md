@@ -1,5 +1,7 @@
 # How Observatory works
 
+> Historical architecture of the discrete D6/P01–P09 approach and its mmWave ACK contract. The maintained [architecture overview](../../docs/software/architecture.md) distinguishes current goals and saved evidence (German).
+
 [Deutsch](architecture.md)
 
 WiFi signals change through reflection, attenuation, and multipath. One TX
@@ -16,7 +18,9 @@ The mmWave sensor is used only as an independent calibration and blind-test
 reference. This prevents the WiFi CSI predictor from indirectly receiving the
 correct answer during evaluation.
 
-## Current mmWave connection
+<a id="current-mmwave-connection"></a>
+
+## Historically documented mmWave connection
 
 The mmWave node sends each radar observation over UDP with its `node_id`,
 `boot_id`, `sequence`, and raw local coordinates. The server acknowledges the
@@ -30,15 +34,13 @@ server applies the sealed Setup-v2 transform matching the `node_id` to the raw
 coordinates. Already transformed packet fields remain only for older
 collectors and standalone diagnostics.
 
-The following Bklit-style diagrams document those implemented contracts. They
+The following diagram and the text above document those historical contracts. They
 deliberately contain no new measurements and prove neither loss-free transport
 nor positioning accuracy.
 
 ![ACK connection flow from the LD2450 to the sensing server](figures/mmwave-connection/01-ack-verbindungsfluss.png)
 
-![Adaptive timeout and retry model](figures/mmwave-connection/02-timeout-und-retry.png)
 
-![Server ownership of the room-coordinate transform](figures/mmwave-connection/03-transform-verantwortung.png)
 
 ```text
 physical setup

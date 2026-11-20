@@ -120,3 +120,5 @@ Nach unverändertem Build und ohne weitere Parameteranpassung folgen:
 4. Wiederholung an mindestens einer anderen Position.
 
 Erst wenn diese neuen Läufe die vorab festgelegten Grenzen von höchstens 10 % Leerraum-Fehlpräsenz und mindestens 80 % Still-Recall bestehen, kann D5 als neuer Standard erwogen werden.
+
+Der ursprüngliche [Software-Replayer](../../software/ruview/scripts/evaluate_d5_replay.py) bleibt ebenfalls erhalten. Der oben genannte Projekt-Replayer und dieser Quellstand verwenden heute Python-3.15-Syntax; der historische Replay-Befund ist davon getrennt und wurde für diese Dokumentationszusammenführung nicht neu gemessen.

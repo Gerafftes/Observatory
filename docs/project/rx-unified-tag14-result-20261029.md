@@ -1,9 +1,8 @@
-# RX Unified Tag14: Ergebnis vom 29. Oktober 2026
+# RX Unified Tag 14 Ergebnis vom 29 Oktober 2026
 
-**Die Messfolge Q900 → Short30 → Basis180 → Peerpilot60 → Paar300 mit
-anschließender TX-only-Rückkehr ist bestanden.** Das ist ein technischer
-Erfassungsnachweis. Positioniergenauigkeit, D6-Qualifikation und eine
-Vier-RX-Mesh-Topologie werden damit nicht nachgewiesen.
+**Gespeicherter Abschluss vom 29. Oktober 2026; öffentliche Fassung vom 4. November 2026.** Die Messfolge Q900 → Short30 → Basis180 → Peerpilot60 → Paar300 einschließlich der Rückkehr auf TX-only wurde im damaligen Abschluss als bestanden bewertet. Das beschreibt den historischen Messstand, keinen heutigen Geräte- oder Prozesszustand. Die damaligen Messungen und Tests wurden für diese Fassung nicht wiederholt.
+
+Der Abschluss dieser Messfolge umfasste keinen 60-minütigen Stabilitätslauf. Die später getrennt dokumentierte TX-only-Neubewertung steht im [Projektstatus](status.md) und im [Validierungsstand des Projekt-READMEs](../../README.md#aktueller-validierungsstand). Daraus folgt kein globaler Firmware-Freeze und keine Freigabe für weitere Geräteaktionen.
 
 ## Ergebnisse der Messfolge
 
@@ -26,7 +25,7 @@ Alle TX-Kontrolllinks erreichten ebenfalls 293/293 gültige Fenster. Die neue Pi
 
 Unerklärte Sequenzlücken bleiben separat dokumentiert: Short30 **4**, gültige Basis180 **9**, frischer Pilot **4**, Paar300 **24**. Die bestandenen Phasengrenzen und der vollständige PCAP/Raw-Abgleich beweisen keine verlustfreie Funkübertragung. Die Messfolge ist außerdem kein Nachweis physischer Raumleistung, D6-Qualifikation oder einer Vier-RX-Mesh-Topologie.
 
-## Verwendete Software
+## Versionen und unveränderte Grenzen
 
 Alle Phasen verwenden denselben neuen Firmwarestand:
 
@@ -36,16 +35,12 @@ Alle Phasen verwenden denselben neuen Firmwarestand:
 
 Q900/Short30 liefen mit dem damals geprüften Host `3aa730bc…ca4d00`. Nach dem Recorderfix liefen die gültige Basis180 und die Peerphasen mit `d262b462…8a45d4`. Beide Hoststände, ihre Quellen und die tatsächlich verwendeten Setups sind pro Phase gebunden; es wird kein einzelner unveränderter Hostbuild für die gesamte Historie behauptet. Der neue Host änderte nur `recording_routes.rs`; Firmware, Raw-Auditlogik und Messgrenzen blieben unverändert. Der vollständige Host-Binärtarget-Testlauf bestand mit 555 Tests und 6 vorhandenen ignorierten Tests.
 
+Phasendauern, 900-Sekunden-Paarfenster, 50-ms-Ende-/Zeitabbildungsgrenzen, Ressourcen, Layouts, Masken, Raten und Fenstergrenzen wurden nicht gelockert.
+
 ## Negative Befunde bleiben erhalten
 
 Die erste Basis180 vom 29.10. bleibt **negativ**: Vier zusätzliche gültige Datagramme im PCAP fehlten im Raw-Nachweis. Die Offlineanalyse reproduzierte blockierende Dateiarbeit in der Statusroute und fehlende Recorderbilanzierung früher Queueverluste. Der korrigierte Host lagert den Scan aus und bilanziert neue CSI-Queueverluste konservativ bis zum Writerabschluss. Historische Verluste werden über einen eigenen Aufnahmestartstand abgegrenzt. Die gültige neue Basis wurde separat gemessen; sie wertet die alte Datei nicht nachträglich auf.
 
-Die zusätzliche aktuelle Schlussprüfung verifizierte **124 unveränderliche Nachweisdateien** gegen gespeicherte Hashes und prüfte die Raw-/PCAP-Bindungen der akzeptierten Phasen. Das weiterlaufende operative Hostlog wurde ausdrücklich nicht als unveränderliche geschlossene Datei behandelt.
+Die damalige zusätzliche Schlussprüfung verifizierte **124 unveränderliche Nachweisdateien** gegen gespeicherte Hashes und prüfte die Raw-/PCAP-Bindungen der akzeptierten Phasen. Das weiterlaufende operative Hostlog wurde ausdrücklich nicht als unveränderliche geschlossene Datei behandelt.
 
-## Einordnung
-
-Die [Ergebnisse vom 27. Oktober](rx-unified-tag14-result-20261027.md) bleiben
-als negativer Vorläufer erhalten. Ein vollständiger Firmware-Freeze benötigt
-zusätzliche Stabilitätsnachweise; dieser Bericht behauptet keinen 60-Minuten-Lauf.
-Rohdaten und gerätespezifische Diagnosen sind nicht Bestandteil des öffentlichen
-Repositorys.
+Rohdaten, vollständige Geräte-/Laufdiagnosen und die privaten Originalbelege sind nicht Teil dieser öffentlichen Darstellung. Die dokumentierten Software-Artefakthashes binden die damaligen Versionen; sie sind keine Geräteauthentisierung.

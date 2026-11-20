@@ -28,10 +28,14 @@ The Bklit Studio uses generated demo data and has no CSV import. The figures the
 - Zero-based axes are used where percentages or rates are shown.
 - The D5 live panel explicitly preserves the unpaired-FPR caveat.
 - D6 `empty-neutral-01` and `empty-neutral-02` remain separate setup series.
-- The former duplicate `..._figures` archive was removed from the canonical
-  `experiment-reports/` directory; this Bklit set is the maintained export linked from the
-  technical report.
+- Only the former duplicate `..._figures` directory inside the canonical
+  `experiment-reports/` package was removed earlier. The original software figures
+  and Bklit exports remain unchanged under `software/ruview/results/`.
+- The maintained `figures/` set remains linked from this technical report; the
+  original render date, QA statements and underlying data are historical evidence.
 
 ## Credits
 
 [Bklit UI](https://bklit.com) · [`@bklitui/ui/charts`](https://github.com/bklit/bklit-ui)
+
+Historical originals: [software figures](../../software/ruview/results/2026-08-23_D4-D5-D6_figures/) and [Bklit exports](../../software/ruview/results/2026-08-27_D4-D5-D6_bklit_figures/). Rendering and CSV files are retained in place; no renderer was executed for the Markdown consolidation.

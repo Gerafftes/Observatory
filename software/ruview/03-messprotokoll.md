@@ -157,7 +157,7 @@ Gegenständen mit — ausgeschlossen ist nur eine Person. Frühere Aufnahmen mit
 Nachweise:
 [TX-Firmwareidentität](results/2026-08-09_D6_setupaufnahme-und-TX-firmwareidentitaet.md)
 und
-[Neusiegelung/Preflight](results/2026-08-09_D6_sidecar-fix-neusiegelung-und-preflight.md).
+[Neusiegelung/Preflight](../../experiment-reports/2026-08-09_D6_sidecar-fix-neusiegelung-und-preflight/README.md).
 
 Die neue Leerraumkalibrierung `empty-neutral-20260809-02` ist inzwischen unter
 dem neuen Siegel bestanden: 65 Sekunden, 6.102 Frames, 0 Drops, vollständige

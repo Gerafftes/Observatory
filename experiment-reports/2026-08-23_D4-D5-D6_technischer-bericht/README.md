@@ -3,21 +3,23 @@
 Stand: 23. August 2026
 Auswertung: vorhandene Aufnahmen, keine neue Messung, keine Schwellenwertänderung
 
-Diagramm-Render: 27. August 2026 mit den offiziellen `@bklitui/ui/charts`-Komponenten
+
+Öffentliche Textfassung. Tabellen sind historische Ableitungen; Rohaufnahmen, CSV-Exporte, Generatoren und zusätzliche Diagramme sind nicht Teil dieses öffentlichen Ausschnitts. Es wurden keine neuen Messungen oder Replays ausgeführt.
+
 
 ## Technische Zusammenfassung
 
 - **D4 begrenzt grobe Bewegungsalarme, löst Anwesenheit aber nicht.** In den drei gültigen Leerraumläufen E0b/E0c/E0d waren 535 von 711 Samples global positiv: **75,2 % Fehlpräsenz**. `PRESENT_MOVING` und `ACTIVE` verschwanden weitgehend, aber ein einzelner lokaler `PRESENT_STILL`-Pfad genügte weiterhin für globale Präsenz.
 - **Das historische D5-Offline-Replay bestand, der reale Transfer nicht.** Zwei vertauschte Replay-Folds erreichten im Mittel 0,0 % Leerraum-Fehlpräsenz und 89,3 % Still-Recall. Der anschließende reale Still-Livetest erreichte dagegen 0 von 350 global positiven Samples: **0 % Recall**.
 - **D5-abs senkt die Leerraum-Fehlpräsenz, macht den Still-Recall aber unbrauchbar.** E0 Validation bestand mit 0/273 globalen Fehlpräsenzen; E1 verfehlte mit 0/276 den Recall vollständig. Gegen die Zielgrenzen ist D5-abs insgesamt **nicht bestanden**.
-- **D6 belegt technisch vollständige, setupgebundene Roh-CSI-Erfassung.** Alle fünf Aufnahmen sind `completed`, nicht unvollständig, haben 0 Recorder-Drops, keinen Writerfehler, RX1–RX4 und ein einheitliches Raster von 2.437 MHz / 1 Antenne / 64 Subcarriern. `empty-neutral-02` ist die beste Baseline-Kandidatin der aktuellen Setup-Serie.
+- **D6 belegt technisch vollständige Roh-CSI-Erfassung.** Vier der fünf Aufnahmen haben eine Setupbindung; Discovery bleibt Inventur. Alle fünf Aufnahmen sind `completed`, nicht unvollständig, haben 0 Recorder-Drops, keinen Writerfehler, RX1–RX4 und ein einheitliches Raster von 2.437 MHz / 1 Antenne / 64 Subcarriern. `empty-neutral-02` ist die beste Baseline-Kandidatin der aktuellen Setup-Serie.
 - **Keine Phase beweist zuverlässige Live-Positions- oder Personenerkennung.** D6 enthält keine Ground Truth; D4/D5 wurden nicht gegen einen unabhängigen mmWave-Pfad blind validiert. mmWave bleibt für Kalibrierung, Ground Truth, Synchronisation und Blindtests erforderlich.
 
-![Globaler D4/D5-Vergleich](figures/01-globaler-vergleich.png)
 
 ## Umfang und Nenner
 
-Der [bereinigte Laufüberblick](data/laufuebersicht.csv) inventarisiert **25 Aufnahmen**: 20 API-/Klassifikationsläufe und 5 D6-Roh-CSI-Aufnahmen. Der [D4-RX-Diagnostikexport](data/d4-rx-diagnostik.csv) enthält zusätzlich pro Lauf und RX die Stimmen sowie Mittelwert und P95 der rohen und geglätteten Bewegungsscores.
+25 Aufnahmen: 20 API-/Klassifikationsläufe und fünf D6-Roh-CSI-Aufnahmen.
+
 
 | Datengruppe | Läufe | Zulässige Verwendung |
 |---|---|---|
@@ -61,8 +63,6 @@ Alle fünf verwendeten Läufe enthalten die vier Pflichtdateien, RX1–RX4 in je
 | Person E1b | 0/237 (0,0 %) | 172/237 (72,6 %) | 185/237 (78,1 %) | 0/237 (0,0 %) |
 | **Person gepoolt** | **0/474 (0,0 %)** | **191/474 (40,3 %)** | **356/474 (75,1 %)** | **92/474 (19,4 %)** |
 
-![D4-Leerraumstimmen pro RX](figures/02-d4-rx-leerraum-heatmap.png)
-
 Der auffällige Pfad ist nicht stabil: E0b wird von RX4 dominiert, E0d von RX2. Die mittige Mac-Position senkte RX4 von 84,8 % in E0b auf 0 % in E0c/E0d, entfernte aber die Ursache nicht; sie verlagerte sich. In E0b lagen beispielsweise die geglätteten P95-Werte bei RX1/RX2/RX3/RX4 bei 0,000026 / 0,051103 / 0,074513 / 0,093415. Die vollständigen Roh-, P95-, geglätteten und Baseline-Werte stehen im D4-RX-CSV.
 
 Die strukturelle Ursache ist die Aggregation: Für `PRESENT_STILL` genügte ein einzelner positiver RX. D4 reduzierte dadurch grobe globale Bewegungsklassen, verwandelte lokale Drift aber weiterhin in globale Anwesenheit.
@@ -89,8 +89,6 @@ Im ersten Personenpfad trugen vor allem RX3/RX4, im zweiten RX2/RX3. Das Replay 
 | D5 E1 Persistenz | 114 | 29,911 s | 3,8113 | 0 | 0 | 1 | 114 | 0 |
 | **Zusammen** | **350** | **89,657 s** | **3,9038** | **0 (0 % Recall)** | **0** | **1** | **114** | **87** |
 
-![D5-Live-Linkwechsel](figures/03-d5-live-rx-linkwechsel.png)
-
 Der informative Funkpfad wechselte von RX4 auf RX3. Da nie zwei RX gleichzeitig das Quorum erreichten, blieb die globale Klasse durchgehend `ABSENT`. Für diese reale Kalibrierung fehlt außerdem ein gepaarter Leerraum-Prüflauf; ihre Leerraum-FPR ist daher **unklar**, nicht 0 %.
 
 ### D5-abs vom 27.07.
@@ -109,7 +107,6 @@ Alle drei Läufe enthalten pro RX die D5-Struktur und eine globale Klasse. In de
 | E1 Still-Recall | 0/276 (0,0 %) | 0 | 0 | 0 | 0 | Ziel ≥80 %: **nicht bestanden** |
 | **D5-abs gesamt** | — | — | — | — | — | **nicht bestanden** |
 
-Die API-Rasterdarstellung ist zwischen den drei Läufen nicht durchgehend identisch: E0 Calibration und E0 Validation melden in `data.nodes` ausschließlich 0 Subcarrier / 0 Amplitudenwerte; E1 enthält 253 Samples in diesem Zustand und 23 Samples mit 64 Subcarriern / 56 Amplitudenwerten. Die Klassifikations- und D5-Diagnosewerte sind vorhanden, aber die alten Metadaten binden weder `setup_id`/`setup_sha256` noch Firmware-/Artefakt-Hashes maschinenlesbar. Deshalb ist D5-abs kein Freigabenachweis für ein fest versiegeltes Setup.
 
 ## D4 gegen D5-abs
 
@@ -127,12 +124,11 @@ Die Rohdateien wurden gegen ihre `.meta.json`-Sidecars geprüft: Framezahl, RX-V
 | Aufnahme | Status | Frames / RX1–RX4 | Rohspanne | Drops / Writer | Raster | Setup | Freigabe |
 |---|---|---|---:|---|---|---|---|
 | discovery-neutral-01 | completed, vollständig | 2.612 / 623·626·645·718 | 24,993 s | 0 / null | einheitlich | keine Setup-ID | **nur Discovery** |
-| preflight-neutral-01 | completed, vollständig | 2.545 / 604·647·684·610 | 25,005 s | 0 / null | einheitlich | setup-0a49… | **technisch gültig, alte Serie** |
-| empty-neutral-01 | completed, vollständig | 4.760 / 1138·1183·1233·1206 | 64,987 s | 0 / null | einheitlich | setup-0a49… | **nur historisch vergleichbar** |
-| preflight-neutral-02 | completed, vollständig | 2.701 / 608·675·752·666 | 24,903 s | 0 / null | einheitlich | setup-2beda… | **technisch gültig** |
-| empty-neutral-02 | completed, vollständig | 6.102 / 1436·1557·1635·1474 | 64,995 s | 0 / null | einheitlich | setup-2beda… | **Baseline verwendbar im selben Setup** |
+| preflight-neutral-01 | completed, vollständig | 2.545 / 604·647·684·610 | 25,005 s | 0 / null | einheitlich | Serie 01 | **technisch gültig, alte Serie** |
+| empty-neutral-01 | completed, vollständig | 4.760 / 1138·1183·1233·1206 | 64,987 s | 0 / null | einheitlich | Serie 01 | **nur historisch vergleichbar** |
+| preflight-neutral-02 | completed, vollständig | 2.701 / 608·675·752·666 | 24,903 s | 0 / null | einheitlich | Serie 02 | **technisch gültig** |
+| empty-neutral-02 | completed, vollständig | 6.102 / 1436·1557·1635·1474 | 64,995 s | 0 / null | einheitlich | Serie 02 | **Baseline verwendbar im selben Setup** |
 
-![D6-RX-Frameraten](figures/04-d6-rx-frameraten.png)
 
 Für alle fünf Dateien gilt:
 
@@ -142,23 +138,12 @@ Für alle fünf Dateien gilt:
 - Eine Session-ID und ein TX-Filter-Binding pro Datei.
 - `status=completed`, `incomplete=false`, `dropped_frames=0`, `writer_error=null` und Serverversion 0.3.3.
 
-Die Siegelberichte binden Setup, ausführbaren Server, TX-App, RX-Firmware und TX-Filter wie folgt. Die zweite Serie übernahm Raum, Geräte, Firmware, Kanal und Filter unverändert; nur das korrigierte Serverartefakt erforderte ein neues Setup-Siegel.
 
-| Identität | Serie 01 | Serie 02 |
-|---|---|---|
-| Setup-ID | `setup-0a49d75f122f9dc9` | `setup-2beda4496ccfb547` |
-| Setup-SHA-256 | `0a49d75f…b9008a4e` | `2beda449…a3564a0` |
-| Server-SHA-256 | `91feb860…cd3484b` | `6554c510…d14f8b5` |
-| TX-App-Readback-SHA-256 | `a66a11ad…77994e5` | unverändert `a66a11ad…77994e5` |
-| RX1–RX4-Firmware-SHA-256 | `12a11944…6e147cd` | unverändert `12a11944…6e147cd` |
-| TX-Filter-SHA-256 | `60c998af…47fad86c` | unverändert `60c998af…47fad86c` |
 
-Abweichungen:
+Die fünf Rohaufnahmen verteilen sich auf eine ungebundene Discovery und zwei getrennte Setupserien mit je einem Preflight und einer Leerraumaufnahme. Vier von fünf sind setupgebunden. Die zweite Serie behielt die physische Geometrie und den Funkstand bei; ein korrigiertes Serverartefakt erforderte eine neue Bindung.
 
-- `discovery-neutral-01` ist vollständig, hat aber keine Setup-ID/-SHA und je RX einen Sequenzrücksprung; es bleibt Inventur, keine Baseline.
-- `empty-neutral-01` gehört zur alten Setup-ID `setup-0a49d75f122f9dc9`. Es enthält 43 per-RX-Lücken über 500 ms, maximal 1.280,868 ms. Lesbar und recorderseitig vollständig, aber nur historisch vergleichbar.
-- `preflight-neutral-02` und `empty-neutral-02` gehören gemeinsam zur aktuellen Setup-ID `setup-2beda4496ccfb547` und SHA `2beda4496ccfb547217f15ed62418d363aed8ddbc19221d872c4a89a1a3564a0`.
-- `empty-neutral-02` hat keine Lücke über 500 ms; die größte per-RX-Lücke beträgt 479,993 ms. Sie ist die beste vorhandene Baseline-Kandidatin, jedoch ausschließlich für dasselbe versiegelte Setup.
+Discovery bleibt Inventur und enthält je RX einen Sequenzrücksprung. Empty 01 ist nur historisch vergleichbar: 43 per-RX-Lücken über 500 ms, maximal 1.280,868 ms. Empty 02 hat keine Lücke über 500 ms; maximal 479,993 ms. Die beiden Serien dürfen nicht gemeinsam kalibriert werden. Empty 02 ist nur im selben Setup eine Baseline-Kandidatin.
+
 
 ## Evidenzmatrix
 
@@ -197,12 +182,7 @@ Nächste Reihenfolge ohne Schwellenwertänderung:
 3. Mindestens drei bekannte Punkte für die Raumtransformation aufnehmen und Residuen prüfen.
 4. Erst danach setupgebundene Kalibrier-/Trainingsdaten erzeugen, Modell einfrieren und neue Blindtests durchführen.
 
-## Reproduzierbarkeit und Quellen
 
-- Daten-/Legacy-Abbildungs-Generator: [`project_tools/build_d4_d5_d6_results.py`](../../project_tools/build_d4_d5_d6_results.py)
-- D5-Replayer: [`project_tools/evaluate_d5_replay.py`](../../project_tools/evaluate_d5_replay.py)
-- Laufübersicht: [`data/laufuebersicht.csv`](data/laufuebersicht.csv)
-- D4-RX-Diagnostik: [`data/d4-rx-diagnostik.csv`](data/d4-rx-diagnostik.csv)
-- Diagrammvertrag und QA: [`chart-map.md`](chart-map.md)
-- Bklit-Render-Spezifikation: [`rendering.md`](rendering.md)
-- Vorberichte: [D4/E0b](../2026-07-26_D4-E0b_sauberer-leerraum/README.md), [D5 Offline-Replay](../2026-07-26_D5_offline-replay-und-praesenzkalibrierung/README.md), [D5 Still-Livetest](../2026-07-26_D5_still-livetest/README.md), [D6 Versiegelung](../2026-08-09_D6_setup-siegel-und-preflight/README.md), [D6 Sidecar-Fix](../2026-08-09_D6_sidecar-fix-neusiegelung-und-preflight/README.md)
+## Nachvollziehbarkeit dieser Textfassung
+
+Die historischen Laufübersichten, RX-Diagnostik, Recorder-Sidecars, Generatoren und Renderdokumente bleiben in den lokalen Originalablagen erhalten. Diese öffentliche Textfassung kopiert keine Rohdaten oder Gerätebindungen und verlinkt keine nicht mitgelieferten Ableitungen. Der damalige nächste Hardwareplan ist historischer Kontext, keine aktuelle Gerätefreigabe.

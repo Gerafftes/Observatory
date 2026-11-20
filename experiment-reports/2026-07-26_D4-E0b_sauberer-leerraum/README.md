@@ -1,8 +1,10 @@
 # D4/E0b: sauberer Leerraumtest — 2026-07-26
 
+> Öffentliche Darstellung des datierten Originalberichts. Die damaligen Ergebniszahlen und methodischen Grenzen bleiben erhalten; Geräte-/Netzidentitäten und lokale Nachweispfade sind ausgelassen. Beschriebene Folgeschritte sind historisch und erteilen keine aktuelle Gerätefreigabe.
+
 ## Gültigkeit
 
-Dieser Lauf ist die gültige Wiederholung des zuvor kontaminierten E0-Versuchs. Der Raum blieb während der vollständigen Aufnahme leer. Das Messende wurde außerhalb des Raums durch zweimaliges Blinken der Home-Assistant-Leuchte `CAB SM Küche Fackel` signalisiert.
+Dieser Lauf ist die gültige Wiederholung des zuvor kontaminierten E0-Versuchs. Der Raum blieb während der vollständigen Aufnahme leer. Das Messende wurde außerhalb des Raums mit einem zweimaligen Lichtsignal angezeigt.
 
 ## Ziel
 
@@ -10,7 +12,7 @@ Geprüft werden ausschließlich die per-RX- und globale Klassifikation mit D4 un
 
 ## Aufbau und Daten
 
-- 1 kontrollierter TX, Absender-MAC `02:00:00:00:00:04`
+- 1 kontrollierter TX mit festgelegtem Absender; die Adresse wird nicht veröffentlicht
 - RX1 bis RX4 mit aktivem TX-MAC-Filter
 - fester Raumaufbau und korrigierte Gerätegeometrie
 - 10 Sekunden Vorlauf, danach 60 Sekunden leerer Raum
@@ -20,9 +22,7 @@ Geprüft werden ausschließlich die per-RX- und globale Klassifikation mit D4 un
 - alle vier RX in jedem Sample vorhanden
 - keine Logger-Fehler und keine als `stale` markierten RX
 
-Rohdaten:
-
-`data/raw/2026-07-26_21-24-17_E0b_sauberer_leerraum_D4_alle_RX_TX_MAC_Filter/`
+Die Rohdaten des historischen Leerraumlaufs sind nicht Bestandteil dieser öffentlichen Darstellung.
 
 ## Ergebnis
 
@@ -72,7 +72,7 @@ RX4 allein verursacht damit bereits fast die Hälfte aller globalen Samples. Die
 
 E0b ist nicht bestanden. D4 verhindert zwar weiterhin globale Klassen `PRESENT_MOVING` und `ACTIVE`, löst die Anwesenheitserkennung aber nicht. Eine reine Kalibrierungswiederholung würde die strukturelle Aggregationsursache nicht beheben.
 
-Vor einer Regeländerung ist ein gleich langer Positivlauf mit still sitzender Person erforderlich. Nur der Vergleich der Verteilungen zeigt, ob:
+Der damals geforderte nächste Schritt vor einer Regeländerung war ein gleich langer Positivlauf mit still sitzender Person. Erst der Vergleich der Verteilungen sollte zeigen, ob:
 
 1. eine höhere lokale Still-Schwelle,
 2. ein Quorum aus mehreren RX,

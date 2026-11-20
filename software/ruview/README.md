@@ -58,7 +58,7 @@ Die drei wichtigsten Einstiegspunkte sind:
 
 1. [Aktueller D6-/mmWave-Arbeitsstand](08-aktueller-arbeitsstand-d6-und-position.md)
 2. [Ergebnisberichte](results/)
-3. [PCB-01-Fertigungsdaten](hardware/pcb-01/)
+3. [PCB-01-Fertigungsdaten](../../hardware/pcb-01/)
 
 Die verwendete RX-Firmware und der Sensing-Server stammen aus dem separaten
 Upstream-Projekt [ruvnet/RuView](https://github.com/ruvnet/RuView). Die lokalen
@@ -167,19 +167,20 @@ Der Assistent führt durch Verbindung, Ausrichtung, Abdeckung, Zonen, Training,
 Blindtest und Ergebnis. Der Screenshot zeigt den geprüften Fehlerzustand
 `Server nicht erreichbar` mit HTTP 502, nicht eine verbundene Radaraufnahme.
 
-<img src="images/ui/mmwave-calibration-server-unreachable.png" alt="Siebenstufiger mmWave-Kalibrierungsassistent mit nicht erreichbarem Server und HTTP-502-Status" width="900">
+[Historische HTTP-502-Aufnahme](images/ui/mmwave-calibration-server-unreachable.png)
 
 ### Experiment-Cockpit
 
-Das neue Cockpit hält Setup-Profil, WiFi-Workflow, Aufnahmen und die getrennte
-mmWave-Referenz in einer Ansicht. Die Aufnahmen unten stammen aus einem
-simulierten Lauf ohne angeschlossene Sensoren.
+Das Cockpit hält Setup-Profil, WiFi-Workflow, Aufnahmen und die getrennte
+mmWave-Referenz in einer Ansicht. Live-Status und Workflow zeigen den Stand
+vom 7. November 2026 einschließlich des gesperrten Alt-Runs. Die CAD-Ansicht
+verwendet ein Demo-Profil mit erfundenen Raummaßen und Sensorpositionen.
 
-<img src="images/ui/experiment-cockpit-setup.png" alt="Experiment-Cockpit mit Setup-Profil, Statusübersicht und simuliertem Hardwarezustand" width="900">
+<img src="../../project-media/ui/experiment-cockpit-live-20261107.jpg" alt="Aktuelles Experiment-Cockpit mit Live-Status" width="900">
 
-<img src="images/ui/experiment-cockpit-guide.png" alt="Experiment-Cockpit mit Raum-, TX- und RX-Positionen sowie wartender mmWave-Referenz" width="900">
+<img src="../../project-media/ui/experiment-cockpit-room-demo.jpg" alt="CAD-Demo-Raum mit TX-, RX- und Radarmarkern" width="900">
 
-<img src="images/ui/experiment-cockpit-workflow-guide.png" alt="Experiment-Cockpit mit Workflow-Guide und zehn gesperrten beziehungsweise freigeschalteten Phasen" width="900">
+<img src="../../project-media/ui/experiment-cockpit-workflow-20261107.jpg" alt="Workflow-Phasen mit einem durch das Runtime-Seal-Gate gesperrten Alt-Run" width="900">
 
 #### Kurzanleitung
 
@@ -249,11 +250,11 @@ physischer Aufbau
 
 Wichtige Nachweise:
 
-- [D5: Offline-Replay und experimentelle Präsenzkalibrierung](results/2026-07-26_D5_offline-replay-und-experimentelle-praesenzkalibrierung.md)
-- [D5: realer Still-Livetest](results/2026-07-26_D5_realer-still-livetest.md)
+- [D5: Offline-Replay und experimentelle Präsenzkalibrierung](../../experiment-reports/2026-07-26_D5_offline-replay-und-praesenzkalibrierung/README.md)
+- [D5: realer Still-Livetest](../../experiment-reports/2026-07-26_D5_still-livetest/README.md)
 - [D6: Setupaufnahme und TX-Firmwareidentität](results/2026-08-09_D6_setupaufnahme-und-TX-firmwareidentitaet.md)
-- [D6: Setup-Siegel und Preflight](results/2026-08-09_D6_setup-siegel-und-preflight.md)
-- [D6: Sidecar-Fix, Neusiegelung und Leerraumkalibrierung](results/2026-08-09_D6_sidecar-fix-neusiegelung-und-preflight.md)
+- [D6: Setup-Siegel und Preflight](../../experiment-reports/2026-08-09_D6_setup-siegel-und-preflight/README.md)
+- [D6: Sidecar-Fix, Neusiegelung und Leerraumkalibrierung](../../experiment-reports/2026-08-09_D6_sidecar-fix-neusiegelung-und-preflight/README.md)
 
 ## Hardware
 
@@ -267,14 +268,14 @@ Fertigungsvorschau zeigt den verwendeten Platinenstand:
 
 <img src="images/pcb-01-preview.webp" alt="Fertigungsvorschau von PCB-01 mit ESP32-C3-Footprint, C1, C2 und Anschluss U2" width="460">
 
-Die [Gerber- und Bohrdaten von PCB-01](hardware/pcb-01/) liegen mit SHA-256 und
+Die [Gerber- und Bohrdaten von PCB-01](../../hardware/pcb-01/) liegen mit SHA-256 und
 Fertigungshinweis im Repository.
 
 Als Gehäuse für die ESP32-S3-Boards ist das externe MakerWorld-Modell
 [*ESP32 S3 Wroom Case*](https://makerworld.com/de/models/1456361-esp32-s3-wroom-case#profileId-1517915)
 vorgesehen. Wegen seiner MakerWorld Standard Digital File License wird die
 STL nicht erneut im Repository bereitgestellt. Weitere Hinweise stehen unter
-[`hardware/esp32-s3-case/`](hardware/esp32-s3-case/).
+[`hardware/esp32-s3-case/`](../../hardware/esp32-s3-case/).
 
 ### BFLD privacy layer
 
@@ -299,14 +300,14 @@ verhindert. Die zugehörigen Architekturentscheidungen sind
 | [`01-projektjournal.md`](01-projektjournal.md) | Chronologischer Entwicklungsverlauf |
 | [`02-versuchslog.md`](02-versuchslog.md) | Durchgeführte Versuche |
 | [`03-messprotokoll.md`](03-messprotokoll.md) | Messabläufe und Qualitätsregeln |
-| [`04-auswertung-bis-problemfrage.md`](04-auswertung-bis-problemfrage.md) | Auswertung entlang der Forschungsfrage |
+| [`04-auswertung-bis-problemfrage.md`](../../docs/project/04-auswertung-bis-problemfrage.md) | Auswertung entlang der Forschungsfrage |
 | [`05-erfolge-niederlagen-und-aenderungen.md`](05-erfolge-niederlagen-und-aenderungen.md) | Erfolge, Fehlschläge und Kursänderungen |
 | [`06-ruview-anpassungen.md`](06-ruview-anpassungen.md) | Lokale Änderungen an RuView |
 | [`07-screenshot-nachweise.md`](07-screenshot-nachweise.md) | Visuelle Nachweise und Fehlerbilder |
 | [`08-aktueller-arbeitsstand-d6-und-position.md`](08-aktueller-arbeitsstand-d6-und-position.md) | Verbindlicher D6-/mmWave-Wiedereinstieg |
 | [`v2/crates/wifi-densepose-bfld/README.md`](v2/crates/wifi-densepose-bfld/README.md) | BFLD-Datenschutzschicht, Invarianten und ADR-118 bis ADR-123 |
 | [`results/`](results/) | Ausführliche Ergebnisberichte |
-| [`templates/messblatt.md`](templates/messblatt.md) | Vorlage für neue Messungen |
+| [`templates/messblatt.md`](../../measurement-templates/messblatt.md) | Vorlage für neue Messungen |
 
 ## Lizenz
 

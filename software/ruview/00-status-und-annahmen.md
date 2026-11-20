@@ -119,7 +119,7 @@ markiert; auch der Preflight wurde noch nicht durchgeführt.
 Dieser historische Grenzstand wurde anschließend abgeschlossen. Das Setup ist
 nun als `setup-0a49d75f122f9dc9` versiegelt; der 25-Sekunden-Preflight bestand
 mit 2.545 Frames und 0 Drops. Vollständiger Nachweis:
-[results/2026-08-09_D6_setup-siegel-und-preflight.md](results/2026-08-09_D6_setup-siegel-und-preflight.md).
+[results/2026-08-09_D6_setup-siegel-und-preflight.md](../../experiment-reports/2026-08-09_D6_setup-siegel-und-preflight/README.md).
 
 ## Aktueller Stand nach dem D5-Livetest vom 2026-07-26
 
@@ -139,7 +139,7 @@ Der nächste belastbare Entscheidungsschritt ist eine zusammengehörige blinde T
 3. mindestens eine weitere Still-Position,
 4. erst danach eine Änderung der Fusion oder Schwellen.
 
-Ausführliche Auswertung: [results/2026-07-26_D5_realer-still-livetest.md](results/2026-07-26_D5_realer-still-livetest.md)
+Ausführliche Auswertung: [results/2026-07-26_D5_realer-still-livetest.md](../../experiment-reports/2026-07-26_D5_still-livetest/README.md)
 
 ## Aktueller Entwicklungsstand vom 2026-08-01
 

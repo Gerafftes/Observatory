@@ -1,5 +1,7 @@
 # D6-Setupaufnahme und TX-Firmwareidentität — 2026-08-09
 
+> Öffentliche Darstellung des datierten Originalberichts. Die damaligen Ergebniszahlen und methodischen Grenzen bleiben erhalten; Geräte-/Netzidentitäten und lokale Nachweispfade sind ausgelassen. Beschriebene Folgeschritte sind historisch und erteilen keine aktuelle Gerätefreigabe.
+
 ## Zweck
 
 Vor dem versiegelten D6-Preflight wurden die noch fehlende normale
@@ -33,7 +35,6 @@ Weitere festgelegte Zustände:
 
 - Tür: geschlossen
 - CSI-WLAN: verbunden
-- IP-Adresse des Macs im CSI-WLAN: `192.168.4.50/24`
 - Möbel und normale statische Gegenstände: bleiben für Preflight,
   Leerraumkalibrierung und alle späteren Aufnahmen unverändert im Raum
 
@@ -55,8 +56,7 @@ erkannt:
 - eingebettetes PSRAM: 8 MB
 - Quarz: 40 MHz
 
-Die rohe Chip- beziehungsweise AP-MAC wird in diesem neuen Nachweis nicht
-wiederholt. Ältere Journalteile enthalten noch historische Klartextangaben.
+Rohe Chip- und Netzwerkadressen sind nicht Teil dieser öffentlichen Darstellung.
 
 ### Warum ein zweiter Readback nötig war
 
@@ -109,17 +109,9 @@ Angreifer.
 
 ## RX-Bindung
 
-Die vier aktuellen privaten Provisionierungszustände von RX1 bis RX4 melden
-jeweils Node-ID 1 bis 4, Kanal 6 und denselben gesetzten TX-Filter. Nach dem
-definierten Schema `sha256-ruview-tx-filter-mac-v1` ist die gemeinsame
-Filteridentität, ohne die rohe Adresse in diesem neuen Nachweis zu
-wiederholen:
+Die damaligen privaten Provisionierungsnachweise von RX1 bis RX4 meldeten Node-ID 1 bis 4, Kanal 6 und denselben konfigurierten TX-Filter. Konkrete Adresse und daraus abgeleiteter Filterhash werden nicht veröffentlicht.
 
-`60c998af0f5f845bd2afaac558a7da831a3a34ec07544de0efc6d1e747fad86c`
-
-Eine ältere doppelte RX3-Zustandsdatei ohne Filter bleibt ausdrücklich
-historisch und wird nicht als Gerätewahrheit verwendet. Der Filterhash bindet
-die kontrollierte Firmwarekette, veröffentlicht aber nicht die rohe MAC.
+Eine ältere doppelte RX3-Zustandsdatei ohne Filter bleibt als historischer, nicht maßgeblicher Stand eingeordnet. Die vollständige Filterbindung bleibt im unveränderten lokalen Originalnachweis erhalten.
 
 ## Datenschutz und Aufräumen
 
@@ -127,18 +119,18 @@ die kontrollierte Firmwarekette, veröffentlicht aber nicht die rohe MAC.
 - Der von `esptool` geladene Stub lief nur temporär im RAM.
 - Nach jedem Lesevorgang wurde der TX per RTS normal zurückgesetzt.
 - Der unvollständige 16-MB-Readback, Partitionstabelle, OTA-Auswahldaten und
-  aktive App-Kopie wurden nach Hash- und Metadatenprüfung aus `/private/tmp`
-  gelöscht.
+  aktive App-Kopie wurden nach der damaligen Hash- und Metadatenprüfung aus
+  dem temporären Prüfbereich gelöscht; dessen lokaler Pfad wird nicht veröffentlicht.
 - Rohe MAC, WLAN-SSID, WLAN-Passwort und OTA-Schlüssel wurden nicht in diesen
   neuen Nachweis übernommen.
 
 ## Aktueller Grenzstatus
 
-Zum Ende dieses Eintrags ist der TX für den Readback noch per USB mit dem Mac
-verbunden. Dieser temporäre Kabelzustand gehört **nicht** in das versiegelte
+Zum damaligen Ende dieses Eintrags war der TX für den Readback noch per USB mit dem Mac
+verbunden. Dieser temporäre Kabelzustand gehörte **nicht** in das versiegelte
 Messsetup.
 
-Der nächste zulässige Ablauf ist:
+Der damals vorgesehene Folgeablauf war:
 
 1. USB-Datenkabel entfernen und TX wieder ausschließlich mit Strom versorgen.
 2. Mac, TX, RX1 bis RX4, Möbel, übrige Kabel und geschlossene Tür unverändert
@@ -148,4 +140,4 @@ Der nächste zulässige Ablauf ist:
 4. Server mit exakt diesem Setup neu starten.
 5. Versiegelten 25-Sekunden-Preflight ohne Person und ohne Bewegung ausführen.
 
-Erst ein bestandener Preflight gibt die 65-Sekunden-Leerraumkalibrierung frei.
+Der damalige Ablauf setzte für die 65-Sekunden-Leerraumkalibrierung einen bestandenen Preflight voraus. Diese historische Beschreibung erteilt keine heutige Freigabe für Reset, Start oder Messung.

@@ -142,3 +142,5 @@ Diese Punkte müssen in Firmware und Rohdaten geprüft werden, bevor weitere Sch
 ## Berichtsfähiges Ergebnis
 
 Der Versuch zeigt, dass ein vollständiger 1TX-/4RX-Datenpfad, reale Sensorgeometrie und eine visuell plausible Punktwolke noch keine valide Bewegungserkennung ergeben. Ohne Kontrolle der Paketquelle und zeitlich vergleichbarer CSI-Frames können Netzwerk- und Signalvariationen stärker sein als die durch eine Person verursachte Änderung. Negative Ergebnisse der Live-Visualisierung müssen daher getrennt von der grundsätzlichen Funktionsfähigkeit des CSI-Datenempfangs bewertet werden.
+
+Die unveränderte [ursprüngliche Screenshotkopie](../../software/ruview/skizzen/screenshots/2026-07-18_18-54-33_fixed-room-live-sensing-failure.png) bleibt zusätzlich zum Paketbild erhalten. Beide Ablagen zeigen denselben historischen Softwarezustand; daraus folgt kein neuer Positionsnachweis.

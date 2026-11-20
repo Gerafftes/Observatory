@@ -1,171 +1,40 @@
-# 03 Messprotokoll
+# 03 Messprotokoll – öffentliche Methodik
 
-## Zweck
+Historische Versuchsplanung mit Stand 9. August 2026. Die folgenden Sollregeln sind keine Behauptung, dass alle Messreihen durchgeführt wurden. Ergebnisse stehen im [technischen Bericht](../../experiment-reports/2026-08-23_D4-D5-D6_technischer-bericht/README.md).
 
-Das Messprotokoll stellt sicher, dass die Daten später wirklich zur Problemfrage passen:
+## Zweck und Dokumentation
 
-> Wie zuverlässig kann ein WLAN-CSI-System Bewegungen und Atemrhythmen im Raum erfassen?
+Problemfrage: Wie zuverlässig kann ein WLAN-CSI-System Bewegungen und Atemrhythmen im Raum erfassen?
 
-## Vor jeder Messung dokumentieren
+Vor jedem Lauf werden Datum/Uhrzeit, Raumskizze, TX-/RX-/Referenzgeometrie, Abstände, Kanal, logische Node-Rollen, Filterzustand und parallele Referenzmessung festgehalten. Währenddessen werden Start/Ende, Bewegungen, Störungen, Ausfälle und aktive RX notiert. Private Netzwerk- und Gerätekennungen gehören nicht in den öffentlichen Bericht.
 
-- Datum und Uhrzeit
-- Raum und grobe Skizze
-- Position von TX, RX1, RX2, RX3 und mmWave
-- Abstand TX zu RXs
-- WLAN-Kanal
-- verwendete Node-IDs
-- ob `--filter-mac` aktiv ist
-- ob mmWave parallel läuft
+## Frühe geplante Reihen
 
-## Messreihen erster Test
+| Reihe | Sollumfang | Situation / Referenz |
+|---|---:|---|
+| A0 | 60 s | leerer Raum |
+| A1 | 60 s | ruhiges Stehen, manuelles Label |
+| A2 | 60 s | langsames Gehen, manuelles Label und Referenzsensor |
+| A3 | 120 s | ruhiges Sitzen/Atmen, unabhängige Atemreferenz |
+| A4-L/M/R | je 60 s | links / Mitte / rechts, manuelle Labels |
+| G1 | 60 s | langsame Bewegung mit vier RX, Guard-Vergleich |
 
-| ID | Dauer | Situation | Referenz |
-|---|---:|---|---|
-| A0 | 60 s | leerer Raum | keine Person |
-| A1 | 60 s | Person steht ruhig in Mitte | manuelles Label |
-| A2 | 60 s | Person läuft langsam durch Raum | manuelles Label + mmWave |
-| A3 | 120 s | Person sitzt ruhig und atmet normal | mmWave/Fitnessuhr/manuelles Zählen |
-| A4-L | 60 s | Person steht links | manuelles Label |
-| A4-M | 60 s | Person steht Mitte | manuelles Label |
-| A4-R | 60 s | Person steht rechts | manuelles Label |
-| G1 | 60 s | Guard-Intervall-Test mit 4RX, Person bewegt sich langsam | Serverlog: weniger/keine `Multistatic fusion failed` |
-| D5 E1 | 59,7 s | Person sitzt nach realer D5-Leerraumkalibrierung still | manuelles Label; 4RX vollständig |
-| D5 E1 Persistenz | 29,9 s | dieselbe Person sitzt weiter still | manuelles Label; 4RX vollständig |
+Die Sollwerte ersetzen nicht die tatsächlich aufgezeichneten Dauern; das Journal nennt für die frühe A3-Aufnahme 180 s.
 
-## Dateinamen
+Nach jedem Lauf: vollständige RX-Abdeckung, plausible Signalqualität und Referenzwerte prüfen. Bei fehlendem RX, Neustart, fehlendem UDP-Empfang, starker Bewegung während Atemmessung oder ausgefallener Referenz wird der Lauf als ungültig protokolliert und wiederholt. Ein größeres Guard-Intervall bleibt ein Visualisierungs-Workaround und ersetzt keine Knotensynchronisation.
 
-Empfohlen:
+## Tatsächlicher D5-Livetest vom 26. Juli 2026
 
-```text
-data/raw/2026-06-26_A0_empty_room/
-data/raw/2026-06-26_A1_person_middle/
-data/raw/2026-06-26_A2_motion_walk/
-data/raw/2026-06-26_A3_breathing_sitting/
-data/raw/2026-06-26_A4_zone_left/
-```
+| Lauf | Dauer | Ergebnis |
+|---|---:|---|
+| still sitzend | 59,7 s | 236/236 global ABSENT |
+| Still-Persistenz | 29,9 s | 114/114 global ABSENT |
 
-## Während der Messung notieren
-
-- Startzeit
-- Endzeit
-- besondere Ereignisse
-- Bewegung im Raum
-- Störungen durch andere Personen/Geräte
-- sichtbare Ausfälle im Server
-- ob alle Node-IDs aktiv waren
-
-## Erste Qualitätsprüfung
-
-Direkt nach jeder Messung prüfen:
-
-- Kommen Frames von RX1?
-- Kommen Frames von RX2?
-- Kommen Frames von RX3?
-- Haben die Frames plausible RSSI-Werte?
-- Ist Bewegung im Signal sichtbar?
-- Hat mmWave plausible Werte geliefert?
-
-## Guard-Intervall-Test G1
-
-Ziel: Prüfen, ob ein größeres RuView-Guard-Intervall die Mehrknoten-Visualisierung stabilisiert.
-
-Server-Start für G1:
-
-```zsh
-mkdir -p ./logs
-
-WDP_GUARD_INTERVAL_US=500000 \
-WDP_SOFT_GUARD_US=200000 \
-RUST_LOG=debug ./target/release/sensing-server \
-  --source esp32 \
-  --udp-port 5005 \
-  --http-port 8080 \
-  --ws-port 8765 \
-  --bind-addr 0.0.0.0 \
-  2>&1 | tee ./logs/G1_guard500ms_server.log
-```
-
-Erfolgskriterium:
-
-- `nodes [1, 2, 3, 4]` bleibt stabil
-- Serverlog zeigt deutlich weniger `Multistatic fusion failed`
-- RuView-Visualisierung bleibt sichtbar stabiler
-
-Methodische Einschränkung:
-
-Ein größeres Guard-Intervall ist ein Visualisierungs-Workaround. Es ersetzt keine echte Synchronisation der ESP32-Knoten.
-
-## Abbruchkriterien
-
-Messung wiederholen, wenn:
-
-- ein RX komplett fehlt
-- TX/RX neu gestartet hat
-- Laptop/Server UDP-Pakete nicht empfängt
-- Person während Atemmessung stark gesprochen/gelaufen ist
-- mmWave-Referenz ausgefallen ist
-
-## Minimaler Tagesabschluss
-
-Am Ende des ersten Testtags sollten mindestens diese Daten existieren:
-
-- leerer Raum
-- Person steht
-- Person bewegt sich
-- ruhige Atmung
-- eine kurze Notiz, welche RX-Nodes funktioniert haben
-
-## D5-Livetest vom 2026-07-26
-
-| Lauf | Rohdaten | Ergebnis |
-|---|---|---|
-| D5 E1 | `data/raw/2026-07-26_23-28-03_D5_E1_still_sitzend/` | 236 von 236 Samples global `ABSENT` |
-| D5 E1 Persistenz | `data/raw/2026-07-26_23-30-21_D5_E1_still_persistenz/` | 114 von 114 Samples global `ABSENT` |
-
-Qualitätsprüfung:
-
-- RX1 bis RX4 in jedem Sample vorhanden
-- keine Einträge in den beiden `errors.log`-Dateien
-- D5-Referenz und aktuelle Evidenz für alle vier RX vorhanden
-- reale Person manuell als still sitzend gelabelt
-
-Bewertung:
-
-Der Positivtest ist nicht bestanden. Für eine vollständige Aussage zur realen D5-Leistung fehlt unter derselben Kalibrierung noch der separat aufgezeichnete blinde Leerraumlauf.
+Alle vier RX, Referenzen und laufende Evidenz waren vorhanden; die Logger meldeten keine Fehler. Die Person war manuell als still sitzend gelabelt. Der Positivtest ist nicht bestanden. Ein separater blinder Leerraumlauf unter derselben Kalibrierung fehlte; daraus folgt keine Leerraum-FPR von null.
 
 ## Geplanter D6-/9-Punkt-Blindtest
 
-Status am 2026-08-09: noch nicht als Messserie durchgeführt. Die korrigierte
-unversiegelte 25-Sekunden-Discovery mit RX1 bis RX4 ist bestanden. Mac-Position,
-geschlossene Tür, CSI-Hostadresse, dominantes 64-Subcarrier-Raster, RX-Firmware,
-Serverartefakt, aktive TX-App und gemeinsamer TX-Filterhash sind erfasst. Der
-Mac-Bezugspunkt liegt bei `(Breite, Länge, Höhe) =
-(0,94 m, 0,00 m, 0,87 m)` beziehungsweise RuView
-`[4.02, 0.87, 2.50]`; damit steht er auf gleicher Höhe wie RX4 und 4 cm von RX4
-entfernt auf der von RX2 wegführenden Linie.
-
-Der TX wurde nach dem zerstörungsfreien Firmware-Readback wieder ausschließlich
-mit Strom versorgt. Nach einer streng fail-closed behandelten
-Sidecar-Inkompatibilität wurde der korrigierte Server separat eingefroren und
-das unveränderte physische Setup neu als `setup-2beda4496ccfb547` versiegelt.
-Der neue versiegelte Preflight `preflight-neutral-20260809-02` bestand über 25
-Sekunden mit 2.701 Frames, 0 Drops, exakt RX1 bis RX4, stabilem 64-Subcarrier-
-Raster und passender Setupidentität. Die Leerraumaufnahme misst anschließend
-diesen realen Aufbau einschließlich Mac, Möbeln, Kabeln und normalen
-Gegenständen mit — ausgeschlossen ist nur eine Person. Frühere Aufnahmen mit
-„Mac mittig“ sind nicht als Kalibrierung für diesen Aufbau verwendbar.
-Nachweise:
-[TX-Firmwareidentität](../../experiment-reports/2026-08-09_D6_setupaufnahme-und-tx-firmwareidentitaet/README.md)
-und
-[Neusiegelung/Preflight](../../experiment-reports/2026-08-09_D6_sidecar-fix-neusiegelung-und-preflight/README.md).
-
-Die neue Leerraumkalibrierung `empty-neutral-20260809-02` ist inzwischen unter
-dem neuen Siegel bestanden: 65 Sekunden, 6.102 Frames, 0 Drops, vollständige
-RX1-bis-RX4-Abdeckung und erfolgreiche strikte Offline-Inspektion. Damit ist
-das nächste zulässige Gate die reale Trainingsaufnahme an P01.
-
-Die folgenden Regeln sind vorab festgelegt und werden nicht nach Sichtung der
-Blindvorhersagen gelockert.
+Am 9. August war die vollständige Messserie noch nicht durchgeführt. Nach korrigiertem Sidecar und neu gebundener Setupserie bestanden ein ungefähr 25-s-Preflight (2.701 Frames) und eine ungefähr 65-s-Leerraumaufnahme (6.102 Frames) mit vier RX und null Recorder-Drops. Frühere Kalibrierungen mit anderem Laptopstandort oder anderer Setupserie dürfen nicht übernommen werden. Das nächste damalige Messgate war P01-Training.
 
 ### Aufnahmeumfang
 

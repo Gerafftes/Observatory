@@ -2,13 +2,16 @@
 
 [English](README.en.md)
 
-Diese Seite bündelt die Dateien und Bezugsangaben für den vorläufigen
-mmWave-Breadboard-Aufbau. Sie ist die zentrale Weiterleitung für CAD, Foto,
-Befestigungsteile und die zusätzlichen mmWave-Bauteile.
+Diese Seite dokumentiert die vorläufige mmWave-Breadboard-Variante mit
+HLK-LD2450 und ESP32-C3, ihre Befestigungsteile und zusätzlichen Kondensatoren.
+Der Gesamtaufbau sieht zwei getrennte ESP32-C3/LD2450-Referenzknoten vor;
+ihre gemeinsame Abnahme ist offen. [Zur Hardwareübersicht](../README.md).
 
-## CAD und Aufbau-Foto
+## Aufbau und CAD-Umfang
 
-- [Breadboard-Body.stl](Breadboard-Body.stl) — CAD-Datei für den Breadboard-Körper
+Die CAD-Datei für den Breadboard-Körper gehört in ein separates
+Hardware-Quellpaket und ist in diesem Dokumentationsstand nicht enthalten.
+Das Foto ersetzt keine Verdrahtungs-, Druck- oder Geräteprüfung.
 
 <img src="../../project-media/mmwave-breadboard-setup.jpeg" alt="Vorläufiger Breadboard-Aufbau mit HLK-LD2450 und ESP32-C3" width="700">
 
@@ -16,13 +19,21 @@ Das Foto dokumentiert den provisorischen Aufbau mit HLK-LD2450 und ESP32-C3.
 Die Druckorientierung, das Material und die Passprobe sind noch nicht
 validiert.
 
+## Verdrahtung und Datenpfad
+
+Das HLK-LD2450 sendet über UART an den ESP32-C3. Dieser leitet die
+Radardaten über WLAN per UDP an Port `55010` des Sensing-Servers weiter.
+Der Browser verbindet sich per HTTP und WebSocket mit dem Server.
+
+<a href="../../project-media/mmwave-breadboard-wiring.png"><img src="../../project-media/mmwave-breadboard-wiring.png" alt="Verdrahtung von HLK-LD2450 und ESP32-C3 mit Stromversorgung, UART und Radar-Datenpfad"></a>
+
 ## Verwendete Befestigungsteile
 
 | Teil | Spezifikation | Bezugslink |
 |---|---|---|
 | Heat-Set-Insert | M1.6 × 2.5 | [CNCKitchen: Heat Set Insert M1.6 × 2.5](https://cnckitchen.store/products/heat-set-insert-m1-6-100-pieces-kopie) |
 | Installation Tip | M1.6 × 1 | [CNCKitchen: Installation Tips (Sammlung; der konkrete M1.6-×-1-Einsatz ist nicht separat archiviert)](https://cnckitchen.store/collections/soldering-tips-and-sets) |
-| QUARKZMAN-Holzschrauben | M1.6 × 8 mm, Schlitz-Rundkopf, Messing, selbstschneidend, 40 Stück | [eBay: QUARKZMAN M1.6 × 8 mm](https://www.ebay.de/itm/147225076300) |
+| QUARKZMAN-Holzschrauben | M1.6 × 8 mm, Schlitz-Rundkopf, Messing, selbstschneidend, 40 Stück | — |
 
 Die `40 Stück` entsprechen der für diesen Aufbau dokumentierten Beschaffung.
 Händlerangebote und Packungsgrößen können sich ändern. Die Links sind daher

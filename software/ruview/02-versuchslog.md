@@ -203,7 +203,7 @@ G3 ist kein erfolgreicher Ortungsnachweis. Der Test belegt jedoch, dass die näc
 **Nachweis**
 
 - [Screenshot](skizzen/screenshots/2026-07-18_18-54-33_fixed-room-live-sensing-failure.png)
-- [Ausführliche Diagnose](results/2026-07-18_fester-raum_live-visualisierung_diagnose.md)
+- [Ausführliche Diagnose](../../experiment-reports/2026-07-18_fester-raum_live-visualisierung-diagnose/README.md)
 
 ### Mess-ID: D5-Live — Reale Leerraumkalibrierung und still sitzende Person
 
@@ -235,4 +235,4 @@ Der reale D5-Positivtest ist mit 0,0 % Still-Recall nicht bestanden. D5 bleibt d
 
 **Nachweis**
 
-- [Ausführliche Auswertung](results/2026-07-26_D5_realer-still-livetest.md)
+- [Ausführliche Auswertung](../../experiment-reports/2026-07-26_D5_still-livetest/README.md)

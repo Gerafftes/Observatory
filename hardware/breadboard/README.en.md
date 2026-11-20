@@ -2,18 +2,29 @@
 
 [Deutsch](README.md)
 
-This page collects the files and sourcing references for the provisional mmWave
-breadboard setup. It is the central link for the CAD file, photo, fastening
-hardware, and additional mmWave components.
+This page documents the provisional HLK-LD2450 and ESP32-C3 breadboard
+variant, its fastening hardware, and additional capacitors. The full setup
+intends two separate ESP32-C3/LD2450 reference nodes; their joint acceptance
+remains open. [Hardware overview](../README.en.md).
 
-## CAD and setup photo
+## Setup and CAD scope
 
-- [Breadboard-Body.stl](Breadboard-Body.stl) — CAD file for the breadboard body
+The breadboard body CAD file belongs to a separate hardware source package
+and is not included in this documentation snapshot. The photo does not replace
+wiring, printing, or device checks.
 
 <img src="../../project-media/mmwave-breadboard-setup.jpeg" alt="Provisional breadboard setup with HLK-LD2450 and ESP32-C3" width="700">
 
 The photo documents the provisional setup with the HLK-LD2450 and ESP32-C3.
 Print orientation, material, and fit have not yet been validated.
+
+## Wiring and data path
+
+The HLK-LD2450 sends data to the ESP32-C3 over UART. The ESP32-C3
+forwards radar data over Wi-Fi to UDP port `55010` on the sensing server.
+The browser connects to the server over HTTP and WebSocket.
+
+<a href="../../project-media/mmwave-breadboard-wiring.png"><img src="../../project-media/mmwave-breadboard-wiring.png" alt="HLK-LD2450 and ESP32-C3 wiring with power, UART, and the radar data path"></a>
 
 ## Fastening hardware used
 
@@ -21,7 +32,7 @@ Print orientation, material, and fit have not yet been validated.
 |---|---|---|
 | Heat-set insert | M1.6 × 2.5 | [CNCKitchen: Heat Set Insert M1.6 × 2.5](https://cnckitchen.store/products/heat-set-insert-m1-6-100-pieces-kopie) |
 | Installation tip | M1.6 × 1 | [CNCKitchen: Installation Tips (collection; the exact M1.6 × 1 tip is not archived separately)](https://cnckitchen.store/collections/soldering-tips-and-sets) |
-| QUARKZMAN wood screws | M1.6 × 8 mm, slotted round head, brass, self-tapping, 40 pieces | [eBay: QUARKZMAN M1.6 × 8 mm](https://www.ebay.de/itm/147225076300) |
+| QUARKZMAN wood screws | M1.6 × 8 mm, slotted round head, brass, self-tapping, 40 pieces | — |
 
 The documented `40 pieces` is the quantity procured for this setup. Seller
 listings and pack sizes can change. The links are sourcing/comparison links,

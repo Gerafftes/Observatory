@@ -2,53 +2,31 @@
 
 [Deutsch](experiment-cockpit.md)
 
-This page describes the UI views and reproducible flow for the setup profile,
-WiFi baseline, mmWave reference, blind captures, and evaluation.
+The live and workflow views were captured on 7 November 2026. The CAD view uses a separate demo profile.
 
-## mmWave calibration assistant
+![Current experiment cockpit showing live status.](../project-media/ui/experiment-cockpit-live-20261107.jpg)
 
-The assistant guides the operator through connection, alignment, coverage,
-zones, training, blind testing, and results. The screenshot shows the tested
-`Server unreachable` error state with HTTP 502, not a connected radar capture.
+## Room setup
 
-<img src="../project-media/ui/mmwave-calibration-server-unreachable.png" alt="Seven-step mmWave calibration assistant showing an unreachable server and HTTP 502 status" width="900">
+![CAD view of a demo room with TX, RX, and radar markers.](../project-media/ui/experiment-cockpit-room-demo.jpg)
 
-## Experiment cockpit
+The demo room is 6 × 4 m with a ceiling height of 2.60 m. During an experiment, the run can retain its sealed geometry.
 
-The cockpit keeps the setup profile, WiFi workflow, recordings, and the
-separate mmWave reference visible in one place. The screenshots come from a
-simulated run with no sensors connected.
+## Workflow phases
 
-<img src="../project-media/ui/experiment-cockpit-setup.png" alt="Experiment cockpit with setup profile, status overview, and simulated hardware state" width="900">
+![Workflow phases with the historical run blocked by the runtime-seal gate.](../project-media/ui/experiment-cockpit-workflow-20261107.jpg)
 
-<img src="../project-media/ui/experiment-cockpit-guide.png" alt="Experiment cockpit showing room, TX, and RX positions while the mmWave reference waits" width="900">
+The visible older run has no valid runtime seal and is blocked from continuing.
 
-<img src="../project-media/ui/experiment-cockpit-workflow-guide.png" alt="Experiment cockpit workflow guide with ten locked or ready phases" width="900">
+## Workflow and limits
 
-## Short guide
+1. Save room dimensions, TX/RX positions and an immutable profile revision.
+2. Bind an experiment run to that revision. A saved profile alone is not an active runtime seal.
+3. A real measurement needs the complete setup binding, appropriate identities and live gates. A demo cannot substitute for that evidence.
+4. Prepare an empty WiFi baseline and separate mmWave calibration. Missing RX means no valid fingerprints; missing radar means the reference remains waiting.
+5. Keep blind captures separate from the reference. Register and hash-bind prediction first, then reveal truth.
+6. Evaluate accuracy, coverage, distance error, unknown/ambiguous states and quality gates. Without real data the report remains `SOFTWARE-ONLY / UNVALIDATED`.
 
-1. **Open the setup profile:** Enter room dimensions (length/height/width),
-   the TX position, and RX1–RX4 positions, then click **Save new profile
-   version**.
-2. **Create an experiment run:** Enter a run name, select the saved profile,
-   and click **Create WiFi experiment**.
-3. **Seal the setup:** The guide stores the profile and hash for this run.
-   This is a software-only step.
-4. **Empty WiFi baseline:** Keep the room empty, start and finish the empty
-   calibration. Without CSI nodes, the system stops at **too few RX
-   fingerprints**.
-5. **mmWave calibration:** The radar supplies separate position packets,
-   coverage, and CSI time alignment. Without the sensor, the status remains
-   **Waiting for mmWave**.
-6. **Blind test:** Generate a reproducible order and collect new CSI captures
-   without ground truth. Without RX nodes there are no valid captures; the
-   software demo can only show the flow.
-7. **Keep prediction and truth separate:** Register only the WiFi prediction
-   first, then reveal the separate radar/position truth.
-8. **Evaluate and report:** Compare accuracy, coverage, error distance,
-   confusion matrix, and quality gates, then write the report. Without
-   hardware it remains explicitly **SOFTWARE-ONLY / UNVALIDATED** and proves
-   no real measurement quality.
+The recorded mmWave assistant covers connection, alignment, coverage, zones, training, blind testing and results. The former HTTP-502/offline image remains a historical error-state record in the software documentation.
 
-> [!NOTE]
-> The screenshots and demo flow document software states. They do not prove a connected radar, valid CSI captures, or real positioning accuracy.
+The [interface guide](../docs/user-guide/interface.md) separates simulation, display and measurement evidence. The [historical experiment guide](ruview/ui/observatory/EXPERIMENT_SETUP_GUIDE.md) describes setup/run binding; the [live data contract](ruview/ui/observatory/LIVE_DATA_CONTRACT.md) constrains discrete display. These contracts do not establish continuous WiFi positioning or joint acceptance of two radars. The linked detailed guides are in German except for the live data contract.

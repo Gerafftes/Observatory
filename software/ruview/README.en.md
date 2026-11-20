@@ -57,7 +57,7 @@ The three most important entry points are:
 
 1. [Current D6/mmWave status](08-aktueller-arbeitsstand-d6-und-position.md)
 2. [Result reports](results/)
-3. [PCB-01 manufacturing files](hardware/pcb-01/)
+3. [PCB-01 manufacturing files](../../hardware/pcb-01/)
 
 The RX firmware and sensing server are based on the separate upstream project
 [ruvnet/RuView](https://github.com/ruvnet/RuView). The local project changes
@@ -165,19 +165,20 @@ The assistant guides the operator through connection, alignment, coverage,
 zones, training, blind testing, and results. The screenshot shows the tested
 `Server unreachable` error state with HTTP 502, not a connected radar capture.
 
-<img src="images/ui/mmwave-calibration-server-unreachable.png" alt="Seven-step mmWave calibration assistant showing an unreachable server and HTTP 502 status" width="900">
+[Historical HTTP-502 screenshot](images/ui/mmwave-calibration-server-unreachable.png)
 
 ### Experiment cockpit
 
-The new cockpit keeps the setup profile, WiFi workflow, recordings, and the
-separate mmWave reference visible in one place. The screenshots below come
-from a simulated run with no sensors connected.
+The cockpit keeps the setup profile, WiFi workflow, recordings, and the
+separate mmWave reference visible in one place. The live and workflow views show the UI on
+7 November 2026, including the blocked older run. The CAD view uses a demo
+profile with fictional room dimensions and sensor positions.
 
-<img src="images/ui/experiment-cockpit-setup.png" alt="Experiment cockpit with setup profile, status overview, and simulated hardware state" width="900">
+<img src="../../project-media/ui/experiment-cockpit-live-20261107.jpg" alt="Current experiment cockpit with live status" width="900">
 
-<img src="images/ui/experiment-cockpit-guide.png" alt="Experiment cockpit showing room, TX, and RX positions while the mmWave reference waits" width="900">
+<img src="../../project-media/ui/experiment-cockpit-room-demo.jpg" alt="CAD demo room with TX, RX, and radar markers" width="900">
 
-<img src="images/ui/experiment-cockpit-workflow-guide.png" alt="Experiment cockpit workflow guide with ten locked or ready phases" width="900">
+<img src="../../project-media/ui/experiment-cockpit-workflow-20261107.jpg" alt="Workflow phases with the historical run blocked by the runtime-seal gate" width="900">
 
 #### Short guide
 
@@ -248,11 +249,11 @@ physical setup
 
 Key evidence:
 
-- [D5: offline replay and experimental presence calibration](results/2026-07-26_D5_offline-replay-und-experimentelle-praesenzkalibrierung.md)
-- [D5: real still-presence live test](results/2026-07-26_D5_realer-still-livetest.md)
+- [D5: offline replay and experimental presence calibration](../../experiment-reports/2026-07-26_D5_offline-replay-und-praesenzkalibrierung/README.md)
+- [D5: real still-presence live test](../../experiment-reports/2026-07-26_D5_still-livetest/README.md)
 - [D6: setup capture and TX firmware identity](results/2026-08-09_D6_setupaufnahme-und-TX-firmwareidentitaet.md)
-- [D6: setup seal and preflight](results/2026-08-09_D6_setup-siegel-und-preflight.md)
-- [D6: sidecar fix, resealing, and empty-room calibration](results/2026-08-09_D6_sidecar-fix-neusiegelung-und-preflight.md)
+- [D6: setup seal and preflight](../../experiment-reports/2026-08-09_D6_setup-siegel-und-preflight/README.md)
+- [D6: sidecar fix, resealing, and empty-room calibration](../../experiment-reports/2026-08-09_D6_sidecar-fix-neusiegelung-und-preflight/README.md)
 
 ## Hardware
 
@@ -266,14 +267,14 @@ manufacturing preview shows the board revision used by the project:
 
 <img src="images/pcb-01-preview.webp" alt="PCB-01 manufacturing preview with ESP32-C3 footprint, C1, C2, and connector U2" width="460">
 
-The [PCB-01 Gerber and drill files](hardware/pcb-01/) are available in this
+The [PCB-01 Gerber and drill files](../../hardware/pcb-01/) are available in this
 repository with a SHA-256 checksum and manufacturing note.
 
 The external MakerWorld model
 [*ESP32 S3 Wroom Case*](https://makerworld.com/de/models/1456361-esp32-s3-wroom-case#profileId-1517915)
 is intended as an enclosure for the ESP32-S3 boards. Its MakerWorld Standard
 Digital File License does not permit redistributing the STL through this
-repository. See [`hardware/esp32-s3-case/`](hardware/esp32-s3-case/) for the
+repository. See [`hardware/esp32-s3-case/`](../../hardware/esp32-s3-case/) for the
 source and usage note.
 
 ## Documentation
@@ -287,13 +288,13 @@ German.
 | [`01-projektjournal.md`](01-projektjournal.md) | Chronological development journal |
 | [`02-versuchslog.md`](02-versuchslog.md) | Experiments performed |
 | [`03-messprotokoll.md`](03-messprotokoll.md) | Measurement procedures and quality rules |
-| [`04-auswertung-bis-problemfrage.md`](04-auswertung-bis-problemfrage.md) | Analysis organized around the research question |
+| [`04-auswertung-bis-problemfrage.md`](../../docs/project/04-auswertung-bis-problemfrage.md) | Analysis organized around the research question |
 | [`05-erfolge-niederlagen-und-aenderungen.md`](05-erfolge-niederlagen-und-aenderungen.md) | Successes, failures, and changes in direction |
 | [`06-ruview-anpassungen.md`](06-ruview-anpassungen.md) | Local changes to RuView |
 | [`07-screenshot-nachweise.md`](07-screenshot-nachweise.md) | Visual evidence and failure screenshots |
 | [`08-aktueller-arbeitsstand-d6-und-position.md`](08-aktueller-arbeitsstand-d6-und-position.md) | Authoritative D6/mmWave handoff |
 | [`results/`](results/) | Detailed result reports |
-| [`templates/messblatt.md`](templates/messblatt.md) | Measurement-sheet template |
+| [`templates/messblatt.md`](../../measurement-templates/messblatt.md) | Measurement-sheet template |
 
 ## License
 

@@ -1,5 +1,7 @@
 # 04 Auswertung bis zur Beantwortung der Problemfrage
 
+Öffentlicher historischer Auswertungsplan. Beobachtungen tragen ihr damaliges Datum; geplante Auswertungen und erwartete Aussagen sind keine neuen Messergebnisse. Die spätere [D4/D5/D6-Auswertung](../../experiment-reports/2026-08-23_D4-D5-D6_technischer-bericht/README.md) ergänzt diesen Stand.
+
 ## Problemfrage
 
 Wie zuverlässig kann ein ESP32-basiertes WLAN-CSI-System Bewegungen und Atemrhythmen im Raum erfassen, und welche physikalischen Grenzen ergeben sich dabei?
@@ -33,7 +35,7 @@ Diese Werte sind noch keine Trefferquote, weil die reale Situation nicht sauber 
 Pilotmessung A0/A1/A2 vom 2026-06-26:
 
 - Eine erste gelabelte Messung mit nur einem RX zeigte noch keine robuste Trennung der Phasen.
-- Im ungefähr markierten Leerraum-Abschnitt wurde `presence=True` in ca. 81% der Zeilen ausgegeben. Das ist eine hohe False-Positive-Rate.
+- Im nur ungefähr markierten Leerraum-Abschnitt wurde `presence=True` in ca. 81% der Zeilen ausgegeben. Wegen der unzureichenden Labelung ist dies ein historischer Ausgabeanteil, keine belastbare Leerraum-Fehlerrate.
 - Ruhiges Stehen lag bei ca. 92% `presence=True`, langsames Gehen bei ca. 78% `presence=True`.
 - Die mittleren Feature-Werte der drei Phasen lagen relativ nah beieinander. Das spricht dafür, dass die aktuelle Einzel-Link-Geometrie und Linkqualität noch nicht ausreichen, um zuverlässig zu klassifizieren.
 
@@ -134,5 +136,7 @@ WLAN kann Menschen exakt und zuverlässig wie Radar erfassen.
 Sondern eher:
 
 ```text
-WLAN-CSI kann Bewegung und ruhige Atmung unter kontrollierten Bedingungen sichtbar machen. Die Zuverlässigkeit hängt stark von Position, Funkpfaden, Raum, Bewegung und Anzahl der Personen ab. Für robuste Ortung und Atemmessung sind mehrere Empfänger, Kalibrierung und Referenz-/Qualitätsbewertung nötig.
+Als zu prüfende Arbeitshypothese gilt: WLAN-CSI kann Bewegung und ruhige Atmung unter kontrollierten Bedingungen sichtbar machen. Die Zuverlässigkeit hängt stark von Position, Funkpfaden, Raum, Bewegung und Anzahl der Personen ab. Für robuste Ortung und Atemmessung sind mehrere Empfänger, Kalibrierung und Referenz-/Qualitätsbewertung nötig.
 ```
+
+Ein validierter Atemfrequenznachweis, ein kontrollierter Routervergleich und belastbare Live-Positionierung sind mit den hier genannten Beobachtungen nicht belegt.

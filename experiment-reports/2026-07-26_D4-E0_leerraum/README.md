@@ -1,5 +1,7 @@
 # D4/E0-Mischlauf — 2026-07-26
 
+> Öffentliche Darstellung des datierten Originalberichts. Die damaligen Ergebniszahlen und methodischen Grenzen bleiben erhalten; Geräte-/Netzidentitäten und lokale Nachweispfade sind ausgelassen. Beschriebene Folgeschritte sind historisch und erteilen keine aktuelle Gerätefreigabe.
+
 > **Nachträglicher Gültigkeitshinweis:** Der Raum wurde während der Aufnahme zweimal kurz betreten. Der Lauf ist deshalb keine reine Leerraum-Baseline und darf nicht zur Festlegung von Schwellen oder zur Berechnung einer Leerraum-Fehlerrate verwendet werden. Die Messung bleibt als dokumentierter Mischlauf erhalten.
 
 ## Ziel
@@ -8,16 +10,14 @@ Geplant war ein Leerraumtest nach der D4-Änderung und dem TX-MAC-Filter auf all
 
 ## Aufbau
 
-- 1 kontrollierter TX, Absender-MAC `02:00:00:00:00:04`
+- 1 kontrollierter TX mit festgelegtem Absender; die Adresse wird nicht veröffentlicht
 - 4 RX mit aktivem Filter auf diese TX-MAC
 - fester Raumaufbau mit korrigierter TX-/RX-Geometrie
 - RuView-Sensing-Server mit D4-Bewegungsmetrik
 - geplanter Leerraumlauf; während der 60 Sekunden zweimal kurz betreten
 - Abfrageintervall 250 ms
 
-Rohdaten:
-
-`data/raw/2026-07-26_21-05-50_E0_leerer_raum_D4_alle_RX_TX_MAC_Filter/`
+Die Rohdaten des historischen Mischlaufs sind nicht Bestandteil dieser öffentlichen Darstellung.
 
 ## Datenqualität
 
@@ -79,4 +79,4 @@ Die globale Aggregation verlangt für Bewegung ein Quorum von mindestens zwei de
 
 Der Lauf deutet darauf hin, dass D4 die zuvor dominierende grobe Bewegungsaktivität reduziert. Wegen der zwei nicht zeitlich markierten Raumzutritte ist aber weder ein Bestehen noch ein Scheitern von E0 ableitbar. Insbesondere dürfen die 45,6 % `PRESENT_STILL` nicht als Leerraum-Fehlerrate bezeichnet werden.
 
-Zuerst muss E0 als vollständig ununterbrochener 60-Sekunden-Leerraumlauf wiederholt werden. Danach folgt ein kontrollierter Lauf mit still sitzender Person. Erst der Vergleich dieser beiden gültigen Läufe zeigt, ob eine Quorum-Regel, eine höhere Präsenzschwelle oder eine andere zeitliche Logik Still-Anwesenheit trennt, ohne echte stille Personen zu verlieren.
+Der damals geforderte nächste Schritt war ein vollständig ununterbrochener 60-Sekunden-Leerraumlauf, anschließend ein kontrollierter Positivlauf mit still sitzender Person. Die dokumentierte Leerraum-Wiederholung steht im [E0b-Bericht](../2026-07-26_D4-E0b_sauberer-leerraum/README.md). Sie macht den hier beschriebenen Mischlauf nicht nachträglich zu einer gültigen Leerraum-Baseline.

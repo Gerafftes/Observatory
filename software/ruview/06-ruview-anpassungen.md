@@ -158,7 +158,7 @@ Nach mittigem Aufstellen des Macs wurde E0b unter ansonsten gleichen Bedingungen
 
 Der Mac-Standort ist damit für RX4 ein nachgewiesener starker Einflussfaktor. Ob der Effekt durch Funkaktivität oder durch das geänderte Multipfadfeld von Gehäuse und Kabeln entsteht, ist mit diesem einzelnen A/B-Wechsel noch nicht getrennt. Für folgende Tests bleibt der Mac mittig.
 
-Ausführliche Auswertung: [results/2026-07-26_E0b-E0c_mac-position-ab-test.md](results/2026-07-26_E0b-E0c_mac-position-ab-test.md)
+Ausführliche Auswertung: [results/2026-07-26_E0b-E0c_mac-position-ab-test.md](../../experiment-reports/2026-07-26_E0b-E0c_mac-position-ab-test/README.md)
 
 ### E1: Link-spezifische Trennung stiller Anwesenheit
 
@@ -173,7 +173,7 @@ Bei RX4 blieb der erhöhte Wert bis zum Ende der Aufnahme bestehen. Eine vorläu
 
 Konsequenz: Die Präsenzlogik sollte nicht alle RX mit einer identischen Schwelle und ODER-Verknüpfung behandeln. Benötigt werden per-RX-Leerraumreferenzen, eine Fusion der relativen Abweichungen und eine zeitliche Mindestdauer. Der Schwellenkandidat muss mit einem neuen Laufpaar bestätigt werden.
 
-Ausführliche Auswertung: [results/2026-07-26_E0c-E1_still-person-separation.md](results/2026-07-26_E0c-E1_still-person-separation.md)
+Ausführliche Auswertung: [results/2026-07-26_E0c-E1_still-person-separation.md](../../experiment-reports/2026-07-26_E0c-E1_still-person-separation/README.md)
 
 ### E0d/E1b: unabhängige Prüfung verwirft RX4-Festschwelle
 
@@ -186,7 +186,7 @@ RX3 zeigte dagegen in beiden Paaren einen Anstieg des geglätteten Minutenmittel
 
 RX2 demonstrierte zugleich Link-Instabilität: In E0d meldete es im leeren Raum in 83,5 % der Samples Präsenz. Die nächste Serveränderung muss deshalb per-RX-Referenzen, längere Zeitfenster und eine Zuverlässigkeitsbewertung kombinieren. Eine feste RX4-Schwelle wird nicht implementiert.
 
-Ausführliche Auswertung: [results/2026-07-26_E0d-E1b_unabhaengige-bestaetigung.md](results/2026-07-26_E0d-E1b_unabhaengige-bestaetigung.md)
+Ausführliche Auswertung: [results/2026-07-26_E0d-E1b_unabhaengige-bestaetigung.md](../../experiment-reports/2026-07-26_E0d-E1b_unabhaengige-bestaetigung/README.md)
 
 ## D5: experimentelle Leerraumreferenz und RX-Quorum
 
@@ -221,7 +221,7 @@ Vor dem physischen Livetest bestanden 709 Rust-Tests, 7 Python-Replayer-Tests, d
 
 Der Offline-Replay ist positiv, aber wegen nur zwei Laufpaaren, einer Sitzung und einer Sitzposition noch kein Produktionsnachweis. Die Parameter werden vor den nächsten blinden Leerraum-/Still-Läufen eingefroren.
 
-Ausführliche Auswertung: [results/2026-07-26_D5_offline-replay-und-experimentelle-praesenzkalibrierung.md](results/2026-07-26_D5_offline-replay-und-experimentelle-praesenzkalibrierung.md)
+Ausführliche Auswertung: [results/2026-07-26_D5_offline-replay-und-experimentelle-praesenzkalibrierung.md](../../experiment-reports/2026-07-26_D5_offline-replay-und-praesenzkalibrierung/README.md)
 
 ### Reale D5-Validierung
 
@@ -242,7 +242,7 @@ Die technische Fail-closed-Regel arbeitete wie vorgesehen, weil eine einzelne RX
 
 D5 bleibt experimentell und wird nicht als Standard aktiviert. Das Quorum wird ohne neuen zugehörigen Leerraumlauf nicht gelockert, da eine Ein-RX-Regel die bereits gemessenen Leerraum-Fehlalarme wieder zulassen könnte.
 
-Ausführliche Auswertung: [results/2026-07-26_D5_realer-still-livetest.md](results/2026-07-26_D5_realer-still-livetest.md)
+Ausführliche Auswertung: [results/2026-07-26_D5_realer-still-livetest.md](../../experiment-reports/2026-07-26_D5_still-livetest/README.md)
 
 ## D6 und diskrete Positionspipeline vom 2026-07-29
 

@@ -48,3 +48,5 @@ Preview:
 The KiCad source files in this folder are included so the revision can be inspected or edited.
 
 These checks validate the PCB files and connectivity. They do not prove that the existing ESP or LD2450 hardware is functional.
+
+Der frühere [CAD-/Gerber-Exportbestand](../mmwave-PCB/PCB-02/gerber/) bleibt an seinem bisherigen Ort erhalten. Diese historische Ablage wird nicht verschoben; der gepflegte Bestell- und Prüfberichtseinstieg ist dieses Verzeichnis.

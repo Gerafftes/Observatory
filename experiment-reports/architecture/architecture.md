@@ -1,5 +1,7 @@
 # Wie Observatory funktioniert
 
+> Historische Architektur des diskreten D6-/P01–P09-Ansatzes mit damaligem mmWave-ACK-Vertrag. Der gepflegte [Architektureinstieg](../../docs/software/architecture.md) unterscheidet aktuelle Ziele und gespeicherte Nachweise.
+
 [English](architecture.en.md)
 
 WLAN-Signale verändern sich durch Reflexion, Abschattung und Multipath. Ein
@@ -16,7 +18,9 @@ Der mmWave-Sensor dient nur als unabhängige Referenz für Kalibrierung und
 Blindbewertung. Dadurch wird verhindert, dass der WLAN-CSI-Prädiktor während
 des Tests indirekt die richtige Antwort erhält.
 
-## Aktuelle mmWave-Verbindung
+<a id="aktuelle-mmwave-verbindung"></a>
+
+## Damals dokumentierte mmWave-Verbindung
 
 Der mmWave-Node sendet jede Radarmessung mit `node_id`, `boot_id`, `sequence`
 und lokalen Rohkoordinaten per UDP. Der Server bestätigt die konkrete
@@ -31,15 +35,13 @@ Setup-v2-Transform auf die Rohkoordinaten an. Bereits transformierte
 Paketfelder bleiben nur für ältere Empfänger und Standalone-Diagnostik
 erhalten.
 
-Die folgenden Bklit-artigen Schaubilder dokumentieren diese implementierten
+Das folgende Schaubild und die obige Textbeschreibung dokumentieren diese damaligen
 Verträge. Sie enthalten bewusst keine neuen Messwerte und belegen weder
 Paketverlustfreiheit noch Positionsgenauigkeit.
 
 ![ACK-Verbindungsfluss vom LD2450 bis zum Sensing Server](figures/mmwave-connection/01-ack-verbindungsfluss.png)
 
-![Adaptives Timeout- und Retry-Modell](figures/mmwave-connection/02-timeout-und-retry.png)
 
-![Serverseitige Verantwortung für die Raumtransformation](figures/mmwave-connection/03-transform-verantwortung.png)
 
 ```text
 physischer Aufbau

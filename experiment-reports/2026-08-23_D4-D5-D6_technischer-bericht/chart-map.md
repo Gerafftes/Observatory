@@ -8,3 +8,9 @@
 | `figures/04-d6-rx-frameraten.png` | Are all receivers represented at plausible throughput? | D6 raw host timestamps and frame counts | per-RX frames divided by whole-file raw span | Bklit grouped bar chart for five setup-bound recordings | inspected; five recordings and four RX series visible |
 
 Design constraints: zero-based axes, restrained neutral palette from Bklit tokens, direct labels where interpretation matters, no smoothed trend lines, no hidden denominators. The current figures were rendered with the official Bklit UI source and visually inspected as PNGs; the maintained exports live beside this report in `figures/`.
+
+## Historischer Exportkontext
+
+Die vier ursprünglichen Bklit-Dateinamen waren `01_globaler_vergleich.png`, `02_D4_RX_leerraum_heatmap.png`, `03_D5_live_RX_linkwechsel.png` und `04_D6_RX_frameraten.png`; sie entsprechen in dieser Reihenfolge den vier oben genannten Paketbildern. [Bklit-Exporte](../../software/ruview/results/2026-08-27_D4-D5-D6_bklit_figures/) und [ursprüngliche Software-Abbildungen](../../software/ruview/results/2026-08-23_D4-D5-D6_figures/) bleiben unverändert erhalten.
+
+Die Tabellenformulierung „five setup-bound recordings“ gehört zum damaligen Diagrammvertrag: Die detaillierte Berichtstabelle unterscheidet tatsächlich vier setupgebundene Aufnahmen und eine Discovery-Inventur ohne Setupbindung. Bildwerte und ursprüngliche QA-Angaben werden dadurch nicht rückwirkend zu einer neuen Messung.

@@ -2,60 +2,40 @@
 
 [Deutsch](README.md)
 
-The WiFi CSI setup consists of five ESP32-S3 boards. A separate ESP32-C3 board
-connects the HLK-LD2450 as an independent mmWave reference sensor.
+The WiFi CSI setup consists of five ESP32-S3 boards. Two separate ESP32-C3
+nodes, each with an HLK-LD2450, are intended for the independent mmWave
+reference; their joint acceptance remains open. The [hardware overview](../docs/hardware/overview.md)
+describes the complete setup (German).
 
-## Reference sensor
+## Board revisions
 
-<img src="../project-media/hlk-ld2450-mmwave-sensor.jpeg" alt="HLK-LD2450 24 GHz mmWave reference sensor" width="560">
+**PCB-03 is the intended current revision.** PCB-01 and PCB-02 remain historical
+predecessors. PCB-03 corrects the LD2450 orientation by 180° relative to PCB-02,
+keeps the SMD capacitors, and preserves the outer dimensions and mounting holes
+of the earlier revisions.
 
-## PCBs
+![PCB-03 documented top view](pcb-03/preview/PCB-03-top.png)
 
-PCB-01 connects the ESP32-C3 to the mmWave reference path. The following
-manufacturing preview documents the earlier board revision:
+The [PCB-03 page](pcb-03/README.md) records geometry and UART mapping.
+KiCad projects, POC schematics, Gerber/drill data, and ordering archives belong
+to a separate hardware source package; they are not included in this
+documentation snapshot. The preview establishes no DRC, manufacturing, fit,
+or device acceptance result.
 
-<img src="../project-media/pcb-01-preview.webp" alt="PCB-01 manufacturing preview with ESP32-C3 footprint, C1, C2, and connector U2" width="560">
+## Breadboard variant
 
-The [PCB-01 Gerber and drill files](pcb-01/) are available with a SHA-256
-checksum and manufacturing note.
+![Provisional HLK-LD2450 and ESP32-C3 setup](../project-media/mmwave-breadboard-setup.jpeg)
 
-The final [PCB-03 with KiCad sources, validation reports, and ordering archive](pcb-03/)
-applies the corrected 180° LD2450 orientation, keeps the SMD capacitors, and
-preserves the PCB-01/PCB-02 outer dimensions and mounting-hole positions.
-
-PCB-02 remains documented as the previous revision.
-
-The complete KiCad project sources are under `hardware/`: [PCB-01](pcb-01/), [PCB-02](pcb-02/), [PCB-03](pcb-03/), and [POC schematics](poc/). The [KiCad entry guide](KICAD.md) lists the project files and required libraries.
-
-> [!IMPORTANT]
-> **PCB-03 is the required revision for the current setup.** PCB-01 and PCB-02 remain documented as previous revisions.
-
-## Breadboard setup
-
-The comparison below shows the current PCB-03 revision next to the temporary
-breadboard setup:
-
-<table>
-<tr>
-<td><img src="pcb-03/preview/PCB-03-top.png" alt="PCB-03 top view with ANT KEEP CLEAR, USB connector, U1, C1, and C2" width="460"><br><strong>PCB-03 — current revision</strong><br>This final board is the one to use for the current mmWave setup.</td>
-<td><img src="../project-media/mmwave-breadboard-setup.jpeg" alt="Temporary breadboard setup with HLK-LD2450 and ESP32-C3" width="460"><br><strong>Temporary breadboard setup</strong><br>The photo documents the provisional mmWave wiring on the breadboard.</td>
-</tr>
-</table>
-
-All files and sourcing references are collected on the separate
-[breadboard page](breadboard/README.en.md): STL, setup photo, heat-set insert,
-installation tip, wood screws, and both mmWave capacitors.
-
-The page also documents the used quantities and the still-open validation items
-for printing, insertion temperature, and fit.
+The photo documents the provisional breadboard variant. The
+[breadboard page](breadboard/README.en.md) lists fastening hardware, capacitors,
+and open checks for printing, insertion temperature, and fit. It is not an
+assembly guide with an accepted result.
 
 ## ESP32-S3 enclosure
 
 The external MakerWorld model
 [*ESP32 S3 Wroom Case*](https://makerworld.com/de/models/1456361-esp32-s3-wroom-case#profileId-1517915)
-by MakerWorld user [`aiekick`](https://makerworld.com/de/@aiekick) is intended as
-an enclosure for the ESP32-S3 boards.
-
-The source page lists the model under the **MakerWorld Standard Digital File
-License**, so the STL is not redistributed in this repository. See
-[`esp32-s3-case/`](esp32-s3-case/) for the usage note.
+by [`aiekick`](https://makerworld.com/de/@aiekick) is the intended enclosure.
+The documented source revision lists the **MakerWorld Standard Digital File
+License**. The STL is not redistributed here; check the current license at the
+source. This does not establish enclosure fit or device acceptance.

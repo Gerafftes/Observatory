@@ -1,5 +1,7 @@
 # 08 Aktueller Arbeitsstand: D6 und Positionsbestimmung
 
+> Historischer Entwicklungsstand vom 14. August 2026. Der heutige Überblick steht im [Projektstatus](status.md). Die damalige Wiedereinstiegsrolle und Freigaben gelten nur in ihrem ursprünglichen Kontext.
+
 Stand: 2026-08-14
 
 Dieses Dokument ist der verbindliche Wiedereinstiegspunkt für die laufende

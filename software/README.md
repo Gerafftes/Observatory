@@ -1,17 +1,6 @@
 # Observatory software source
 
-`software/ruview/` contains the complete source snapshot used by Observatory:
-
-- the browser UI under `ui/`
-- the Rust workspace and sensing backend under `v2/`
-- the ESP32 CSI and mmWave firmware under `firmware/`
-- the historical Python backend under `archive/v1/`
-- scripts, tests, architecture documents and D4/D5/D6 implementation paths
-- all eight upstream submodule source trees as ordinary vendored files
-
-A clone of Observatory therefore does not need a second checkout from
-`ruvnet/RuView`. Cargo, npm, Python and ESP-IDF may still download normal
-package dependencies when they are not already cached.
+Dieser öffentliche Dokumentationsstand beschreibt den angepassten RuView-Snapshot. Er enthält Dokumentation und Bilder, keinen ausführbaren Rust-/ESP-IDF-/Browser-Quellbaum. Die folgenden Herkunftsangaben bleiben als datierte Importbindung erhalten.
 
 ## Provenance
 
@@ -31,64 +20,28 @@ at their pinned commits:
 | `v2/crates/ruview-swarm` | `267aba5be2288aa6cbe574492062b04fa8c8a6ce` |
 | `v2/crates/worldgraph` | `fdade422069d3162634292710d78cb9963c0f48d` |
 
-Observatory adaptations include the experiment cockpit and calibration UI,
-RX source binding and recorder/audit paths, RX unified/peer measurement support,
-TX safety and maintenance tools, and local regression tests. See
-[RuView adaptations](../docs/project/06-ruview-anpassungen.md) and the
-[current result report](../docs/project/rx-unified-tag14-result-20261029.md).
+## Veröffentlichte Quellreferenzen
 
-This is a source distribution with the required runtime sources and third-party
-license/notice files. Normal development dependencies are obtained through the
-package managers. Device-specific configuration and recordings are supplied
-locally.
+Am 4. November 2026 wurden sieben Dateiobjekte am veröffentlichten Commit `028f9d3f2703e1f3610e856f48fa0a709647818b` lesend nachgewiesen. Git-Blobhash und Größe stimmen jeweils mit den gebundenen lokalen Bytes überein. Der lokale Commit `840a2e6e186278a29efd78e09c970b3d64591bf2` ist davon verschieden; insbesondere fehlen ihm die Optionen `--rx-session-only` und `--data-dir`.
 
-## Prerequisites
+- [csi_collector.c](https://github.com/Gerafftes/Observatory/blob/028f9d3f2703e1f3610e856f48fa0a709647818b/software/ruview/firmware/esp32-csi-node/main/csi_collector.c)
+- [index.html](https://github.com/Gerafftes/Observatory/blob/028f9d3f2703e1f3610e856f48fa0a709647818b/software/ruview/ui/index.html)
+- [server-control.service.js](https://github.com/Gerafftes/Observatory/blob/028f9d3f2703e1f3610e856f48fa0a709647818b/software/ruview/ui/services/server-control.service.js)
+- [d6_fingerprint.rs](https://github.com/Gerafftes/Observatory/blob/028f9d3f2703e1f3610e856f48fa0a709647818b/software/ruview/v2/crates/wifi-densepose-sensing-server/src/d6_fingerprint.rs)
+- [main.rs](https://github.com/Gerafftes/Observatory/blob/028f9d3f2703e1f3610e856f48fa0a709647818b/software/ruview/v2/crates/wifi-densepose-sensing-server/src/main.rs)
+- [position_capture.rs](https://github.com/Gerafftes/Observatory/blob/028f9d3f2703e1f3610e856f48fa0a709647818b/software/ruview/v2/crates/wifi-densepose-sensing-server/src/position_capture.rs)
+- [server_control.rs](https://github.com/Gerafftes/Observatory/blob/028f9d3f2703e1f3610e856f48fa0a709647818b/software/ruview/v2/crates/wifi-densepose-sensing-server/src/server_control.rs)
 
-- Git and a current stable Rust/Cargo toolchain (locally checked with Rust 1.96).
-- Node.js for the browser's dependency-free `node --test` suite.
-- Python 3.15 for the existing tooling that uses lazy-import syntax.
-- KiCad 10 and its standard libraries for [editable hardware](../hardware/KICAD.md).
-- Firmware builds additionally need the ESP-IDF version and target setup stated
-  in the corresponding firmware guide; simulation does not need ESP-IDF or boards.
+Die Dateiprüfung vom 4. November betraf diese sieben Dateien. Der separate
+Schnellstarttest umfasste Build und Start in einem frischen Checkout des
+GitHub-Commits `11ccc9b`. Die [Installationsanleitung](../docs/setup/installation.md)
+beschreibt den Demo-Aufruf mit eigenem Datenverzeichnis, Loopback und
+abgeschalteten mmWave-Netzwerkdiensten und Steuerungshelfer.
 
-## Build and run
+## Umfang und Lizenzen
 
-From the Observatory repository root:
+Der vollständige Import enthält Rust-Workspace, UI, Firmware, historische Python-Teile und eigene Fremdkomponenten. Paketabhängigkeiten können dort eigene Downloads benötigen. Git-Historien, Caches, Aufnahmen, Konfigurationen und private Provisionierungsdaten sind kein Bestandteil dieses Dokumentationssatzes.
 
-```bash
-cd software/ruview/v2
-cargo check --locked -p wifi-densepose-sensing-server --no-default-features
-WDP_RUFIELD_SIGNING_SEED="$(python3 -c 'import secrets; print(secrets.token_hex(32))')" \
-cargo run --locked -p wifi-densepose-sensing-server --no-default-features -- \
-  --source simulate --rx-session-only --bind-addr 127.0.0.1 \
-  --http-port 3002 \
-  --ws-port 3001
-```
+Lizenz- und Notice-Dateien der jeweiligen Fremdkomponenten gelten für deren Quellbäume; die [Projektlizenz](../LICENSE.md) ersetzt sie nicht. BFLD-/ADR-Verträge und frühere Replay-/Softwaretests sind keine Observatory-Deployment- oder Hardwareabnahme. Hier wurden keine solchen Tests erneut ausgeführt.
 
-Then open `http://127.0.0.1:3002/ui/index.html#sensing`. Simulation binds to loopback and disables mmWave network/control paths.
-The generated signing seed exists only in the demo process environment. A real
-measurement setup needs its own persistent private signing key; never put that
-key in an example file or a commit.
-A first build may need Internet access to download ordinary dependencies.
-
-From the repository root, run the source and browser checks:
-
-```bash
-sh project_tools/verify_observatory_source.sh
-node --test software/ruview/ui/tests/*.test.mjs
-```
-
-`project_tools/csi-host-ip-alias.sh` is an optional macOS operational helper,
-not part of simulation. Its privileged modes require your own TX identity in
-`OBSERVATORY_TX_BSSID`. Installing it is a separate network operation; the
-hardware-free `self-test` never needs that identity.
-
-Simulation and software tests do not prove real CSI, mmWave operation or
-position accuracy. Hardware results remain subject to the setup, preflight,
-calibration and blind-validation gates documented in the repository root.
-
-## Licenses
-
-The vendored source keeps its original `LICENSE`, `LICENSE.md`, `NOTICE` and
-component-level license files. Those files govern their respective source
-trees; the Observatory root license does not replace third-party notices.
+Weiter: [Architektur](../docs/software/architecture.md), [Benutzeranleitung](../docs/user-guide/interface.md) und [öffentliche historische Anpassungen](../docs/project/06-ruview-anpassungen.md).

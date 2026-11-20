@@ -38,11 +38,13 @@ target is still required before sealing a changed transform.
 ## Required proof for the next run
 
 Capture `/api/v1/mmwave/status` immediately before and after the same 25-second
-preflight/session, then run:
+preflight/session. From the repository root, run the
+[runtime audit script](../../software/ruview/scripts/audit_mmwave_runtime.py)
+with the corresponding local artifacts:
 
 ```bash
-python3 project_tools/audit_mmwave_runtime.py \
-  --recording data/mmwave/<SESSION>.mmwave.jsonl \
+python3.15 software/ruview/scripts/audit_mmwave_runtime.py \
+  --recording /absolute/path/to/session.mmwave.jsonl \
   --setup /absolute/path/to/sealed-setup.json \
   --status-before /tmp/mmwave-status-before.json \
   --status-after /tmp/mmwave-status-after.json \
@@ -53,3 +55,5 @@ A passing report requires the sealed node/transform, exact coordinate
 recomputation, no accepted out-of-room target, one stable boot, no sequence
 gap or clock change, and zero server-side rejection, `room_bounds`, packet-loss
 and reboot increments in the measured window.
+
+The earlier software example used `data/mmwave/<SESSION>.mmwave.jsonl` relative to its software working directory. That historical recording-path convention is retained here as provenance; the command above uses explicit absolute input paths. The recorded runtime `FAIL`, required before/after snapshots and all original boundaries remain unchanged.

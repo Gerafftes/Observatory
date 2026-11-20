@@ -2,52 +2,31 @@
 
 [English](experiment-cockpit.en.md)
 
-Diese Seite beschreibt die UI-Ansichten und den reproduzierbaren Ablauf für
-Setup-Profil, WiFi-Baseline, mmWave-Referenz, Blindaufnahmen und Evaluation.
+Die Live- und Workflow-Ansichten stammen vom 7. November 2026. Die CAD-Ansicht zeigt ein separates Demo-Profil.
 
-## mmWave-Kalibrierungsassistent
+![Aktuelles Experiment-Cockpit mit Live-Status.](../project-media/ui/experiment-cockpit-live-20261107.jpg)
 
-Der Assistent führt durch Verbindung, Ausrichtung, Abdeckung, Zonen, Training,
-Blindtest und Ergebnis. Der Screenshot zeigt den geprüften Fehlerzustand
-`Server nicht erreichbar` mit HTTP 502, nicht eine verbundene Radaraufnahme.
+## Raum-Setup
 
-<img src="../project-media/ui/mmwave-calibration-server-unreachable.png" alt="Siebenstufiger mmWave-Kalibrierungsassistent mit nicht erreichbarem Server und HTTP-502-Status" width="900">
+![CAD-Ansicht eines Demo-Raums mit TX-, RX- und Radarmarkern.](../project-media/ui/experiment-cockpit-room-demo.jpg)
 
-## Experiment-Cockpit
+Der Demo-Raum ist 6 × 4 m groß und 2,60 m hoch. Bei einem Versuch kann weiterhin die versiegelte Geometrie des Runs gelten.
 
-Das Cockpit hält Setup-Profil, WiFi-Workflow, Aufnahmen und die getrennte
-mmWave-Referenz in einer Ansicht. Die Aufnahmen stammen aus einem simulierten
-Lauf ohne angeschlossene Sensoren.
+## Workflow-Phasen
 
-<img src="../project-media/ui/experiment-cockpit-setup.png" alt="Experiment-Cockpit mit Setup-Profil, Statusübersicht und simuliertem Hardwarezustand" width="900">
+![Workflow-Phasen mit einem durch das Runtime-Seal-Gate gesperrten historischen Run.](../project-media/ui/experiment-cockpit-workflow-20261107.jpg)
 
-<img src="../project-media/ui/experiment-cockpit-guide.png" alt="Experiment-Cockpit mit Raum-, TX- und RX-Positionen sowie wartender mmWave-Referenz" width="900">
+Der sichtbare ältere Run besitzt kein gültiges Runtime-Seal und ist für die Fortsetzung gesperrt.
 
-<img src="../project-media/ui/experiment-cockpit-workflow-guide.png" alt="Experiment-Cockpit mit Workflow-Guide und zehn gesperrten beziehungsweise freigeschalteten Phasen" width="900">
+## Ablauf und Grenzen
 
-## Kurzanleitung
+1. Raummaße, TX-/RX-Positionen und eine unveränderliche Profilversion speichern.
+2. Einen Experiment-Run an genau diese Profilversion binden. Das Speichern eines Profils ist noch kein aktives Laufzeitsiegel.
+3. Für eine reale Messung die vollständige Setupbindung mit passenden Identitäten und Live-Gates herstellen; eine Demo kann diesen Schritt nicht als Hardwarebeweis ersetzen.
+4. Leere WiFi-Baseline und getrennte mmWave-Kalibrierung vorbereiten. Ohne RX fehlen gültige Fingerprints, ohne Sensor wartet der Radarstatus.
+5. Blindaufnahmen von der Referenz getrennt erfassen. Prediction zuerst registrieren und hashbinden, Truth erst danach aufdecken.
+6. Accuracy, Coverage, Fehlerdistanz, unbekannte/mehrdeutige Zustände und Qualitätsgates auswerten. Ohne echte Daten bleibt der Report `SOFTWARE-ONLY / UNVALIDATED`.
 
-1. **Setup-Profil öffnen:** Raummaße (Länge/Höhe/Breite), TX-Position und
-   RX1–RX4-Positionen eintragen, danach **Neue Profilversion speichern**.
-2. **Experiment-Run anlegen:** Versuchsname und gespeichertes Profil wählen,
-   dann **WiFi-Experiment anlegen**.
-3. **Setup versiegeln:** Der Guide speichert Profil und Hash für diesen Run.
-   Das ist nur ein Software-Schritt.
-4. **Leere WiFi-Baseline:** Raum leer halten, Leerkalibrierung starten und
-   abschließen. Ohne CSI-Nodes stoppt der Ablauf bei **zu wenigen
-   RX-Fingerprints**.
-5. **mmWave-Kalibrierung:** Der Radar liefert separat Positionspakete,
-   Abdeckung und CSI-Zeitbezug. Ohne Sensor bleibt der Status **Wartet auf
-   mmWave**.
-6. **Blindtest:** Eine reproduzierbare Reihenfolge erzeugen und neue CSI-
-   Aufnahmen ohne Ground Truth sammeln. Ohne RX-Nodes gibt es keine gültigen
-   Aufnahmen; der Software-Demo-Run bleibt nur eine Ansicht.
-7. **Prediction und Truth trennen:** Zuerst nur die WiFi-Prediction
-   registrieren, danach die getrennte Radar-/Positionswahrheit aufdecken.
-8. **Evaluation und Report:** Accuracy, Coverage, Fehlerdistanz,
-   Confusion Matrix und Qualitätsgates auswerten und anschließend den Report
-   schreiben. Ohne Hardware bleibt er ausdrücklich
-   **SOFTWARE-ONLY / UNVALIDATED** und beweist keine echte Messqualität.
+Der dokumentierte mmWave-Assistent führt durch Verbindung, Ausrichtung, Abdeckung, Zonen, Training, Blindtest und Ergebnis. Die frühere HTTP-502-/Offline-Aufnahme bleibt als historischer Fehlerzustand in der Softwaredokumentation erhalten.
 
-> [!NOTE]
-> Die Screenshots und der Demo-Ablauf dokumentieren Softwarezustände. Sie sind kein Nachweis eines verbundenen Radars, gültiger CSI-Aufnahmen oder realer Positionsgenauigkeit.
+Die [Benutzeranleitung](../docs/user-guide/interface.md) trennt Simulation, Anzeige und Messnachweis. Der [historische Experimentleitfaden](ruview/ui/observatory/EXPERIMENT_SETUP_GUIDE.md) erklärt die Setup-/Run-Bindung; der [Live-Datenvertrag](ruview/ui/observatory/LIVE_DATA_CONTRACT.md) begrenzt die diskrete Anzeige. Ein vorhandener Bedienablauf ist kein Nachweis kontinuierlicher WiFi-Ortung oder zweier gemeinsam abgenommener Radare.

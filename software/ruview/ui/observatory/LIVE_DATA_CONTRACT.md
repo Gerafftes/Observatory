@@ -1,5 +1,7 @@
 # Observatory live data contract
 
+Public presentation of the recorded discrete-display contract. This is a software contract, not a fresh hardware or positioning acceptance. The implementation/test filenames below refer to the complete source project, not files shipped in this documentation-only set.
+
 This document records what Observatory may present as a real ESP32
 measurement. It is intentionally stricter than accepting any data that arrives
 through an open WebSocket.
@@ -50,7 +52,9 @@ measurement. Its grid must be finite, bounded, exactly match `grid_size`, and
 is scaled to the validated live room dimensions. It is cleared whenever the
 exact hardware position gate fails.
 
-## Regression test
+## Documented regression command
+
+The command belongs to the full source project. It was not run for this documentation assembly; the following case list describes its recorded scope.
 
 Run:
 

@@ -27,3 +27,5 @@ Die Ablage dokumentiert den verwendeten Fertigungsstand. Sie ist kein Ersatz
 für eine erneute DRC-, Lagen- und Fertigungsprüfung vor einer Nachbestellung.
 
 Publication note: the ZIP container omits macOS resource metadata. Gerber and drill payloads are unchanged; the checksum above describes the sanitized public archive.
+
+Die identische frühere [Software-Snapshot-Kopie des Exportarchivs](../../software/ruview/hardware/pcb-01/PCB-01-gerber-2026-08-06.zip) bleibt unverändert erhalten; die gepflegten KiCad-Quellen liegen in diesem Verzeichnis.

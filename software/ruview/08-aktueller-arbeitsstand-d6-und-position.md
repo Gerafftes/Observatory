@@ -1082,7 +1082,7 @@ Detailnachweis:
   Bestätigung `Raum leer`
 
 Detailnachweis:
-[results/2026-08-09_D6_setup-siegel-und-preflight.md](results/2026-08-09_D6_setup-siegel-und-preflight.md)
+[results/2026-08-09_D6_setup-siegel-und-preflight.md](../../experiment-reports/2026-08-09_D6_setup-siegel-und-preflight/README.md)
 
 ### 2026-08-09 — Sidecar-Fix, Neusiegelung und neuer Preflight
 
@@ -1106,7 +1106,7 @@ Detailnachweis:
   Bestätigung, dass der Raum vollständig ohne Person bleibt
 
 Detailnachweis:
-[results/2026-08-09_D6_sidecar-fix-neusiegelung-und-preflight.md](results/2026-08-09_D6_sidecar-fix-neusiegelung-und-preflight.md)
+[results/2026-08-09_D6_sidecar-fix-neusiegelung-und-preflight.md](../../experiment-reports/2026-08-09_D6_sidecar-fix-neusiegelung-und-preflight/README.md)
 
 ### 2026-08-09 — Neue 65-Sekunden-Leerraumkalibrierung bestanden
 
